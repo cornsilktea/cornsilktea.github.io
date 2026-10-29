@@ -557,7 +557,7 @@
 <script charset="utf-8" src="character-maker.js?v=20261026a"></script>
 <script charset="utf-8" src="match-kit.js?v=20261029c"></script>
 <script charset="utf-8" src="account-match-kit.js?v=20261029b"></script>
-<script charset="utf-8" src="24.turbo-lap-stats.js?v=20261028d"></script>
+<script charset="utf-8" src="24.turbo-lap-stats.js?v=20261029a"></script>
 <script>new CharacterMakerDialog(undefined, false);</script>
 <script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }</script>
 <script type="module">
@@ -5052,10 +5052,11 @@ function progText(prog) {
 function renderResult() {
   const r = BT.result || {};
   const rows = okeys(r).map(id => Object.assign({ id }, r[id])).sort((a, b) => (a.quit ? 1 : 0) - (b.quit ? 1 : 0) || rankCmp(a, b));
+  const finishes = rows.map(x => x.quit ? 0 : x.fin || 0);
   $("bDoneCourse").textContent = TRACKS[BT.course].name;
   setHtml($("bDoneRows"), rows.length ? rows.map((x, i) => '<tr><td>' + (i + 1) + "위</td><td>" +
     '<span class="sideDot" style="background:' + (SIDE_COLOR[x.team] || "#8A978C") + '"></span>' + escHtml(x.nick) + (x.id === BT.myId ? " (나)" : "") + "</td><td>" +
-    (x.quit ? '<em class="none">나감 · 패배</em>' : x.fin ? "<em>" + fmtTime(x.fin) + "</em>" : '<em class="none">미완주 · ' + progText(x.prog) + "</em>") + "</td></tr>").join("")
+    (x.quit ? '<em class="none">나감 · 패배</em>' : x.fin ? "<em>" + TurboLapClock.text(x.fin, finishes) + "</em>" : '<em class="none">미완주 · ' + progText(x.prog) + "</em>") + "</td></tr>").join("")
     : '<tr><td colspan="3">결과를 불러오는 중…</td></tr>');
   const mine = rows.findIndex(x => x.id === BT.myId);
   let msg = "";

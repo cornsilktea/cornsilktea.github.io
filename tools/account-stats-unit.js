@@ -7,7 +7,7 @@ const names = ["AccountNumbers", "AccountRates", "AccountMatchKey", "AccountKeyL
   "ZombiePlan", "ZombieCodec", "ZombieStatsMath", "ZombieProfile", "ZombieStatsView", "SnAccountPlan", "SnAccountCodec", "SnAccountMath", "SnAccountProfile", "SnAccountView", "SnReportBuilder",
   "WbAccountPlan", "WbAccountCodec", "WbAccountMath", "WbAccountProfile", "WbAccountView", "WbReportBuilder",
   "AccountClassRank", "RandomMatchPlan", "RandomMatchCodec", "RandomMatchMath", "RandomMatchProfile", "RandomMatchView",
-  "AccountPendingCodec", "AccountMatchSender", "AccountPendingGuard", "MkStreakMath", "TeamBattleRepairPlanner", "TeamBattleRepairNames"];
+  "AccountPendingCodec", "AccountMatchSender", "AccountPendingGuard", "MkStreakMath", "TeamBattleRepairPlanner", "TeamBattleRepairNames", "TurboLapClock"];
 const src = files.map((f) => fs.readFileSync(path.join(root, f), "utf8")).join("\n") + "\n;({" + names.join(",") + "})";
 const K = vm.runInNewContext(src, { console, Math, Set, Map, Array, Object, Number, String, JSON, isFinite, Date, Promise, window: {}, WbBalance: { RATE: 30 } });
 
@@ -357,6 +357,7 @@ const randomReport = (extra) => Object.assign({ matchId: "rm1", result: "win", r
   const rankPatch = K.AccountClassRank.patch("soccer", user, "2-5", { g: 3, w: 2, x: 0 });
   check("반별 순위 요약: 반 칸에 쓰고 미분류 칸은 지움", rankPatch["gameRanks/soccer/2-5/u1"].g === 3 && rankPatch["gameRanks/soccer/none/u1"] === null && K.AccountClassRank.classKey("3-1") === "none");
 }
+check("24번 결과 시간: 0.01초까지 같은 기록끼리만 0.001초까지", K.TurboLapClock.text(62341, [62341, 62348]) === "1:02.341" && K.TurboLapClock.text(62348, [62341, 62348]) === "1:02.348" && K.TurboLapClock.text(63000, [62341, 63000]) === "1:03.00" && K.TurboLapClock.text(65009, [65009, 65001, 70000]) === "1:05.009" && K.TurboLapClock.text(70000, [65009, 65001, 70000]) === "1:10.00" && K.TurboLapClock.text(62341, [62341, 0]) === "1:02.34");
 /* 30번 통계 정상화(2026-10-29): 다른 학생의 최근 매치에 남은 판으로 빠진 학생을 채운다 */
 (() => {
   const TEACHER = { uid: "use16pcii5RbEATuPtWhRDArmoj2" };

@@ -223,7 +223,7 @@ class TurboLapStatsView implements AccountDialogView<TurboLapStatsNode, TurboLap
     const order = entry.rows.map((row, index) => ({ row, index })).sort((a, b) => TurboLapStatsView.compare(a.row, b.row));
     const rows = order.map((item, place) => {
       const row = item.row;
-      const record = row.fin ? AccountHtml.clock(row.fin) : "미완주 · " + Math.round(row.prog * 100) + "%";
+      const record = row.fin ? TurboLapClock.text(row.fin, entry.rows.map((other) => other.fin)) : "미완주 · " + Math.round(row.prog * 100) + "%";
       const cells = [(place + 1) + "위", AccountHtml.esc(row.nick) + (item.index === entry.myIndex ? " (나)" : ""), record, AccountHtml.esc(this.carLabel(row.car))];
       return item.index === entry.myIndex ? cells.map((cell) => '<b class="asd-result-mine">' + cell + "</b>") : cells;
     });
@@ -346,5 +346,24 @@ class TurboLapVersusView {
   private rateLine(label: string, pair: TurboLapWinPair | null): string {
     if (!pair || !pair.g) return AccountHtml.esc(label) + " <em>기록 없음</em>";
     return AccountHtml.esc(label) + " <em>" + Math.round(pair.w / pair.g * 100) + "%</em> <small>" + pair.w + "승 " + (pair.g - pair.w) + "패</small>";
+  }
+}
+
+/* 결과표의 완주 시간: 보통은 0.01초까지, 0.01초까지 같은 완주 기록이 둘 이상이면 그 기록들만 0.001초까지(2026-10-29 선생님 요청).
+   순위는 원래 0.001초 단위로 정해지는데 화면이 같은 시간으로 보여 왜 졌는지 알 수 없었다. 게임 결과 화면과 최근 매치 결과 창이 함께 쓴다 */
+class TurboLapClock {
+  static text(ms: number, allFinishes: number[]): string {
+    return TurboLapClock.tied(ms, allFinishes) ? TurboLapClock.millis(ms) : AccountHtml.clock(ms);
+  }
+
+  static tied(ms: number, allFinishes: number[]): boolean {
+    const shown = AccountHtml.clock(ms);
+    return allFinishes.filter((other) => other > 0 && AccountHtml.clock(other) === shown).length > 1;
+  }
+
+  static millis(ms: number): string {
+    const whole = Math.max(0, Math.round(ms));
+    const seconds = Math.floor(whole % 60000 / 1000);
+    return Math.floor(whole / 60000) + ":" + (seconds < 10 ? "0" : "") + seconds + "." + String(whole % 1000).padStart(3, "0");
   }
 }
