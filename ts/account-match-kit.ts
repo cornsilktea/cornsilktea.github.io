@@ -963,6 +963,11 @@ class AccountGameAccount<R, P extends AccountMatchPlanBase, N, E extends Account
     this.sender.record(report, null);
   }
 
+  /* 결과를 잠시 기다렸다 쓰는 게임(24·25)이 판이 끝난 순간 부른다. 기다리는 사이 화면이 닫혀도 이 결과로 정산된다(2026-10-29) */
+  stash(report: R): void {
+    this.sender.stash(report);
+  }
+
   pendingGuard(buildForfeit: (ticket: MkTicket) => R | null): MkMatchGuard {
     return new AccountPendingGuard<R, P, N, E, null>(this.sender, buildForfeit);
   }

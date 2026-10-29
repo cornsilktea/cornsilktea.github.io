@@ -474,6 +474,14 @@ const pendingChecks = (async () => {
   check("30번 끝난 직후 화면이 닫힘: 진짜 결과(승·MVP)로 정산, pending 지움, 규칙 통과",
     !closed.at("users/u1/pending/teambattle") && closedRecent[0] && closedRecent[0].r === 1 && closedStats.w === 1 && closedStats.m === 1 && closedStats.c.warrior.k === 3 && closedRule.errors.length === 0, [closedStats, closedRule.errors]);
 
+  const turboClosed = new LiveDb();
+  const turboSender = new K.AccountMatchSender(() => new K.AccountMatchStore(turboClosed, pendingUser, new K.TurboLapProfile()));
+  turboSender.arm(turboReport({ result: "lose" }));
+  turboSender.stash(turboReport());
+  await new Promise((r) => setTimeout(r, 20));
+  await new K.AccountMatchStore(turboClosed, pendingUser, new K.TurboLapProfile()).settlePending();
+  check("24번 끝난 직후 화면이 닫힘: 미리 적은 패배 대신 진짜 승리로 정산", !turboClosed.at("users/u1/pending/turbolap") && turboClosed.at("users/u1/stats/turbolap").w === 1 && turboClosed.at("users/u1/stats/turbolap").l === 0, turboClosed.at("users/u1/stats/turbolap"));
+
   const ordered = new LiveDb();
   const tbSender = new K.AccountMatchSender(() => new K.AccountStatsStore(ordered, pendingUser));
   tbSender.arm(leftReport);

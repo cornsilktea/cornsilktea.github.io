@@ -470,7 +470,7 @@
 <script charset="utf-8" src="character-kit.js?v=20261011"></script>
 <script charset="utf-8" src="character-maker.js?v=20261026a"></script>
 <script charset="utf-8" src="match-kit.js?v=20261028c"></script>
-<script charset="utf-8" src="account-match-kit.js?v=20261029a"></script>
+<script charset="utf-8" src="account-match-kit.js?v=20261029b"></script>
 <script charset="utf-8" src="25.fps-survival-stats.js?v=20261027b"></script>
 <script>new CharacterMakerDialog(undefined, false);</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
@@ -2745,7 +2745,8 @@ class FpsMatchReporter {
     return { matchId: this.matchId(), myIndex: ids.indexOf(T.myId), players: ids.map(id => this.playerLine(id, iLeft)), score: [b, r],
       winnerTeam: winner === "blue" ? 0 : winner === "red" ? 1 : -1, progress: iLeft ? AccountForfeit.progressOnLeave(!!fpsRandom.ticket(), fpsRandom.progress()) : 1, iLeft };
   }
-  ended(match) { setTimeout(() => { if (T.match === match) this.recordEnded(); }, FpsMatchReporter.SETTLE_MS); }
+  ended(match) { this.stashEnded(); setTimeout(() => { if (T.match === match) this.recordEnded(); }, FpsMatchReporter.SETTLE_MS); }
+  stashEnded() { if (T.ref && T.me && !T.spec && T.match && T.match.shownEnd) this.account.stash(this.report(false)); }
   recordEnded() { if (T.ref && T.me && !T.spec && T.match && T.match.shownEnd) this.account.record(this.report(false)); }
   forfeitApplies() { return !!T.ref && !!T.me && !T.spec && T.status === "playing" && (!!fpsRandom.ticket() || fpsRandom.progress() >= AccountForfeit.AT); }
   leaving() { if (this.forfeitApplies()) this.account.record(this.report(true)); }

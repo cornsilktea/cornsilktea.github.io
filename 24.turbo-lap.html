@@ -556,7 +556,7 @@
 <script charset="utf-8" src="character-kit.js?v=20261011"></script>
 <script charset="utf-8" src="character-maker.js?v=20261026a"></script>
 <script charset="utf-8" src="match-kit.js?v=20261028c"></script>
-<script charset="utf-8" src="account-match-kit.js?v=20261029a"></script>
+<script charset="utf-8" src="account-match-kit.js?v=20261029b"></script>
 <script charset="utf-8" src="24.turbo-lap-stats.js?v=20261028d"></script>
 <script>new CharacterMakerDialog(undefined, false);</script>
 <script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }</script>
@@ -5725,13 +5725,18 @@ class TurboRandomMatch {
     if (!rows.length || BT.status !== "ended") return;
     if (this.settleFor !== ticket.matchId) {
       this.settleFor = ticket.matchId;
+      this.account.stash(this.accountReport(ticket, rows, this.resultOf(rows, quitWinner, ticket)));
       setTimeout(() => { this.settledFor = ticket.matchId; if (cardNow === "bdone") renderResult(); }, TurboRandomMatch.SETTLE_MS);
       return;
     }
     if (this.settledFor !== ticket.matchId) return;
-    const winner = quitWinner || (rows[0].fin ? rows[0] : null), mine = SIDES[ticket.side], result = !winner ? "draw" : winner.team === mine ? "win" : "lose";
+    const mine = SIDES[ticket.side], result = this.resultOf(rows, quitWinner, ticket);
     this.record(this.accountReport(ticket, rows, result));
     this.flow.matchEnded({ result, rivals: this.resultRivals(rows, mine) }, () => { $("bDoneHint").textContent = this.flow.endHint(); });
+  }
+  resultOf(rows, quitWinner, ticket) {
+    const winner = quitWinner || (rows[0].fin ? rows[0] : null);
+    return !winner ? "draw" : winner.team === SIDES[ticket.side] ? "win" : "lose";
   }
   record(report) {
     TurboRecentCourses.note(report.course);
