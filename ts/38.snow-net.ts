@@ -1,4 +1,4 @@
-interface SnPlayerRecord extends RkPlayerRecord {}
+interface SnPlayerRecord extends RkPlayerRecord { vs?: SnVersusCard }
 interface SnMatchRecord { id: number; seed: number; mode: SnMode; teams: SnRosterTeam[]; startAt: number }
 interface SnEventBatch { s: number; b: Array<[number, SnEvent[]]> }
 interface SnEndRecord { match: number; ranks: number[]; stats: number[][]; at: number }
@@ -13,7 +13,7 @@ class SnRoomRules {
   static readonly SEATS = 6;
   static readonly SPECTATOR_SLOT = 9;
   static readonly RULES: RkRoomRules = { root: SnRoomRules.ROOT, seatCount: SnRoomRules.SEATS, spectatorSlot: SnRoomRules.SPECTATOR_SLOT, seatOrder: [0, 2, 4, 1, 3, 5], spectatorLimit: 12 };
-  static readonly VALUES: readonly string[] = ["mode", "match", "snap", "wall", "loot", "snowmap", "ev", "end"];
+  static readonly VALUES: readonly string[] = ["mode", "match", "snap", "wall", "loot", "snowmap", "ev", "end", "vsAt"];
   static readonly SEND_MS = 100;
   static readonly KEEPALIVE_MS = 1000;
   static readonly SNOWMAP_MS = 5000;
