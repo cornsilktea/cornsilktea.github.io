@@ -1,15 +1,16 @@
 const fs = require("fs"), vm = require("vm"), path = require("path");
 const root = path.join(__dirname, "..");
-const files = ["match-kit.js", "account-match-kit.js", "account-stats.js", "24.turbo-lap-stats.js", "25.fps-survival-stats.js", "31.zombie-outbreak-stats.js", "38.snow-account.js", "39.balloon-account.js", "teambattle-stats-repair.js", "teambattle-mvp-lab.js"];
+const files = ["match-kit.js", "account-match-kit.js", "account-stats.js", "24.turbo-lap-stats.js", "25.fps-survival-stats.js", "31.zombie-outbreak-stats.js", "38.snow-account.js", "39.balloon-account.js", "teambattle-stats-repair.js", "teambattle-mvp-lab.js", "teambattle-mvp-rescore.js", "patch-notes.js"];
 const names = ["AccountNumbers", "AccountRates", "AccountMatchKey", "AccountKeyLedger", "AccountForfeit", "AccountShape", "AccountRecentHeadCodec", "RecentMatchRing", "AccountLoginNotice", "RecentBlockList", "AccountGameProfile", "AccountMatchStore",
   "TeamBattleRates", "AccountMvpJudge", "TeamBattlePlan", "TeamBattleCodec", "TeamBattleRing", "AccountStatsMath", "AccountStatsTable", "ClassStatsSummary", "TeamBattleProfile", "AccountStatsStore",
   "TurboLapPlan", "TurboLapCodec", "TurboLapStatsMath", "TurboLapProfile", "TurboLapStatsView", "FpsPlan", "FpsCodec", "FpsStatsMath", "FpsProfile", "FpsStatsView",
   "ZombiePlan", "ZombieCodec", "ZombieStatsMath", "ZombieProfile", "ZombieStatsView", "SnAccountPlan", "SnAccountCodec", "SnAccountMath", "SnAccountProfile", "SnAccountView", "SnReportBuilder",
   "WbAccountPlan", "WbAccountCodec", "WbAccountMath", "WbAccountProfile", "WbAccountView", "WbReportBuilder",
   "AccountClassRank", "RandomMatchPlan", "RandomMatchCodec", "RandomMatchMath", "RandomMatchProfile", "RandomMatchView",
-  "AccountPendingCodec", "AccountMatchSender", "AccountPendingGuard", "MkStreakMath", "TeamBattleRepairPlanner", "TeamBattleRepairNames", "TurboLapClock", "MvpLabCollector", "MvpLabAudit", "MvpLabBackup", "MvpLabStats", "MvpWeightFitter", "MvpFormulaReport", "CurrentMvpFormula", "TeamShareMvpFormula", "MvpLabMatch", "TeamBattleScore", "MvpLabWeightSet"];
+  "AccountPendingCodec", "AccountMatchSender", "AccountPendingGuard", "MkStreakMath", "TeamBattleRepairPlanner", "TeamBattleRepairNames", "TurboLapClock", "MvpLabCollector", "MvpLabAudit", "MvpLabBackup", "MvpLabStats", "MvpWeightFitter", "MvpFormulaReport", "CurrentMvpFormula", "TeamShareMvpFormula", "MvpLabMatch", "TeamBattleScore", "MvpLabWeightSet", "LegacyTeamBattleScore", "MvpRescorePlan", "MvpRescoreStudent", "MvpRescorePatchStats", "PatchNoteCodec", "PatchNoteSeen"];
 const src = files.map((f) => fs.readFileSync(path.join(root, f), "utf8")).join("\n") + "\n;({" + names.join(",") + "})";
-const K = vm.runInNewContext(src, { console, Math, Set, Map, Array, Object, Number, String, JSON, isFinite, Date, Promise, window: {}, WbBalance: { RATE: 30 } });
+const fakeStorage = { data: {}, getItem(k) { return this.data[k] === undefined ? null : this.data[k]; }, setItem(k, v) { this.data[k] = String(v); } };
+const K = vm.runInNewContext(src, { localStorage: fakeStorage, console, Math, Set, Map, Array, Object, Number, String, JSON, isFinite, Date, Promise, window: {}, WbBalance: { RATE: 30 } });
 
 let passed = 0;
 const failures = [];
@@ -408,6 +409,40 @@ check("24번 결과 시간: 0.01초까지 같은 기록끼리만 0.001초까지"
   RuleChecker.validate(RULES.recent.teambattle, { 0: patch["users/uc/recent/teambattle/0"] }, {}, {}, "recent/teambattle", studentErrors);
   check("정상화 규칙: 학생 계정은 여전히 판 수 건너뛰기·옛 시각 쓰기 거부", studentErrors.length >= 2, studentErrors);
 })();
+/* 30번 MVP 점수 v3 다시 계산(2026-10-29): 결과표가 다 남은 학생만 새 식으로 MVP 수·평균 점수를 처음부터 다시 센다 */
+(() => {
+  const TEACHER = { uid: "use16pcii5RbEATuPtWhRDArmoj2" };
+  const user = (name, cls, extra) => Object.assign({ profile: { name, cls } }, extra || {});
+  const lines = players({ 0: { kills: 4, dmg: 900, assists: 3 }, 1: { kills: 1, dmg: 300, heal: 1000, assists: 2 }, 3: { kills: 1, dmg: 400 } });
+  const base = report({ players: lines });
+  const oldWinners = new K.AccountMvpJudge((l) => K.LegacyTeamBattleScore.of(l)).winners(lines), newWinners = new K.AccountMvpJudge((l) => K.TeamBattleScore.of(l)).winners(lines);
+  check("MVP v3: 회복 1000 의 나는 옛 식 MVP, 새 식에서는 처치 4·어시스트 3 의 가가 MVP", oldWinners.join() === "1" && newWinners.join() === "0", [oldWinners, newWinners]);
+  const stored = (me, id, at) => Object.assign(JSON.parse(JSON.stringify(K.TeamBattleCodec.encode(Object.assign({}, base, { myIndex: me }), id, true))), { at });
+  const oldScore = K.LegacyTeamBattleScore.of(lines[1]);
+  const knightNode = { n: 2, w: 2, bg: 2, bw: 2, rg: 0, rw: 0, m: 2, kn: 2, k: 1, d: 0, a: 2, dmg: 300, hl: 1000, bl: 0, st: 0, sl: 0, scn: 2, sc: oldScore };
+  const users = {
+    ub: user("20102 나", "2-1", { recent: { teambattle: { 0: stored(1, "m1", 1000), 1: stored(1, "m2", 2000) } }, stats: { teambattle: { g: 2, w: 2, l: 0, bg: 2, bw: 2, rg: 0, rw: 0, m: 2, ids: { m1: 1000, m2: 2000 }, c: { knight: knightNode } } } }),
+    uc: user("20103 다", "2-1", { recent: { teambattle: { 0: stored(1, "m1", 1000) } }, stats: { teambattle: { g: 2, w: 2, l: 0, bg: 2, bw: 2, rg: 0, rw: 0, m: 2, c: { knight: knightNode } } } })
+  };
+  const v2 = { matches: 3, red: 1, blue: 2, druid: { picks: 3, wins: 1, kills: 1, deaths: 2, assist: 4, dmg: 300, heal: 1000, block: 0, stun: 0, mvp: 1400 + 40 * 5, mvpPicks: 3, kdPicks: 3 } };
+  const plan = new K.MvpRescorePlan(users, v2, null);
+  const b = plan.students.find((x) => x.uid === "ub"), c = plan.students.find((x) => x.uid === "uc");
+  check("MVP v3: 결과표가 다 있는 학생은 MVP 2→0, 캐릭터 평균 점수는 새 식, scn = 판 수", b.changed && b.node.m === 0 && b.node.c.knight.m === 0 && b.node.c.knight.scn === 2 && b.node.c.knight.sc === K.TeamBattleScore.of(lines[1]), b.node);
+  check("MVP v3: 결과표가 빠진 학생은 건드리지 않고 이유를 보임", !c.changed && /1판만/.test(c.skipReason), c.skipReason);
+  const again = new K.MvpRescorePlan(Object.assign({}, users, { ub: Object.assign({}, users.ub, { stats: { teambattle: b.node } }) }), v2, 123);
+  check("MVP v3: 두 번 눌러도 같은 값(이미 고친 학생은 바뀔 것 없음), 전체 통계는 한 번만", !again.students.find((x) => x.uid === "ub").changed && again.patchRows.length === 0);
+  const row = plan.patchRows[0];
+  check("MVP v3: 전체 통계 v2 — 옛 평균에서 둔화 몫(5초)을 거꾸로 구해 새 식으로", row.char === "druid" && Math.abs(row.after - (100 - 200 + 4 * 80 + 300 + 700 + 5 * 20)) < 0.01, row);
+  const patch = plan.patch(777);
+  check("MVP v3: PATCH 에 학생 통계·반 별 통계·v2 평균·한 번만 표시", patch["users/ub/stats/teambattle"].m === 0 && patch["classStats/2-1/ub"].m === 0 && patch["teambattle/patchstats/v2/druid/mvp"] === row.after && patch["portal/migrations/teambattleMvpV3/v2At"] === 777 && !patch["users/uc/stats/teambattle"]);
+  const errors = [];
+  RuleChecker.validate(RULES.stats.teambattle, b.node, users.ub.stats.teambattle, { auth: TEACHER }, "stats/teambattle", errors);
+  check("MVP v3 규칙: 선생님 계정은 MVP 수를 줄여 쓸 수 있음", errors.length === 0, errors);
+  check("패치노트: 내용이 없으면 무시, 제목·내용 다듬기", K.PatchNoteCodec.decode({ id: 1, body: "  " }) === null && K.PatchNoteCodec.make(" 제목 ", "가\r\n나 ", 5, 6).body === "가\n나" && K.PatchNoteCodec.decode({ id: 5, title: "t", body: "b" }).at === 5 && K.PatchNoteCodec.path("teambattle") === "portal/patchNotes/teambattle");
+  const seen = new K.PatchNoteSeen("teambattle");
+  seen.mark("u1", 10);
+  check("패치노트: 본 기록은 계정·게시 번호별", seen.has("u1", 10) && !seen.has("u1", 11) && !seen.has("u2", 10) && !new K.PatchNoteSeen("other").has("u1", 10));
+})();
 /* 30번 MVP 공식 비교(2026-10-29): 결과표를 판 하나로 묶고, 공식별 점수·MVP·점검을 계산한다(읽기만) */
 (() => {
   const user = (name, cls, extra) => Object.assign({ profile: { name, cls } }, extra || {});
@@ -428,8 +463,8 @@ check("24번 결과 시간: 0.01초까지 같은 기록끼리만 0.001초까지"
   check("MVP 비교: 팀 비중 — 처치·피해를 다 한 가가 같은 팀 다보다 높음", share.score(m.players[0], m, 0) > share.score(m.players[2], m, 0) && share.score(m.players[2], m, 0) === 0, m.players.map((l) => share.score(l, m, 0)));
   const rep = new K.MvpFormulaReport(current, lab.matches, 0);
   check("MVP 비교: 보고서 — MVP 가 이긴 팀, 캐릭터별 판 수", rep.winnerMvpRate === 1 && rep.chars.warrior.games === 1 && rep.chars.warrior.mvp === 1, rep);
-  const rw = K.MvpLabWeightSet.REWEIGHTED;
-  check("MVP 비교: 가중치 조정안(2026-10-29) — 어시스트 80·회복 0.7·기절 40·둔화 20, 나머지는 지금 식", rw.kill === 100 && rw.assist === 80 && rw.death === 100 && rw.dmg === 1 && rw.heal === 0.7 && rw.blocked === 1 && rw.stunSec === 40 && rw.slowSec === 20, rw);
+  const cw = K.MvpLabWeightSet.CURRENT, lw = K.MvpLabWeightSet.LEGACY;
+  check("MVP 점수 v3(2026-10-29): 어시스트 80·회복 0.7·기절 40·둔화 20, 옛 식은 50·1·60·40", cw.kill === 100 && cw.assist === 80 && cw.death === 100 && cw.dmg === 1 && cw.heal === 0.7 && cw.blocked === 1 && cw.stunSec === 40 && cw.slowSec === 20 && lw.assist === 50 && lw.heal === 1 && lw.stunSec === 60 && lw.slowSec === 40, [cw, lw]);
   check("MVP 비교: 상관 계산", Math.abs(K.MvpLabStats.pearson([1, 2, 3, 4], [2, 4, 6, 8]) - 1) < 1e-9 && K.MvpLabStats.pearson([1, 2], [1, 2]) === null);
   const fake = [];
   for (let i = 0; i < 40; i++) {

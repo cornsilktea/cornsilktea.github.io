@@ -5192,7 +5192,7 @@ class AstrologerTests {
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "900 을 겨냥해도 " + C.range + " 에 떨어짐");
     });
     run(G, "점성술사 기본 공격: 조준 없이 쓰면 가장 가까운 적 위치에 떨어지는가", function (done) {
-      var bad = [], W = self.astroWorld([{ id: "near", x: 200 + 250 }, { id: "far", x: 200 + 360 }]), as = W.ent("as");
+      var bad = [], W = self.astroWorld([{ id: "near", x: 200 + 250 }, { id: "far", x: 200 + 250 + ULT.sfR + 80 }]), as = W.ent("as");
       api.fireBasic(as, 0);
       W.step(ULT.sfDelay + 300);
       if (self.lost(W, "near") !== C.dmg) bad.push("가까운 적 피해 " + self.lost(W, "near"));

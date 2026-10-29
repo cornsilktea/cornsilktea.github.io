@@ -89,10 +89,18 @@ class MvpFormula {
 }
 class CurrentMvpFormula extends MvpFormula {
     constructor() {
-        super("지금 식", MvpLabText.weights(MvpLabWeightSet.CURRENT));
+        super("지금 식(v3)", MvpLabText.weights(MvpLabWeightSet.CURRENT));
     }
     raw(line) {
         return TeamBattleScore.of(line);
+    }
+}
+class LegacyMvpFormula extends MvpFormula {
+    constructor() {
+        super("옛 식(v2 까지)", MvpLabText.weights(MvpLabWeightSet.LEGACY));
+    }
+    raw(line) {
+        return LegacyTeamBattleScore.of(line);
     }
 }
 class WeightedMvpFormula extends MvpFormula {
@@ -135,10 +143,12 @@ TeamShareMvpFormula.SCALE = 10;
 class MvpLabWeightSet {
 }
 MvpLabWeightSet.CURRENT = {
-    kill: TeamBattleScore.KILL, assist: TeamBattleScore.ASSIST, death: TeamBattleScore.DEATH, dmg: 1, heal: 1, blocked: 1,
+    kill: TeamBattleScore.KILL, assist: TeamBattleScore.ASSIST, death: TeamBattleScore.DEATH, dmg: 1, heal: TeamBattleScore.HEAL, blocked: 1,
     stunSec: TeamBattleScore.STUN_PER_SEC, slowSec: TeamBattleScore.SLOW_PER_SEC
 };
-MvpLabWeightSet.REWEIGHTED = Object.assign({}, MvpLabWeightSet.CURRENT, { assist: 80, heal: 0.7, stunSec: 40, slowSec: 20 });
+MvpLabWeightSet.LEGACY = Object.assign({}, MvpLabWeightSet.CURRENT, {
+    assist: LegacyTeamBattleScore.ASSIST, heal: 1, stunSec: LegacyTeamBattleScore.STUN_PER_SEC, slowSec: LegacyTeamBattleScore.SLOW_PER_SEC
+});
 /* 팀 처치 차이(블루 − 레드)를 피해·회복·막은 피해·기절·둔화의 팀 합계 차이로 설명하는 능형 회귀.
    승패는 처치 수로 정해지므로(MatchFlow.hostJudge) 승패 대신 처치 차이를 쓴다. 계수(처치 몇 개 분량)에 처치 점수 100 을 곱해 1당 점수로 바꾸고,
    음수(데이터가 적어 생긴 흔들림)는 0 으로 둔다. 처치·어시스트·쓰러짐 점수는 지금 식 그대로 */
@@ -396,7 +406,7 @@ class MvpLabPanel {
         const fit = MvpWeightFitter.fit(matches);
         const list = [
             new CurrentMvpFormula(),
-            new WeightedMvpFormula("가중치 조정", MvpLabWeightSet.REWEIGHTED, "")
+            new LegacyMvpFormula()
         ];
         if (fit)
             list.push(new WeightedMvpFormula("승리 기여도 가중치", fit.weights, " (결과표 " + fit.matches + "판으로 계산, 설명력 R² " + fit.rSquared.toFixed(2) + ")"));

@@ -230,7 +230,7 @@
       <li>내 계정으로 AI 없이 치른 대회모드 경기만 집계합니다(랜덤 매칭 포함).</li>
       <li>경기가 절반 넘게 진행된 뒤 나가면 패배로 세고, 절반 전에 나간 경기는 세지 않습니다.</li>
       <li>MVP는 결과 화면의 환산점수가 가장 높은 사람이고, 점수가 같으면 모두 MVP로 셉니다. 중간에 나간 사람은 MVP가 될 수 없습니다.</li>
-      <li>평균 MVP 점수는 결과 화면 환산점수의 평균이며, 2026년 10월 28일 이후 경기부터 셉니다.</li>
+      <li>평균 MVP 점수는 결과 화면 환산점수의 평균입니다. 2026년 10월 29일 v3 패치에서 바뀐 계산식으로 지난 경기도 다시 계산했습니다.</li>
     </ul>
   </div>
 </div>
@@ -282,7 +282,8 @@
 <script charset="utf-8" src="character-maker.js?v=20261026a"></script>
 <script>new CharacterMakerDialog(undefined, false);</script>
 <script charset="utf-8" src="account-match-kit.js?v=20261029b"></script>
-<script charset="utf-8" src="account-stats.js?v=20261029a"></script>
+<script charset="utf-8" src="account-stats.js?v=20261029c"></script>
+<script charset="utf-8" src="patch-notes.js?v=20261029a"></script>
 <script type="module">
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
@@ -1703,7 +1704,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     static MODE = "cup";
     static LIST = [
       { id: "v1", path: "teambattle/modestats/cup" },
-      { id: "v2", path: "teambattle/patchstats/v2" }
+      { id: "v2", path: "teambattle/patchstats/v2" },
+      { id: "v3", path: "teambattle/patchstats/v3" }
     ];
     static get current() { return StatsPatches.LIST[StatsPatches.LIST.length - 1]; }
     static of(id) { return StatsPatches.LIST.find(function (p) { return p.id === id; }) || StatsPatches.current; }
@@ -2411,7 +2413,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     static MELEE = { color: 0xFF9A3C, spark: "#FF9A3C" };
     static MODEL = { file: "Barbarian", right: "axe_1handed" };
     static ULT = {
-      bzDur: GameTime.gameMs(6), bzDmgMul: 1.5, bzCdMul: 1 / 1.5, bzHeal: 20
+      bzDur: GameTime.gameMs(6), bzDmgMul: 1.6, bzCdMul: 1 / 1.6, bzHeal: 20
     };
     static STATS = { name: "광전사", role: "fighter", icon: "🪓", hp: 240, speed: GameTime.gameSpeed(155), ultSpeed: GameTime.gameSpeed(210), cd: GameTime.gameMs(1.4), dmg: 30, range: 110, arc: Math.PI * 0.55,
                rally: { hpRate: 0.5, ms: GameTime.gameMs(7), perSec: 7 }, ultName: "광폭화", heals: true };
@@ -2446,7 +2448,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     static ULT = {
       rmDur: GameTime.gameMs(4), rmRate: 1000 / GameTime.gameMs(0.5), rmDashMs: GameTime.gameMs(0.4), rmDashRange: 100
     };
-    static STATS = { name: "결투가", role: "assassin", icon: "🤺", hp: 145, speed: GameTime.gameSpeed(175), cd: GameTime.gameMs(1), dmg: 40, range: 100,
+    static STATS = { name: "결투가", role: "assassin", icon: "🤺", hp: 130, speed: GameTime.gameSpeed(175), cd: GameTime.gameMs(1), dmg: 40, range: 100,
                dashRange: 250, dashMs: GameTime.gameMs(0.5), stab: true, selfHeal: 10, ultName: "르미즈", heals: true };
     get botRole() { return "flank"; }
     isRiposting(E, t) { return E.buffUntil > t; }
@@ -2544,7 +2546,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     static MODEL = { file: "Mage", portraitPlant: true, right: "staff", recolor: [[1, 0, 2, "#D8342E", "#6A0E10"], [1, 7, 1, "#4A1012", "#1E0507"], [1, 2, 1, "#FF9A3A", "#C8401A"], [2, 1, 1, "#FF9A3A", "#C8401A"]],
                rightRecolor: [[2, 6, 1, "#FFD27A", "#E0341E"]] };
     static ULT = {
-      mbDelay: GameTime.gameMs(1.5), mbR: 250, mbDmg: 100, mbDmgMin: 65, mbCast: 550, mbMin: 60, mbStunMs: GameTime.gameMs(1.7),
+      mbDelay: GameTime.gameMs(1), mbR: 250, mbDmg: 110, mbDmgMin: 75, mbCast: 550, mbMin: 60, mbStunMs: GameTime.gameMs(1.7),
       mbStunMin: GameTime.gameMs(0.9), mbSteps: 5
     };
     static STATS = { name: "화염술사", role: "caster", icon: "🔥", hp: 115, speed: GameTime.gameSpeed(170), cd: GameTime.gameMs(1.4), dmg: 5, range: 350, pSpeed: 700, pr: 9, burn: { ms: GameTime.gameMs(6), maxHpRate: 0.025 }, ultName: "메테오", ultAim: true };
@@ -2594,7 +2596,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     static ULT = {
       asSmokeMs: 400, asDur: GameTime.gameMs(21)
     };
-    static STATS = { name: "은신자", role: "assassin", icon: "🗡️", hp: 150, speed: GameTime.gameSpeed(175), ultSpeed: GameTime.gameSpeed(280), cd: GameTime.gameMs(1.1), dmg: 32, range: 110, arc: Math.PI * 0.6, hits: 2, hitGap: 160, ambushDmg: 45, throwDmg: 25, throwRange: 350, pSpeed: 1080, pr: 8, ultName: "은신" };
+    static STATS = { name: "은신자", role: "assassin", icon: "🗡️", hp: 140, speed: GameTime.gameSpeed(175), ultSpeed: GameTime.gameSpeed(280), cd: GameTime.gameMs(1.1), dmg: 32, range: 110, arc: Math.PI * 0.6, hits: 2, hitGap: 160, ambushDmg: 45, throwDmg: 25, throwRange: 350, pSpeed: 1080, pr: 8, ultName: "은신" };
     skillSpeed(E, t) { return E.stealthUntil > t ? this.data.ultSpeed : null; }
     ambush(E, t) { var services = this.services;
       if (E.stealthUntil <= t) return null;
@@ -2709,10 +2711,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   class ThrowerType extends CharacterType {
     static MODEL = { file: "Skeleton_Rogue", right: "Potion_1", rightScale: 2.2 };
     static ULT = {
-      plFlight: 700, plFlightMin: 100, plR: 60, plDur: GameTime.gameMs(2.5), plTick: GameTime.gameMs(1), plMax: 4, plFade: 500, plLob: 90, plGauge: 1,
+      plFlight: 700, plFlightMin: 100, plR: 70, plDur: GameTime.gameMs(2.5), plTick: GameTime.gameMs(1), plMax: 4, plFade: 500, plLob: 90, plGauge: 1,
       fgR: 150, fgDur: GameTime.gameMs(6), fgDmg: 15, fgHeal: 5, fgSlowMul: 0.6, fgSlowMs: 400, fgCast: ArenaSize.KEY * 4 + 100, fgRefund: 1
     };
-    static STATS = { name: "투척병", role: "shooter", icon: "🧪", hp: 120, speed: GameTime.gameSpeed(145), cd: GameTime.gameMs(1.4), dmg: 15, ticks: 3, range: ArenaSize.KEY * 4 + 120, minRange: ArenaSize.KEY * 1, healCut: true, ultName: "독안개", ultAim: true, heals: true };
+    static STATS = { name: "투척병", role: "shooter", icon: "🧪", hp: 120, speed: GameTime.gameSpeed(145), cd: GameTime.gameMs(1.4), dmg: 18, ticks: 3, range: ArenaSize.KEY * 4 + 120, minRange: ArenaSize.KEY * 1, healCut: true, ultName: "독안개", ultAim: true, heals: true };
     showAimGuide(E, ult, c) { var services = this.services; services.aimGuide.showAimCircle(services.input.aimReach(E, services.input.aim.btn), ult ? ThrowerType.ULT.fgR : ThrowerType.ULT.plR); return true; }
     aimRange(btn) { return [ThrowerType.STATS.minRange, btn === "ult" ? ThrowerType.ULT.fgCast : ThrowerType.STATS.range]; }
     overrideBasic(E, ang, reach, t) { var services = this.services; services.fieldFx.throwPoison(E, ang, reach, false); return true; }
@@ -2784,7 +2786,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       bsLeapMinMs: GameTime.gameMs(0.3), bsLeapMaxMs: GameTime.gameMs(1.5), bsR: 200, bsDmg: 45, bsStunMs: GameTime.gameMs(1.5), bsCast: 450, bsMin: 60,
       bsHop: 45
     };
-    static STATS = { name: "대장장이", role: "fighter", icon: "🔨", hp: 445, speed: GameTime.gameSpeed(150), cd: GameTime.gameMs(1.8), dmg: 30, range: 180, width: 150, windup: GameTime.gameMs(0.5), fx: { stunMs: GameTime.gameMs(0.7) }, ultName: "내려찍기", ultAim: true };
+    static STATS = { name: "대장장이", role: "fighter", icon: "🔨", hp: 445, speed: GameTime.gameSpeed(150), cd: GameTime.gameMs(1.8), dmg: 30, range: 180, width: 150, windup: GameTime.gameMs(0.5), fx: { stunMs: GameTime.gameMs(0.5) }, ultName: "내려찍기", ultAim: true };
     get hidesBasicEdge() { return true; }
     isHammerLeaping(E, t) { return E.ultUntil > t; }
     isRooted(E, t) { return this.isHammerLeaping(E, t); }
@@ -2871,7 +2873,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
                rightRecolor: [[1, 5, 1, "#4A4258", "#141019"], [1, 6, 1, "#3A3446", "#0E0C12"], [0, 2, 1, "#4A4258", "#141019"], [0, 3, 1, "#3A3446", "#0E0C12"], [0, 4, 1, "#D0303A", "#6A0E14"]],
                leftRecolor: [[1, 5, 1, "#4A4258", "#141019"], [1, 6, 1, "#3A3446", "#0E0C12"], [0, 2, 1, "#4A4258", "#141019"], [0, 3, 1, "#3A3446", "#0E0C12"], [0, 4, 1, "#D0303A", "#6A0E14"]] };
     static ULT = {
-      dmR: 400, dmGrowMs: GameTime.gameMs(2), dmDur: GameTime.gameMs(8), dmStunMs: GameTime.gameMs(1), dmBoltDmg: 20, dmStrikeMaxHpRate: 0.2,
+      dmR: 400, dmGrowMs: GameTime.gameMs(2), dmDur: GameTime.gameMs(8), dmStunMs: GameTime.gameMs(1), dmBoltDmg: 20, dmStrikeMaxHpRate: 0.22,
       dmStrikeStunMs: GameTime.gameMs(0.7), dmStunGraceMs: 40, cuStacks: 3, cuBoomDmg: 30, cuBoomMs: 500, cuExpireMs: GameTime.gameMs(4)
     };
     static STATS = { name: "주술사", role: "shooter", icon: "👊", hp: 115, speed: GameTime.gameSpeed(160), cd: GameTime.gameMs(1.3), dmg: 5, range: 400, width: 100, ultName: "영역전개" };
@@ -2884,6 +2886,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return true;
     }
     afterStrike(T, d) { var services = this.services; services.domainFx.applyCurse(T, d.owner, services.clock.now()); }
+    showAimGuide(E, ult, c) { var services = this.services; return !ult && !!services.domainFx.activeDomainOf(E, services.clock.now()); }
     botUltRange() { return ShamanType.ULT.dmR * 0.7; }
     wantsBasicNow(B, t) { var services = this.services; return t >= B.cdUntil && !!services.domainFx.domainStrikeTarget(B, t); }
     get hasSkillClip() { return true; }
@@ -2964,7 +2967,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     static ULT = {
       exRange: 600, exSpeed: 1300, exPr: 4, exDmg: 35, exStunMs: GameTime.gameMs(1.5)
     };
-    static STATS = { name: "자객", role: "assassin", icon: "🔪", hp: 145, speed: GameTime.gameSpeed(175), cd: GameTime.gameMs(1.3), dmg: 40, range: 100,
+    static STATS = { name: "자객", role: "assassin", icon: "🔪", hp: 130, speed: GameTime.gameSpeed(175), cd: GameTime.gameMs(1.3), dmg: 40, range: 100,
                dashRange: 200, dashWidth: 150, dashDmg: 40, dashMs: 300, finishDelay: 125, ultName: "처형", ultAim: true };
     static WAVE = { life: HitmanType.STATS.dashMs + 160, travel: HitmanType.STATS.dashMs };
     showAimGuide(E, ult, c) { var services = this.services;
@@ -3030,7 +3033,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     static MODEL = { file: "Knight", portraitPlant: true, right: "halberd", rightScale: 1.2, rightTilt: Math.PI / 2, left: "Skeleton_Shield_Large_A", leftScale: 0.8, leftRot: [-0.266, 0, -1.588],
                 recolor: [[0, 3, 1, "#1F4A2E", "#0E2417"], [1, 0, 1, "#1F4A2E", "#0E2417"], [2, 2, 1, "#1F4A2E", "#0E2417"], [1, 1, 1, "#E4EAEF", "#9AA4AC"], [1, 2, 2, "#C7D1D9", "#6E7880"]] };
     static ULT = {
-      gdR: 200, gdKb: 150, gdKbMs: 500, gdDmg: 32, gdSlowMul: 0.8, gdSlowMs: GameTime.gameMs(1.5)
+      gdR: 200, gdKb: 150, gdKbMs: 500, gdDmg: 40, gdSlowMul: 0.8, gdSlowMs: GameTime.gameMs(1.5)
     };
     static STATS = { name: "수문장", role: "fighter", icon: "🏰", hp: 460, speed: GameTime.gameSpeed(150), cd: GameTime.gameMs(1.5), dmg: 25, range: 140, arc: Math.PI * 130 / 180,
                 fx: { slowMs: GameTime.gameMs(1.5), slowMul: 0.7 }, ultName: "창벽" };
@@ -3057,7 +3060,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     static MODEL = { file: "Mage", portraitPlant: true, right: "staff_A", left: "spellbook_closed",
                recolor: [[1, 0, 1, "#F2F6FA", "#C9D6E2"], [1, 1, 1, "#8FD8F0", "#4FA9D9"], [1, 2, 1, "#8FD8F0", "#4FA9D9"], [2, 1, 1, "#8FD8F0", "#4FA9D9"], [0, 5, 1, "#F2F6FA", "#C9D6E2"]] };
     static ULT = {
-      frSlowMs: GameTime.gameMs(1.5), frSlowMul: 0.8, frSlowStep: 0.2, frFreezeMs: GameTime.gameMs(1), frFreezeMaxHpRate: 0.06, frBzHides: true, frBzR: 400,
+      frSlowMs: GameTime.gameMs(1.5), frSlowMul: 0.8, frSlowStep: 0.2, frFreezeMs: GameTime.gameMs(1), frFreezeMaxHpRate: 0.08, frBzHides: true, frBzR: 400,
       frBzDur: GameTime.gameMs(9), frBzDmg: 6, frBzTick: GameTime.gameMs(1), frBzDelay: 400
     };
     static STATS = { name: "얼음술사", role: "caster", icon: "❄️", hp: 115, speed: GameTime.gameSpeed(170), cd: GameTime.gameMs(1.4), dmg: 10, range: 350, pSpeed: 650, pr: 8, ultName: "눈보라" };
@@ -3100,7 +3103,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       bwR: 150, bwDur: GameTime.gameMs(4), bwTick: GameTime.gameMs(0.3), bwHurtGaugeEvery: 4, bwDmg: 18, bwKillGauge: 5, bdR: 70, bdDmg: 10,
       bdDelay: GameTime.gameMs(0.4)
     };
-    static STATS = { name: "검무희", role: "assassin", icon: "🌸", hp: 150, speed: GameTime.gameSpeed(175), ultSpeed: GameTime.gameSpeed(210), cd: GameTime.gameMs(1.2), dmg: 20, range: 350, pSpeed: 900, pr: 8, ultName: "칼날 폭풍" };
+    static STATS = { name: "검무희", role: "assassin", icon: "🌸", hp: 135, speed: GameTime.gameSpeed(175), ultSpeed: GameTime.gameSpeed(210), cd: GameTime.gameMs(1.2), dmg: 20, range: 350, pSpeed: 900, pr: 8, ultName: "칼날 폭풍" };
     get botRole() { return "back"; }
     isBladeStorming(E, t) { return E.buffUntil > t; }
     earlyPose(E, t) { return this.isBladeStorming(E, t) ? ["Melee_2H_Attack_Spinning", 1.2] : null; }
@@ -3150,7 +3153,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
                           [0, 1, 1, "#FFF3B0", "#E6BE4E"], [2, 7, 1, "#FFD23F", "#C98A10"], [2, 3, 1, "#1C2448", "#0B0F22"], [1, 7, 1, "#27336A", "#111733"], [1, 1, 1, "#27336A", "#111733"]],
                 leftRecolor: [[1, 6, 1, "#FFE45C", "#E0A01A"], [2, 4, 1, "#2A3A7A", "#141C40"], [3, 0, 1, "#8FE8FF", "#2A7BFF"], [2, 5, 3, "#26304E", "#10152A"]] };
     static ULT = {
-      ocDur: GameTime.gameMs(7), ocRate: 1.5, ocSpeedBonus: 50, ocRangeBonus: 30, ocR: 200, ocDmg: 30, ocStunMs: GameTime.gameMs(1.5), ocRingPts: 10
+      ocDur: GameTime.gameMs(9), ocRate: 1.5, ocSpeedBonus: 50, ocRangeBonus: 30, ocR: 200, ocDmg: 30, ocStunMs: GameTime.gameMs(1.5), ocRingPts: 10
     };
     static STATS = { name: "뇌전사수", role: "shooter", icon: "⚡", hp: 100, speed: GameTime.gameSpeed(130), cd: GameTime.gameMs(0.9), dmg: 10, range: 420, pSpeed: 750, pr: 10,
                 chain: { every: 3, r: 250, count: 2, dmg: 27 }, ultName: "과충전" };
@@ -3204,11 +3207,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   class EngineerType extends CharacterType {
     static MODEL = { file: "Engineer", right: "engineer_Wrench" };
     static ULT = {
-      trDur: GameTime.gameMs(10), trR: 340, trCd: GameTime.gameMs(0.5), trScanMs: 120, trWarmMs: 300, trDmg: 10, trHeavyEvery: 3, trHeavyDmg: 34,
+      trDur: GameTime.gameMs(12), trR: 340, trCd: GameTime.gameMs(0.5), trScanMs: 120, trWarmMs: 300, trDmg: 10, trHeavyEvery: 3, trHeavyDmg: 34,
       trStunMs: GameTime.gameMs(0.8), trMax: 2, trGauge: 1, trSpeedBonus: GameTime.gameSpeed(30), trShellSpeed: GameTime.gameSpeed(1000), trHitR: 38,
       trCastMs: 450
     };
-    static STATS = { name: "공학자", role: "shooter", icon: "🔧", hp: 105, speed: GameTime.gameSpeed(140), cd: GameTime.gameMs(1.1), dmg: 10, range: 350, pSpeed: 760, pr: 9, ultName: "포탑 설치" };
+    static STATS = { name: "공학자", role: "shooter", icon: "🔧", hp: 105, speed: GameTime.gameSpeed(140), cd: GameTime.gameMs(1), dmg: 10, range: 350, pSpeed: 760, pr: 9, ultName: "포탑 설치" };
     static WRENCH_SCALE = 0.9;
     speedBonus(E, t) { var services = this.services; return services.turrets.coveringCount(E, t) * EngineerType.ULT.trSpeedBonus; }
     get startsSkillTimer() { return false; }
@@ -3354,10 +3357,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
                   recolor: [[1, 0, 2, "#2E2038", "#0A060F"], [1, 2, 1, "#C58BFF", "#6A2BC4"], [2, 1, 1, "#C58BFF", "#6A2BC4"], [0, 5, 1, "#C58BFF", "#6A2BC4"]],
                   leftRecolor: [[1, 2, 1, "#C58BFF", "#6A2BC4"], [2, 1, 1, "#C58BFF", "#6A2BC4"]] };
     static ULT = {
-      sfMin: 60, sfDelay: GameTime.gameMs(0.6), sfR: 70, sfStunEvery: 3, sfStunMs: GameTime.gameMs(1), agCast: 400, agMin: 60, agDur: GameTime.gameMs(3),
+      sfMin: 60, sfDelay: GameTime.gameMs(0.6 / 1.3), sfR: 100, sfStunEvery: 3, sfStunMs: GameTime.gameMs(1), agCast: 400, agMin: 60, agDur: GameTime.gameMs(3),
       agR: 350, agPull: 260, agGap: 70, agBoomDmg: 25
     };
-    static STATS = { name: "점성술사", role: "caster", icon: "🌠", hp: 115, speed: GameTime.gameSpeed(170), cd: GameTime.gameMs(1.4), dmg: 13, range: 380, ultName: "가르강튀아", ultAim: true };
+    static STATS = { name: "점성술사", role: "caster", icon: "🌠", hp: 115, speed: GameTime.gameSpeed(170), cd: GameTime.gameMs(1.4), dmg: 17, range: 380, ultName: "가르강튀아", ultAim: true };
     get startsSkillTimer() { return true; }
     isHammerLeaping(E, t) { return false; }
     isRooted(E, t) { return false; }
@@ -3392,8 +3395,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     static FORM_MODELS = { giantGolem: { file: "Skeleton_Golem", right: "Skeleton_Mace_Large", scale: 0.85 } };
     static MODEL = { file: "Barbarian_Large", right: "Skeleton_Mace_Large", scale: 0.85, portraitFit: 1.1 };
     static ULT = {
-      gjCast: 300, gjMin: 60, gjTransformMs: GameTime.gameMs(1.2), gjDur: GameTime.gameMs(6), gjDef: 0.8, gjR: 150, gjTick: GameTime.gameMs(1),
-      gjTickDmg: 20, gjMaceRange: 150, gjMaceDmg: 23
+      gjCast: 300, gjMin: 60, gjTransformMs: GameTime.gameMs(1.2), gjDur: GameTime.gameMs(6), gjDef: 0.65, gjR: 150, gjTick: GameTime.gameMs(1),
+      gjTickDmg: 20, gjMaceRange: 200, gjMaceDmg: 23
     };
     static STATS = { name: "거신", role: "fighter", icon: "🗿", hp: 500, speed: GameTime.gameSpeed(135), cd: GameTime.gameMs(1.6), dmg: 23, range: 120, arc: Math.PI * 0.6, bodyR: 36, ultName: "골렘 강림", ultAim: true, blocks: true };
     static HEAD_Y = 150;
@@ -4622,9 +4625,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.damage.damage(T, B.dmg, B.owner, false, "domainbolt");
       services.domainFx.applyCurse(T, B.owner, t);
     }
-    domainStrikeTarget(E, t) { var services = this.services;
+    activeDomainOf(E, t) { var services = this.services;
       var zone = null;
       services.field.domains.forEach(function (dm) { if (dm.e.owner === E.id && services.domainFx.domainActive(dm.e, t) && !services.domainFx.domainOwnerFell(dm)) zone = dm; });
+      return zone;
+    }
+    domainStrikeTarget(E, t) { var services = this.services;
+      var zone = services.domainFx.activeDomainOf(E, t);
       if (!zone) return null;
       var c = services.domainFx.domainCenter(zone), reach = services.domainFx.domainRadius(zone.e, t) + ArenaSize.BODY_R * 0.5, best = null, bd = Infinity;
       services.targets.everyone(t).forEach(function (o) {
@@ -8647,9 +8654,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class ResultBoard {
-    static MVP_STUN_PER_SEC = 60;
-    static MVP_SLOW_PER_SEC = 40;
-    static MVP_ASSIST = 50;
+    static MVP_STUN_PER_SEC = 40;
+    static MVP_SLOW_PER_SEC = 20;
+    static MVP_ASSIST = 80;
+    static MVP_HEAL = 0.7;
     constructor(services) { this.services = services; this.roster = new ResultRoster(services); }
     boardRows(list, myId) { var services = this.services;
       var rows = "", redStarted = false, mine = list ? myId : services.session.myId;
@@ -8669,7 +8677,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     secText(v) { var services = this.services; return v > 0 ? services.netstate.oneDecimal(v) + "초" : "-"; }
     mvpScore(E) { var services = this.services;
-      return E.kills * 100 + (E.assists || 0) * ResultBoard.MVP_ASSIST + Math.round(E.dmg) + Math.round(E.heal || 0) + Math.round(E.blocked || 0)
+      return E.kills * 100 + (E.assists || 0) * ResultBoard.MVP_ASSIST + Math.round(E.dmg) + Math.round(Math.round(E.heal || 0) * ResultBoard.MVP_HEAL) + Math.round(E.blocked || 0)
         + Math.round(services.netstate.oneDecimal(E.stunDealt) * ResultBoard.MVP_STUN_PER_SEC) + Math.round(services.netstate.twoDecimals(E.slowWeight) * ResultBoard.MVP_SLOW_PER_SEC) - E.deaths * 100;
     }
     mvpHtml(list) { var services = this.services;
@@ -8689,7 +8697,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     scoreHelpHtml() {
       var items = [
-        ["처치 1번", "+100"], ["어시스트 1번", "+" + ResultBoard.MVP_ASSIST], ["입힌 피해 1", "+1"], ["회복 1", "+1"], ["막은 피해 1", "+1"],
+        ["처치 1번", "+100"], ["어시스트 1번", "+" + ResultBoard.MVP_ASSIST], ["입힌 피해 1", "+1"], ["회복 1", "+" + ResultBoard.MVP_HEAL], ["막은 피해 1", "+1"],
         ["기절 1초", "+" + ResultBoard.MVP_STUN_PER_SEC], ["둔화 1초 × 둔화율", "+" + ResultBoard.MVP_SLOW_PER_SEC], ["쓰러짐 1번", "−100"]
       ];
       return "<table>" + items.map(function (item) {
@@ -10220,6 +10228,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       new GameEvents(services).bind();
       new SceneBoot(services).build();
       new AppLauncher(services).launch();
+      if (!Environment.SILENT_RUN) new PatchNoteNotice("teambattle", "팀 배틀 아레나").watch();
     }
   }
   new App().start();

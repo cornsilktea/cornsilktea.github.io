@@ -156,6 +156,11 @@
   #rankBody { margin-top: var(--sg-s4); }
   .rank-divider { margin: var(--sg-s4) 0; border: 0; border-top: 1px solid var(--sg-line-mid); }
   .panel .stats-box { max-height: none; overflow-x: auto; overflow-y: visible; }
+  /* 패치노트 미리 보기: 학생 화면 창(patch-notes.js 의 PatchNoteDialog)과 같은 어두운 판 */
+  .patch-note-preview:not(:empty) { margin-top: var(--sg-s3); padding: 16px 20px; border-radius: 12px; background: rgba(16,24,19,.96); border-top: 3px solid #D97B4F; color: #EEF2EE; }
+  .patch-note-preview .pn-tag { font-size: 13px; font-weight: 800; color: #D97B4F; }
+  .patch-note-preview .pn-title { margin-top: 4px; font-size: 20px; font-weight: 800; }
+  .patch-note-preview .pn-body { margin-top: 8px; white-space: pre-wrap; line-height: 1.7; color: #DDE4DE; }
   /* 반 별 통계 표의 이름 칸(30번): 누르면 학생 개인 통계 창(StudentStatsWindow) */
   #rankTable td.rank-name { cursor: pointer; color: #D97B4F; text-decoration: underline; text-underline-offset: 3px; }
   .student-stats .student-tabs { justify-content: flex-start; margin: 0 0 var(--sg-s2); }
@@ -502,6 +507,41 @@
         </div>
         <p class="msg" id="tbMvpMsg"></p>
         <div id="tbMvpBox" class="stats-box"></div>
+        <!-- 30번 MVP 점수 v3 다시 계산(2026-10-29): 새 환산점수 식으로 학생 계정의 MVP 수·평균 MVP 점수(결과표가 모두 남은 학생만)와
+             전체 통계 v2 평균 MVP 점수(평균값으로 추정, 한 번만)를 고친다. 계산은 teambattle-mvp-rescore.js -->
+        <hr class="rank-divider">
+        <h3>30번 MVP 점수 v3 다시 계산</h3>
+        <p class="msg">v3 패치의 새 MVP 점수 식으로 지난 경기의 MVP 수·평균 MVP 점수를 고칩니다. 먼저 위 칸의 '백업 내려받기'를 해 두세요.</p>
+        <div class="actions">
+          <button id="tbRescoreCheck" type="button">미리 보기</button>
+          <button id="tbRescoreApply" type="button" disabled>적용</button>
+        </div>
+        <p class="msg" id="tbRescoreMsg"></p>
+        <div id="tbRescoreBox" class="stats-box"></div>
+      </div>
+    </div>
+
+    <!-- 패치노트(2026-10-29): 게임별 패치노트를 portal/patchNotes/<게임> 에 쓰면 로그인한 학생이 그 게임에 처음 들어올 때 한 번 창으로 본다.
+         펼칠 때 지금 게시된 글을 한 번 읽는다. 동작은 patch-notes.js 의 PatchNoteEditor·PatchNoteNotice -->
+    <div class="panel" id="patchNotePanel">
+      <h2>패치노트</h2>
+      <div class="actions" style="margin-top:0">
+        <button id="patchNoteToggle" type="button" aria-expanded="false">펼치기</button>
+      </div>
+      <div id="patchNoteBody" hidden>
+        <p class="hint">게시하면 로그인한 학생이 그 게임에 처음 들어올 때 한 번 창으로 보고, 확인을 누르면 다시 뜨지 않습니다(기기마다 기억).</p>
+        <div class="actions">
+          <select id="patchNoteGame"></select>
+        </div>
+        <input id="patchNoteTitle" type="text" maxlength="80" placeholder="제목 (예: v3 밸런스 패치)" style="width:100%;margin-top:10px">
+        <textarea id="patchNoteText" rows="12" maxlength="4000" placeholder="학생에게 보여 줄 패치 내용을 쓰세요" style="width:100%;margin-top:10px"></textarea>
+        <div class="actions">
+          <label><input id="patchNoteAgain" type="checkbox" checked> 이미 본 학생에게도 다시 띄우기</label>
+          <button id="patchNotePublish" type="button">게시</button>
+          <button id="patchNoteRemove" type="button">내리기</button>
+        </div>
+        <p class="msg" id="patchNoteMsg"></p>
+        <div id="patchNotePreview" class="patch-note-preview"></div>
       </div>
     </div>
 
@@ -539,9 +579,11 @@
      30번은 StudentStatsWindow(account-stats.js), 나머지는 각 게임 통계 모듈의 Profile·View + AccountStatsDialog(StudentAccountWindow).
      통계가 있는 새 게임을 만들면 그 게임의 통계 .js 를 여기 한 줄 더하고 ClassRankPanel.GAMES 에 account 를 넘긴다. -->
 <script charset="utf-8" src="account-match-kit.js?v=20261029b"></script>
-<script charset="utf-8" src="account-stats.js?v=20261029a"></script>
-<script charset="utf-8" src="teambattle-stats-repair.js?v=20261029a"></script>
-<script charset="utf-8" src="teambattle-mvp-lab.js?v=20261029b"></script>
+<script charset="utf-8" src="account-stats.js?v=20261029c"></script>
+<script charset="utf-8" src="teambattle-stats-repair.js?v=20261029b"></script>
+<script charset="utf-8" src="teambattle-mvp-lab.js?v=20261029c"></script>
+<script charset="utf-8" src="teambattle-mvp-rescore.js?v=20261029a"></script>
+<script charset="utf-8" src="patch-notes.js?v=20261029a"></script>
 <script charset="utf-8" src="24.turbo-lap-stats.js?v=20261029a"></script>
 <script charset="utf-8" src="25.fps-survival-stats.js?v=20261028c"></script>
 <script charset="utf-8" src="31.zombie-outbreak-stats.js?v=20261028c"></script>
@@ -1733,7 +1775,8 @@ const STATS_GAMES = {
     /* 마지막 줄이 현재 패치(창을 열면 처음 보여 줌) */
     patches: [
       { id: "v1", path: "teambattle/modestats/cup" },
-      { id: "v2", path: "teambattle/patchstats/v2" }
+      { id: "v2", path: "teambattle/patchstats/v2" },
+      { id: "v3", path: "teambattle/patchstats/v3" }
     ],
     /* 30번 게임의 CHARS 와 같은 아이디·이름·직업군(group)으로 둔다. 캐릭터가 새로 생기면 여기에도 한 줄 추가해야
        표에 나온다(데이터베이스규칙.json 의 teambattle/patchstats 허용 목록도 함께).
@@ -2328,13 +2371,29 @@ $("recToggle").addEventListener("click", () => {
 
 /* 반 별 통계도 접어 두고, 펼친 뒤 게임·반 버튼을 눌러야 그 한 곳만 읽습니다 */
 new ClassRankPanel().bind();
-/* 30번 정상화·MVP 비교 도구가 교사 토큰으로 데이터베이스를 읽고 쓰는 통로(상태 없음) */
+/* 패치노트 칸은 접어 두고, 처음 펼칠 때 지금 게시된 글을 한 번 읽습니다 */
+class PatchNotePanel {
+  constructor(editor) { this.editor = editor; this.loaded = false; }
+  bind() {
+    this.editor.bind();
+    $("patchNoteToggle").addEventListener("click", () => {
+      const open = $("patchNoteBody").hidden;
+      $("patchNoteBody").hidden = !open;
+      $("patchNoteToggle").textContent = open ? "접기" : "펼치기";
+      $("patchNoteToggle").setAttribute("aria-expanded", open ? "true" : "false");
+      if (open && !this.loaded) { this.loaded = true; this.editor.load(); }
+    });
+  }
+}
+/* 30번 정상화·MVP 비교·MVP 다시 계산·패치노트 도구가 교사 토큰으로 데이터베이스를 읽고 쓰는 통로(상태 없음) */
 class AdminRestIo {
   async read(path) { const r = await fetch(await authedUrl(path), { cache: "no-store" }); if (!r.ok) throw new Error(String(r.status)); return r.json(); }
   async patch(values) { const r = await fetch(await authedUrl(""), { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(values) }); if (!r.ok) throw new Error(String(r.status)); }
 }
 new TeamBattleRepairPanel(new AdminRestIo(), { check: "tbRepairCheck", apply: "tbRepairApply", left: "tbRepairLeft", msg: "tbRepairMsg", box: "tbRepairBox" }).bind();
 new MvpLabPanel(new AdminRestIo(), (id) => StudentStatsWindow.roleOf(id).name, { backup: "tbMvpBackup", compare: "tbMvpCompare", bonus: "tbMvpBonus", msg: "tbMvpMsg", box: "tbMvpBox" }).bind();
+new MvpRescorePanel(new AdminRestIo(), (id) => StudentStatsWindow.roleOf(id).name, { check: "tbRescoreCheck", apply: "tbRescoreApply", msg: "tbRescoreMsg", box: "tbRescoreBox" }).bind();
+new PatchNotePanel(new PatchNoteEditor(new AdminRestIo(), { game: "patchNoteGame", title: "patchNoteTitle", body: "patchNoteText", again: "patchNoteAgain", publish: "patchNotePublish", remove: "patchNoteRemove", msg: "patchNoteMsg", preview: "patchNotePreview" })).bind();
 
 window.__portalBooted = true;
 if (!cfg.isAdminReady()) {

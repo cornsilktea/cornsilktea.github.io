@@ -301,11 +301,13 @@ class AccountStatsStore extends AccountMatchStore {
     }
 }
 /* 결과 창 환산점수 식(30번 ResultBoard.mvpScore 와 같은 식 — &test 가 둘이 같은 값을 내는지 본다).
-   최근 매치 목록·교사 화면은 저장된 줄로 다시 계산한다(점수는 저장하지 않음, 5-2b) */
+   최근 매치 목록·교사 화면은 저장된 줄로 다시 계산한다(점수는 저장하지 않음, 5-2b).
+   2026-10-29 v3 패치에서 어시스트 50→80·회복 1→0.7·기절 60→40·둔화 40→20 으로 바꿨다(선생님 결정).
+   예전 식은 LegacyTeamBattleScore — 이미 저장된 MVP 수를 새 식으로 다시 셀 때 "그때 누가 MVP 였나"를 되짚는 데만 쓴다 */
 class TeamBattleScore {
     static of(line) {
         return line.kills * TeamBattleScore.KILL + (line.assists || 0) * TeamBattleScore.ASSIST
-            + Math.round(line.dmg) + Math.round(line.heal || 0) + Math.round(line.blocked || 0)
+            + Math.round(line.dmg) + Math.round(Math.round(line.heal || 0) * TeamBattleScore.HEAL) + Math.round(line.blocked || 0)
             + Math.round(AccountNumbers.oneDecimal(line.stun) * TeamBattleScore.STUN_PER_SEC)
             + Math.round(AccountNumbers.twoDecimals(line.slowWeight) * TeamBattleScore.SLOW_PER_SEC)
             - line.deaths * TeamBattleScore.DEATH;
@@ -333,10 +335,23 @@ class TeamBattleScore {
     }
 }
 TeamBattleScore.KILL = 100;
-TeamBattleScore.ASSIST = 50;
+TeamBattleScore.ASSIST = 80;
 TeamBattleScore.DEATH = 100;
-TeamBattleScore.STUN_PER_SEC = 60;
-TeamBattleScore.SLOW_PER_SEC = 40;
+TeamBattleScore.HEAL = 0.7;
+TeamBattleScore.STUN_PER_SEC = 40;
+TeamBattleScore.SLOW_PER_SEC = 20;
+class LegacyTeamBattleScore {
+    static of(line) {
+        return line.kills * TeamBattleScore.KILL + (line.assists || 0) * LegacyTeamBattleScore.ASSIST
+            + Math.round(line.dmg) + Math.round(line.heal || 0) + Math.round(line.blocked || 0)
+            + Math.round(AccountNumbers.oneDecimal(line.stun) * LegacyTeamBattleScore.STUN_PER_SEC)
+            + Math.round(AccountNumbers.twoDecimals(line.slowWeight) * LegacyTeamBattleScore.SLOW_PER_SEC)
+            - line.deaths * TeamBattleScore.DEATH;
+    }
+}
+LegacyTeamBattleScore.ASSIST = 50;
+LegacyTeamBattleScore.STUN_PER_SEC = 60;
+LegacyTeamBattleScore.SLOW_PER_SEC = 40;
 /* 최근 매치 한 판에서 내 쪽 요약: 환산점수와 그 판 전체 순위, MVP(계정 통계와 같은 AccountMvpJudge), 우리·상대 팀 처치 */
 class TeamBattleMatchSummary {
     constructor(entry) {

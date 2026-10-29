@@ -115,11 +115,21 @@ abstract class MvpFormula {
 
 class CurrentMvpFormula extends MvpFormula {
   constructor() {
-    super("지금 식", MvpLabText.weights(MvpLabWeightSet.CURRENT));
+    super("지금 식(v3)", MvpLabText.weights(MvpLabWeightSet.CURRENT));
   }
 
   raw(line: AccountPlayerLine): number {
     return TeamBattleScore.of(line);
+  }
+}
+
+class LegacyMvpFormula extends MvpFormula {
+  constructor() {
+    super("옛 식(v2 까지)", MvpLabText.weights(MvpLabWeightSet.LEGACY));
+  }
+
+  raw(line: AccountPlayerLine): number {
+    return LegacyTeamBattleScore.of(line);
   }
 }
 
@@ -166,10 +176,12 @@ class TeamShareMvpFormula extends MvpFormula {
 
 class MvpLabWeightSet {
   static readonly CURRENT: MvpLabWeights = {
-    kill: TeamBattleScore.KILL, assist: TeamBattleScore.ASSIST, death: TeamBattleScore.DEATH, dmg: 1, heal: 1, blocked: 1,
+    kill: TeamBattleScore.KILL, assist: TeamBattleScore.ASSIST, death: TeamBattleScore.DEATH, dmg: 1, heal: TeamBattleScore.HEAL, blocked: 1,
     stunSec: TeamBattleScore.STUN_PER_SEC, slowSec: TeamBattleScore.SLOW_PER_SEC
   };
-  static readonly REWEIGHTED: MvpLabWeights = Object.assign({}, MvpLabWeightSet.CURRENT, { assist: 80, heal: 0.7, stunSec: 40, slowSec: 20 });
+  static readonly LEGACY: MvpLabWeights = Object.assign({}, MvpLabWeightSet.CURRENT, {
+    assist: LegacyTeamBattleScore.ASSIST, heal: 1, stunSec: LegacyTeamBattleScore.STUN_PER_SEC, slowSec: LegacyTeamBattleScore.SLOW_PER_SEC
+  });
 }
 
 /* 팀 처치 차이(블루 − 레드)를 피해·회복·막은 피해·기절·둔화의 팀 합계 차이로 설명하는 능형 회귀.
@@ -437,7 +449,7 @@ class MvpLabPanel {
     const fit = MvpWeightFitter.fit(matches);
     const list: MvpFormula[] = [
       new CurrentMvpFormula(),
-      new WeightedMvpFormula("가중치 조정", MvpLabWeightSet.REWEIGHTED, "")
+      new LegacyMvpFormula()
     ];
     if (fit) list.push(new WeightedMvpFormula("승리 기여도 가중치", fit.weights, " (결과표 " + fit.matches + "판으로 계산, 설명력 R² " + fit.rSquared.toFixed(2) + ")"));
     list.push(new TeamShareMvpFormula());
