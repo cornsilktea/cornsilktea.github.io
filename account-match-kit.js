@@ -174,7 +174,7 @@ class AccountClassRank {
 AccountClassRank.ROOT = "gameRanks";
 AccountClassRank.CLASS_PATH = "profile/cls";
 AccountClassRank.NONE = "none";
-AccountClassRank.CLASS_PATTERN = /^[12]-[1-5]$/;
+AccountClassRank.CLASS_PATTERN = /^[1-3]-[1-5]$/;
 AccountClassRank.NAME_MAX = 40;
 class AccountGameProfile {
     get statsPath() {

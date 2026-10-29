@@ -27,7 +27,7 @@
    우리 반 신기록
      · 반별 링크(?c=)로 들어오면 WorldRecord() 가 WR.cls 를 알아서 만든다(같은 모양: rec·loaded·text()·who()·beats()).
        WR.prompt(값) 은 세계 신기록이면 학년·반·이름 창을, 우리 반 신기록만이면 이름 창을 띄운다(둘 다 등록).
-     · 저장 경로는 records/<게임>/<key>cls<학년글자><반글자> (1학년→a·2학년→b, 1반→a…5반→e. 예: allclsbc = 2학년 3반).
+     · 저장 경로는 records/<게임>/<key>cls<학년글자><반글자> (1학년→a·2학년→b·3학년→c, 1반→a…5반→e. 예: allclsbc = 2학년 3반).
        데이터베이스 규칙이 소문자 영문만 받아 숫자 대신 글자를 쓴다.
      · 화면에는 세계 신기록 옆에 "우리 반 신기록" 칸을 hidden 으로 두고 WR.cls 가 있을 때만 보이게 한다
        ([hidden]{display:none !important} 필요). wrBeat 로 prompt 를 가리는 게임은 WR.beatsClass(값) 도 함께 본다.
@@ -46,7 +46,7 @@
   "use strict";
 
   var LOWER_BASE = 1000000000;   // 작을수록 좋은 기록의 저장값 = LOWER_BASE - 값 (규칙이 0 이상만 받음)
-  var GRADES = [1, 2];
+  var GRADES = [1, 2, 3];
   var CLASSES = [1, 2, 3, 4, 5];
 
   var CSS =
@@ -184,9 +184,9 @@
   }
 
   /* 반 신기록의 key: <key>cls<학년글자><반글자> — 규칙이 소문자 영문만 받으므로 숫자 대신 글자
-     (1학년→a, 2학년→b / 1반→a … 5반→e). 예: records/snakegame/allclsaa = 1학년 1반 */
+     (1학년→a, 2학년→b, 3학년→c / 1반→a … 5반→e). 예: records/snakegame/allclsaa = 1학년 1반 */
   function classKey(key, pc) {
-    return key + "cls" + "ab".charAt(pc.grade - 1) + "abcde".charAt(pc.cls - 1);
+    return key + "cls" + "abc".charAt(pc.grade - 1) + "abcde".charAt(pc.cls - 1);
   }
 
   function WorldRecord(game, opts) {

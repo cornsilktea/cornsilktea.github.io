@@ -39,7 +39,7 @@ class AccountPolicy {
 }
 AccountPolicy.DOMAIN = "dongma.sen.ms.kr";
 AccountPolicy.ADMIN_UIDS = ["use16pcii5RbEATuPtWhRDArmoj2", "HFcjiyXAl1YWzm3AyrZmzo4uMdG3"];
-AccountPolicy.LOGIN_CLASS_PATTERN = /[?&]c=(?:[12]-[1-5]|contest)(?:&|$)/;
+AccountPolicy.LOGIN_CLASS_PATTERN = /[?&]c=(?:[1-3]-[1-5]|contest)(?:&|$)/;
 class AccountAuthClient {
     constructor() {
         this.sdk = null;

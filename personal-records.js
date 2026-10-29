@@ -184,7 +184,7 @@ class AccountClassClaim {
         }
     }
 }
-AccountClassClaim.CLASS_PATTERN = /^[12]-[1-5]$/;
+AccountClassClaim.CLASS_PATTERN = /^[1-3]-[1-5]$/;
 AccountClassClaim.DONE_PREFIX = "account_cls_";
 class AccountRecordsStarter {
     start() {

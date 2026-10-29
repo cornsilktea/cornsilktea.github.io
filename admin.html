@@ -391,6 +391,8 @@
       <div class="class-grid" id="classGrid1"></div>
       <p class="class-grade">2학년</p>
       <div class="class-grid" id="classGrid2"></div>
+      <p class="class-grade">3학년</p>
+      <div class="class-grid" id="classGrid3"></div>
       <!-- 일반배포용·학생배포용: 학생 첫 화면에는 안 나오고 신기록도 등록되지 않습니다. 잠금은 각각 따로(classes/test, classes/student) -->
       <p class="class-grade">배포용</p>
       <div class="class-grid class-grid-test" id="classGridTest">
@@ -583,8 +585,8 @@
 <!-- 반 별 통계에서 학생 이름을 누르면 여는 개인 통계 창이 게임과 같은 계산·되살리기·표 클래스를 쓰려고 불러온다.
      30번은 StudentStatsWindow(account-stats.js), 나머지는 각 게임 통계 모듈의 Profile·View + AccountStatsDialog(StudentAccountWindow).
      통계가 있는 새 게임을 만들면 그 게임의 통계 .js 를 여기 한 줄 더하고 ClassRankPanel.GAMES 에 account 를 넘긴다. -->
-<script charset="utf-8" src="account-match-kit.js?v=20261029b"></script>
-<script charset="utf-8" src="account-stats.js?v=20261029d"></script>
+<script charset="utf-8" src="account-match-kit.js?v=20261029c"></script>
+<script charset="utf-8" src="account-stats.js?v=20261029e"></script>
 <script charset="utf-8" src="patch-notes.js?v=20261029b"></script>
 <script charset="utf-8" src="24.turbo-lap-stats.js?v=20261029a"></script>
 <script charset="utf-8" src="25.fps-survival-stats.js?v=20261028c"></script>
@@ -784,9 +786,9 @@ const REC_GAMES = {
 /* 항목(key) 이름 풀이. 반 신기록은 <key>cls<학년글자><반글자> (world-record.js 와 같은 규칙) */
 function keyLabel(game, key) {
   const m = REC_GAMES[game];
-  const cm = /^([a-z]+)cls([ab])([a-e])$/.exec(key);
+  const cm = /^([a-z]+)cls([abc])([a-e])$/.exec(key);
   const base = cm ? cm[1] : key;
-  const cls = cm ? ("ab".indexOf(cm[2]) + 1) + "학년 " + ("abcde".indexOf(cm[3]) + 1) + "반" : "세계";
+  const cls = cm ? ("abc".indexOf(cm[2]) + 1) + "학년 " + ("abcde".indexOf(cm[3]) + 1) + "반" : "세계";
   const sub = (m && m.keyed) ? (m.keyNames && m.keyNames[base] ? m.keyNames[base] : m.keyed + " " + base) : (base === "all" ? "" : base);
   return (sub ? sub + " · " : "") + cls;
 }
@@ -859,9 +861,9 @@ function recWho(rec) {
 /* 반 신기록 key 의 꼬리: "cls" + 학년 글자 + 반 글자 (world-record.js 와 같은 규칙) */
 function classSuffix(cid) {
   const c = D.classById(cid);
-  return "cls" + "ab".charAt(c.grade - 1) + "abcde".charAt(c.cls - 1);
+  return "cls" + "abc".charAt(c.grade - 1) + "abcde".charAt(c.cls - 1);
 }
-function isClassKey(key) { return /cls[ab][a-e]$/.test(key); }
+function isClassKey(key) { return /cls[abc][a-e]$/.test(key); }
 
 /* 세계 신기록 관리: 반 기록이 아닌 것만 */
 function renderRecords() {
@@ -1017,7 +1019,7 @@ function renderSummary() {
   $("dot").className = "dot" + (opened.length === 0 ? "" : " some");
   $("summaryText").textContent =
     games.length === 0 ? "등록된 수업 자료가 없습니다."
-    : opened.length === 0 ? "전체 잠금 (10개 반·일반배포용·학생배포용·대회서버 모두 닫힘)"
+    : opened.length === 0 ? "전체 잠금 (15개 반·일반배포용·학생배포용·대회서버 모두 닫힘)"
     : "열린 반: " + opened.map((c) => c.label + " " + openCount(c.id) + "개").join(" · ");
 }
 
@@ -1153,7 +1155,7 @@ class ClassRankPanel {
   static get FRESH_SORT() { return { key: "n", dir: 1 }; }
 
   static classes() {
-    return D.ALL_CLASSES.filter((c) => /^[12]-[1-5]$/.test(c.id)).concat([{ id: ClassRankPanel.NONE, label: "미분류" }]);
+    return D.ALL_CLASSES.filter((c) => /^[1-3]-[1-5]$/.test(c.id)).concat([{ id: ClassRankPanel.NONE, label: "미분류" }]);
   }
 
   static pickable() {
@@ -2112,14 +2114,14 @@ async function move(i, dir) {
   } catch (e) { busy = false; say("classMsg", e.message); }
 }
 
-/* 자료 하나의 값을 10개 반·일반배포용·학생배포용·대회서버 모두에 한 번에 쓰기 위한 묶음(classes 에 PATCH). null 이면 지움 */
+/* 자료 하나의 값을 15개 반·일반배포용·학생배포용·대회서버 모두에 한 번에 쓰기 위한 묶음(classes 에 PATCH). null 이면 지움 */
 function classPatch(slug, value) {
   const patch = {};
   D.ALL_CLASSES.forEach((c) => { patch[c.id + "/" + slug] = value; });
   return patch;
 }
 
-/* 전체 끄기: 10개 반·일반배포용·학생배포용·대회서버의 모든 자료를 한 번에 닫습니다 */
+/* 전체 끄기: 15개 반·일반배포용·학생배포용·대회서버의 모든 자료를 한 번에 닫습니다 */
 async function allOff() {
   if (games.length === 0) return;
   const patch = {};
@@ -2127,7 +2129,7 @@ async function allOff() {
   try {
     await write("classes", patch);
     await load();
-    say("mainMsg", "10개 반·일반배포용·학생배포용·대회서버의 자료를 모두 닫았습니다.");
+    say("mainMsg", "15개 반·일반배포용·학생배포용·대회서버의 자료를 모두 닫았습니다.");
   } catch (e) { say("mainMsg", e.message); }
 }
 
@@ -2262,7 +2264,7 @@ function seedCard(g) {
         unitsSet: true,
         removed: null            /* 예전에 지운 표시가 있으면 함께 지웁니다 */
       });
-      /* 새 자료는 초기데이터.json 의 open 값과 상관없이 10개 반·일반배포용·학생배포용·대회서버 모두 잠긴 채로 시작합니다.
+      /* 새 자료는 초기데이터.json 의 open 값과 상관없이 15개 반·일반배포용·학생배포용·대회서버 모두 잠긴 채로 시작합니다.
          (열기는 반별 열기·잠그기에서 선생님이 직접) */
       await write("classes", classPatch(g.slug, false));
       busy = false;

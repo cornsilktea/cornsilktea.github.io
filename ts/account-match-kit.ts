@@ -211,7 +211,7 @@ class AccountClassRank {
   static readonly ROOT = "gameRanks";
   static readonly CLASS_PATH = "profile/cls";
   static readonly NONE = "none";
-  static readonly CLASS_PATTERN = /^[12]-[1-5]$/;
+  static readonly CLASS_PATTERN = /^[1-3]-[1-5]$/;
   static readonly NAME_MAX = 40;
 
   static classKey(cls: unknown): string {

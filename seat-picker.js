@@ -505,7 +505,7 @@ class ClassChoice {
         button.setAttribute("aria-pressed", String(on));
     }
 }
-ClassChoice.GRADES = [1, 2];
+ClassChoice.GRADES = [1, 2, 3];
 ClassChoice.CLASSES = [1, 2, 3, 4, 5];
 class SaveDialog {
     constructor() {

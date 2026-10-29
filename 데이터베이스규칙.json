@@ -252,7 +252,7 @@
           "score": { ".validate": "newData.isNumber()" },
           "name": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 20" },
           "at": { ".validate": "newData.isNumber() && ((newData.val() > now - 600000 && newData.val() < now + 600000) || (auth != null && (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')))" },
-          "grade": { ".validate": "newData.isNumber() && (newData.val() === 1 || newData.val() === 2)" },
+          "grade": { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 3" },
           "cls": { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 5" },
           "uid": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 128" },
           "party": {
@@ -275,7 +275,7 @@
           "at": { ".validate": "newData.val() === now || ((auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3') && newData.val() === data.val())" },
           "cls": {
             ".write": "auth != null && (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')",
-            ".validate": "newData.isString() && newData.val().matches(/^[12]-[1-5]$/) && (!data.exists() || newData.val() === data.val() || auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+            ".validate": "newData.isString() && newData.val().matches(/^[1-3]-[1-5]$/) && (!data.exists() || newData.val() === data.val() || auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
           },
           "$other": { ".validate": false }
         },
@@ -678,7 +678,7 @@
       "$cls": {
         "$uid": {
           ".write": "auth != null && ((auth.uid === $uid && auth.token.email_verified === true && auth.token.email.endsWith('@dongma.sen.ms.kr')) || auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')",
-          ".validate": "$cls.matches(/^([12]-[1-5]|none)$/) && newData.hasChildren(['n', 'g', 'w', 'm']) && newData.child('w').val() <= newData.child('g').val() && newData.child('m').val() <= newData.child('g').val() && (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3' || (newData.child('g').val() === newData.parent().parent().parent().child('users').child($uid).child('stats').child('teambattle').child('g').val() && newData.child('w').val() === newData.parent().parent().parent().child('users').child($uid).child('stats').child('teambattle').child('w').val() && newData.child('m').val() === newData.parent().parent().parent().child('users').child($uid).child('stats').child('teambattle').child('m').val()))",
+          ".validate": "$cls.matches(/^([1-3]-[1-5]|none)$/) && newData.hasChildren(['n', 'g', 'w', 'm']) && newData.child('w').val() <= newData.child('g').val() && newData.child('m').val() <= newData.child('g').val() && (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3' || (newData.child('g').val() === newData.parent().parent().parent().child('users').child($uid).child('stats').child('teambattle').child('g').val() && newData.child('w').val() === newData.parent().parent().parent().child('users').child($uid).child('stats').child('teambattle').child('w').val() && newData.child('m').val() === newData.parent().parent().parent().child('users').child($uid).child('stats').child('teambattle').child('m').val()))",
           "n": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 40" },
           "g": { ".validate": "newData.isNumber() && newData.val() >= 0" },
           "w": { ".validate": "newData.isNumber() && newData.val() >= 0" },
@@ -693,7 +693,7 @@
         "$cls": {
           "$uid": {
             ".write": "auth != null && ((auth.uid === $uid && auth.token.email_verified === true && auth.token.email.endsWith('@dongma.sen.ms.kr')) || auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')",
-            ".validate": "$game.matches(/^(turbolap|fpsbattle|zombieoutbreak|snowroyale|waterballoon|minigames|volleyball|soccer)$/) && $cls.matches(/^([12]-[1-5]|none)$/) && newData.hasChildren(['n', 'g', 'w', 'x']) && newData.child('w').val() <= newData.child('g').val() && (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3' || (newData.child('g').val() === newData.parent().parent().parent().parent().child('users').child($uid).child('stats').child($game).child('g').val() && newData.child('w').val() === newData.parent().parent().parent().parent().child('users').child($uid).child('stats').child($game).child('w').val()))",
+            ".validate": "$game.matches(/^(turbolap|fpsbattle|zombieoutbreak|snowroyale|waterballoon|minigames|volleyball|soccer)$/) && $cls.matches(/^([1-3]-[1-5]|none)$/) && newData.hasChildren(['n', 'g', 'w', 'x']) && newData.child('w').val() <= newData.child('g').val() && (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3' || (newData.child('g').val() === newData.parent().parent().parent().parent().child('users').child($uid).child('stats').child($game).child('g').val() && newData.child('w').val() === newData.parent().parent().parent().parent().child('users').child($uid).child('stats').child($game).child('w').val()))",
             "n": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 40" },
             "g": { ".validate": "newData.isNumber() && newData.val() >= 0" },
             "w": { ".validate": "newData.isNumber() && newData.val() >= 0" },
@@ -756,7 +756,7 @@
       "$cls": {
         ".indexOn": ["at"],
         "$id": {
-          ".write": "$cls.matches(/^[12]-[1-5]$/) && (!data.exists() || (auth != null && (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')))",
+          ".write": "$cls.matches(/^[1-3]-[1-5]$/) && (!data.exists() || (auth != null && (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')))",
           ".validate": "newData.hasChildren(['mode', 'cells', 'at'])",
           "mode": { ".validate": "newData.isString() && newData.val().matches(/^(pair|exam)$/)" },
           "cells": { ".validate": "newData.isString() && newData.val().matches(/^(-1|0|[1-9][0-9]{0,2})(,(-1|0|[1-9][0-9]{0,2})){29}$/)" },

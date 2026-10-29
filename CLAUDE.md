@@ -53,7 +53,7 @@
      붙고, 잠금은 Firebase `portal/classes/<반>/<자료>` 를 본다(`games/<자료>/open` 은 더 이상 안 씀).
      가드가 `window.PORTAL_CLASS`(`{id,grade,cls,label}` 또는 null)를 만들어 주므로 학년·반이 필요한 게임은 이걸 읽는다.
      자료 안에서 다른 자료로 링크할 때는 `location.search` 를 그대로 붙여 반이 유지되게 한다.
-     학급 목록(1·2학년 각 5반)은 `data.js` 의 `CLASSES` 한 곳에만 있다.
+     학급 목록(1~3학년 각 5반, 3학년은 2026-10-29 미리 추가)은 `data.js` 의 `CLASSES` 한 곳에만 있다.
    - 대회서버(`?c=contest`)는 `data.js` 의 `CONTEST_GAMES` 에 적힌 자료만 나온다. 설명은 `data.js` 주석.
    - 파일에 `Content-Security-Policy` 가 있으면 `connect-src` 에 Firebase 주소를 허용한다(사용법.md 3절).
 2. **파일 이름은 `<번호>.<영문이름>.html`**, 번호는 저장소 최대 번호 + 1 (`ls` 로 확인). 구분자는 점.

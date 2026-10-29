@@ -175,7 +175,7 @@ class LocalBestMigrator {
    다른 반 링크로 들어와 거부되면 cls 없이 다시 쓰고, 이 기기에는 "이미 처리함" 표시를 남겨 다음 로그인부터는 시도하지 않는다
    (그래서 보통은 로그인 한 번당 요청 1회 그대로). 선생님 계정은 칠판에서 반 링크로 로그인하므로 적지 않는다. */
 class AccountClassClaim {
-  static readonly CLASS_PATTERN = /^[12]-[1-5]$/;
+  static readonly CLASS_PATTERN = /^[1-3]-[1-5]$/;
   private static readonly DONE_PREFIX = "account_cls_";
 
   constructor(private readonly user: PortalUser) {}

@@ -20,7 +20,7 @@
      반마다 링크가 다르고(index.html?c=1-1), 잠금도 반마다 따로 둡니다
      (Firebase portal/classes/<반>/<자료> = true/false). */
   var CLASSES = [];
-  [1, 2].forEach(function (grade) {
+  [1, 2, 3].forEach(function (grade) {
     [1, 2, 3, 4, 5].forEach(function (cls) {
       CLASSES.push({ id: grade + "-" + cls, grade: grade, cls: cls, label: grade + "학년 " + cls + "반" });
     });
@@ -53,7 +53,7 @@
   }
   /* 주소의 ?c=1-1 (또는 ?c=test·?c=student·?c=contest) 을 읽어 학급을 돌려줍니다(없거나 틀리면 null) */
   function classFromSearch(search) {
-    var m = /[?&]c=([12]-[1-5]|test|student|contest)(?:&|$)/.exec(search || "");
+    var m = /[?&]c=([1-3]-[1-5]|test|student|contest)(?:&|$)/.exec(search || "");
     return m ? classById(m[1]) : null;
   }
 

@@ -533,7 +533,7 @@ class ControlPanel {
 }
 
 class ClassChoice {
-  private static readonly GRADES = [1, 2];
+  private static readonly GRADES = [1, 2, 3];
   private static readonly CLASSES = [1, 2, 3, 4, 5];
 
   private grade = 0;

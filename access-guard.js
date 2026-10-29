@@ -103,7 +103,7 @@
      PORTAL_CLASS 는 { id:"test", grade:0, cls:0, label:"일반배포용", test:true } 가 되며
      세계·반 신기록은 등록하지 않습니다(world-record.js 가 test 를 보고 막음).
      학생배포용 링크(?c=student)도 똑같이 동작하되 잠금은 portal/classes/student 를 따로 봅니다(student:true 도 붙음). */
-  var classMatch = /[?&]c=([12])-([1-5])(?:&|$)/.exec(location.search);
+  var classMatch = /[?&]c=([1-3])-([1-5])(?:&|$)/.exec(location.search);
   var klass = classMatch ? {
     id: classMatch[1] + "-" + classMatch[2],
     grade: parseInt(classMatch[1], 10),

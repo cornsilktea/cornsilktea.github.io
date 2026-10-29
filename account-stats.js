@@ -229,7 +229,7 @@ class ClassStatsSummary {
     }
 }
 ClassStatsSummary.NONE = "none";
-ClassStatsSummary.CLASS_PATTERN = /^[12]-[1-5]$/;
+ClassStatsSummary.CLASS_PATTERN = /^[1-3]-[1-5]$/;
 ClassStatsSummary.NAME_MAX = 40;
 class TeamBattleProfile extends AccountGameProfile {
     constructor() {

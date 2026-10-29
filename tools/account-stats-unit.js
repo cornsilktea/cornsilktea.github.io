@@ -369,7 +369,7 @@ const randomReport = (extra) => Object.assign({ matchId: "rm1", result: "win", r
   check("랜덤 매칭 승패: 통계 창 글자(승패·3위 안)", view.statsHtml(b.node).indexOf("3위 안") >= 0 && view.blockBodyHtml(back).indexOf("vs ") === 0);
   const user = { uid: "u1", name: "20104 홍길동", email: "a@b" };
   const rankPatch = K.AccountClassRank.patch("soccer", user, "2-5", { g: 3, w: 2, x: 0 });
-  check("반별 순위 요약: 반 칸에 쓰고 미분류 칸은 지움", rankPatch["gameRanks/soccer/2-5/u1"].g === 3 && rankPatch["gameRanks/soccer/none/u1"] === null && K.AccountClassRank.classKey("3-1") === "none");
+  check("반별 순위 요약: 반 칸에 쓰고 미분류 칸은 지움", rankPatch["gameRanks/soccer/2-5/u1"].g === 3 && rankPatch["gameRanks/soccer/none/u1"] === null && K.AccountClassRank.classKey("3-1") === "3-1" && K.AccountClassRank.classKey("4-1") === "none");
 }
 check("24번 결과 시간: 0.01초까지 같은 기록끼리만 0.001초까지", K.TurboLapClock.text(62341, [62341, 62348]) === "1:02.341" && K.TurboLapClock.text(62348, [62341, 62348]) === "1:02.348" && K.TurboLapClock.text(63000, [62341, 63000]) === "1:03.00" && K.TurboLapClock.text(65009, [65009, 65001, 70000]) === "1:05.009" && K.TurboLapClock.text(70000, [65009, 65001, 70000]) === "1:10.00" && K.TurboLapClock.text(62341, [62341, 0]) === "1:02.34");
 /* 패치노트(2026-10-29): 글 다듬기·본 기록 */

@@ -41,7 +41,7 @@ interface AuthSdk {
 class AccountPolicy {
   static readonly DOMAIN = "dongma.sen.ms.kr";
   static readonly ADMIN_UIDS = ["use16pcii5RbEATuPtWhRDArmoj2", "HFcjiyXAl1YWzm3AyrZmzo4uMdG3"];
-  static readonly LOGIN_CLASS_PATTERN = /[?&]c=(?:[12]-[1-5]|contest)(?:&|$)/;
+  static readonly LOGIN_CLASS_PATTERN = /[?&]c=(?:[1-3]-[1-5]|contest)(?:&|$)/;
 
   static requiresLogin(search: string): boolean {
     return AccountPolicy.LOGIN_CLASS_PATTERN.test(search);
