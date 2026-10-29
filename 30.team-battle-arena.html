@@ -1901,6 +1901,31 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return MathKit.pick(pool.length ? pool : left);
     }
   }
+  class DraftAiBanner {
+    static FRESH_MS = 600000;
+    constructor(services) { this.services = services; this.rates = {}; this.loadedAt = 0; this.loading = false; }
+    prepare() { var self = this, db = this.services.backend.db;
+      if (!db || this.loading || (this.loadedAt && Date.now() - this.loadedAt < DraftAiBanner.FRESH_MS)) return;
+      this.loading = true;
+      db.ref(StatsPatches.current.path).once("value").then(function (snap) { self.rates = DraftAiBanner.ratesOf(snap.val() || {}); self.loadedAt = Date.now(); })
+        .catch(function () { return undefined; }).then(function () { self.loading = false; });
+    }
+    static ratesOf(s) { var rates = {};
+      Object.keys(s).forEach(function (k) { var d = s[k];
+        if (!d || typeof d !== "object") return;
+        var games = Math.max(0, (+d.picks || 0) - (+d.draws || 0));
+        if (games > 0) rates[k] = { rate: (+d.wins || 0) / games, games: games };
+      });
+      return rates;
+    }
+    choose(left) { var self = this, ranked = left.filter(function (c) { return self.services.draftAi.roleOf(c) !== DraftAiPicker.FIGHTER; });
+      if (!ranked.length) return Draft.NO_BAN;
+      var known = ranked.filter(function (c) { return self.rates[c]; });
+      if (!known.length) return MathKit.pick(ranked);
+      known.sort(function (a, b) { return self.rates[b].rate - self.rates[a].rate || self.rates[b].games - self.rates[a].games; });
+      return known[0];
+    }
+  }
   class Draft {
     static STEPS = [{ keys: ["b1"], ban: true }, { keys: ["r1"], ban: true }, { keys: ["b1"] }, { keys: ["r1", "r2"] }, { keys: ["b2", "b3"] }, { keys: ["r3"] }];
     static SHOWN_MS = 15000;
@@ -1963,6 +1988,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     startDraft() { var services = this.services;
       var seq = {}, t = services.clock.now();
+      services.draftBan.prepare();
       ["blue", "red"].forEach(function (team) {
         var ids = services.session.teamIds(team);
         if (services.randomMatch.ticket()) ids = ids.filter(function (id) { return !services.session.players[id].isAI; }).concat(ids.filter(function (id) { return services.session.players[id].isAI; }));
@@ -2072,7 +2098,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         auto.forEach(function (id) {
           if (services.draft.draftWaiting(cur, step).indexOf(id) < 0) return;
           var left = services.draft.draftLeft(cur), hover = cur.hover && cur.hover[id], chosen = left.indexOf(hover) >= 0 ? hover : null;
-          if (banStep) services.draft.applyDraftChoice(cur, id, chosen || (services.draft.isAiSeat(id) && left.length && !services.randomMatch.ticket() ? MathKit.pick(left) : Draft.NO_BAN));
+          if (banStep) services.draft.applyDraftChoice(cur, id, chosen || (services.draft.isAiSeat(id) ? services.draftBan.choose(left) : Draft.NO_BAN));
           else if (left.length) services.draft.applyDraftChoice(cur, id, chosen || (services.draft.isAiSeat(id) ? services.draftAi.choose(cur, id, left) : MathKit.pick(left)));
         });
         return services.draft.draftSettle(cur, services.clock.now());
@@ -10047,7 +10073,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     refresh() { var services = this.services, room = services.session.room;
       if (this.root.hidden || !room) return;
-      this.view.render(MapCatalog.of(room.map).name, this.seatsOf("blue"), this.seatsOf("red"));
+      this.view.render(this.mapName(room), this.seatsOf("blue"), this.seatsOf("red"));
+    }
+    mapName(room) { var ticket = this.services.randomMatch.ticket();
+      return (ticket && ticket.map) || MapCatalog.of(room.map).name;
     }
     startAfterShow(start) { var self = this, wait = this.root.hidden ? ArenaVersusCurtain.SHOW_MS : this.shownAt + ArenaVersusCurtain.SHOW_MS - performance.now();
       clearTimeout(this.startTimer);
@@ -10077,6 +10106,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.statsView = new StatsView(services);
       services.launcher = new MatchLauncher(services);
       services.draftAi = new DraftAiPicker(services);
+      services.draftBan = new DraftAiBanner(services);
       services.draftView = new DraftView(services);
       services.draft = new Draft(services);
       services.netstate = new NetState(services);
