@@ -33,9 +33,8 @@
     -webkit-text-size-adjust: 100%;
   }
   .wrap { max-width: 880px; margin: 0 auto; }
-  .title-row { display: flex; align-items: center; gap: var(--sg-s3); flex-wrap: wrap; margin: 0 0 var(--sg-s2); }
+  .title-row { display: flex; align-items: center; gap: var(--sg-s3); flex-wrap: wrap; margin: 0 0 var(--sg-s6); }
   h1 { font-size: var(--sg-fs-2xl); font-weight: 800; line-height: var(--sg-lh-tight); letter-spacing: -.01em; margin: 0; }
-  .sub { font-size: var(--sg-fs-sm); line-height: var(--sg-lh); color: var(--sg-ink-soft); margin: 0 0 var(--sg-s6); }
 
   .panel {
     background: var(--sg-panel); border: 1px solid var(--sg-line-mid); border-radius: var(--sg-radius);
@@ -74,11 +73,26 @@
   #loginBtn:not(:disabled) { background: var(--sg-primary); border-color: var(--sg-primary); color: var(--sg-primary-ink); }
   #allOff { color: var(--sg-danger); border-color: var(--sg-danger); }
   #allOff:hover { background: var(--sg-danger-soft); }
+  /* 새 학년도 시작: 맨 아래 위험 칸과 확인 창 */
+  .year-panel { border-color: var(--sg-danger); }
+  #yearOpen, #yearGo { color: var(--sg-danger); border-color: var(--sg-danger); }
+  #yearOpen:hover, #yearGo:not(:disabled):hover { background: var(--sg-danger-soft); }
+  .year-dialog {
+    width: min(520px, calc(100vw - 32px)); padding: var(--sg-s6); border: 1px solid var(--sg-danger); border-radius: var(--sg-radius);
+    background: var(--sg-panel); color: var(--sg-ink); box-shadow: var(--sg-shadow-lg);
+  }
+  .year-dialog::backdrop { background: var(--sg-overlay); }
+  .year-dialog h2 { font-size: var(--sg-fs-xl); margin: 0 0 var(--sg-s4); }
+  .year-dialog ul { margin: 0 0 var(--sg-s4); padding-left: 1.2em; line-height: var(--sg-lh); }
+  .year-dialog input { width: 100%; margin-top: var(--sg-s2); }
+  .year-dialog .actions { justify-content: flex-end; }
 
   .row { display: flex; gap: var(--sg-s3); flex-wrap: wrap; }
   .row > * { flex: 1 1 160px; }
   .actions { display: flex; gap: var(--sg-s2); flex-wrap: wrap; margin-top: var(--sg-s4); }
   .actions button { flex: 0 1 auto; min-width: 120px; }
+  /* 지금 상태 칸의 전체 끄기·새로고침·로그아웃은 같은 너비 */
+  .actions.same-width button { flex: 0 0 160px; }
 
   .msg { font-size: var(--sg-fs-sm); color: var(--sg-ink-mid); margin: var(--sg-s3) 0 0; line-height: var(--sg-lh); }
   .msg:empty { margin: 0; }
@@ -323,9 +337,10 @@
   @media (max-width: 600px) {
     body { padding: var(--sg-s4); }
     h1 { font-size: 20px; }
-    .sub { margin-bottom: var(--sg-s4); }
+    .title-row { margin-bottom: var(--sg-s4); }
     .panel { padding: var(--sg-s4); }
     .actions button { flex: 1 1 120px; }
+    .actions.same-width button { flex: 1 1 0; min-width: 0; }
     /* 제목은 한 줄을 다 쓰고, 빌드·통계·스위치는 그 아래 한 줄에 */
     .game-head { flex-wrap: wrap; }
     .game-info { flex-basis: 100%; }
@@ -345,7 +360,6 @@
     <h1>수업 자료 제어판</h1>
     <button id="themeToggle" type="button" class="btn" aria-label="화면 밝기 전환"></button>
   </div>
-  <p class="sub">반을 고른 뒤 스위치를 켜면 그 반 학생만 바로 들어갈 수 있고, 끄면 즉시 막힙니다. 저장 버튼은 없습니다.</p>
 
   <!-- 로그인 -->
   <div class="panel" id="loginPanel">
@@ -361,8 +375,8 @@
     <div class="panel">
       <h2>지금 상태</h2>
       <div class="summary"><span class="dot" id="dot"></span><span id="summaryText">불러오는 중…</span></div>
-      <div class="actions">
-        <button id="allOff" type="button">전체 끄기 (10개 반·일반배포용·학생배포용·대회서버 모두)</button>
+      <div class="actions same-width">
+        <button id="allOff" type="button">전체 끄기</button>
         <button id="reload" type="button">새로고침</button>
         <button id="logout" type="button">로그아웃</button>
       </div>
@@ -378,20 +392,17 @@
       <p class="class-grade">2학년</p>
       <div class="class-grid" id="classGrid2"></div>
       <!-- 일반배포용·학생배포용: 학생 첫 화면에는 안 나오고 신기록도 등록되지 않습니다. 잠금은 각각 따로(classes/test, classes/student) -->
-      <p class="class-grade">배포용 (선생님·지인·학생 배포용 — 학생 첫 화면에는 나오지 않음)</p>
+      <p class="class-grade">배포용</p>
       <div class="class-grid class-grid-test" id="classGridTest">
         <button id="copyTestLink" type="button" title="일반배포용 목록 링크를 클립보드에 복사합니다">일반배포용 링크 복사</button>
         <button id="copyStudentLink" type="button" title="학생배포용 목록 링크를 클립보드에 복사합니다">학생배포용 링크 복사</button>
       </div>
       <!-- 대회서버: 반 고르기 화면 맨 아래의 '대회서버'(contest.html). 대회용 자료(data.js 의 CONTEST_GAMES)만 나옵니다 -->
-      <p class="class-grade">대회서버 (반 고르기 화면 맨 아래 — 터보 랩·FPS 서바이벌·팀 배틀·좀비만)</p>
+      <p class="class-grade">대회서버</p>
       <div class="class-grid class-grid-test" id="classGridContest">
         <button id="copyContestLink" type="button" title="대회서버 링크를 클립보드에 복사합니다">대회서버 링크 복사</button>
       </div>
       <p class="msg" id="pickMsg"></p>
-      <p class="hint">반마다 링크가 다릅니다(목록 화면에서 반을 고르면 그 반의 QR 이 나옵니다). 스위치도 반마다 따로 켜고 끕니다.
-        일반·학생배포용 링크로 들어온 사람은 세계·반 신기록을 등록할 수 없습니다.
-        대회서버는 여러 반이 섞이므로 반 신기록 없이 세계 신기록만 등록합니다.</p>
     </div>
 
     <!-- 고른 반의 자료 스위치 목록 -->
@@ -533,6 +544,35 @@
         </div>
       </div>
     </div>
+
+    <!-- 새 학년도 시작(2026-10-29 선생님 요청): 일 년에 한 번만 쓰고 되돌리기 어려워서 제어판 맨 아래에 두고, 확인 창에서 문구를 쳐야 시작한다.
+         하는 일은 스크립트의 SchoolYearReset 주석. -->
+    <div class="panel year-panel" id="yearPanel">
+      <h2>새 학년도 시작</h2>
+      <p class="hint">
+        진급해서 학년·반이 바뀌었을 때 <b>새 학기 첫 수업 전에 한 번</b> 누릅니다.
+        모든 학생의 반을 비우면 학생이 <b>새 반 링크로 처음 로그인할 때 새 반이 다시 적힙니다.</b>
+        지난해 반 별 통계는 보관한 뒤 비우고, 학생의 개인 통계·최근 매치·신기록은 그대로 둡니다.
+      </p>
+      <div class="actions"><button id="yearOpen" type="button">새 학년도 시작…</button></div>
+      <p class="msg" id="yearMsg"></p>
+    </div>
+
+    <dialog class="year-dialog" id="yearDialog">
+      <h2>새 학년도를 시작할까요?</h2>
+      <ul>
+        <li>모든 학생의 반이 비워져 <b>반 별 통계에서 학생이 모두 사라집니다.</b></li>
+        <li>학생이 새 반 링크(<code>?c=학년-반</code>)로 로그인하면 그 반으로 다시 적힙니다.</li>
+        <li>지난해 반 별 통계는 데이터베이스 <code>archive</code> 칸에 날짜 이름으로 보관됩니다.</li>
+        <li>개인 통계·최근 매치·개인 기록·세계/반 신기록은 바뀌지 않습니다.</li>
+      </ul>
+      <label for="yearTyped">계속하려면 <b>새 학년도 시작</b> 을 그대로 입력하세요.</label>
+      <input id="yearTyped" type="text" autocomplete="off" placeholder="새 학년도 시작">
+      <div class="actions">
+        <button id="yearCancel" type="button">취소</button>
+        <button id="yearGo" type="button" disabled>시작</button>
+      </div>
+    </dialog>
 
   </div>
 
@@ -2375,12 +2415,111 @@ class PatchNotePanel {
     });
   }
 }
-/* 패치노트 칸이 교사 토큰으로 데이터베이스를 읽고 쓰는 통로(상태 없음) */
+/* 패치노트·새 학년도 칸이 교사 토큰으로 데이터베이스를 읽고 쓰는 통로(상태 없음). keys 는 아이디 목록만 받는 얕은 읽기 */
 class AdminRestIo {
   async read(path) { const r = await fetch(await authedUrl(path), { cache: "no-store" }); if (!r.ok) throw new Error(String(r.status)); return r.json(); }
+  async keys(path) { const r = await fetch(await authedUrl(path) + "&shallow=true", { cache: "no-store" }); if (!r.ok) throw new Error(String(r.status)); return Object.keys((await r.json()) || {}); }
   async patch(values) { const r = await fetch(await authedUrl(""), { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(values) }); if (!r.ok) throw new Error(String(r.status)); }
 }
 new PatchNotePanel(new PatchNoteEditor(new AdminRestIo(), { game: "patchNoteGame", title: "patchNoteTitle", body: "patchNoteText", again: "patchNoteAgain", publish: "patchNotePublish", remove: "patchNoteRemove", msg: "patchNoteMsg", preview: "patchNotePreview" })).bind();
+
+/* 새 학년도 시작(2026-10-29 선생님 요청): 학생 반(profile.cls)은 반 링크로 처음 로그인할 때 한 번만 적히고 규칙상 교사만 바꿀 수 있어서,
+   진급하면 저절로 바뀌지 않는다. 해마다 새 학기 전에 한 번 모든 학생의 반을 비우면, 학생이 새 반 링크로 처음 로그인할 때
+   새 반이 다시 적힌다(personal-records.js 의 AccountClassClaim — 기기 표시는 반 이름을 기억하므로 다른 반 링크면 다시 적는다).
+   반 별 통계 요약(classStats·gameRanks)은 옛 반 칸에 남으면 새 반 칸과 겹치므로 archive/<보관 이름>/ 에 통째로 옮겨 두고 지운다.
+   요약 값은 계정 누적이라 학생이 새 학년에 첫 판을 하면 누적 값 그대로 새 반 칸에 다시 생긴다. 개인 통계·최근 매치·신기록은 건드리지 않는다.
+   요청: 읽기 3번(users 아이디 목록·classStats·gameRanks) → 보관 쓰기 1번 → 반 비우기·요약 지우기 PATCH(몇 백 줄씩 나눔). 보관이 실패하면 아무것도 지우지 않는다. */
+class SchoolYearReset {
+  static PATCH_SIZE = 300;
+
+  constructor(io) { this.io = io; }
+
+  static archiveName(now) {
+    const two = (n) => String(n).padStart(2, "0");
+    return now.getFullYear() + two(now.getMonth() + 1) + two(now.getDate()) + "-" + two(now.getHours()) + two(now.getMinutes());
+  }
+
+  static summaryPaths(root, tree, depth) {
+    const paths = [];
+    const walk = (node, prefix, left) => {
+      if (!node || typeof node !== "object") return;
+      Object.keys(node).forEach((k) => left > 1 ? walk(node[k], prefix + "/" + k, left - 1) : paths.push(prefix + "/" + k));
+    };
+    walk(tree, root, depth);
+    return paths;
+  }
+
+  async run(report) {
+    report("학생 목록과 반 별 통계를 읽는 중…");
+    const [uids, classStats, gameRanks] = await Promise.all([this.io.keys("users"), this.io.read("classStats"), this.io.read("gameRanks")]);
+    const name = SchoolYearReset.archiveName(new Date());
+    report("지난 반 별 통계를 archive/" + name + " 에 보관하는 중…");
+    const archive = {};
+    archive["archive/" + name] = { classStats: classStats || null, gameRanks: gameRanks || null, students: uids.length, at: { ".sv": "timestamp" } };
+    await this.io.patch(archive);
+    const clears = uids.map((uid) => "users/" + uid + "/profile/cls")
+      .concat(SchoolYearReset.summaryPaths("classStats", classStats, 2))
+      .concat(SchoolYearReset.summaryPaths("gameRanks", gameRanks, 3));
+    let failed = 0;
+    for (let i = 0; i < clears.length; i += SchoolYearReset.PATCH_SIZE) {
+      report("반을 비우는 중… " + Math.min(i + SchoolYearReset.PATCH_SIZE, clears.length) + " / " + clears.length);
+      failed += await this.clear(clears.slice(i, i + SchoolYearReset.PATCH_SIZE));
+    }
+    return { name, students: uids.length, failed };
+  }
+
+  /* 한 묶음이 거부되면 어느 줄 때문인지 모르므로 한 줄씩 다시 보내고, 끝내 안 되는 줄 수를 돌려준다 */
+  async clear(paths) {
+    const values = (list) => Object.fromEntries(list.map((p) => [p, null]));
+    try { await this.io.patch(values(paths)); return 0; } catch (e) { /* 아래에서 한 줄씩 */ }
+    let failed = 0;
+    for (const p of paths) {
+      try { await this.io.patch(values([p])); } catch (e) { failed++; }
+    }
+    return failed;
+  }
+}
+
+/* 제어판 맨 아래 새 학년도 칸: 실수로 누르지 않게 확인 창에서 문구를 그대로 쳐야 시작 버튼이 켜진다 */
+class SchoolYearPanel {
+  static CONFIRM_TEXT = "새 학년도 시작";
+
+  constructor(reset) { this.reset = reset; this.busy = false; }
+
+  bind() {
+    $("yearOpen").addEventListener("click", () => this.open());
+    $("yearTyped").addEventListener("input", () => { $("yearGo").disabled = $("yearTyped").value.trim() !== SchoolYearPanel.CONFIRM_TEXT; });
+    $("yearCancel").addEventListener("click", () => $("yearDialog").close());
+    $("yearGo").addEventListener("click", () => this.start());
+  }
+
+  open() {
+    if (this.busy) return;
+    $("yearTyped").value = "";
+    $("yearGo").disabled = true;
+    $("yearDialog").showModal();
+    $("yearTyped").focus();
+  }
+
+  async start() {
+    if ($("yearTyped").value.trim() !== SchoolYearPanel.CONFIRM_TEXT) return;
+    $("yearDialog").close();
+    this.busy = true;
+    $("yearOpen").disabled = true;
+    try {
+      const done = await this.reset.run((text) => say("yearMsg", text));
+      say("yearMsg", "끝났습니다. 학생 " + done.students + "명의 반을 비웠고, 지난 반 별 통계는 archive/" + done.name + " 에 보관했습니다."
+        + (done.failed ? " (" + done.failed + "줄은 지우지 못했습니다. 다시 누르면 남은 것만 지웁니다.)" : ""));
+    } catch (e) {
+      const denied = e.message === "401" || e.message === "403";
+      say("yearMsg", denied ? "거부되었습니다. 데이터베이스 규칙(archive 칸)을 콘솔에 게시했는지 확인해 주세요. 아무것도 지우지 않았습니다." : "중간에 멈췄습니다 (" + e.message + "). 다시 눌러 주세요.");
+    } finally {
+      this.busy = false;
+      $("yearOpen").disabled = false;
+    }
+  }
+}
+new SchoolYearPanel(new SchoolYearReset(new AdminRestIo())).bind();
 
 window.__portalBooted = true;
 if (!cfg.isAdminReady()) {
