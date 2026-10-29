@@ -155,15 +155,16 @@
   /* 제어판 안의 표(반별 순위·렉 진단)는 창 높이에 갇히지 않고 끝까지 펼친다 — 페이지 스크롤과 표 스크롤이 겹치지 않게(2026-10-27 선생님 요청) */
   #rankBody { margin-top: var(--sg-s4); }
   .rank-divider { margin: var(--sg-s4) 0; border: 0; border-top: 1px solid var(--sg-line-mid); }
-  .panel .stats-box { max-height: none; overflow-x: auto; overflow-y: visible; }
+  .panel .stats-box, .tool-sheet .stats-box { max-height: none; overflow-x: auto; overflow-y: visible; box-shadow: none; }
   /* 관리 도구 탭(서류철 모양): 고른 탭과 아래 펼친 칸을 같은 밝은 색으로 칠해 한 장처럼 보이게 한다 */
   .tool-box { --tool-lit: color-mix(in srgb, var(--sg-panel) 91%, #fff); margin-bottom: var(--sg-s4); }
   .tool-tabs { display: flex; flex-wrap: wrap; gap: var(--sg-s1); align-items: flex-end; }
-  .tool-tab { position: relative; min-height: 48px; padding: var(--sg-s3) var(--sg-s5); border: 1px solid var(--sg-line-mid); border-radius: 10px 10px 0 0;
+  .tool-tab { position: relative; min-height: 48px; padding: var(--sg-s3) var(--sg-s5); border: 1px solid var(--sg-line-mid); border-radius: var(--sg-radius) var(--sg-radius) 0 0;
     background: var(--sg-panel); color: var(--sg-ink-soft); font-size: var(--sg-fs-lg); font-weight: 800; box-shadow: none; }
   .tool-tab:hover { background: var(--sg-panel-alt); color: var(--sg-ink); }
   .tool-tab.on { z-index: 1; margin-bottom: -1px; padding-bottom: calc(var(--sg-s3) + 1px); border-color: var(--sg-line-strong); border-bottom-color: var(--tool-lit); background: var(--tool-lit); color: var(--sg-ink); }
-  .tool-sheet { padding: var(--sg-s6); border: 1px solid var(--sg-line-strong); border-radius: 0 var(--sg-radius) var(--sg-radius) var(--sg-radius); background: var(--tool-lit); box-shadow: var(--sg-shadow-sm); }
+  .tool-sheet { padding: var(--sg-s6); border: 1px solid var(--sg-line-strong); border-radius: var(--sg-radius); background: var(--tool-lit); box-shadow: var(--sg-shadow-sm); }
+  .tool-box.first-on .tool-sheet { border-top-left-radius: 0; }
   .tool-sheet .hint:first-child { margin-top: 0; }
   /* 패치노트 미리 보기: 학생 화면 창(patch-notes.js 의 PatchNoteDialog)과 같은 어두운 판 */
   .patch-note-preview:not(:empty) { margin-top: var(--sg-s3); padding: 16px 20px; border-radius: 12px; background: rgba(16,24,19,.96); border-top: 3px solid #D97B4F; color: #EEF2EE; }
@@ -2354,6 +2355,7 @@ class ToolTabs {
       tab.setAttribute("aria-selected", on ? "true" : "false");
     });
     $("toolSheet").hidden = !reopen;
+    $("toolBox").classList.toggle("first-on", reopen && this.tabs[0].dataset.tool === key);
   }
 }
 new ToolTabs().bind();
