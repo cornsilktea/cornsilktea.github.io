@@ -114,7 +114,7 @@
     </div>
   </div>
   <div id="charCardBox" class="card charCol">
-    <div class="secTitle charHead"><span>캐릭터<span id="charHint" class="secHint">선택한 캐릭터를 한 번 더 누르면 자세한 설명이 나와요.</span></span><span class="charBtns"><button id="btnStats" class="mini" type="button">전체 통계</button><button id="btnZoomChars" class="mini" type="button">확대</button><button id="btnFlipAll" class="mini" type="button">모든 카드 뒤집기</button></span></div>
+    <div class="secTitle charHead"><span>캐릭터<span id="charHint" class="secHint">선택한 캐릭터를 한 번 더 누르면 자세한 설명이 나와요.</span></span><span class="charBtns"><button id="btnPatchNote" class="mini" type="button">패치노트</button><button id="btnStats" class="mini" type="button">전체 통계</button><button id="btnZoomChars" class="mini" type="button">확대</button><button id="btnFlipAll" class="mini" type="button">모든 카드 뒤집기</button></span></div>
     <div class="chars" id="chars"></div>
   </div>
   </div>
@@ -291,7 +291,7 @@
 <script charset="utf-8" src="account-match-kit.js?v=20261029b"></script>
 <script charset="utf-8" src="account-stats.js?v=20261029d"></script>
 <script charset="utf-8" src="30.team-battle-versus.js?v=20261029b"></script>
-<script charset="utf-8" src="patch-notes.js?v=20261029a"></script>
+<script charset="utf-8" src="patch-notes.js?v=20261029b"></script>
 <script type="module">
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
@@ -10329,7 +10329,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       new GameEvents(services).bind();
       new SceneBoot(services).build();
       new AppLauncher(services).launch();
-      if (!Environment.SILENT_RUN) new PatchNoteNotice("teambattle", "팀 배틀 아레나").watch();
+      var patchNotes = new PatchNoteNotice("teambattle", "팀 배틀 아레나");
+      if (!Environment.SILENT_RUN) patchNotes.watch();
+      Dom.$("btnPatchNote").onclick = function () { patchNotes.reopen(); };
     }
   }
   new App().start();

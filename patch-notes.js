@@ -74,7 +74,7 @@ class PatchNoteDialog {
         back.className = "pn-back";
         back.setAttribute("role", "dialog");
         back.setAttribute("aria-modal", "true");
-        back.innerHTML = '<div class="pn-box"><div class="pn-head"><div class="pn-tag">📢 ' + PatchNoteText.esc(gameTitle) + " 패치노트 · " + PatchNoteText.when(note.at) + "</div>" +
+        back.innerHTML = '<div class="pn-box"><div class="pn-head"><div class="pn-tag">📢 ' + PatchNoteText.esc(gameTitle) + " 패치노트" + (note.at ? " · " + PatchNoteText.when(note.at) : "") + "</div>" +
             '<div class="pn-title">' + PatchNoteText.esc(note.title || "새 패치 안내") + "</div></div>" +
             '<div class="pn-body">' + PatchNoteText.esc(note.body) + "</div>" +
             '<div class="pn-foot"><button class="pn-ok" type="button">확인</button></div></div>';
@@ -103,7 +103,27 @@ PatchNoteDialog.STYLE = [
     ".pn-foot{padding:14px 22px 18px;text-align:right;}",
     ".pn-ok{min-width:120px;padding:10px 18px;border:0;border-radius:10px;background:#D97B4F;color:#fff;font:800 16px var(--sg-font,\"Nanum Gothic\",sans-serif);cursor:pointer;}"
 ].join("");
-/* 게임 쪽: 로그인이 끝나면 패치노트를 한 번 읽고, 이 계정이 아직 안 본 것이면 창을 띄운다 */
+/* 게임별 패치노트 한 편을 REST 로 읽는다(portal 은 누구나 읽을 수 있어 로그인 없이도 된다). 한 번 읽은 것은 들고 있다 */
+class PatchNoteSource {
+    constructor(game) {
+        this.game = game;
+        this.note = null;
+    }
+    async latest(fresh) {
+        const config = window.PORTAL_CONFIG;
+        if (this.note && !fresh)
+            return this.note;
+        if (!config)
+            return this.note;
+        const response = await fetch(config.DB_URL.replace(/\/+$/, "") + "/" + PatchNoteCodec.path(this.game) + ".json", { cache: "no-store" });
+        if (!response.ok)
+            throw new Error("patch note " + response.status);
+        this.note = PatchNoteCodec.decode(await response.json());
+        return this.note;
+    }
+}
+/* 게임 쪽: 로그인이 끝나면 패치노트를 한 번 읽고, 이 계정이 아직 안 본 것이면 창을 띄운다.
+   reopen() 은 게임 화면의 `패치노트` 버튼(2026-10-29 선생님 요청)이 부른다 — 본 것이어도 지금 패치노트를 다시 보여 준다(누를 때만 읽기 1번, 이미 읽었으면 0번) */
 class PatchNoteNotice {
     constructor(game, gameTitle, dialog = new PatchNoteDialog()) {
         this.game = game;
@@ -111,19 +131,31 @@ class PatchNoteNotice {
         this.dialog = dialog;
         this.checkedFor = "";
         this.seen = new PatchNoteSeen(game);
+        this.source = new PatchNoteSource(game);
     }
     watch() {
         document.addEventListener(PatchNoteNotice.USER_EVENT, () => { void this.check(); });
         void this.check();
     }
+    async reopen() {
+        let note;
+        try {
+            note = (await this.source.latest(false)) || PatchNoteNotice.EMPTY_NOTE;
+        }
+        catch (error) {
+            note = PatchNoteNotice.FAILED_NOTE;
+        }
+        const user = window.PORTAL_USER;
+        this.dialog.show(this.gameTitle, note, () => { if (user && note.id)
+            this.seen.mark(user.uid, note.id); });
+    }
     async check() {
-        const user = window.PORTAL_USER, config = window.PORTAL_CONFIG;
-        if (!user || !config || this.checkedFor === user.uid)
+        const user = window.PORTAL_USER;
+        if (!user || !window.PORTAL_CONFIG || this.checkedFor === user.uid)
             return;
         this.checkedFor = user.uid;
         try {
-            const response = await fetch(config.DB_URL.replace(/\/+$/, "") + "/" + PatchNoteCodec.path(this.game) + ".json", { cache: "no-store" });
-            const note = response.ok ? PatchNoteCodec.decode(await response.json()) : null;
+            const note = await this.source.latest(true);
             if (!note || this.seen.has(user.uid, note.id))
                 return;
             this.dialog.show(this.gameTitle, note, () => this.seen.mark(user.uid, note.id));
@@ -134,6 +166,8 @@ class PatchNoteNotice {
     }
 }
 PatchNoteNotice.USER_EVENT = "portal-user-changed";
+PatchNoteNotice.EMPTY_NOTE = { id: 0, title: "아직 패치노트가 없어요", body: "새 패치노트가 올라오면 여기에서 볼 수 있어요.", at: 0 };
+PatchNoteNotice.FAILED_NOTE = { id: 0, title: "패치노트를 불러오지 못했어요", body: "인터넷 연결을 확인하고 잠시 뒤 다시 눌러 주세요.", at: 0 };
 /* 제어판 쪽: 게임별 패치노트 쓰기·고치기·내리기 */
 class PatchNoteEditor {
     constructor(io, ids) {

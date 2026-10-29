@@ -31,7 +31,7 @@
 - `admin.html` `RankGame.GAMES` 에 `new RankGame("<게임키>", "<이름>(<번호>)", { label: "x 칸 이름" } 또는 null, "무엇을 세는지")` — 번호 순서 자리에.
 - `admin.html`: 그 게임 통계 `.js` 를 `<script>` 로 불러오고(30번 줄 아래), `RankGame` 다섯째 인자로 `() => ({ profile: new 게임Profile(), view: new 게임View() })` 를 넘긴다 → 반 별 통계에서 학생 이름을 누르면 학생이 보는 것과 같은 개인 통계 창(`StudentAccountWindow` = `AccountStatsDialog` + `AccountTeacherReader`)이 열린다(2026-10-28 선생님 요청). 승패만 남기는 게임은 `RandomMatchProfile`·`RandomMatchView`.
 - `tools/account-stats-unit.js` 에 그 게임의 `GameCase`(저장 → 되살리기 왕복·집계 판정·규칙 통과)와 미리 적기(`pendingCase`) 한 줄씩.
-- HTML 에 `match-kit.js`·`account-match-kit.js`·`<번호>.<이름>-stats.js` 를 `?v=` 와 함께 불러오고, 시작 화면 요소에 `data-account-home`.
+- HTML 에 `match-kit.js`·`account-match-kit.js`·`<번호>.<이름>-stats.js` 를 `?v=` 와 함께 불러온다(시작 화면 `data-account-home` 은 2026-10-29 부터 필요 없음).
 
 **공통 규칙은 이 파일 위의 "모든 게임 공통 규칙"을 그대로 따른다**(로그인한 학생만, 판 끝 쓰기 1번·창 열 때 읽기 1번, 사람끼리 판만 누적, 랜덤 매칭은 언제 나가도 패배, 미리 적는 패배, 파생값 저장 안 함).
 끝나면 `npx tsc -p .` → `node tools/account-stats-unit.js` → `node tools/match-sim.js` → `?c=test` 화면에서 버튼·로그인 안내 확인 → 커밋·푸시.
@@ -73,9 +73,8 @@
 
 ## 2026-10-27 선생님 요청으로 바뀐 것(로그아웃·반별 순위·랜덤 매칭 패배·아이디 연승·최근 20매치)
 
-- **로그아웃 버튼은 초기화면에서만**: `account-login.ts` 의 `AccountChipPlacement`. 목록 화면(index·contest 의 script 에 `data-account-chip="always"`)은 늘 보이고,
-  게임은 시작 화면 요소에 `data-account-home` 을 단 곳이 보일 때만 보인다(대기실·경기·결과에서는 숨김). 표시가 없는 자료(퀴즈 등)는 안 보인다 — 로그아웃은 목록 화면에서.
-  새 게임은 시작 화면 요소에 `data-account-home` 을 단다. 화면이 보이는지는 기기 안에서 0.4초마다 확인한다(네트워크 아님). 30번의 예전 숨김 코드는 지웠다.
+- **로그아웃 버튼은 목록 화면에서만**(2026-10-29 선생님 요청으로 바꿈, 그 전은 게임 시작 화면에도 있었음): `account-login.ts` 의 `AccountChipPlacement.onListPage()`. 목록 화면(index.html "정보 수업용 링크 모음"·contest.html 대회서버 목록, script 에 `data-account-chip="always"`)에서만 버튼을 만들고, 게임·퀴즈에서는 아예 만들지 않는다.
+  게임 시작 화면의 `data-account-home` 표시는 남아 있지만 이제 아무 일도 하지 않는다(새 게임에 달 필요 없음). 0.4초마다 확인하던 것도 없앴다.
 - **최근 매치 20칸**: `RecentMatchRing.SLOTS = 20`, 경로 `users/<uid>/recent/<게임키>/<0~19>`, 규칙 `$slot` 은 `^([0-9]|1[0-9])$`. 버튼·탭 이름도 "최근 20매치".
 - **랜덤 매칭은 언제 나가도 패배**: `MkRandomFlow.forfeitApplies` 가 진행도를 보지 않는다(문구 `MkForfeit.QUESTION` = "지금 나가면 패배로 기록됩니다. 나갈까요?").
   계정 통계도 같은 판단: 게임이 나갈 때 보고서의 진행도를 `AccountForfeit.progressOnLeave(랜덤 매칭?, 진행도)` 로 넘긴다(랜덤 매칭이면 1 → 절반 규칙에 안 걸림).

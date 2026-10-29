@@ -223,9 +223,8 @@
 
 ## 2026-10-27 선생님 요청으로 바뀐 것(로그아웃·반별 순위·랜덤 매칭 패배·아이디 연승·최근 20매치)
 
-- **로그아웃 버튼은 초기화면에서만**: `account-login.ts` 의 `AccountChipPlacement`. 목록 화면(index·contest 의 script 에 `data-account-chip="always"`)은 늘 보이고,
-  게임은 시작 화면 요소에 `data-account-home` 을 단 곳이 보일 때만 보인다(대기실·경기·결과에서는 숨김). 표시가 없는 자료(퀴즈 등)는 안 보인다 — 로그아웃은 목록 화면에서.
-  새 게임은 시작 화면 요소에 `data-account-home` 을 단다. 화면이 보이는지는 기기 안에서 0.4초마다 확인한다(네트워크 아님). 30번의 예전 숨김 코드는 지웠다.
+- **로그아웃 버튼은 목록 화면에서만**(2026-10-29 선생님 요청으로 바꿈, 그 전은 게임 시작 화면에도 있었음): `account-login.ts` 의 `AccountChipPlacement.onListPage()`. 목록 화면(index.html "정보 수업용 링크 모음"·contest.html 대회서버 목록, script 에 `data-account-chip="always"`)에서만 버튼을 만들고, 게임·퀴즈에서는 아예 만들지 않는다.
+  게임 시작 화면의 `data-account-home` 표시는 남아 있지만 이제 아무 일도 하지 않는다(새 게임에 달 필요 없음). 0.4초마다 확인하던 것도 없앴다.
 - **최근 매치 20칸**: `RecentMatchRing.SLOTS = 20`, 경로 `users/<uid>/recent/<게임키>/<0~19>`, 규칙 `$slot` 은 `^([0-9]|1[0-9])$`. 버튼·탭 이름도 "최근 20매치".
 - **랜덤 매칭은 언제 나가도 패배**: `MkRandomFlow.forfeitApplies` 가 진행도를 보지 않는다(문구 `MkForfeit.QUESTION` = "지금 나가면 패배로 기록됩니다. 나갈까요?").
   계정 통계도 같은 판단: 게임이 나갈 때 보고서의 진행도를 `AccountForfeit.progressOnLeave(랜덤 매칭?, 진행도)` 로 넘긴다(랜덤 매칭이면 1 → 절반 규칙에 안 걸림).

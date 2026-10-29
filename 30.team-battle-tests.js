@@ -5656,10 +5656,10 @@ class AccountStatsTests {
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "6명 환산점수 일치, MVP 표시 4가지(공동·피해량 가르기·없음) 일치, 블록에 점수·순위·MVP·요약 줄");
     });
 
-    run(G, "학생 화면: 캐릭터 칸 버튼이 전체 통계·확대·모든 카드 뒤집기 순이고, 시작 화면 방 코드 아래 내 통계 · 최근 20매치 버튼 창에서 서로 오가며, 로그인 전에는 안내만 뜨는가", function (done) {
+    run(G, "학생 화면: 캐릭터 칸 버튼이 패치노트·전체 통계·확대·모든 카드 뒤집기 순이고, 시작 화면 방 코드 아래 내 통계 · 최근 20매치 버튼 창에서 서로 오가며, 로그인 전에는 안내만 뜨는가", function (done) {
       var bad = [], userBefore = window.PORTAL_USER;
       var ids = Array.prototype.map.call(document.querySelectorAll(".charBtns button"), function (b) { return b.id + ":" + b.textContent; });
-      if (ids.join() !== "btnStats:전체 통계,btnZoomChars:확대,btnFlipAll:모든 카드 뒤집기") bad.push("버튼 " + ids.join());
+      if (ids.join() !== "btnPatchNote:패치노트,btnStats:전체 통계,btnZoomChars:확대,btnFlipAll:모든 카드 뒤집기") bad.push("버튼 " + ids.join());
       if (!document.querySelector("#joinBox + #btnMyStats")) bad.push("내 통계 버튼 위치");
       try {
         window.PORTAL_USER = null;
