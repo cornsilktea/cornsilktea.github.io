@@ -1,8 +1,8 @@
 const fs = require("fs"), vm = require("vm"), path = require("path");
 const root = path.join(__dirname, "..");
-const files = ["match-kit.js", "account-match-kit.js", "account-stats.js", "24.turbo-lap-stats.js", "25.fps-survival-stats.js", "31.zombie-outbreak-stats.js", "38.snow-account.js", "39.balloon-account.js", "patch-notes.js"];
+const files = ["match-kit.js", "account-match-kit.js", "account-stats.js", "30.team-battle-versus.js", "24.turbo-lap-stats.js", "25.fps-survival-stats.js", "31.zombie-outbreak-stats.js", "38.snow-account.js", "39.balloon-account.js", "patch-notes.js"];
 const names = ["AccountNumbers", "AccountRates", "AccountMatchKey", "AccountKeyLedger", "AccountForfeit", "AccountShape", "AccountRecentHeadCodec", "RecentMatchRing", "AccountLoginNotice", "RecentBlockList", "AccountGameProfile", "AccountMatchStore",
-  "TeamBattleRates", "AccountMvpJudge", "TeamBattlePlan", "TeamBattleCodec", "TeamBattleRing", "AccountStatsMath", "AccountStatsTable", "ClassStatsSummary", "TeamBattleProfile", "AccountStatsStore",
+  "TeamBattleRates", "AccountMvpJudge", "TeamBattlePlan", "TeamBattleCodec", "TeamBattleRing", "AccountStatsMath", "AccountStatsTable", "ClassStatsSummary", "TeamBattleProfile", "AccountStatsStore", "TeamBattleVersusCards",
   "TurboLapPlan", "TurboLapCodec", "TurboLapStatsMath", "TurboLapProfile", "TurboLapStatsView", "FpsPlan", "FpsCodec", "FpsStatsMath", "FpsProfile", "FpsStatsView",
   "ZombiePlan", "ZombieCodec", "ZombieStatsMath", "ZombieProfile", "ZombieStatsView", "SnAccountPlan", "SnAccountCodec", "SnAccountMath", "SnAccountProfile", "SnAccountView", "SnReportBuilder",
   "WbAccountPlan", "WbAccountCodec", "WbAccountMath", "WbAccountProfile", "WbAccountView", "WbReportBuilder",
@@ -94,6 +94,13 @@ check("절반 규칙: 절반 전에 나가면 기록 없음, 절반부터는 기
   const n = c2.node, c = n.c[ch];
   check("누적: 판·승·진영·MVP 합산", n.g === 2 && n.w === 1 && n.l === 1 && n.bg === 1 && n.bw === 1 && n.rg === 1 && n.rw === 0 && n.m === 1, n);
   check("누적: 캐릭터 이동 평균", c.n === 2 && c.k === 2 && c.d === 2 && c.a === 1 && c.dmg === 750.5 && c.bl === 5 && c.st === 0.6 && c.sl === 0.7, c);
+  const r1 = K.AccountStatsMath.apply(null, l1, { key: "r1", win: true, side: 0, mvp: false, at: 1, random: true });
+  const r2 = K.AccountStatsMath.apply(JSON.parse(JSON.stringify(r1.node)), l2, { key: "r2", win: false, side: 1, mvp: false, at: 2 });
+  check("랜덤 매칭 칸: 랜덤 매칭 판만 rm 에 셈(일반 방 판은 그대로)", r1.node.rm.g === 1 && r1.node.rm.w === 1 && r1.node.rm.c[l1.char].n === 1 && r2.node.rm.g === 1 && r2.node.g === 2, [r1.node.rm, r2.node.rm]);
+  const r3 = K.AccountStatsMath.apply(JSON.parse(JSON.stringify(r1.node)), l1, { key: "r3", win: false, side: 0, mvp: false, at: 3, random: true });
+  check("랜덤 매칭 칸: 두 번째 랜덤 판은 판 +1", r3.node.rm.g === 2 && r3.node.rm.c[l1.char].n === 2, r3.node.rm);
+  const vsCard = K.TeamBattleVersusCards.fromStats(r2.node, () => true);
+  check("랜덤 매칭 칸: 대결 화면 카드는 rm 만 읽음(일반 방 판 제외)", vsCard.g === 1 && vsCard.w === 1 && vsCard.top.length === 1 && vsCard.top[0].n === 1, vsCard);
   check("누적: 같은 열쇠는 두 번 올라가지 않음", K.AccountStatsMath.apply(n, l2, { key: "k1", win: true, side: 0, mvp: true, at: 3 }) === null);
 }
 
@@ -502,6 +509,10 @@ const pendingChecks = (async () => {
   check("연승 규칙: 같은 판 표시로 연승을 올리면 거부", !legal(three, { n: 9, b: 9, id: "m3", p: "x" }) && S.arm(armed, "m4") === null && S.normalize({ n: 1, b: 1, id: "a", p: "a" }).p === undefined);
 })();
 (() => {
+  const before = { g: 1, w: 1, c: { warrior: { n: 1, w: 1 } } }, rmErrors = [], rmCheat = [];
+  RuleChecker.validate(RULES.stats.teambattle.rm, { g: 2, w: 1, c: { warrior: { n: 2, w: 1 } } }, before, {}, "rm", rmErrors);
+  RuleChecker.validate(RULES.stats.teambattle.rm, { g: 3, w: 1, c: { warrior: { n: 3, w: 1 } } }, before, {}, "rm", rmCheat);
+  check("랜덤 매칭 칸: 규칙 통과(판 +1), 한 번에 2판 올리면 거부", rmErrors.length === 0 && rmCheat.length > 0, rmErrors);
   const rule = RULES.stats.teambattle.c.$char;
   const ok = (before, after) => { const errors = []; RuleChecker.validate(rule, after, before, { $char: "knight" }, "c/knight", errors); return errors.length === 0; };
   const old = { n: 4, w: 2, bg: 2, bw: 1, rg: 2, rw: 1, m: 1, kn: 4, k: 2, d: 1, a: 3, dmg: 500, hl: 0, bl: 0, st: 1, sl: 0 };

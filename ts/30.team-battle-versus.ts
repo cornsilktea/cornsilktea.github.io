@@ -22,6 +22,8 @@ interface TeamBattleVersusLook {
   nameOf(charId: string): string;
 }
 
+type TeamBattleVersusSlot = TeamBattleVersusSeat | null | "empty";
+
 type TeamBattleVersusRoomCard = { g: number; w: number; t: [string, number, number][] };
 
 class TeamBattleVersusCards {
@@ -29,13 +31,10 @@ class TeamBattleVersusCards {
 
   static fromStats(node: AccountStatsNode | null, known: (charId: string) => boolean): TeamBattleVersusCard | null {
     if (!node) return null;
-    const chars = AccountShape.slots(node.c);
-    const picks = Object.keys(chars).filter(known).map((c) => {
-      const item = (chars[c] && typeof chars[c] === "object" ? chars[c] : {}) as Record<string, unknown>;
-      return { c, n: AccountNumbers.count(item.n), w: AccountNumbers.count(item.w) };
-    }).filter((pick) => pick.n > 0);
+    const random = node.rm || AccountStatsMath.normalizeRandom(null);
+    const picks = Object.keys(random.c).filter(known).map((c) => ({ c, n: random.c[c].n, w: random.c[c].w })).filter((pick) => pick.n > 0);
     picks.sort((a, b) => b.n - a.n || b.w - a.w || a.c.localeCompare(b.c));
-    return { g: AccountNumbers.count(node.g), w: AccountNumbers.count(node.w), top: picks.slice(0, TeamBattleVersusCards.TOP) };
+    return { g: random.g, w: random.w, top: picks.slice(0, TeamBattleVersusCards.TOP) };
   }
 
   static toRoom(card: TeamBattleVersusCard): TeamBattleVersusRoomCard {
@@ -62,7 +61,7 @@ class TeamBattleVersusView {
     this.root.textContent = "";
   }
 
-  render(mapName: string, blue: (TeamBattleVersusSeat | null)[], red: (TeamBattleVersusSeat | null)[]): void {
+  render(mapName: string, blue: TeamBattleVersusSlot[], red: TeamBattleVersusSlot[]): void {
     const key = JSON.stringify([mapName, blue, red]);
     if (key === this.shownKey) return;
     const animate = !this.shownKey;
@@ -75,13 +74,14 @@ class TeamBattleVersusView {
     if (animate) window.setTimeout(() => this.root.classList.remove("tbv-enter"), TeamBattleVersusView.ENTER_MS);
   }
 
-  private sideHtml(team: "blue" | "red", seats: (TeamBattleVersusSeat | null)[]): string {
+  private sideHtml(team: "blue" | "red", seats: TeamBattleVersusSlot[]): string {
     const rows: string[] = [];
     for (let i = 0; i < 3; i++) rows.push(this.rowHtml(seats[i] || null));
     return '<div class="tbv-side ' + team + '"><div class="tbv-team">' + (team === "blue" ? "블루 팀" : "레드 팀") + "</div>" + rows.join("") + "</div>";
   }
 
-  private rowHtml(seat: TeamBattleVersusSeat | null): string {
+  private rowHtml(seat: TeamBattleVersusSlot): string {
+    if (seat === "empty") return '<div class="tbv-row waiting"><div class="tbv-who"><b>빈 자리</b><span class="tbv-rate">&nbsp;</span></div>' + this.picksHtml([]) + "</div>";
     if (!seat) return '<div class="tbv-row waiting"><div class="tbv-who"><b>입장하는 중…</b><span class="tbv-rate">&nbsp;</span></div>' + this.picksHtml([]) + "</div>";
     return '<div class="tbv-row' + (seat.me ? " me" : "") + '"><div class="tbv-who"><b>' + (seat.ai ? "🤖 " : "") + AccountHtml.esc(seat.nick) + "</b>"
       + '<span class="tbv-rate">' + this.rateHtml(seat) + "</span></div>"

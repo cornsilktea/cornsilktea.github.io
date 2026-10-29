@@ -204,9 +204,13 @@ class TurboLapRates {
     constructor(account) {
         this.account = account;
         this.node = null;
+        this.loaded = false;
     }
     load() {
-        return this.account.loadStats().then((node) => { this.node = node; }).catch(() => undefined);
+        return this.account.loadStats().then((node) => { this.node = node; this.loaded = true; }).catch(() => undefined);
+    }
+    loadOnce() {
+        return this.loaded ? Promise.resolve() : this.load();
     }
     static cardOf(raw) {
         if (!raw || typeof raw !== "object")

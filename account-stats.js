@@ -8,6 +8,7 @@
        c/<캐릭터> = { n 판, w 승, bg, bw, rg, rw, m MVP 횟수, kn 킬·데스·어시스트 평균 분모,
                       k·d·a 평균 킬·데스·어시스트, dmg·hl·bl 평균 피해·회복·막은 피해, st·sl 평균 기절·둔화(초),
                       scn·sc 평균 환산점수의 판 수·평균(2026-10-28 추가 — 그 전 판은 없어서 n 과 따로 센다) }
+       rm = { g, w, c/<캐릭터> = { n, w } } 랜덤 매칭 판만 센 판·승(2026-10-29 추가, 대결 화면용 — 그 전 판은 없다)
        ids = 최근에 올린 경기 열쇠(같은 판을 두 번 올리지 않게, 최근 AccountKeyLedger.KEEP 개만)
      users/<uid>/recent/teambattle/<0~19>  최근 매치 20칸(값 배열, TeamBattleCodec) — 칸 이름 규칙으로도 20판을 넘지 못한다
      classStats/<학년-반|none>/<uid> { n 이름, g, w, m }  교사 화면 반별 승률 순위용 요약(교사만 읽음)
@@ -146,7 +147,22 @@ class AccountStatsMath {
         const chars = AccountShape.slots(source.c);
         node.c = {};
         Object.keys(chars).forEach((key) => { node.c[key] = AccountStatsMath.normalizeChar(chars[key]); });
+        node.rm = AccountStatsMath.normalizeRandom(source.rm);
         return node;
+    }
+    static normalizeRandom(raw) {
+        const source = (raw && typeof raw === "object" ? raw : {}), chars = AccountShape.slots(source.c);
+        const node = { g: AccountNumbers.count(source.g), w: AccountNumbers.count(source.w), c: {} };
+        Object.keys(chars).forEach((key) => {
+            const item = (chars[key] && typeof chars[key] === "object" ? chars[key] : {});
+            node.c[key] = { n: AccountNumbers.count(item.n), w: AccountNumbers.count(item.w) };
+        });
+        return node;
+    }
+    static applyRandom(before, charId, win) {
+        const pair = before.c[charId] || { n: 0, w: 0 }, c = Object.assign({}, before.c);
+        c[charId] = { n: pair.n + 1, w: pair.w + (win ? 1 : 0) };
+        return { g: before.g + 1, w: before.w + (win ? 1 : 0), c };
     }
     static normalizeChar(raw) {
         const node = AccountStatsMath.emptyChar();
@@ -170,13 +186,14 @@ class AccountStatsMath {
             rw: before.rw + (!blue && outcome.win ? 1 : 0),
             m: before.m + (outcome.mvp ? 1 : 0),
             ids: Object.assign({}, ids),
-            c: Object.assign({}, before.c || {})
+            c: Object.assign({}, before.c || {}),
+            rm: outcome.random ? AccountStatsMath.applyRandom(before.rm || AccountStatsMath.normalizeRandom(null), line.char, outcome.win) : before.rm
         };
         node.ids[outcome.key] = outcome.at;
         const evictedKeys = AccountKeyLedger.overflowKeys(node.ids);
         evictedKeys.forEach((key) => { delete node.ids[key]; });
         node.c[line.char] = AccountStatsMath.applyChar(node.c[line.char] || AccountStatsMath.emptyChar(), line, outcome);
-        return { node, charId: line.char, addedKey: outcome.key, evictedKeys };
+        return { node, charId: line.char, addedKey: outcome.key, evictedKeys, random: !!outcome.random };
     }
     static applyChar(before, line, outcome) {
         const blue = outcome.side === 0;
@@ -257,7 +274,7 @@ class TeamBattleProfile extends AccountGameProfile {
     }
     applyStats(raw, report, plan, key, at) {
         const me = report.players[report.myIndex];
-        const change = AccountStatsMath.apply(raw, me, { key, win: plan.win, side: me.team, mvp: plan.mvp, at });
+        const change = AccountStatsMath.apply(raw, me, { key, win: plan.win, side: me.team, mvp: plan.mvp, at, random: !!report.random });
         return change ? { node: change.node, patch: this.statsPatch(change) } : null;
     }
     extraReadPath() {
@@ -283,6 +300,11 @@ class TeamBattleProfile extends AccountGameProfile {
         values["c/" + change.charId] = node.c[change.charId];
         values["ids/" + change.addedKey] = node.ids[change.addedKey];
         change.evictedKeys.forEach((key) => { values["ids/" + key] = null; });
+        if (change.random && node.rm) {
+            values["rm/g"] = node.rm.g;
+            values["rm/w"] = node.rm.w;
+            values["rm/c/" + change.charId] = node.rm.c[change.charId];
+        }
         return values;
     }
 }

@@ -557,7 +557,7 @@
 <script charset="utf-8" src="character-maker.js?v=20261026a"></script>
 <script charset="utf-8" src="match-kit.js?v=20261029c"></script>
 <script charset="utf-8" src="account-match-kit.js?v=20261029c"></script>
-<script charset="utf-8" src="24.turbo-lap-stats.js?v=20261029b"></script>
+<script charset="utf-8" src="24.turbo-lap-stats.js?v=20261029c"></script>
 <script>new CharacterMakerDialog(undefined, false);</script>
 <script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }</script>
 <script type="module">
@@ -3863,6 +3863,31 @@ class MenuCornerButtons {
     });
   }
 }
+class TurboRoomVersus {
+  static SHOW_MS = 4000;
+  static SLACK_MS = 3000;
+  static instance = null;
+  static get main() { return TurboRoomVersus.instance || (TurboRoomVersus.instance = new TurboRoomVersus()); }
+  constructor() { this.vsAt = 0; this.hostTimer = 0; this.closeTimer = 0; }
+  watch(ref) { this.vsAt = 0; sub(ref.child("vsAt"), "value", s => { this.vsAt = s.val() || 0; this.follow(); }); }
+  leftMs() { return turboRandom.ticket() || !this.vsAt ? 0 : this.vsAt + TurboRoomVersus.SHOW_MS + TurboRoomVersus.SLACK_MS - tnow(); }
+  active() { return BT.status === "lobby" && this.leftMs() > 0; }
+  follow() {
+    clearTimeout(this.closeTimer);
+    if (BT.status !== "lobby" || (cardNow !== "lobby" && cardNow !== "found")) return;
+    const left = this.leftMs();
+    if (left > 0) this.closeTimer = setTimeout(() => this.follow(), left);
+    showCard(turboRandom.roomCard());
+    turboRandom.renderVersus();
+  }
+  requestStart() {
+    if (turboRandom.ticket()) { hostStart(); return; }
+    if (!isHost() || BT.status !== "lobby" || !humanRacerReady() || battleLoadSync.blocksStart() || this.leftMs() > 0) return;
+    BT.ref.update({ vsAt: tnow() });
+    clearTimeout(this.hostTimer);
+    this.hostTimer = setTimeout(() => hostStart(), TurboRoomVersus.SHOW_MS);
+  }
+}
 class VersusCurtain {
   static MIN_MS = 2000;
   static FADE_MS = 350;
@@ -4643,7 +4668,7 @@ function askNickFirst() {
   CharacterMakerDialog.requestOpen();
 }
 function bMsg(t) { $("bStartMsg").textContent = t || ""; }
-function newPlayer(team, t) { return { nickname: PlayerProfile.storedNick(), team, car: garage.key, joinedAt: t }; }
+function newPlayer(team, t) { const rate = turboRandom.rates.forRoom(); return Object.assign({ nickname: PlayerProfile.storedNick(), team, car: garage.key, joinedAt: t }, rate ? { rate } : {}); }
 
 function roomCodes() {
   const base = String((window.PORTAL_CONFIG || {}).DB_URL || "").replace(/\/+$/, "");
@@ -4671,6 +4696,7 @@ async function createRoom() {
   try {
     await connectDb();
     await sweepRooms();
+    await turboRandom.rates.loadOnce();
     for (let n = 0; n < 8; n++) {
       const code = String(10000 + Math.floor(Math.random() * 90000)), t = tnow();
       if (await turboRandom.codeTaken(code)) continue;
@@ -4697,6 +4723,7 @@ async function joinRoom() {
     if (st === "lobby") team = !sideIds("left", ps).length ? "left" : !sideIds("right", ps).length ? "right" : null;
     if (!team && sideIds("spec", ps).length < BATTLE.specMax) team = "spec";
     if (!team) { bMsg(st === "lobby" ? "방이 가득 찼어요." : "경기 중이고 관전자 자리도 찼어요."); return; }
+    await turboRandom.rates.loadOnce();
     await ref.child("players/" + BT.myId).set(newPlayer(team, tnow()));
     bMsg("");
     enterRoom(code);
@@ -4734,6 +4761,7 @@ function enterRoom(code) {
     if (state === "countdown" && BT.startAt > 0) BT.match.goPerf = performance.now() + goDelayMs();
   });
   sub(ref.child("result"), "value", s => { BT.result = s.val(); if (cardNow === "bdone") renderResult(); });
+  TurboRoomVersus.main.watch(ref);
   sub(ref.child("quitSide"), "value", s => { BT.quitSide = s.val(); if (cardNow === "bdone") renderResult(); });
   sub(ref.child("bye"), "value", s => quitGrace.setByes(s.val()));
   sub(ref.child("status"), "value", s => onStatus(s.val()));
@@ -5604,15 +5632,16 @@ class TurboRandomMatch {
     return this.flow;
   }
   inParty() { return !!this.flow && this.flow.inParty(); }
-  roomCard() { return this.ticket() ? "found" : "lobby"; }
+  roomCard() { return this.ticket() || TurboRoomVersus.main.active() ? "found" : "lobby"; }
   renderVersus() {
     const ticket = this.ticket();
-    if (!ticket || !BT.ref) return;
+    if ((!ticket && !TurboRoomVersus.main.active()) || !BT.ref) return;
+    $("versusCurtain").querySelector(".tv-curtain-head").textContent = ticket ? "🏁 상대를 찾았어요!" : "🏁 곧 출발해요!";
     const racer = side => {
       const id = racerOf(side), p = id ? BT.players[id] : null;
       return p ? { nick: p.nickname || "?", car: p.car || "", bot: isBot(id), me: id === BT.myId, rate: TurboLapRates.cardOf(p.rate) } : null;
     };
-    this.versus.render(TurboRandomMatch.courseOf(ticket), racer("left"), racer("right"), (ticket.rivals || [])[0] || "🤖 AI");
+    this.versus.render(ticket ? TurboRandomMatch.courseOf(ticket) : BT.course, racer("left"), racer("right"), ticket ? (ticket.rivals || [])[0] || "🤖 AI" : "상대");
   }
   static courseOf(ticket) {
     return COURSES.find(key => TRACKS[key].name === ticket.map) || BT.course;
@@ -5782,7 +5811,7 @@ $("btnLeaveLobby").onclick = e => { e.currentTarget.blur(); leaveRoom(); };
 $("btnLeaveEnd").onclick = e => { e.currentTarget.blur(); turboRandom.recordBeforeLeave(); leaveRoom(); };
 $("btnMatchLeave").onclick = e => { e.currentTarget.blur(); if (confirm(turboRandom.leaveQuestion())) { turboRandom.recordBeforeLeave(); leaveRoom(); } };
 $("btnToLobby").onclick = e => { e.currentTarget.blur(); hostBackToLobby(); };
-$("btnBStart").onclick = e => { e.currentTarget.blur(); hostStart(); };
+$("btnBStart").onclick = e => { e.currentTarget.blur(); TurboRoomVersus.main.requestStart(); };
 $("btnJoinLeft").onclick = e => { e.currentTarget.blur(); pickTeam("left"); };
 $("btnJoinRight").onclick = e => { e.currentTarget.blur(); pickTeam("right"); };
 $("btnJoinSpec").onclick = e => { e.currentTarget.blur(); pickTeam("spec"); };

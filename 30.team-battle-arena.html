@@ -289,8 +289,8 @@
 <script charset="utf-8" src="character-maker.js?v=20261026a"></script>
 <script>new CharacterMakerDialog(undefined, false);</script>
 <script charset="utf-8" src="account-match-kit.js?v=20261029c"></script>
-<script charset="utf-8" src="account-stats.js?v=20261029e"></script>
-<script charset="utf-8" src="30.team-battle-versus.js?v=20261029b"></script>
+<script charset="utf-8" src="account-stats.js?v=20261029f"></script>
+<script charset="utf-8" src="30.team-battle-versus.js?v=20261029c"></script>
 <script charset="utf-8" src="patch-notes.js?v=20261029b"></script>
 <script type="module">
 import * as THREE from "three";
@@ -960,7 +960,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     teamIds(team) { var services = this.services; return Object.keys(services.session.players || {}).filter(function (id) { return services.session.players[id] && services.session.players[id].team === team; }).sort(services.session.byJoin(services.session.players)); }
     isHost() { var services = this.services; return !!services.session.room && services.session.room.host === services.session.myId; }
     newPlayer(team, joinedAt, ps) { var services = this.services;
-      return { nickname: services.nick.name, isAI: false, team: team, characterType: services.roster.freeCharOn(ps, team, services.session.myId), joinedAt: joinedAt };
+      return Object.assign({ nickname: services.nick.name, isAI: false, team: team, characterType: services.roster.freeCharOn(ps, team, services.session.myId), joinedAt: joinedAt }, services.versus.seatExtra());
     }
     roomCodes() { var services = this.services;
       var base = String(services.backend.conf.DB_URL || "").replace(/\/+$/, "");
@@ -1054,7 +1054,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       Dom.setText(Dom.$("dfRoomCode"), "방 코드 " + code);
       services.session.leaving = false;
       var ref = services.backend.db.ref(RoomSession.ROOT + "/" + code);
-      services.session.room = { code: code, ref: ref, mode: null, map: "forest", status: "lobby", host: null, startAt: 0, winner: null, overtimeAt: null, endedAt: 0, final: null, roster: null, draft: null, bans: null, statsNote: null };
+      services.session.room = { code: code, ref: ref, mode: null, map: "forest", vsAt: 0, status: "lobby", host: null, startAt: 0, winner: null, overtimeAt: null, endedAt: 0, final: null, roster: null, draft: null, bans: null, statsNote: null };
       services.fxView.clear3d();
       services.session.players = {}; services.match.leave();
       ref.child("players/" + services.session.myId).onDisconnect().remove();
@@ -1079,6 +1079,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.session.sub(ref.child("arena"), "value", function (s) { services.session.room.arena = s.val() || "forest"; services.arenaView.syncArena(); });
       services.session.sub(ref.child("hostPlayerId"), "value", function (s) { services.session.room.host = s.val(); services.session.room.hostLoaded = true; services.clock.hostChanged(services.session.room.host); services.session.checkHost(); services.lobby.playersChanged(); });
       services.session.sub(ref.child("startAt"), "value", function (s) { services.session.room.startAt = s.val() || 0; });
+      services.session.sub(ref.child("vsAt"), "value", function (s) { services.session.room.vsAt = s.val() || 0; services.versus.follow(services.screens.now); });
       services.session.sub(ref.child("winner"), "value", function (s) { services.session.room.winner = s.val(); });
       services.session.sub(ref.child("overtimeAt"), "value", function (s) { services.session.room.overtimeAt = s.val(); });
       services.session.sub(ref.child("bans"), "value", function (s) { services.session.room.bans = s.val(); });
@@ -8786,7 +8787,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     snapshot() { var services = this.services, room = services.session.room, myId = services.session.myId;
       if (!room || !room.roster || !room.roster[myId]) return null;
       return { entries: services.resultBoard.roster.entries, present: Object.assign({}, services.session.players), roster: Object.assign({}, room.roster), myId: myId,
-               mode: room.mode, winner: room.winner, final: room.final, matchId: this.matchIdOf(room) };
+               mode: room.mode, winner: room.winner, final: room.final, matchId: this.matchIdOf(room), random: !!this.services.randomMatch.ticket() };
     }
     build(snap, iLeft, progress, liveScore) { var self = this;
       var myIndex = -1, rows = this.services.resultBoard.roster.rows(snap.entries), f = snap.final || liveScore || {};
@@ -8795,7 +8796,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         return self.lineOf(row, row.id === snap.myId ? iLeft : !snap.present[row.id], snap.roster[row.id] && snap.roster[row.id].ai);
       });
       return { matchId: snap.matchId, mode: snap.mode, winnerTeam: AccountReportBuilder.TEAMS.indexOf(snap.winner), myIndex: myIndex, players: players,
-               score: [+f.blue || 0, +f.red || 0], progress: progress, iLeft: iLeft };
+               score: [+f.blue || 0, +f.red || 0], progress: progress, iLeft: iLeft, random: !!snap.random };
     }
   }
   class AccountMatchRecorder {
@@ -10023,11 +10024,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   class ArenaVersusCurtain {
     static SHOW_MS = 4500;
+    static ROOM_SLACK_MS = 3000;
     static MIN_MS = 2000;
     static FADE_MS = 350;
     static RELOAD_MS = 6000;
     constructor(services) {
-      this.services = services; this.root = Dom.$("versusCurtain"); this.card = null; this.stale = true; this.loading = false; this.shownAt = 0; this.timer = 0; this.startTimer = 0; this.assign = null;
+      this.services = services; this.root = Dom.$("versusCurtain"); this.card = null; this.stale = true; this.loading = false; this.shownAt = 0; this.timer = 0; this.startTimer = 0; this.roomTimer = 0; this.hostTimer = 0; this.assign = null;
       this.view = new TeamBattleVersusView(Dom.$("tbvBody"), { faceOf: function (c) { return services.catalog.faceImgSrc(c); }, nameOf: function (c) { return services.charTypes.statsOf(c).name; } });
     }
     known(c) { return !!this.services.charTypes.statsOf(c); }
@@ -10039,16 +10041,26 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     matchEnded() { var self = this; this.stale = true; setTimeout(function () { self.loadMine(); }, ArenaVersusCurtain.RELOAD_MS); }
     seatExtra() { return this.card ? { vs: TeamBattleVersusCards.toRoom(this.card) } : {}; }
-    follow(screen) { var services = this.services;
-      clearTimeout(this.timer);
-      if (screen === "lobby" && document.body.classList.contains("mkMatched") && services.session.room && services.session.room.status === "lobby") { this.show(); return; }
+    matched() { return document.body.classList.contains("mkMatched"); }
+    roomLeftMs() { var room = this.services.session.room;
+      if (!room || this.matched() || !room.vsAt) return 0;
+      return room.vsAt + ArenaVersusCurtain.SHOW_MS + ArenaVersusCurtain.ROOM_SLACK_MS - this.services.clock.now();
+    }
+    follow(screen) { var services = this.services, room = services.session.room, self = this;
+      clearTimeout(this.timer); clearTimeout(this.roomTimer);
+      if (screen === "start") this.loadMine();
+      var lobby = screen === "lobby" && room && room.status === "lobby", roomLeft = lobby ? this.roomLeftMs() : 0;
+      if (lobby && (this.matched() || roomLeft > 0)) {
+        if (roomLeft > 0) this.roomTimer = setTimeout(function () { self.follow(services.screens.now); }, roomLeft);
+        this.show(); return;
+      }
       if (this.root.hidden) return;
       if (screen === "start" || screen === "party") { this.hide(); return; }
       var left = this.shownAt + ArenaVersusCurtain.MIN_MS - performance.now(), self = this;
       if (left > 0) this.timer = setTimeout(function () { self.hide(); }, left); else this.hide();
     }
     show() {
-      if (this.root.hidden || this.root.classList.contains("out")) { this.shownAt = performance.now(); this.view.reset(); this.loadAssign(); }
+      if (this.root.hidden || this.root.classList.contains("out")) { this.shownAt = performance.now(); this.view.reset(); this.loadAssign(); this.writeHead(); }
       this.root.classList.remove("out"); this.root.hidden = false;
       this.refresh();
     }
@@ -10058,7 +10070,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     loadAssign() { var self = this, room = this.services.session.room;
       this.assign = null;
-      if (!room || !room.ref) return;
+      if (!room || !room.ref || !this.matched()) return;
       room.ref.child("assign").once("value").then(function (snap) { if (self.services.session.room === room) { self.assign = snap.val() || {}; self.refresh(); } }, function () { return undefined; });
     }
     seatsOf(team) { var services = this.services, ps = services.session.players || {}, assign = this.assign;
@@ -10066,6 +10078,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         var p = ps[id];
         return { nick: p.nickname || (p.isAI ? "AI" : "학생"), ai: !!p.isAI, me: id === services.session.myId, card: p.isAI ? null : TeamBattleVersusCards.fromRoom(p.vs) };
       });
+      if (!this.matched()) { while (seats.length < MatchRules.TEAM_MAX) seats.push("empty"); return seats; }
       if (!assign) return seats;
       var coming = Object.keys(assign).filter(function (id) { return assign[id] === team && !ps[id]; }).length;
       while (seats.length < MatchRules.TEAM_MAX) seats.push(coming-- > 0 ? null : { nick: "AI", ai: true, me: false, card: null });
@@ -10077,6 +10090,17 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     mapName(room) { var ticket = this.services.randomMatch.ticket();
       return (ticket && ticket.map) || MapCatalog.of(room.map).name;
+    }
+    writeHead() { var matched = this.matched(), room = this.services.session.room;
+      Dom.setText(this.root.querySelector(".tbv-head"), matched ? "⚔️ 상대 팀을 찾았어요!" : "⚔️ 곧 대결이 시작돼요!");
+      Dom.setText(this.root.querySelector(".tbv-hint"), room && room.mode === "cup" ? "곧 캐릭터 선택이 시작돼요." : "곧 경기가 시작돼요.");
+    }
+    hostStart(start) { var services = this.services, room = services.session.room, self = this;
+      if (!room || room.mode === "practice" || this.matched()) { start(); return; }
+      if (this.roomLeftMs() > 0) return;
+      room.ref.update({ vsAt: services.clock.now() });
+      clearTimeout(this.hostTimer);
+      this.hostTimer = setTimeout(function () { var now = services.session.room; if (now === room && room.status === "lobby") start(); }, ArenaVersusCurtain.SHOW_MS);
     }
     startAfterShow(start) { var self = this, wait = this.root.hidden ? ArenaVersusCurtain.SHOW_MS : this.shownAt + ArenaVersusCurtain.SHOW_MS - performance.now();
       clearTimeout(this.startTimer);
@@ -10258,7 +10282,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     Dom.$("btnJoin").onclick = function () { services.sound.audio(); if (services.nick.askFirst()) services.randomMatch.joinByCode(); };
     Dom.$("joinCode").onkeydown = function (e) { if (e.key === "Enter" && services.nick.askFirst()) services.randomMatch.joinByCode(); };
     Dom.$("btnRandom").onclick = function () { services.sound.audio(); if (services.nick.askFirst()) services.randomMatch.open(); };
-    Dom.$("btnStart").onclick = function () { services.launcher.startGame(); };
+    Dom.$("btnStart").onclick = function () { services.versus.hostStart(function () { services.launcher.startGame(); }); };
     }
   }
   class DraftEvents {

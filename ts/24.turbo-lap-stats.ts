@@ -260,11 +260,16 @@ interface TurboLapRateCard extends TurboLapWinPair {
 
 class TurboLapRates {
   private node: TurboLapStatsNode | null = null;
+  private loaded = false;
 
   constructor(private readonly account: TurboLapAccount) {}
 
   load(): Promise<void> {
-    return this.account.loadStats().then((node) => { this.node = node; }).catch(() => undefined);
+    return this.account.loadStats().then((node) => { this.node = node; this.loaded = true; }).catch(() => undefined);
+  }
+
+  loadOnce(): Promise<void> {
+    return this.loaded ? Promise.resolve() : this.load();
   }
 
   static cardOf(raw: unknown): TurboLapRateCard | null {
