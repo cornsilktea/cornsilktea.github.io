@@ -527,6 +527,82 @@ class WbLobbyView {
   }
 }
 
+interface WbVersusSource {
+  session(): RkSession<WbPlayerRecord> | null;
+  ticket(): MkTicket | null;
+  lineup(): WbVersusLineup | null;
+  now(): number;
+}
+
+class WbVersusStage {
+  static readonly RANDOM_SHOW_MS = 4000;
+  static readonly ROOM_SHOW_MS = 4000;
+  static readonly SLACK_MS = 3000;
+  static readonly MIN_MS = 2000;
+  static readonly FADE_MS = 350;
+  private readonly view: WbVersusView;
+  private shownAt = 0;
+  private closeTimer = 0;
+  private fadeTimer = 0;
+  private startTimer = 0;
+
+  constructor(private readonly root: HTMLElement, private readonly source: WbVersusSource) {
+    this.view = new WbVersusView(root);
+  }
+
+  sync(): void {
+    window.clearTimeout(this.closeTimer);
+    const session = this.source.session();
+    if (!session) { window.clearTimeout(this.startTimer); this.hide(); return; }
+    if (session.status !== "lobby") { this.hideAfterMin(); return; }
+    const ticket = this.source.ticket(), left = ticket ? Infinity : this.roomLeftMs(session);
+    const lineup = left > 0 ? this.source.lineup() : null;
+    if (!lineup) { this.hide(); return; }
+    this.show();
+    this.view.render(ticket ? "상대를 찾았어요!" : "곧 대결이 시작돼요!", lineup);
+    if (isFinite(left)) this.closeTimer = window.setTimeout(() => this.sync(), left);
+  }
+
+  afterShown(run: () => void): void {
+    window.clearTimeout(this.startTimer);
+    const wait = this.root.hidden ? WbVersusStage.RANDOM_SHOW_MS : this.shownAt + WbVersusStage.RANDOM_SHOW_MS - performance.now();
+    if (wait > 0) this.startTimer = window.setTimeout(run, wait);
+    else run();
+  }
+
+  requestRoomStart(session: RkSession<WbPlayerRecord>, run: () => void): void {
+    if (this.roomLeftMs(session) > 0) return;
+    session.ref.update({ vsAt: this.source.now() });
+    window.clearTimeout(this.startTimer);
+    this.startTimer = window.setTimeout(run, WbVersusStage.ROOM_SHOW_MS);
+  }
+
+  private roomLeftMs(session: RkSession<WbPlayerRecord>): number {
+    const at = Number(session.value<number>("vsAt")) || 0;
+    return at ? at + WbVersusStage.ROOM_SHOW_MS + WbVersusStage.SLACK_MS - this.source.now() : 0;
+  }
+
+  private show(): void {
+    window.clearTimeout(this.fadeTimer);
+    if (this.root.hidden || this.root.classList.contains("out")) { this.shownAt = performance.now(); this.view.reset(); }
+    this.root.classList.remove("out");
+    this.root.hidden = false;
+  }
+
+  private hideAfterMin(): void {
+    if (this.root.hidden) return;
+    const left = this.shownAt + WbVersusStage.MIN_MS - performance.now();
+    if (left > 0) this.closeTimer = window.setTimeout(() => this.hide(), left);
+    else this.hide();
+  }
+
+  private hide(): void {
+    if (this.root.hidden || this.root.classList.contains("out")) return;
+    this.root.classList.add("out");
+    this.fadeTimer = window.setTimeout(() => { this.root.hidden = true; this.root.classList.remove("out"); this.view.reset(); }, WbVersusStage.FADE_MS);
+  }
+}
+
 class WbGame {
   static readonly STALL_MS = 250;
   static readonly WATCHDOG_MS = 100;
@@ -549,6 +625,13 @@ class WbGame {
   private view: WbMatchView | null = null;
   private practice = false;
   private readonly account = new WbAccount();
+  private readonly versusRates = new WbVersusRates(this.account);
+  private readonly versus = new WbVersusStage(WbDom.el("versusCurtain"), {
+    session: () => this.session,
+    ticket: () => { const flow = this.random(); return flow ? flow.ticket() : null; },
+    lineup: () => this.versusLineup(),
+    now: () => this.backend.now()
+  });
   private holding = false;
   private matchId = 0;
   private lastMs = 0;
@@ -602,7 +685,7 @@ class WbGame {
     on("btnRandomTeam", () => this.createParty("team"));
     on("btnJoin", () => this.joinRoom());
     WbDom.el("joinCode").addEventListener("keydown", (e) => { if ((e as KeyboardEvent).key === "Enter") this.joinRoom(); });
-    on("btnStart", () => this.startMatch());
+    on("btnStart", () => this.requestStart());
     on("btnLeave", () => this.leaveRoom(""));
     on("btnSeatMode", () => this.toggleSeatMode());
     on("btnModeToggle", () => this.toggleMode());
@@ -707,7 +790,7 @@ class WbGame {
     const session = this.session, view = this.view;
     const match = session ? session.value<WbMatchRecord>("match") : null;
     if (!session || !view || !match || !this.onlineForfeitApplies()) return null;
-    return WbReportBuilder.fromEngine(this.matchKey(session, match), view.driver.engine, view.driver.myIndex, AccountForfeit.progressOnLeave(this.inRandomMatch(), this.matchProgress()));
+    return WbReportBuilder.fromEngine(this.matchKey(session, match), view.driver.engine, view.driver.myIndex, AccountForfeit.progressOnLeave(this.inRandomMatch(), this.matchProgress()), this.inRandomMatch());
   }
 
   private forfeitReport(): WbAccountReport | null {
@@ -757,7 +840,7 @@ class WbGame {
       myRecord: () => this.myRecord(),
       enterTicketRoom: (code, hosting) => this.enterTicketRoom(mode, code, hosting),
       leaveRoomQuietly: () => this.leaveRoomQuietly(),
-      startMatch: () => this.startMatch(),
+      startMatch: () => this.versus.afterShown(() => this.startMatch()),
       showParty: () => { this.randomMode = mode; this.showScreen("party"); flow.render(); },
       showStart: (message) => { this.showScreen("start"); this.updateStartButtons(); this.startMessage(message); },
       presentIds: () => (this.session ? RkMatchHooks.humanIds(this.session.players) : [])
@@ -780,6 +863,7 @@ class WbGame {
     this.startMessage("");
     this.randomMode = mode;
     try {
+      await this.versusRates.loadOnce();
       this.startMessage(await this.randomFor(mode).create());
     } catch (error) {
       this.startMessage("랜덤 매칭 방을 만들지 못했어요. (데이터베이스 규칙을 확인해 주세요)");
@@ -806,12 +890,17 @@ class WbGame {
     if (this.view) { this.view.dispose(); this.view = null; }
     this.matchId = 0;
     WbDom.el("lobbyScreen").classList.remove("matched");
+    this.versus.sync();
   }
 
   private reportEnd(session: RkSession<WbPlayerRecord>): void {
     const flow = this.random(), match = session.value<WbMatchRecord>("match"), end = session.value<WbEndRecord>("end");
-    if (match && end && end.match === match.id) this.account.record(WbReportBuilder.fromEnd(this.matchKey(session, match), match, end, this.myId));
     const ticket = flow ? flow.ticket() : null;
+    if (match && end && end.match === match.id) {
+      const report = WbReportBuilder.fromEnd(this.matchKey(session, match), match, end, this.myId, !!ticket);
+      this.account.record(report);
+      this.versusRates.note(report);
+    }
     if (!flow || !ticket || !match || !end || end.match !== match.id) return;
     const index = match.teams.flatMap((t) => t.members).findIndex((m) => m.id === this.myId);
     if (index < 0) return;
@@ -832,13 +921,33 @@ class WbGame {
 
   private myRecord(): WbPlayerRecord {
     const profile = this.profile as PlayerProfile;
-    return { nick: profile.nickOrDefault(), isBot: false, joinedAt: this.backend.now(), slot: 0, look: profile.look, spectator: false };
+    const record: WbPlayerRecord = { nick: profile.nickOrDefault(), isBot: false, joinedAt: this.backend.now(), slot: 0, look: profile.look, spectator: false };
+    const card = this.versusRates.forRoom();
+    if (card) record.vs = card;
+    return record;
+  }
+
+  private versusLineup(): WbVersusLineup | null {
+    const session = this.session;
+    if (!session) return null;
+    const flow = this.random(), ticket = flow ? flow.ticket() : null;
+    const people = new Map<string, WbVersusPerson>();
+    session.players.forEach((record, id) => { if (!record.isBot && !record.spectator) people.set(id, record); });
+    const mode = ticket ? this.randomMode : WbLobbyView.modeOf(session);
+    const assign = ticket ? session.value<Record<string, number>>("assign") : null;
+    const names = (ticket && ticket.rivalIds) || {};
+    const humans = assign && Object.keys(assign).length
+      ? Object.keys(assign).map((id) => ({ id, nick: names[id] || "", slot: Number(assign[id]) || 0 }))
+      : WbLobbyView.humans(session, this.seatPlan);
+    if (!humans.length) return null;
+    return WbVersusLineupBuilder.build(mode, WbRosterPlanner.fill(mode, humans, ticket ? [] : WbLobbyView.botsOf(session)), people, this.myId);
   }
 
   private async createRoom(mode: WbMode): Promise<void> {
     if (!this.backend.database) return;
     this.startMessage("");
     try {
+      await this.versusRates.loadOnce();
       const code = await this.directory.create(this.myId, this.myRecord(), {}, (taken) => this.randomFor("team").codeTaken(taken));
       if (!code) { this.startMessage("방을 만들지 못했어요. 다시 눌러 주세요."); return; }
       this.enterRoom(code, true);
@@ -854,6 +963,7 @@ class WbGame {
     if (code.length !== 5) { this.startMessage("방 코드 5자리를 입력해 주세요."); return; }
     this.startMessage("");
     try {
+      await this.versusRates.loadOnce();
       const party = await this.randomFor("team").tryJoin(code);
       if (party.handled) {
         this.randomMode = "team";
@@ -882,6 +992,7 @@ class WbGame {
     session.connect();
     this.showScreen("lobby");
     (this.lobby as WbLobbyView).render(session, this.seatPlan);
+    this.versus.sync();
   }
 
   private playerRemoved(id: string): void {
@@ -899,6 +1010,7 @@ class WbGame {
     if (flow && (kind === "players" || kind === "host" || kind === "status")) flow.roomChanged(this.seatPlan.humanSeats(session.players).filter((id) => !!id).length, session.isHost(), session.status === "lobby");
     if (flow && kind === "match") flow.armMatch();
     if (kind === "end" || kind === "status") this.reportEnd(session);
+    this.versus.sync();
   }
 
   private syncPhase(): void {
@@ -938,6 +1050,12 @@ class WbGame {
       WbDom.text(WbDom.el("btnResultLeave"), matched ? (this.randomMode === "solo" ? "랜덤 매칭 대기실로" : "팀 대기실로") : "방 나가기");
       WbDom.text(WbDom.el("resultStreak"), "");
     }
+  }
+
+  private requestStart(): void {
+    const session = this.session;
+    if (!session || !session.isHost() || session.status !== "lobby" || !WbLobbyView.humans(session, this.seatPlan).length) return;
+    this.versus.requestRoomStart(session, () => { if (this.session === session) this.startMatch(); });
   }
 
   private startMatch(): void {
@@ -1029,6 +1147,7 @@ class WbGame {
     if (this.view) { this.view.dispose(); this.view = null; }
     this.matchId = 0;
     WbDom.el("lobbyScreen").classList.remove("matched");
+    this.versus.sync();
     if (this.inParty()) { (this.random() as MkRandomFlow).backToParty(message); return; }
     this.showScreen("start");
     this.updateStartButtons();
