@@ -296,6 +296,7 @@ interface CollectionFlowServices {
   readonly partyScreen: HTMLElement;
   readonly partyMount: HTMLElement;
   readonly partyPhase: CollectionPhase;
+  readonly versusScreen: CollectionVersusScreen;
   readonly screens: CollectionScreens;
   readonly lobbyView: CollectionLobbyView;
   readonly resultView: CollectionResultView;
@@ -316,6 +317,8 @@ class CollectionFlow implements CollectionListener, HostGate, CollectionSessionA
   private director: CollectionDirector | null = null;
   private readonly statusHandlers: Readonly<Record<CollectionStatus, () => void>>;
   readonly random: CollectionRandomMatch;
+  private readonly rates: CollectionVersusRates;
+  private readonly versus: CollectionVersusCurtain;
 
   constructor(private readonly services: CollectionFlowServices) {
     this.random = new CollectionRandomMatch(services.backend.database, services.backend.clock, services.localId, {
@@ -324,11 +327,18 @@ class CollectionFlow implements CollectionListener, HostGate, CollectionSessionA
       discardRoom: (code) => services.backend.ref(CollectionRules.ROOM_ROOT + "/" + code).remove(),
       enterTicketRoom: (code, hosting) => this.enterTicketRoom(code, hosting),
       leaveRoomQuietly: () => this.leaveRoomQuietly(),
-      startCollection: () => { if (this.director) this.director.startCollection(); },
+      startCollection: () => this.versus.startAfterShow(() => { if (this.director) this.director.startCollection(); }),
       showParty: () => this.services.phases.goTo(this.services.partyPhase),
       showStart: (message) => this.returnToStart(message),
       presentIds: () => (this.current ? this.current.humanIds() : [])
     }, services.partyScreen, services.partyMount);
+    this.rates = new CollectionVersusRates(services.env, CollectionRandomMatch.STATS_KEY);
+    this.versus = new CollectionVersusCurtain(services.env, services.versusScreen, this.rates, {
+      session: () => this.current,
+      match: () => (this.current ? this.random.versusMatch() : null),
+      screen: () => services.screens.current
+    });
+    this.rates.loadOnce();
     services.randomEntry.onClick(() => this.createParty());
     this.statusHandlers = {
       lobby: () => this.openLobby(),
@@ -343,7 +353,7 @@ class CollectionFlow implements CollectionListener, HostGate, CollectionSessionA
     services.lobbyView.onSwitchSeat(() => { if (this.current) this.current.switchSeat(); });
     services.startView.onJoin(() => this.joinRoom());
     services.startView.onEnterInCode(() => this.joinRoom());
-    services.lobbyView.onStart(() => { if (this.director) this.director.startCollection(); });
+    services.lobbyView.onStart(() => this.versus.hostStart(() => { if (this.director) this.director.startCollection(); }));
     services.lobbyView.onLeave(() => this.leaveRoom());
     services.resultView.onLeave(() => this.leaveRoom());
     services.resultView.onToLobby(() => { if (this.director) this.director.backToLobby(); });
@@ -363,6 +373,10 @@ class CollectionFlow implements CollectionListener, HostGate, CollectionSessionA
     if (!session || !session.hasPlayer(id)) return null;
     const record = session.player(id);
     return { nick: record.nick, slot: record.slot, ai: record.isAI };
+  }
+
+  tickVersus(): void {
+    this.versus.update();
   }
 
   tickHost(): void {
@@ -393,7 +407,7 @@ class CollectionFlow implements CollectionListener, HostGate, CollectionSessionA
 
   private reportFinalToParty(): void {
     const session = this.current;
-    if (session && session.status === "final") this.random.reportFinal(new TournamentScores(session.resultsRecord()), () => this.services.resultPhase.refresh());
+    if (session && session.status === "final") this.rates.reloadAfter(this.random.reportFinal(new TournamentScores(session.resultsRecord()), () => this.services.resultPhase.refresh()));
   }
   roundChanged(): void { this.syncPhase(); }
   closed(message: string): void { this.exitToStart(message); }
@@ -417,7 +431,7 @@ class CollectionFlow implements CollectionListener, HostGate, CollectionSessionA
 
   private myRecord(slot: number, spectator: boolean): CollectionPlayerRecord {
     const profile = this.services.profile;
-    const record: CollectionPlayerRecord = { nick: PlayerProfile.cleanNick(profile.nick) || profile.nickOrDefault(), isAI: false, joinedAt: this.services.backend.clock.now(), slot, look: profile.look };
+    const record: CollectionPlayerRecord = Object.assign({ nick: PlayerProfile.cleanNick(profile.nick) || profile.nickOrDefault(), isAI: false, joinedAt: this.services.backend.clock.now(), slot, look: profile.look }, this.versus.seatExtra());
     if (spectator) record.spectator = true;
     return record;
   }
@@ -431,6 +445,7 @@ class CollectionFlow implements CollectionListener, HostGate, CollectionSessionA
   private async createParty(): Promise<void> {
     const flow = this.random.flow;
     if (!flow) return;
+    this.rates.loadOnce();
     this.setCreateBusy(true);
     this.services.startView.showMessage("");
     try {

@@ -86,6 +86,7 @@ class CollectionSession {
         this.roomPlan = [];
         this.currentRound = null;
         this.resultDeadline = 0;
+        this.versusAt = 0;
         this.players = new Map();
         this.results = null;
         this.wins = {};
@@ -100,6 +101,7 @@ class CollectionSession {
     get plan() { return this.roomPlan; }
     get round() { return this.currentRound; }
     get nextAt() { return this.resultDeadline; }
+    get vsAt() { return this.versusAt; }
     isHost() {
         return this.hostPlayerId === this.myId;
     }
@@ -178,6 +180,7 @@ class CollectionSession {
         this.watchValue("plan", (value) => { this.roomPlan = value || []; });
         this.watchValue("round", (value) => { this.currentRound = value; this.listener.roundChanged(); });
         this.watchValue("nextAt", (value) => { this.resultDeadline = value || 0; });
+        this.watchValue("vsAt", (value) => { this.versusAt = value || 0; });
         this.watchValue("results", (value) => { this.results = value; this.listener.resultsChanged(); });
         this.watchValue("wins", (value) => { this.wins = value || {}; this.listener.winsChanged(); });
     }

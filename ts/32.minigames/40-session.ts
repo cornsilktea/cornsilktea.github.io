@@ -8,6 +8,7 @@ interface CollectionPlayerRecord {
   slot: number;
   look: CharacterLook;
   spectator?: boolean;
+  vs?: CollectionVersusCard;
 }
 
 class RoomSeats {
@@ -133,6 +134,7 @@ class CollectionSession {
   private roomPlan: string[] = [];
   private currentRound: CollectionRound | null = null;
   private resultDeadline = 0;
+  private versusAt = 0;
   private readonly players = new Map<string, CollectionPlayerRecord>();
   private results: ResultsRecord | null = null;
   private wins: Record<string, number> = {};
@@ -150,6 +152,7 @@ class CollectionSession {
   get plan(): readonly string[] { return this.roomPlan; }
   get round(): CollectionRound | null { return this.currentRound; }
   get nextAt(): number { return this.resultDeadline; }
+  get vsAt(): number { return this.versusAt; }
 
   isHost(): boolean {
     return this.hostPlayerId === this.myId;
@@ -240,6 +243,7 @@ class CollectionSession {
     this.watchValue("plan", (value) => { this.roomPlan = (value as string[] | null) || []; });
     this.watchValue("round", (value) => { this.currentRound = value as CollectionRound | null; this.listener.roundChanged(); });
     this.watchValue("nextAt", (value) => { this.resultDeadline = (value as number) || 0; });
+    this.watchValue("vsAt", (value) => { this.versusAt = (value as number) || 0; });
     this.watchValue("results", (value) => { this.results = value as ResultsRecord | null; this.listener.resultsChanged(); });
     this.watchValue("wins", (value) => { this.wins = (value as Record<string, number>) || {}; this.listener.winsChanged(); });
   }
