@@ -73,18 +73,12 @@
   #loginBtn:not(:disabled) { background: var(--sg-primary); border-color: var(--sg-primary); color: var(--sg-primary-ink); }
   #allOff { color: var(--sg-danger); border-color: var(--sg-danger); }
   #allOff:hover { background: var(--sg-danger-soft); }
-  /* 새 학년도 시작: 맨 아래 위험 칸과 확인 창 */
-  #yearOpen, #yearGo { color: var(--sg-danger); border-color: var(--sg-danger); }
-  #yearOpen:hover, #yearGo:not(:disabled):hover { background: var(--sg-danger-soft); }
-  .year-dialog {
-    width: min(520px, calc(100vw - 32px)); padding: var(--sg-s6); border: 1px solid var(--sg-danger); border-radius: var(--sg-radius);
-    background: var(--sg-panel); color: var(--sg-ink); box-shadow: var(--sg-shadow-lg);
-  }
-  .year-dialog::backdrop { background: var(--sg-overlay); }
-  .year-dialog h2 { font-size: var(--sg-fs-xl); margin: 0 0 var(--sg-s4); }
-  .year-dialog ul { margin: 0 0 var(--sg-s4); padding-left: 1.2em; line-height: var(--sg-lh); }
-  .year-dialog input { width: 100%; margin-top: var(--sg-s2); }
-  .year-dialog .actions { justify-content: flex-end; }
+  /* 새 학년도 시작 탭: 확인 문구를 쳐야 켜지는 빨간 시작 버튼 */
+  #yearGo { color: var(--sg-danger); border-color: var(--sg-danger); }
+  #yearGo:not(:disabled):hover { background: var(--sg-danger-soft); }
+  .year-body h3 { font-size: var(--sg-fs-lg); margin: 0 0 var(--sg-s3); }
+  .year-body ul { margin: 0 0 var(--sg-s4); padding-left: 1.2em; line-height: var(--sg-lh); }
+  .year-body input { display: block; width: 100%; max-width: 360px; margin-top: var(--sg-s2); }
 
   .row { display: flex; gap: var(--sg-s3); flex-wrap: wrap; }
   .row > * { flex: 1 1 160px; }
@@ -548,28 +542,22 @@
 
         <!-- 새 학년도 시작(2026-10-29 선생님 요청): 일 년에 한 번만 쓰고 되돌리기 어려워서 관리 도구 맨 끝 탭에 두고, 확인 창에서 문구를 쳐야 시작한다.
              하는 일은 스크립트의 SchoolYearReset 주석. -->
-        <div id="yearBody" hidden>
-          <div class="actions"><button id="yearOpen" type="button">새 학년도 시작…</button></div>
+        <div id="yearBody" class="year-body" hidden>
+          <h3>새 학년도를 시작할까요?</h3>
+          <ul>
+            <li>모든 학생의 반이 비워져 <b>반 별 통계에서 학생이 모두 사라집니다.</b></li>
+            <li>학생이 새 반 링크(<code>?c=학년-반</code>)로 로그인하면 그 반으로 다시 적힙니다.</li>
+            <li>지난해 반 별 통계는 데이터베이스 <code>archive</code> 칸에 날짜 이름으로 보관됩니다.</li>
+            <li>개인 통계·최근 매치·개인 기록·세계/반 신기록은 바뀌지 않습니다.</li>
+          </ul>
+          <label for="yearTyped">계속하려면 <b>새 학년도 시작</b> 을 그대로 입력하세요.</label>
+          <input id="yearTyped" type="text" autocomplete="off" placeholder="새 학년도 시작">
+          <div class="actions"><button id="yearGo" type="button" disabled>시작</button></div>
           <p class="msg" id="yearMsg"></p>
         </div>
       </div>
     </div>
 
-    <dialog class="year-dialog" id="yearDialog">
-      <h2>새 학년도를 시작할까요?</h2>
-      <ul>
-        <li>모든 학생의 반이 비워져 <b>반 별 통계에서 학생이 모두 사라집니다.</b></li>
-        <li>학생이 새 반 링크(<code>?c=학년-반</code>)로 로그인하면 그 반으로 다시 적힙니다.</li>
-        <li>지난해 반 별 통계는 데이터베이스 <code>archive</code> 칸에 날짜 이름으로 보관됩니다.</li>
-        <li>개인 통계·최근 매치·개인 기록·세계/반 신기록은 바뀌지 않습니다.</li>
-      </ul>
-      <label for="yearTyped">계속하려면 <b>새 학년도 시작</b> 을 그대로 입력하세요.</label>
-      <input id="yearTyped" type="text" autocomplete="off" placeholder="새 학년도 시작">
-      <div class="actions">
-        <button id="yearCancel" type="button">취소</button>
-        <button id="yearGo" type="button" disabled>시작</button>
-      </div>
-    </dialog>
 
   </div>
 
@@ -2477,7 +2465,7 @@ class SchoolYearReset {
   }
 }
 
-/* 관리 도구 맨 끝 새 학년도 탭: 실수로 누르지 않게 확인 창에서 문구를 그대로 쳐야 시작 버튼이 켜진다 */
+/* 관리 도구 맨 끝 새 학년도 탭: 펼치면 안내와 확인 칸이 바로 보이고, 실수로 누르지 않게 문구를 그대로 쳐야 시작 버튼이 켜진다 */
 class SchoolYearPanel {
   static CONFIRM_TEXT = "새 학년도 시작";
 
@@ -2489,26 +2477,23 @@ class SchoolYearPanel {
       $("yearBody").hidden = !open;
       $("yearToggle").textContent = open ? "접기" : "펼치기";
       $("yearToggle").setAttribute("aria-expanded", open ? "true" : "false");
+      if (open) this.clearTyped();
     });
-    $("yearOpen").addEventListener("click", () => this.open());
-    $("yearTyped").addEventListener("input", () => { $("yearGo").disabled = $("yearTyped").value.trim() !== SchoolYearPanel.CONFIRM_TEXT; });
-    $("yearCancel").addEventListener("click", () => $("yearDialog").close());
+    $("yearTyped").addEventListener("input", () => { $("yearGo").disabled = this.busy || !this.typedRight(); });
     $("yearGo").addEventListener("click", () => this.start());
   }
 
-  open() {
-    if (this.busy) return;
+  typedRight() { return $("yearTyped").value.trim() === SchoolYearPanel.CONFIRM_TEXT; }
+
+  clearTyped() {
     $("yearTyped").value = "";
     $("yearGo").disabled = true;
-    $("yearDialog").showModal();
-    $("yearTyped").focus();
   }
 
   async start() {
-    if ($("yearTyped").value.trim() !== SchoolYearPanel.CONFIRM_TEXT) return;
-    $("yearDialog").close();
+    if (this.busy || !this.typedRight()) return;
     this.busy = true;
-    $("yearOpen").disabled = true;
+    this.clearTyped();
     try {
       const done = await this.reset.run((text) => say("yearMsg", text));
       say("yearMsg", "끝났습니다. 학생 " + done.students + "명의 반을 비웠고, 지난 반 별 통계는 archive/" + done.name + " 에 보관했습니다."
@@ -2518,7 +2503,6 @@ class SchoolYearPanel {
       say("yearMsg", denied ? "거부되었습니다. 데이터베이스 규칙(archive 칸)을 콘솔에 게시했는지 확인해 주세요. 아무것도 지우지 않았습니다." : "중간에 멈췄습니다 (" + e.message + "). 다시 눌러 주세요.");
     } finally {
       this.busy = false;
-      $("yearOpen").disabled = false;
     }
   }
 }
