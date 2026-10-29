@@ -176,7 +176,7 @@ class MkVersusMatcher extends MkMatcher {
     }
 }
 // 승률이 크게 다른 학생끼리 만나지 않게 한다(2026-10-27 선생님 요청, 24번):
-// 승률 30% 미만은 승률 50% 미만인 상대만, 70% 이상은 50% 이상인 상대만 기다린다(양쪽 모두 만족해야 묶임).
+// 승률 35% 미만은 승률 50% 미만인 상대만, 65% 이상은 50% 이상인 상대만(2026-10-29 선생님 요청, 예전 30%·70%) 기다린다(양쪽 모두 만족해야 묶임).
 // 판 수가 적으면 승률이 한두 판에 크게 흔들리므로 MIN_GAMES 판부터 적용하고, 기록이 없는 쪽(로그인 안 함·새 학생)은 누구와도 만난다.
 // 끝내 맞는 상대가 없으면 기존 AI 대체(aiFallbackMs)가 받아 준다. 팀 항목은 팀원 승패를 합쳐 본다.
 class MkWinBand {
@@ -212,8 +212,8 @@ class MkWinBand {
         return { g, w: Math.min(g, Math.max(0, Math.floor(Number(rate.w) || 0))) };
     }
 }
-MkWinBand.LOW = 0.3;
-MkWinBand.HIGH = 0.7;
+MkWinBand.LOW = 0.35;
+MkWinBand.HIGH = 0.65;
 MkWinBand.MID = 0.5;
 MkWinBand.MIN_GAMES = 5;
 // 1대1·팀 대 팀 묶기에 승률 구간을 더한 것. 맞는 상대가 하나도 없는 항목은 "준비된 항목"에서 빼서

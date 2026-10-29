@@ -1018,7 +1018,8 @@ function el(tag, cls, text) {
    학생 기기가 경기 끝에 자기 요약 한 줄을 쓰고(로그인한 학생만, 교사 계정만 읽기), 게임과 반을 고를 때 그 한 곳만 한 번 읽는다(폴링 없음).
    - 팀 배틀(30): classStats/<반|none>/<uid> = { n, g, w, m }  — 예전부터 쓰던 곳(MVP 포함)
    - 그 밖의 게임: gameRanks/<게임키>/<반|none>/<uid> = { n, g, w, x }  — x 의 뜻은 게임마다 다르다(RankGame.extra, 2026-10-27)
-   승률 = w / g. 기본 정렬은 승률 내림차순, 같으면 판 수가 많은 학생이 위(최소 판 수 기준 없음, 선생님 결정). */
+   승률 = w / g. 게임이나 반을 새로 고르면 이름순으로 시작한다(2026-10-29 선생님 요청, 예전에는 앞에서 고른 정렬이 남았음).
+   어느 칸으로 정렬하든 값이 같으면 승률이 높은 학생, 그다음 판 수가 많은 학생이 위(2026-10-29 선생님 요청, 예전에는 판 수 먼저). */
 async function authedUrl(path) {
   if (!auth || !auth.currentUser) throw new Error("다시 로그인해 주세요.");
   const idToken = await auth.currentUser.getIdToken();
@@ -1089,8 +1090,10 @@ class ClassRankPanel {
     this.game = ClassRankPanel.GAMES[0];
     this.cls = null;
     this.rows = [];
-    this.sort = { key: "rate", dir: -1 };
+    this.sort = ClassRankPanel.FRESH_SORT;
   }
+
+  static get FRESH_SORT() { return { key: "n", dir: 1 }; }
 
   static classes() {
     return D.ALL_CLASSES.filter((c) => /^[12]-[1-5]$/.test(c.id)).concat([{ id: ClassRankPanel.NONE, label: "미분류" }]);
@@ -1121,7 +1124,7 @@ class ClassRankPanel {
 
   renderPickers() {
     this.fillGrid($("rankGames"), ClassRankPanel.GAMES.map((g) => ({ id: g.key, label: g.title })), (id) => this.pickGame(id), this.game.key);
-    this.fillGrid($("rankGrid"), ClassRankPanel.pickable(), (id) => this.load(id), this.cls);
+    this.fillGrid($("rankGrid"), ClassRankPanel.pickable(), (id) => this.pickClass(id), this.cls);
     $("rankRefresh").disabled = !this.cls;
   }
 
@@ -1139,8 +1142,14 @@ class ClassRankPanel {
     Array.from(grid.children).forEach((b) => b.setAttribute("aria-pressed", b.dataset.rank === selected ? "true" : "false"));
   }
 
+  pickClass(cls) {
+    this.sort = ClassRankPanel.FRESH_SORT;
+    this.load(cls);
+  }
+
   pickGame(key) {
     this.game = ClassRankPanel.GAMES.find((g) => g.key === key) || this.game;
+    this.sort = ClassRankPanel.FRESH_SORT;
     this.rows = [];
     $("rankTable").textContent = "";
     this.renderPickers();
@@ -1178,9 +1187,10 @@ class ClassRankPanel {
   compare(a, b) {
     const k = this.sort.key, d = this.sort.dir;
     const value = (r) => k === "rate" ? ClassRankPanel.rate(r.w, r.g) : k === "xrate" ? ClassRankPanel.rate(r.x, r.g) : k === "loss" ? r.g - r.w : r[k];
-    if (k === "n") return d * a.n.localeCompare(b.n, "ko");
-    if (k === "cls") return d * ClassRankPanel.labelOf(a.cls).localeCompare(ClassRankPanel.labelOf(b.cls), "ko", { numeric: true }) || b.g - a.g;
-    return d * (value(a) - value(b)) || b.g - a.g || a.n.localeCompare(b.n, "ko");
+    const tieBreak = () => ClassRankPanel.rate(b.w, b.g) - ClassRankPanel.rate(a.w, a.g) || b.g - a.g || a.n.localeCompare(b.n, "ko");
+    if (k === "n") return d * a.n.localeCompare(b.n, "ko") || tieBreak();
+    if (k === "cls") return d * ClassRankPanel.labelOf(a.cls).localeCompare(ClassRankPanel.labelOf(b.cls), "ko", { numeric: true }) || tieBreak();
+    return d * (value(a) - value(b)) || tieBreak();
   }
 
   columns() {
