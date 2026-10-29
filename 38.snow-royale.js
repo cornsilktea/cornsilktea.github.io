@@ -484,6 +484,152 @@ SnMenuBackdrop.HOLD = 9;
 SnMenuBackdrop.RADIUS = 30;
 SnMenuBackdrop.HEIGHT = 20;
 SnMenuBackdrop.SPIN = 0.06;
+class SnVersusCurtain {
+    constructor(account, backend, myId, scene) {
+        this.account = account;
+        this.backend = backend;
+        this.myId = myId;
+        this.scene = scene;
+        this.root = SnDom.el("versusCurtain");
+        this.view = new SnVersusView(SnDom.el("snvBody"));
+        this.card = null;
+        this.stale = true;
+        this.loading = false;
+        this.shownAt = 0;
+        this.hideTimer = 0;
+        this.roomTimer = 0;
+        this.startTimer = 0;
+        this.hostTimer = 0;
+        this.assign = null;
+        this.screen = "start";
+    }
+    loadMine() {
+        if (!this.stale || this.loading)
+            return;
+        this.loading = true;
+        this.account.loadStats().then((node) => { this.card = SnVersusCards.fromStats(node); this.stale = false; })
+            .catch(() => undefined).then(() => { this.loading = false; });
+    }
+    matchEnded() {
+        this.stale = true;
+        window.setTimeout(() => this.loadMine(), SnVersusCurtain.RELOAD_MS);
+    }
+    seatExtra() {
+        return this.card ? { vs: SnVersusCards.toRoom(this.card) } : {};
+    }
+    follow(screen) {
+        this.screen = screen;
+        window.clearTimeout(this.hideTimer);
+        window.clearTimeout(this.roomTimer);
+        const scene = this.scene();
+        const lobby = screen === "lobby" && !!scene && scene.session.status === "lobby";
+        const roomLeft = lobby && scene ? this.roomLeftMs(scene) : 0;
+        if (lobby && scene && (scene.matched || roomLeft > 0)) {
+            if (roomLeft > 0)
+                this.roomTimer = window.setTimeout(() => this.follow(this.screen), roomLeft);
+            this.show(scene);
+            return;
+        }
+        if (this.root.hidden)
+            return;
+        if (screen !== "game") {
+            this.hide();
+            return;
+        }
+        const left = this.shownAt + SnVersusCurtain.MIN_MS - performance.now();
+        if (left > 0)
+            this.hideTimer = window.setTimeout(() => this.hide(), left);
+        else
+            this.hide();
+    }
+    followAgain() {
+        this.follow(this.screen);
+    }
+    refresh() {
+        const scene = this.scene();
+        if (this.root.hidden || !scene)
+            return;
+        this.view.render(scene.mode, SnVersusLineup.build(scene.mode, this.entrants(scene)));
+    }
+    hostStart(start) {
+        const scene = this.scene();
+        if (!scene || scene.matched) {
+            start();
+            return;
+        }
+        if (this.roomLeftMs(scene) > 0)
+            return;
+        const session = scene.session;
+        session.writeValue("vsAt", this.backend.now());
+        window.clearTimeout(this.hostTimer);
+        this.hostTimer = window.setTimeout(() => { const now = this.scene(); if (now && now.session === session && session.status === "lobby")
+            start(); }, SnVersusCurtain.SHOW_MS);
+    }
+    startAfterShow(start) {
+        const wait = this.root.hidden ? SnVersusCurtain.SHOW_MS : this.shownAt + SnVersusCurtain.SHOW_MS - performance.now();
+        window.clearTimeout(this.startTimer);
+        if (wait <= 0) {
+            start();
+            return;
+        }
+        this.startTimer = window.setTimeout(() => { const scene = this.scene(); if (scene && scene.session.status === "lobby")
+            start(); }, wait);
+    }
+    roomLeftMs(scene) {
+        const vsAt = scene.session.value("vsAt");
+        if (scene.matched || !vsAt)
+            return 0;
+        return vsAt + SnVersusCurtain.SHOW_MS + SnVersusCurtain.ROOM_SLACK_MS - this.backend.now();
+    }
+    show(scene) {
+        if (this.root.hidden || this.root.classList.contains("out")) {
+            this.shownAt = performance.now();
+            this.view.reset();
+            this.loadAssign(scene);
+            SnDom.text(this.root.querySelector(".snv-head"), scene.matched ? (scene.mode === "solo" ? "❄ 상대를 찾았어요!" : "❄ 상대 팀을 찾았어요!") : "❄ 곧 대결이 시작돼요!");
+        }
+        this.root.classList.remove("out");
+        this.root.hidden = false;
+        this.refresh();
+    }
+    hide() {
+        this.root.classList.add("out");
+        this.hideTimer = window.setTimeout(() => { this.root.hidden = true; this.root.classList.remove("out"); }, SnVersusCurtain.FADE_MS);
+    }
+    loadAssign(scene) {
+        this.assign = null;
+        if (!scene.matched)
+            return;
+        const session = scene.session;
+        session.ref.child("assign").once("value").then((snap) => {
+            const now = this.scene();
+            if (now && now.session === session) {
+                this.assign = snap.val() || {};
+                this.refresh();
+            }
+        }, () => undefined);
+    }
+    entrants(scene) {
+        const list = [];
+        scene.session.players.forEach((record, id) => {
+            if (record.spectator || record.isBot || record.slot < 0 || record.slot >= SnRoomRules.SEATS)
+                return;
+            list.push({ id, slot: record.slot, nick: record.nick, me: id === this.myId, coming: false, card: SnVersusCards.fromRoom(record.vs) });
+        });
+        const assign = this.assign || {};
+        if (scene.matched)
+            Object.keys(assign).forEach((id) => {
+                if (!scene.session.players.has(id))
+                    list.push({ id, slot: Number(assign[id]) || 0, nick: "", me: false, coming: true, card: null });
+            });
+        return list;
+    }
+}
+SnVersusCurtain.SHOW_MS = 4500;
+SnVersusCurtain.ROOM_SLACK_MS = 3000;
+SnVersusCurtain.MIN_MS = 2000;
+SnVersusCurtain.FADE_MS = 350;
+SnVersusCurtain.RELOAD_MS = 6000;
 class SnGame {
     constructor(libs) {
         this.libs = libs;
@@ -501,6 +647,7 @@ class SnGame {
         this.backdrop = null;
         this.practice = false;
         this.account = new SnAccount();
+        this.curtain = new SnVersusCurtain(this.account, this.backend, this.myId, () => this.versusScene());
         this.session = null;
         this.view = null;
         this.matchId = 0;
@@ -562,7 +709,7 @@ class SnGame {
         SnDom.el("btnJoin").addEventListener("click", () => this.joinRoom());
         SnDom.el("joinCode").addEventListener("keydown", (e) => { if (e.key === "Enter")
             this.joinRoom(); });
-        SnDom.el("btnStart").addEventListener("click", () => this.startMatch());
+        SnDom.el("btnStart").addEventListener("click", () => this.curtain.hostStart(() => this.startMatch()));
         SnDom.el("btnLeave").addEventListener("click", () => this.leaveRoom(""));
         SnDom.el("btnSeatMode").addEventListener("click", () => this.toggleSeatMode());
         SnDom.el("btnModeToggle").addEventListener("click", () => this.toggleMode());
@@ -570,6 +717,7 @@ class SnGame {
         SnDom.el("btnResultLeave").addEventListener("click", () => this.leaveRoom(""));
         SnDom.el("btnGameLeave").addEventListener("click", () => this.askLeave());
         this.account.bind();
+        this.curtain.loadMine();
         this.lobby.onSeatClick = (slot) => this.clickSeat(slot);
     }
     askLeave() {
@@ -619,7 +767,7 @@ class SnGame {
         const match = session ? session.value("match") : null;
         if (!session || !view || !match || !this.onlineForfeitApplies())
             return null;
-        return SnReportBuilder.fromEngine(this.matchKey(session, match), view.driver.engine, view.driver.myNum, AccountForfeit.progressOnLeave(this.inRandomMatch(), this.matchProgress()));
+        return SnReportBuilder.fromEngine(this.matchKey(session, match), view.driver.engine, view.driver.myNum, AccountForfeit.progressOnLeave(this.inRandomMatch(), this.matchProgress()), this.inRandomMatch());
     }
     forfeitReport() {
         return this.inRandomMatch() ? this.leaveReport() : null;
@@ -636,7 +784,15 @@ class SnGame {
         button.classList.remove("confirm");
         SnDom.text(button, this.practice || this.options.offline ? "나가기" : "방 나가기");
     }
+    versusScene() {
+        const session = this.session;
+        if (!session || this.practice || this.options.offline)
+            return null;
+        const matched = this.inRandomMatch();
+        return { session, matched, mode: matched ? this.randomMode : (session.value("mode") === "solo" ? "solo" : "duos") };
+    }
     showScreen(name) {
+        this.curtain.follow(name);
         SnDom.show(SnDom.el("btnGameLeave"), name === "game");
         this.resetLeave();
         SnDom.show(SnDom.el("startScreen"), name === "start");
@@ -675,7 +831,7 @@ class SnGame {
             myRecord: () => this.myRecord(),
             enterTicketRoom: (code, hosting) => this.enterTicketRoom(mode, code, hosting),
             leaveRoomQuietly: () => this.leaveRoomQuietly(),
-            startMatch: () => this.startMatch(),
+            startMatch: () => this.curtain.startAfterShow(() => this.startMatch()),
             showParty: () => { this.randomMode = mode; this.showScreen("party"); flow.render(); },
             showStart: (message) => { this.showScreen("start"); this.startMessage(message); },
             presentIds: () => (this.session ? RkMatchHooks.humanIds(this.session.players) : [])
@@ -732,7 +888,7 @@ class SnGame {
     reportEnd(session) {
         const flow = this.random(), match = session.value("match"), end = session.value("end");
         if (match && end && end.match === match.id)
-            this.account.record(SnReportBuilder.fromEnd(this.matchKey(session, match), match, end, this.myId));
+            this.account.record(SnReportBuilder.fromEnd(this.matchKey(session, match), match, end, this.myId, this.inRandomMatch()));
         const ticket = flow ? flow.ticket() : null;
         if (!flow || !ticket || !match || !end || end.match !== match.id)
             return;
@@ -743,6 +899,7 @@ class SnGame {
         const showStreak = () => SnDom.text(SnDom.el("resultStreak"), flow.endHint());
         showStreak();
         flow.matchEnded({ result: rank === 1 ? "win" : "lose", rank, of: match.teams.length }, showStreak);
+        this.curtain.matchEnded();
     }
     updateStartButtons() {
         const ok = !!this.backend.database;
@@ -753,7 +910,7 @@ class SnGame {
     startMessage(text) { SnDom.text(SnDom.el("startMsg"), text); }
     myRecord() {
         const profile = this.profile;
-        return { nick: profile.nickOrDefault(), isBot: false, joinedAt: this.backend.now(), slot: 0, look: profile.look, spectator: false };
+        return Object.assign({ nick: profile.nickOrDefault(), isBot: false, joinedAt: this.backend.now(), slot: 0, look: profile.look, spectator: false }, this.curtain.seatExtra());
     }
     async createRoom(mode) {
         if (!this.backend.database)
@@ -830,6 +987,10 @@ class SnGame {
             flow.armMatch();
         if (kind === "end" || kind === "status")
             this.reportEnd(session);
+        if (kind === "vsAt")
+            this.curtain.followAgain();
+        if (kind === "players" || kind === "mode")
+            this.curtain.refresh();
     }
     syncPhase() {
         const session = this.session, ui = this.ui;

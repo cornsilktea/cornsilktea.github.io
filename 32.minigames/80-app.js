@@ -73,7 +73,7 @@ class MiniGamesApp {
         const flow = new CollectionFlow({
             env: this.env, backend: this.backend, directory: new CollectionDirectory(this.backend, this.env, this.tokens), catalog: this.catalog, profile: this.profile,
             startView: this.startView, practiceEntry: this.practiceEntry, practiceMenu: this.practiceMenu, lobbyView, resultView, runtime, hub, phases: this.phases,
-            randomEntry: this.randomEntry, partyScreen: this.page.byId("partyScreen"), partyMount: this.page.byId("partyMount"), partyPhase: new PartyScreenPhase(services), screens,
+            randomEntry: this.randomEntry, partyScreen: this.page.byId("partyScreen"), partyMount: this.page.byId("partyMount"), partyPhase: new PartyScreenPhase(services), versusScreen: new CollectionVersusScreen(this.page, this.env), screens,
             startPhase, lobbyPhase: new LobbyScreenPhase(services), practicePhase: new PracticeScreenPhase(services), playPhase: new PlayScreenPhase(services), resultPhase: new ResultScreenPhase(services),
             random: new RandomRange(this.randomSource), localId: this.localId
         });
@@ -111,6 +111,7 @@ class MiniGamesApp {
         this.lastTickMs = this.env.nowMs();
         this.render.trackFrameTime(dt);
         this.phases.update(dt, draw);
+        this.flow.tickVersus();
     }
 }
 MiniGamesApp.BACKUP_TICK_MS = 50;

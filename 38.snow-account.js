@@ -10,9 +10,10 @@
      - 처치·준 피해·모은 눈·만든 벽·생존 시간·어시스트는 모두 규칙 엔진(SnPlayer, SnEngine.survival)이 센 값을 쓴다.
        어시스트 = 상대가 쓰러지기 5초 안에 그 상대에게 피해를 준 다른 사람(SnBalance.ASSIST_WINDOW, 30번 규칙과 같다).
      - 모드(팀전/개인전)는 합산하고 판 수만 따로 센다. 눈덩이 명중률은 엔진이 세지 않아 넣지 않았다.
+     - rm: 누적 통계에 들어간 판 중 랜덤 매칭 판만 따로 센 칸(2026-10-29, 대결 화면은 이 칸만 보여 준다). 그날부터 쌓인다.
 
    저장:
-     users/<uid>/stats/snowroyale  { g, w, l, gd 팀전 판, gs 개인전 판, k 처치, a 어시스트, dm 준 피해, wl 만든 벽, sv 생존 초 합, rk 순위 합, t3 3위 안 횟수, mk 한 판 최다 처치, ids }
+     users/<uid>/stats/snowroyale  { g, w, l, gd 팀전 판, gs 개인전 판, k 처치, a 어시스트, dm 준 피해, wl 만든 벽, sv 생존 초 합, rk 순위 합, t3 3위 안 횟수, mk 한 판 최다 처치, rm { g, w, k 처치, rk 순위 합 }, ids }
      users/<uid>/recent/snowroyale/<0~19>  { v, id, at, r, ai, md 0팀전/1개인전, me, p [[닉네임, 팀, 순위, 생존 초, 처치, 어시스트, 준 피해, 모은 눈, 만든 벽, 나감 0/1, AI 0/1]] }
    ===================================================================== */
 class SnAccountKeys {
@@ -21,6 +22,7 @@ class SnAccountKeys {
     }
 }
 SnAccountKeys.NUMBERS = ["g", "w", "l", "gd", "gs", "k", "a", "dm", "wl", "sv", "rk", "t3", "mk"];
+SnAccountKeys.RANDOM_NUMBERS = ["g", "w", "k", "rk"];
 SnAccountKeys.MODES = ["duos", "solo"];
 SnAccountKeys.MODE_NAMES = ["팀전", "개인전"];
 class SnAccountPlan {
@@ -69,7 +71,18 @@ SnAccountCodec.NAME_MAX = 20;
 SnAccountCodec.CELLS = 11;
 class SnAccountMath {
     static empty() {
-        return { g: 0, w: 0, l: 0, gd: 0, gs: 0, k: 0, a: 0, dm: 0, wl: 0, sv: 0, rk: 0, t3: 0, mk: 0, ids: {} };
+        return { g: 0, w: 0, l: 0, gd: 0, gs: 0, k: 0, a: 0, dm: 0, wl: 0, sv: 0, rk: 0, t3: 0, mk: 0, rm: SnAccountMath.emptyTally(), ids: {} };
+    }
+    static emptyTally() {
+        return { g: 0, w: 0, k: 0, rk: 0 };
+    }
+    static tallyOf(raw) {
+        const tally = SnAccountMath.emptyTally();
+        if (!raw || typeof raw !== "object")
+            return tally;
+        const source = raw;
+        SnAccountKeys.RANDOM_NUMBERS.forEach((key) => { tally[key] = AccountNumbers.count(source[key]); });
+        return tally;
     }
     static normalize(raw) {
         const node = SnAccountMath.empty();
@@ -77,6 +90,7 @@ class SnAccountMath {
             return node;
         const source = raw;
         SnAccountKeys.NUMBERS.forEach((key) => { node[key] = AccountNumbers.count(source[key]); });
+        node.rm = SnAccountMath.tallyOf(source.rm);
         const ids = AccountShape.slots(source.ids);
         Object.keys(ids).forEach((key) => { node.ids[key] = Number(ids[key]) || 0; });
         return node;
@@ -87,13 +101,14 @@ class SnAccountMath {
             return null;
         const me = report.players[report.myIndex];
         const solo = SnAccountKeys.modeIndex(report.mode) === 1;
-        const kills = AccountNumbers.count(me.kills);
+        const kills = AccountNumbers.count(me.kills), rank = Math.max(1, AccountNumbers.count(me.rank));
+        const rm = report.random ? { g: before.rm.g + 1, w: before.rm.w + (win ? 1 : 0), k: before.rm.k + kills, rk: before.rm.rk + rank } : before.rm;
         const node = {
             g: before.g + 1, w: before.w + (win ? 1 : 0), l: before.l + (win ? 0 : 1),
             gd: before.gd + (solo ? 0 : 1), gs: before.gs + (solo ? 1 : 0),
             k: before.k + kills, a: before.a + AccountNumbers.count(me.assists), dm: before.dm + AccountNumbers.whole(Math.max(0, me.dealt)), wl: before.wl + AccountNumbers.count(me.walls),
-            sv: before.sv + AccountNumbers.whole(Math.max(0, me.secs)), rk: before.rk + Math.max(1, AccountNumbers.count(me.rank)), t3: before.t3 + (me.rank <= 3 ? 1 : 0), mk: Math.max(before.mk, kills),
-            ids: Object.assign({}, before.ids)
+            sv: before.sv + AccountNumbers.whole(Math.max(0, me.secs)), rk: before.rk + rank, t3: before.t3 + (me.rank <= 3 ? 1 : 0), mk: Math.max(before.mk, kills),
+            rm, ids: Object.assign({}, before.ids)
         };
         node.ids[key] = at;
         const evicted = AccountKeyLedger.overflowKeys(node.ids);
@@ -119,6 +134,8 @@ class SnAccountProfile extends AccountGameProfile {
         const node = change.node;
         const patch = {};
         SnAccountKeys.NUMBERS.forEach((name) => { patch[name] = node[name]; });
+        if (report.random)
+            SnAccountKeys.RANDOM_NUMBERS.forEach((name) => { patch["rm/" + name] = node.rm[name]; });
         patch["ids/" + key] = node.ids[key];
         change.evicted.forEach((id) => { patch["ids/" + id] = null; });
         return { node, patch };
@@ -168,21 +185,21 @@ class SnAccountView {
     }
 }
 class SnReportBuilder {
-    static fromEnd(matchId, match, end, myId) {
+    static fromEnd(matchId, match, end, myId, random = false) {
         const members = [];
         match.teams.forEach((team, teamIndex) => team.members.forEach((member) => members.push({ member, team: teamIndex })));
         const players = members.map((item, index) => {
-            const stat = end.stats[index] || [];
+            const stat = (end.stats || [])[index] || [];
             return { name: item.member.nick, team: item.team, rank: end.ranks[item.team] || members.length, secs: stat[3] || 0, kills: stat[0] || 0, assists: stat[5] || 0,
                 dealt: stat[1] || 0, collected: stat[2] || 0, walls: stat[4] || 0, left: false, ai: item.member.bot };
         });
-        return { matchId, mode: match.mode, myIndex: members.findIndex((item) => item.member.id === myId), players, progress: 1, iLeft: false };
+        return { matchId, mode: match.mode, myIndex: members.findIndex((item) => item.member.id === myId), players, progress: 1, iLeft: false, random };
     }
-    static fromEngine(matchId, engine, myNum, progress) {
+    static fromEngine(matchId, engine, myNum, progress, random = false) {
         const ranks = engine.ranks();
         const players = engine.players.map((p) => ({ name: p.nick, team: p.team, rank: ranks[p.team] || engine.teams.length, secs: engine.survival(p), kills: p.kills, assists: p.assists,
             dealt: p.dealt, collected: p.collected, walls: p.walls, left: p.num === myNum, ai: p.bot }));
-        return { matchId, mode: engine.mode, myIndex: myNum, players, progress, iLeft: true };
+        return { matchId, mode: engine.mode, myIndex: myNum, players, progress, iLeft: true, random };
     }
 }
 class SnAccount extends AccountGameAccount {

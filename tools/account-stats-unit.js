@@ -1,10 +1,10 @@
 const fs = require("fs"), vm = require("vm"), path = require("path");
 const root = path.join(__dirname, "..");
-const files = ["match-kit.js", "account-match-kit.js", "account-stats.js", "24.turbo-lap-stats.js", "25.fps-survival-stats.js", "31.zombie-outbreak-stats.js", "38.snow-account.js", "39.balloon-account.js", "39.balloon-versus.js", "patch-notes.js"];
+const files = ["match-kit.js", "account-match-kit.js", "account-stats.js", "24.turbo-lap-stats.js", "25.fps-survival-stats.js", "31.zombie-outbreak-stats.js", "38.snow-account.js", "38.snow-versus.js", "39.balloon-account.js", "39.balloon-versus.js", "patch-notes.js"];
 const names = ["AccountNumbers", "AccountRates", "AccountMatchKey", "AccountKeyLedger", "AccountForfeit", "AccountShape", "AccountRecentHeadCodec", "RecentMatchRing", "AccountLoginNotice", "RecentBlockList", "AccountGameProfile", "AccountMatchStore",
   "TeamBattleRates", "AccountMvpJudge", "TeamBattlePlan", "TeamBattleCodec", "TeamBattleRing", "AccountStatsMath", "AccountStatsTable", "ClassStatsSummary", "TeamBattleProfile", "AccountStatsStore",
   "TurboLapPlan", "TurboLapCodec", "TurboLapStatsMath", "TurboLapProfile", "TurboLapStatsView", "FpsPlan", "FpsCodec", "FpsStatsMath", "FpsProfile", "FpsStatsView",
-  "ZombiePlan", "ZombieCodec", "ZombieStatsMath", "ZombieProfile", "ZombieStatsView", "SnAccountPlan", "SnAccountCodec", "SnAccountMath", "SnAccountProfile", "SnAccountView", "SnReportBuilder",
+  "ZombiePlan", "ZombieCodec", "ZombieStatsMath", "ZombieProfile", "ZombieStatsView", "SnAccountPlan", "SnAccountCodec", "SnAccountMath", "SnAccountProfile", "SnAccountView", "SnReportBuilder", "SnVersusCards",
   "WbAccountPlan", "WbAccountCodec", "WbAccountMath", "WbAccountProfile", "WbAccountView", "WbReportBuilder", "WbRandomTallyMath", "WbVersusCards", "WbVersusLineupBuilder",
   "AccountClassRank", "RandomMatchPlan", "RandomMatchCodec", "RandomMatchMath", "RandomMatchProfile", "RandomMatchView",
   "AccountPendingCodec", "AccountMatchSender", "AccountPendingGuard", "MkStreakMath", "TurboLapClock", "TurboLapOutcome", "TeamBattleScore", "PatchNoteCodec", "PatchNoteSeen"];
@@ -337,6 +337,13 @@ const snowEnd = { match: 1, ranks: [1, 2], at: 1, stats: [[3, 120.6, 5, 200.46, 
   check("38번 누적: 킬·어시·피해·벽·생존·순위 합계", b.node.g === 2 && b.node.w === 1 && b.node.k === 5 && b.node.a === 1 && b.node.dm === 211 && b.node.wl === 3 && b.node.sv === 280 && b.node.rk === 3 && b.node.t3 === 2 && b.node.mk === 3 && b.node.gd === 2, b.node);
   const forfeit = K.SnReportBuilder.fromEnd("m3", snowMatch, snowEnd, "a"); forfeit.iLeft = true; forfeit.progress = 0.3;
   check("38번 판정: 절반 전 나가기는 기록 없음", !new K.SnAccountPlan(forfeit).recordsRecent);
+  const randomWin = K.SnReportBuilder.fromEnd("r1", snowMatch, snowEnd, "a", true); randomWin.players[3].ai = false;
+  const r1 = K.SnAccountMath.apply(null, randomWin, true, "r1", 1);
+  const r2 = K.SnAccountMath.apply(JSON.parse(JSON.stringify(r1.node)), Object.assign(JSON.parse(JSON.stringify(randomWin)), { random: false, matchId: "o1" }), true, "o1", 2);
+  check("38번 랜덤 매칭 칸: 랜덤 매칭 판만 rm 에 셈(일반 방 판은 그대로)", r1.node.rm.g === 1 && r1.node.rm.w === 1 && r1.node.rm.k === 3 && r1.node.rm.rk === 1 && r2.node.rm.g === 1 && r2.node.g === 2, [r1.node.rm, r2.node.rm]);
+  const card = K.SnVersusCards.fromStats(r2.node);
+  check("38번 대결 화면 카드: rm 만 읽고 자리 값으로 왕복", card.g === 1 && card.w === 1 && card.k === 3 && same(K.SnVersusCards.fromRoom(JSON.parse(JSON.stringify(K.SnVersusCards.toRoom(card)))), card) && K.SnVersusCards.fromStats(null) === null && K.SnVersusCards.fromRoom(null) === null, card);
+  check("38번 대결 화면 카드: rm 이 없던 옛 통계는 0판", K.SnVersusCards.fromStats(K.SnAccountMath.normalize({ g: 4, w: 2 })).g === 0);
 }
 
 const balloon = new GameCase("39번", new K.WbAccountProfile(), K.WbAccountCodec, "waterballoon");
@@ -533,6 +540,11 @@ const gameChecks = (async () => {
   await zombie.verifyStore(zombieReport({ rows: zombieRows().slice(0, 3) }));
   const cleanSnow = K.SnReportBuilder.fromEnd("m38", snowMatch, snowEnd, "a"); cleanSnow.players[3].ai = false;
   await snow.verifyStore(cleanSnow);
+  await new GameCase("38번 랜덤 매칭", new K.SnAccountProfile(), K.SnAccountCodec, "snowroyale").verifyStore(Object.assign(JSON.parse(JSON.stringify(cleanSnow)), { random: true }));
+  (() => {
+    const first = { g: 1, w: 1, k: 3, rk: 1 }, legal = (before, after) => { const errors = []; RuleChecker.validate(RULES.stats.snowroyale.rm, after, before, {}, "rm", errors); return errors.length === 0; };
+    check("38번 랜덤 매칭 칸 규칙: 판 +1 통과, 2판·순위 0·처치 100 은 거부", legal(undefined, first) && legal(first, { g: 2, w: 1, k: 5, rk: 4 }) && !legal(first, { g: 3, w: 1, k: 5, rk: 7 }) && !legal(first, { g: 2, w: 1, k: 5, rk: 1 }) && !legal(first, { g: 2, w: 1, k: 103, rk: 3 }));
+  })();
   await balloon.verifyStore(K.WbReportBuilder.fromEnd("m39", wbMatch, wbEnd, "a"));
   {
     const botMatch = JSON.parse(JSON.stringify(wbMatch)); botMatch.teams[1].members[1].bot = true;

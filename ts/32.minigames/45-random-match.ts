@@ -67,6 +67,7 @@ class CollectionFinalOutcome {
 
 class CollectionRandomMatch implements MatchedResultInfo {
   static readonly PARTY_LIMIT = 3;
+  static readonly STATS_KEY = "minigames";
 
   readonly flow: MkRandomFlow | null = null;
 
@@ -79,7 +80,7 @@ class CollectionRandomMatch implements MatchedResultInfo {
       matcher: new MkFreeForAllMatcher(CollectionRandomMatch.PARTY_LIMIT, CollectionRules.MAX_PLAYERS),
       intro: "매칭 시작을 누르면 다른 학생들과 최대 " + CollectionRules.MAX_PLAYERS + "명이 모여 미니게임 모음을 해요. 모자란 자리는 AI가 채워요.",
       showRank: true,
-      stats: new RandomMatchAccount("minigames", "미니게임 랜덤 매칭 통계", true)
+      stats: new RandomMatchAccount(CollectionRandomMatch.STATS_KEY, "미니게임 랜덤 매칭 통계", true)
     };
     this.flow = new MkRandomFlow(database, clock, myId, options, new CollectionMatchHooks(port, myId), new MkPartyPanel(screen, mount, options));
   }
@@ -92,6 +93,11 @@ class CollectionRandomMatch implements MatchedResultInfo {
     return !!this.flow && this.flow.hasTicket();
   }
 
+  versusMatch(): CollectionVersusMatch | null {
+    const ticket = this.flow ? this.flow.ticket() : null;
+    return this.flow && ticket ? { allyIds: this.flow.memberIds(), expect: ticket.expect } : null;
+  }
+
   streakText(): string {
     return this.flow ? this.flow.endHint() : "";
   }
@@ -100,10 +106,13 @@ class CollectionRandomMatch implements MatchedResultInfo {
     return this.flow ? this.flow.codeTaken(code).catch(() => false) : false;
   }
 
-  reportFinal(scores: TournamentScores, onStreak: () => void): void {
+  reportFinal(scores: TournamentScores, onStreak: () => void): string {
     const flow = this.flow;
-    if (!flow || !flow.hasTicket()) return;
+    const ticket = flow ? flow.ticket() : null;
+    if (!flow || !ticket) return "";
     const outcome = CollectionFinalOutcome.of(scores, flow.memberIds());
-    if (outcome) flow.matchEnded(outcome, onStreak);
+    if (!outcome) return "";
+    flow.matchEnded(outcome, onStreak);
+    return ticket.matchId;
   }
 }
