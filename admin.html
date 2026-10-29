@@ -156,6 +156,15 @@
   #rankBody { margin-top: var(--sg-s4); }
   .rank-divider { margin: var(--sg-s4) 0; border: 0; border-top: 1px solid var(--sg-line-mid); }
   .panel .stats-box { max-height: none; overflow-x: auto; overflow-y: visible; }
+  /* 관리 도구 탭(서류철 모양): 고른 탭과 아래 펼친 칸을 같은 밝은 색으로 칠해 한 장처럼 보이게 한다 */
+  .tool-box { --tool-lit: color-mix(in srgb, var(--sg-panel) 91%, #fff); margin-bottom: var(--sg-s4); }
+  .tool-tabs { display: flex; flex-wrap: wrap; gap: var(--sg-s1); align-items: flex-end; }
+  .tool-tab { position: relative; min-height: 48px; padding: var(--sg-s3) var(--sg-s5); border: 1px solid var(--sg-line-mid); border-radius: 10px 10px 0 0;
+    background: var(--sg-panel); color: var(--sg-ink-soft); font-size: var(--sg-fs-lg); font-weight: 800; box-shadow: none; }
+  .tool-tab:hover { background: var(--sg-panel-alt); color: var(--sg-ink); }
+  .tool-tab.on { z-index: 1; margin-bottom: -1px; padding-bottom: calc(var(--sg-s3) + 1px); border-color: var(--sg-line-strong); border-bottom-color: var(--tool-lit); background: var(--tool-lit); color: var(--sg-ink); }
+  .tool-sheet { padding: var(--sg-s6); border: 1px solid var(--sg-line-strong); border-radius: 0 var(--sg-radius) var(--sg-radius) var(--sg-radius); background: var(--tool-lit); box-shadow: var(--sg-shadow-sm); }
+  .tool-sheet .hint:first-child { margin-top: 0; }
   /* 패치노트 미리 보기: 학생 화면 창(patch-notes.js 의 PatchNoteDialog)과 같은 어두운 판 */
   .patch-note-preview:not(:empty) { margin-top: var(--sg-s3); padding: 16px 20px; border-radius: 12px; background: rgba(16,24,19,.96); border-top: 3px solid #D97B4F; color: #EEF2EE; }
   .patch-note-preview .pn-tag { font-size: 13px; font-weight: 800; color: #D97B4F; }
@@ -427,110 +436,100 @@
       </p>
     </div>
 
-    <!-- 세계 신기록 관리: records/<게임>/<항목> 을 읽어 보여 주고, 선생님 계정으로 고치거나 지웁니다.
-         (학생은 규칙상 더 높은 점수만 쓸 수 있고, 선생님 UID 는 규칙에서 예외) -->
-    <div class="panel" id="recPanel">
-      <h2>세계 신기록 관리</h2>
-      <div class="actions" style="margin-top:0">
+    <!-- 관리 도구 5가지(2026-10-29 선생님 요청): 예전에는 카드 5장이 따로 펼치기 버튼을 가졌는데, 한 카드에 서류철 탭처럼 모았다.
+         탭을 누르면 그 기능만 펼쳐지고, 고른 탭과 펼친 칸이 함께 조금 밝아져 하나로 이어져 보인다. 같은 탭을 다시 누르면 접힌다.
+         각 기능의 '처음 펼칠 때만 읽기'는 예전 펼치기 버튼(숨김, *Toggle)이 그대로 맡고, ToolTabs 는 그 버튼을 눌러 줄 뿐이다. -->
+    <div class="tool-box" id="toolBox">
+      <div class="tool-tabs" role="tablist">
+        <button class="tool-tab" type="button" role="tab" aria-selected="false" data-tool="rec">세계 신기록 관리</button>
+        <button class="tool-tab" type="button" role="tab" aria-selected="false" data-tool="crec"><span id="crecTitle">학급 신기록 관리</span></button>
+        <button class="tool-tab" type="button" role="tab" aria-selected="false" data-tool="rank">반 별 통계</button>
+        <button class="tool-tab" type="button" role="tab" aria-selected="false" data-tool="patchNote">패치노트</button>
+        <button class="tool-tab" type="button" role="tab" aria-selected="false" data-tool="lag">30번 렉 진단</button>
+      </div>
+      <div hidden>
         <button id="recToggle" type="button" aria-expanded="false">펼치기</button>
-      </div>
-      <!-- 평소에는 접어 두고, 펼치기를 눌렀을 때만 목록을 불러옵니다 -->
-      <div id="recBody" hidden>
-        <p class="hint">
-          게임마다 모든 학생이 공유하는 세계 신기록입니다. 의심스러운 기록은 <b>지우기</b>(다음 판부터 첫 기록으로 다시 받음),
-          저장 단위가 바뀐 기록은 <b>고치기</b>로 값을 바꿉니다. 값은 각 게임의 저장 단위(초·밀리초·점 등)로 넣습니다.
-        </p>
-        <div class="actions">
-          <button id="recReload" type="button">신기록 새로고침</button>
-        </div>
-        <p class="msg" id="recMsg"></p>
-        <div id="recList"></div>
-      </div>
-    </div>
-
-    <!-- 학급 신기록 관리: 위 '반 고르기'에서 누른 반의 기록(records/<게임>/<항목>cls<학년><반>)만 보여 줍니다 -->
-    <div class="panel" id="crecPanel">
-      <h2 id="crecTitle">학급 신기록 관리</h2>
-      <div class="actions" style="margin-top:0">
         <button id="crecToggle" type="button" aria-expanded="false">펼치기</button>
-      </div>
-      <div id="crecBody" hidden>
-        <p class="hint">
-          위 <b>반 고르기</b>에서 누른 반의 신기록만 나옵니다. 반별 링크(?c=)로 들어온 학생이 세운 기록이며,
-          세계 신기록과 똑같이 <b>고치기</b>·<b>지우기</b>를 할 수 있습니다.
-        </p>
-        <div class="actions">
-          <button id="crecReload" type="button">신기록 새로고침</button>
-        </div>
-        <p class="msg" id="crecMsg"></p>
-        <div id="crecList"></div>
-      </div>
-    </div>
-
-    <!-- 반 별 통계(2026-10-27 이름 바꿈, 예전 "게임별 반별 순위", 예전 "팀 배틀 반별 승률"을 넓힘): 학생 기기가 경기 끝에 자기 요약 한 줄을 씁니다
-         (팀 배틀은 classStats/<반>/<uid>, 다른 게임은 gameRanks/<게임>/<반>/<uid>, 로그인한 학생만).
-         게임과 반 버튼을 누를 때 그 한 곳만 한 번 읽습니다(폴링 없음).
-         반은 학생이 반 링크로 처음 로그인할 때 profile.cls 에 한 번 적히고, 반 링크로 들어온 적이 없으면 '미분류'입니다. -->
-    <div class="panel" id="rankPanel">
-      <h2>반 별 통계</h2>
-      <div class="actions" style="margin-top:0">
         <button id="rankToggle" type="button" aria-expanded="false">펼치기</button>
-      </div>
-      <div id="rankBody" hidden>
-        <div class="class-grid" id="rankGames"></div>
-        <hr class="rank-divider">
-        <div class="class-grid" id="rankGrid"></div>
-        <div class="actions"><button id="rankRefresh" type="button" disabled>🔄 새로고침</button></div>
-        <p class="msg" id="rankMsg"></p>
-        <div id="rankTable" class="stats-box"></div>
-      </div>
-    </div>
-
-    <!-- 패치노트(2026-10-29): 게임별 패치노트를 portal/patchNotes/<게임> 에 쓰면 로그인한 학생이 그 게임에 처음 들어올 때 한 번 창으로 본다.
-         펼칠 때 지금 게시된 글을 한 번 읽는다. 동작은 patch-notes.js 의 PatchNoteEditor·PatchNoteNotice -->
-    <div class="panel" id="patchNotePanel">
-      <h2>패치노트</h2>
-      <div class="actions" style="margin-top:0">
         <button id="patchNoteToggle" type="button" aria-expanded="false">펼치기</button>
-      </div>
-      <div id="patchNoteBody" hidden>
-        <p class="hint">게시하면 로그인한 학생이 그 게임에 처음 들어올 때 한 번 창으로 보고, 확인을 누르면 다시 뜨지 않습니다(기기마다 기억).</p>
-        <div class="actions">
-          <select id="patchNoteGame"></select>
-        </div>
-        <input id="patchNoteTitle" type="text" maxlength="80" placeholder="제목 (예: v3 밸런스 패치)" style="width:100%;margin-top:10px">
-        <textarea id="patchNoteText" rows="12" maxlength="4000" placeholder="학생에게 보여 줄 패치 내용을 쓰세요" style="width:100%;margin-top:10px"></textarea>
-        <div class="actions">
-          <label><input id="patchNoteAgain" type="checkbox" checked> 이미 본 학생에게도 다시 띄우기</label>
-          <button id="patchNotePublish" type="button">게시</button>
-          <button id="patchNoteRemove" type="button">내리기</button>
-        </div>
-        <p class="msg" id="patchNoteMsg"></p>
-        <div id="patchNotePreview" class="patch-note-preview"></div>
-      </div>
-    </div>
-
-    <!-- 30번 렉 진단: 학생 기기가 경기 끝에 perfDiag/teambattle/<YYYYMMDD>/<push 키> 에 진단 요약 한 줄을 씁니다
-         (로그인한 기기만, 연습모드 포함, 닉네임·uid 없음). 날짜를 고르고 불러오기를 누를 때 그날 기록을 한 번만 읽습니다(폴링 없음).
-         필드 뜻과 보는 법은 30.team-battle-notes.md 의 "렉 진단 기록" 절. -->
-    <div class="panel" id="lagPanel">
-      <h2>30번 렉 진단</h2>
-      <div class="actions" style="margin-top:0">
         <button id="lagToggle" type="button" aria-expanded="false">펼치기</button>
       </div>
-      <div id="lagBody" hidden>
-        <p class="hint">
-          팀 배틀 경기가 끝날 때 기기마다 한 줄씩 남은 진단 기록을 <b>기기 모델·반·빌드</b>별로 묶어 평균을 냅니다.
-          <b>빌드</b>는 렉 개선 단계마다 올리는 표시라, 같은 기기·반에서 빌드끼리 비교하면 전후 차이를 볼 수 있습니다.
-          FPS 는 높을수록, 나머지(멈춤·도착 간격·순간이동·RTT)는 낮을수록 좋습니다.
-        </p>
-        <div class="actions">
-          <input id="lagDate" type="date">
-          <button id="lagLoad" type="button">불러오기</button>
-          <label><input id="lagByMode" type="checkbox"> 모드별로 나누기</label>
+      <div class="tool-sheet" id="toolSheet" hidden>
+        <!-- 세계 신기록 관리: records/<게임>/<항목> 을 읽어 보여 주고, 선생님 계정으로 고치거나 지웁니다.
+             (학생은 규칙상 더 높은 점수만 쓸 수 있고, 선생님 UID 는 규칙에서 예외) -->
+        <div id="recBody" hidden>
+          <p class="hint">
+            게임마다 모든 학생이 공유하는 세계 신기록입니다. 의심스러운 기록은 <b>지우기</b>(다음 판부터 첫 기록으로 다시 받음),
+            저장 단위가 바뀐 기록은 <b>고치기</b>로 값을 바꿉니다. 값은 각 게임의 저장 단위(초·밀리초·점 등)로 넣습니다.
+          </p>
+          <div class="actions">
+            <button id="recReload" type="button">신기록 새로고침</button>
+          </div>
+          <p class="msg" id="recMsg"></p>
+          <div id="recList"></div>
         </div>
-        <p class="msg" id="lagMsg"></p>
-        <div id="lagTable" class="stats-box"></div>
+
+        <!-- 학급 신기록 관리: 위 '반 고르기'에서 누른 반의 기록(records/<게임>/<항목>cls<학년><반>)만 보여 줍니다 -->
+        <div id="crecBody" hidden>
+          <p class="hint">
+            위 <b>반 고르기</b>에서 누른 반의 신기록만 나옵니다. 반별 링크(?c=)로 들어온 학생이 세운 기록이며,
+            세계 신기록과 똑같이 <b>고치기</b>·<b>지우기</b>를 할 수 있습니다.
+          </p>
+          <div class="actions">
+            <button id="crecReload" type="button">신기록 새로고침</button>
+          </div>
+          <p class="msg" id="crecMsg"></p>
+          <div id="crecList"></div>
+        </div>
+
+        <!-- 반 별 통계(2026-10-27 이름 바꿈, 예전 "게임별 반별 순위", 예전 "팀 배틀 반별 승률"을 넓힘): 학생 기기가 경기 끝에 자기 요약 한 줄을 씁니다
+             (팀 배틀은 classStats/<반>/<uid>, 다른 게임은 gameRanks/<게임>/<반>/<uid>, 로그인한 학생만).
+             게임과 반 버튼을 누를 때 그 한 곳만 한 번 읽습니다(폴링 없음).
+             반은 학생이 반 링크로 처음 로그인할 때 profile.cls 에 한 번 적히고, 반 링크로 들어온 적이 없으면 '미분류'입니다. -->
+        <div id="rankBody" hidden>
+          <div class="class-grid" id="rankGames"></div>
+          <hr class="rank-divider">
+          <div class="class-grid" id="rankGrid"></div>
+          <div class="actions"><button id="rankRefresh" type="button" disabled>🔄 새로고침</button></div>
+          <p class="msg" id="rankMsg"></p>
+          <div id="rankTable" class="stats-box"></div>
+        </div>
+
+        <!-- 패치노트(2026-10-29): 게임별 패치노트를 portal/patchNotes/<게임> 에 쓰면 로그인한 학생이 그 게임에 처음 들어올 때 한 번 창으로 본다.
+             펼칠 때 지금 게시된 글을 한 번 읽는다. 동작은 patch-notes.js 의 PatchNoteEditor·PatchNoteNotice -->
+        <div id="patchNoteBody" hidden>
+          <p class="hint">게시하면 로그인한 학생이 그 게임에 처음 들어올 때 한 번 창으로 보고, 확인을 누르면 다시 뜨지 않습니다(기기마다 기억).</p>
+          <div class="actions">
+            <select id="patchNoteGame"></select>
+          </div>
+          <input id="patchNoteTitle" type="text" maxlength="80" placeholder="제목 (예: v3 밸런스 패치)" style="width:100%;margin-top:10px">
+          <textarea id="patchNoteText" rows="12" maxlength="4000" placeholder="학생에게 보여 줄 패치 내용을 쓰세요" style="width:100%;margin-top:10px"></textarea>
+          <div class="actions">
+            <label><input id="patchNoteAgain" type="checkbox" checked> 이미 본 학생에게도 다시 띄우기</label>
+            <button id="patchNotePublish" type="button">게시</button>
+            <button id="patchNoteRemove" type="button">내리기</button>
+          </div>
+          <p class="msg" id="patchNoteMsg"></p>
+          <div id="patchNotePreview" class="patch-note-preview"></div>
+        </div>
+
+        <!-- 30번 렉 진단: 학생 기기가 경기 끝에 perfDiag/teambattle/<YYYYMMDD>/<push 키> 에 진단 요약 한 줄을 씁니다
+             (로그인한 기기만, 연습모드 포함, 닉네임·uid 없음). 날짜를 고르고 불러오기를 누를 때 그날 기록을 한 번만 읽습니다(폴링 없음).
+             필드 뜻과 보는 법은 30.team-battle-notes.md 의 "렉 진단 기록" 절. -->
+        <div id="lagBody" hidden>
+          <p class="hint">
+            팀 배틀 경기가 끝날 때 기기마다 한 줄씩 남은 진단 기록을 <b>기기 모델·반·빌드</b>별로 묶어 평균을 냅니다.
+            <b>빌드</b>는 렉 개선 단계마다 올리는 표시라, 같은 기기·반에서 빌드끼리 비교하면 전후 차이를 볼 수 있습니다.
+            FPS 는 높을수록, 나머지(멈춤·도착 간격·순간이동·RTT)는 낮을수록 좋습니다.
+          </p>
+          <div class="actions">
+            <input id="lagDate" type="date">
+            <button id="lagLoad" type="button">불러오기</button>
+            <label><input id="lagByMode" type="checkbox"> 모드별로 나누기</label>
+          </div>
+          <p class="msg" id="lagMsg"></p>
+          <div id="lagTable" class="stats-box"></div>
+        </div>
       </div>
     </div>
 
@@ -2339,6 +2338,25 @@ $("recToggle").addEventListener("click", () => {
   if (open && records.length === 0) loadRecords();
 });
 
+/* 관리 도구 탭: 한 번에 한 기능만 펼친다. 실제 펼치기·처음 읽기는 각 기능의 숨은 펼치기 버튼(<키>Toggle)이 하고,
+   여기서는 열린 것을 접고 고른 것을 펼친 뒤 탭 밝기(.on)와 아래 칸(toolSheet)을 맞춘다. 같은 탭을 다시 누르면 모두 접힌다 */
+class ToolTabs {
+  constructor() { this.tabs = Array.from(document.querySelectorAll("#toolBox .tool-tab")); }
+  bind() { this.tabs.forEach((tab) => tab.addEventListener("click", () => this.choose(tab.dataset.tool))); }
+  isOpen(key) { return !$(key + "Body").hidden; }
+  choose(key) {
+    const reopen = !this.isOpen(key);
+    this.tabs.forEach((tab) => { if (this.isOpen(tab.dataset.tool)) $(tab.dataset.tool + "Toggle").click(); });
+    if (reopen) $(key + "Toggle").click();
+    this.tabs.forEach((tab) => {
+      const on = this.isOpen(tab.dataset.tool);
+      tab.classList.toggle("on", on);
+      tab.setAttribute("aria-selected", on ? "true" : "false");
+    });
+    $("toolSheet").hidden = !reopen;
+  }
+}
+new ToolTabs().bind();
 /* 반 별 통계도 접어 두고, 펼친 뒤 게임·반 버튼을 눌러야 그 한 곳만 읽습니다 */
 new ClassRankPanel().bind();
 /* 패치노트 칸은 접어 두고, 처음 펼칠 때 지금 게시된 글을 한 번 읽습니다 */
