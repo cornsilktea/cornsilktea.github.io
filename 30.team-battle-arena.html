@@ -26,7 +26,7 @@
   "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
 } }
 </script>
-<link rel="stylesheet" href="30.team-battle-arena.css?v=20261028c">
+<link rel="stylesheet" href="30.team-battle-arena.css?v=20261029a">
 </head>
 <body>
 <canvas id="cv"></canvas>
@@ -35,6 +35,13 @@
 <div id="glLostNote" hidden>화면을 다시 그리지 못했어요. 새로고침하면 같은 캐릭터로 이어서 할 수 있어요.</div>
 <div id="tourFade" hidden></div>
 <div id="tourCaption" hidden><i></i><span id="tourCam"></span></div>
+<div id="versusCurtain" class="tbv-curtain" hidden>
+  <div class="tbv-curtain-in">
+    <div class="tbv-head">⚔️ 상대 팀을 찾았어요!</div>
+    <div class="tbv" id="tbvBody"></div>
+    <div class="tbv-hint">곧 캐릭터 선택이 시작돼요.</div>
+  </div>
+</div>
 
 <div id="scrStart" data-account-home class="screen">
   <div id="startCols" class="lobbyCols">
@@ -283,6 +290,7 @@
 <script>new CharacterMakerDialog(undefined, false);</script>
 <script charset="utf-8" src="account-match-kit.js?v=20261029b"></script>
 <script charset="utf-8" src="account-stats.js?v=20261029d"></script>
+<script charset="utf-8" src="30.team-battle-versus.js?v=20261029a"></script>
 <script charset="utf-8" src="patch-notes.js?v=20261029a"></script>
 <script type="module">
 import * as THREE from "three";
@@ -394,6 +402,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     accountRecorder;
     myStats;
     recentMatches;
+    versus;
   }
   class ArenaSize {
     static KEY = 70;
@@ -1431,6 +1440,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     showScreen(k) { var services = this.services;
       var prev = services.screens.now;
       services.screens.now = k;
+      services.versus.follow(k);
       Dom.show(Dom.$("scrStart"), k === "start"); Dom.show(Dom.$("scrLobby"), k === "lobby"); Dom.show(Dom.$("scrDraft"), k === "draft"); Dom.show(Dom.$("scrGame"), k === "game"); Dom.show(Dom.$("scrParty"), k === "party");
       var guardHome = document.querySelector("[data-guard-home]");
       if (guardHome) guardHome.style.display = k === "game" || k === "draft" ? "none" : "";
@@ -9913,7 +9923,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         var g = plan.groups.find(function (group) { return group.side === side; });
         var team = ArenaRandomMatch.SIDE_TEAMS[side], people = g ? MkSeatAssign.peopleOf(g).slice(0, ArenaRandomMatch.PARTY_LIMIT) : [];
         people.forEach(function (id) { assign[id] = team; });
-        if (people.indexOf(myId) >= 0) players[myId] = services.session.newPlayer(team, t, players);
+        if (people.indexOf(myId) >= 0) players[myId] = Object.assign(services.session.newPlayer(team, t, players), services.versus.seatExtra());
         var botCount = g ? Math.min(g.entry.bots || 0, ArenaRandomMatch.PARTY_LIMIT - people.length) : ArenaRandomMatch.PARTY_LIMIT;
         for (var n = 0; n < botCount; n++) {
           var free = services.charTypes.list.filter(function (c) { return !services.roster.takenInMatch(players, team, c); });
@@ -9941,7 +9951,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return Promise.all(["players", "status", "assign/" + myId].map(function (k) { return ref.child(k).once("value"); })).then(function (a) {
         var players = a[0].val(), team = a[2].val();
         if (!players || a[1].val() !== "lobby" || !team) return false;
-        return ref.child("players/" + myId).set(services.session.newPlayer(team, services.clock.now(), players)).then(enter);
+        return ref.child("players/" + myId).set(Object.assign(services.session.newPlayer(team, services.clock.now(), players), services.versus.seatExtra())).then(enter);
       });
     }
     leaveRoom() { var services = this.services;
@@ -9956,8 +9966,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (this.inParty()) { this.flow.backToParty(msg); return; }
       services.screens.showScreen("start"); services.lobby.startMsg(msg);
     }
-    startMatch() { this.services.launcher.startGame(); }
-    showParty() { var services = this.services; services.screens.showScreen("party"); services.nick.refreshNick(); }
+    startMatch() { var services = this.services; services.versus.startAfterShow(function () { services.launcher.startGame(); }); }
+    showParty() { var services = this.services; services.screens.showScreen("party"); services.nick.refreshNick(); services.versus.loadMine(); }
     showStart(message) { var services = this.services; services.screens.showScreen("start"); services.lobby.startMsg(message); }
     presentIds() { var services = this.services; return services.session.room ? services.session.humans(services.session.players) : []; }
     progress() { var services = this.services, room = services.session.room;
@@ -9968,11 +9978,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     forfeitIfLate() { if (this.flow) this.flow.forfeitIfLate(this.progress()); }
     armMatch() { if (this.flow) this.flow.armMatch(); }
     roomChanged() { var services = this.services;
+      services.versus.refresh();
       if (!this.flow || !services.session.room) return;
       var humans = services.session.humans(services.session.players).filter(function (id) { return services.roster.isPlayingTeam(services.session.players[id].team); }).length;
       this.flow.roomChanged(humans, services.session.isHost(), services.session.room.status === "lobby");
     }
-    matchEnded() { this.reportWhenDecided(ArenaRandomMatch.RESULT_TRIES); }
+    matchEnded() { this.services.versus.matchEnded(); this.reportWhenDecided(ArenaRandomMatch.RESULT_TRIES); }
     reportWhenDecided(triesLeft) { var services = this.services, self = this, ticket = this.ticket();
       if (!ticket || !services.session.room || services.session.room.status !== "ended") return;
       Dom.setText(Dom.$("btnLeaveEnd"), "팀 대기실로");
@@ -9982,6 +9993,66 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var showStreak = function () { Dom.setText(Dom.$("endStreak"), self.flow.endHint()); };
       showStreak();
       this.flow.matchEnded({ result: winner === "draw" ? "draw" : winner === mine ? "win" : "lose" }, showStreak);
+    }
+  }
+  class ArenaVersusCurtain {
+    static SHOW_MS = 4500;
+    static MIN_MS = 2000;
+    static FADE_MS = 350;
+    static RELOAD_MS = 6000;
+    constructor(services) {
+      this.services = services; this.root = Dom.$("versusCurtain"); this.card = null; this.stale = true; this.loading = false; this.shownAt = 0; this.timer = 0; this.startTimer = 0; this.assign = null;
+      this.view = new TeamBattleVersusView(Dom.$("tbvBody"), { faceOf: function (c) { return services.catalog.faceImgSrc(c); }, nameOf: function (c) { return services.charTypes.statsOf(c).name; } });
+    }
+    known(c) { return !!this.services.charTypes.statsOf(c); }
+    loadMine() { var self = this, store = AccountStatsStore.open();
+      if (!this.stale || this.loading || !store) return;
+      this.loading = true;
+      store.loadStats().then(function (node) { self.card = TeamBattleVersusCards.fromStats(node, function (c) { return self.known(c); }); self.stale = false; })
+        .catch(function () { return undefined; }).then(function () { self.loading = false; });
+    }
+    matchEnded() { var self = this; this.stale = true; setTimeout(function () { self.loadMine(); }, ArenaVersusCurtain.RELOAD_MS); }
+    seatExtra() { return this.card ? { vs: TeamBattleVersusCards.toRoom(this.card) } : {}; }
+    follow(screen) { var services = this.services;
+      clearTimeout(this.timer);
+      if (screen === "lobby" && document.body.classList.contains("mkMatched") && services.session.room && services.session.room.status === "lobby") { this.show(); return; }
+      if (this.root.hidden) return;
+      if (screen === "start" || screen === "party") { this.hide(); return; }
+      var left = this.shownAt + ArenaVersusCurtain.MIN_MS - performance.now(), self = this;
+      if (left > 0) this.timer = setTimeout(function () { self.hide(); }, left); else this.hide();
+    }
+    show() {
+      if (this.root.hidden || this.root.classList.contains("out")) { this.shownAt = performance.now(); this.view.reset(); this.loadAssign(); }
+      this.root.classList.remove("out"); this.root.hidden = false;
+      this.refresh();
+    }
+    hide() { var self = this;
+      this.root.classList.add("out");
+      this.timer = setTimeout(function () { self.root.hidden = true; self.root.classList.remove("out"); }, ArenaVersusCurtain.FADE_MS);
+    }
+    loadAssign() { var self = this, room = this.services.session.room;
+      this.assign = null;
+      if (!room || !room.ref) return;
+      room.ref.child("assign").once("value").then(function (snap) { if (self.services.session.room === room) { self.assign = snap.val() || {}; self.refresh(); } }, function () { return undefined; });
+    }
+    seatsOf(team) { var services = this.services, ps = services.session.players || {}, assign = this.assign;
+      var seats = services.session.teamIds(team).slice(0, MatchRules.TEAM_MAX).map(function (id) {
+        var p = ps[id];
+        return { nick: p.nickname || (p.isAI ? "AI" : "학생"), ai: !!p.isAI, me: id === services.session.myId, card: p.isAI ? null : TeamBattleVersusCards.fromRoom(p.vs) };
+      });
+      if (!assign) return seats;
+      var coming = Object.keys(assign).filter(function (id) { return assign[id] === team && !ps[id]; }).length;
+      while (seats.length < MatchRules.TEAM_MAX) seats.push(coming-- > 0 ? null : { nick: "AI", ai: true, me: false, card: null });
+      return seats;
+    }
+    refresh() { var services = this.services, room = services.session.room;
+      if (this.root.hidden || !room) return;
+      this.view.render(MapCatalog.of(room.map).name, this.seatsOf("blue"), this.seatsOf("red"));
+    }
+    startAfterShow(start) { var self = this, wait = this.root.hidden ? ArenaVersusCurtain.SHOW_MS : this.shownAt + ArenaVersusCurtain.SHOW_MS - performance.now();
+      clearTimeout(this.startTimer);
+      if (wait <= 0) { start(); return; }
+      this.startTimer = setTimeout(function () { var room = self.services.session.room; if (room && room.status === "lobby") start(); }, wait);
     }
   }
   class ServiceBuilder {
@@ -10085,6 +10156,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.world = new WorldStepper(services);
       services.testBridge = new TestBridge(services);
       services.randomMatch = new ArenaRandomMatch(services);
+      services.versus = new ArenaVersusCurtain(services);
       services.accountReport = new AccountReportBuilder(services);
       services.accountRecorder = new AccountMatchRecorder(services);
       services.myStats = new MyStatsWindow(services);
