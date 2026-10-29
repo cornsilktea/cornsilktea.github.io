@@ -9290,10 +9290,38 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     worstQuantile(q) { var tally = this; return Object.keys(this.byKey).reduce(function (m, k) { return Math.max(m, tally.byKey[k].quantile(q)); }, 0); }
   }
   class DeviceInfo {
+    static MAX_LEN = 32;
+    static GPU_LEN = 22;
+    static hintedModel = "";
+    static gpu = "";
+    static learned = false;
+    static learnOnce(renderer) {
+      if (DeviceInfo.learned) return;
+      DeviceInfo.learned = true;
+      DeviceInfo.gpu = DeviceInfo.shortGpu(DeviceInfo.rendererName(renderer));
+      var hints = navigator.userAgentData;
+      if (hints && hints.getHighEntropyValues) hints.getHighEntropyValues(["model"]).then(function (v) { DeviceInfo.hintedModel = String((v && v.model) || "").trim(); }).catch(function () {});
+    }
+    static rendererName(renderer) {
+      try {
+        var gl = renderer && renderer.getContext(), ext = gl && gl.getExtension("WEBGL_debug_renderer_info");
+        return ext ? String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) || "") : "";
+      } catch (e) { return ""; }
+    }
+    static shortGpu(name) {
+      var clean = String(name || "").replace(/\((TM|R)\)/g, "").replace(/\s+/g, " ");
+      var angle = clean.match(/ANGLE \([^,]*, ([^,(]+)/);
+      var m = (angle ? angle[1] : clean).match(/(Adreno|Mali-?\s?[A-Z]?\d+|Xclipse|PowerVR|Apple|Intel|NVIDIA|GeForce|Radeon|AMD)[^,()]*/i);
+      return m ? m[0].replace(/\s+Direct3D.*$/i, "").trim().slice(0, DeviceInfo.GPU_LEN) : "";
+    }
+    static platform() {
+      var m = (navigator.userAgent || "").match(/\b(iPad|iPhone|CrOS|Android|Windows|Macintosh|Linux)\b/);
+      return m ? m[1] : "other";
+    }
     static model() {
-      var ua = navigator.userAgent || "";
-      var m = ua.match(/\b(SM-[A-Z0-9]+)\b/) || ua.match(/\b(iPad|iPhone|CrOS|Android|Windows|Macintosh|Linux)\b/);
-      return m ? m[1].slice(0, 32) : "other";
+      var sm = (navigator.userAgent || "").match(/\b(SM-[A-Z0-9]+)\b/);
+      var name = sm ? sm[1] : DeviceInfo.hintedModel || (DeviceInfo.platform() + (DeviceInfo.gpu ? " · " + DeviceInfo.gpu : ""));
+      return name.slice(0, DeviceInfo.MAX_LEN);
     }
     static summary() {
       return { dev: DeviceInfo.model(), dpr: MathKit.r1(window.devicePixelRatio || 1), sw: Math.round(screen.width || 0), sh: Math.round(screen.height || 0), touch: Environment.TOUCH ? 1 : 0 };
@@ -9320,6 +9348,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var room = this.services.session.room;
       if (!room || !room.startAt || room.startAt === this.startAt) return;
       this.startAt = room.startAt; this.frames.reset(); this.arrivals.reset(); this.snaps = 0;
+      DeviceInfo.learnOnce(this.services.cameraRig.renderer);
     }
     frame(frameMs) { this.followMatch(); if (this.playing() && !document.hidden) this.frames.add(frameMs); }
     isLocalKey(key) { var services = this.services;
