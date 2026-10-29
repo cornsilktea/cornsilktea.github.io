@@ -490,6 +490,18 @@
         </div>
         <p class="msg" id="tbRepairMsg"></p>
         <div id="tbRepairBox" class="stats-box"></div>
+        <!-- 30번 MVP 점수 공식 비교(2026-10-29): 공식을 바꾸기 전에 학생들의 최근 20매치 결과표에 여러 공식을 적용해 비교한다.
+             users 를 한 번 읽기만 하고 쓰지 않는다. 백업은 30번 계정 통계·최근 매치·반 별 통계를 JSON 으로 내려받는다. 계산은 teambattle-mvp-lab.js -->
+        <hr class="rank-divider">
+        <h3>30번 MVP 점수 공식 비교</h3>
+        <p class="msg">학생들의 최근 20매치 결과표로 여러 MVP 점수 공식을 비교합니다. 읽기만 하고 기록은 바꾸지 않습니다.</p>
+        <div class="actions">
+          <button id="tbMvpCompare" type="button">비교표 만들기</button>
+          <select id="tbMvpBonus"></select>
+          <button id="tbMvpBackup" type="button">백업 내려받기</button>
+        </div>
+        <p class="msg" id="tbMvpMsg"></p>
+        <div id="tbMvpBox" class="stats-box"></div>
       </div>
     </div>
 
@@ -529,6 +541,7 @@
 <script charset="utf-8" src="account-match-kit.js?v=20261029b"></script>
 <script charset="utf-8" src="account-stats.js?v=20261029a"></script>
 <script charset="utf-8" src="teambattle-stats-repair.js?v=20261029a"></script>
+<script charset="utf-8" src="teambattle-mvp-lab.js?v=20261029a"></script>
 <script charset="utf-8" src="24.turbo-lap-stats.js?v=20261029a"></script>
 <script charset="utf-8" src="25.fps-survival-stats.js?v=20261028c"></script>
 <script charset="utf-8" src="31.zombie-outbreak-stats.js?v=20261028c"></script>
@@ -2315,10 +2328,13 @@ $("recToggle").addEventListener("click", () => {
 
 /* 반 별 통계도 접어 두고, 펼친 뒤 게임·반 버튼을 눌러야 그 한 곳만 읽습니다 */
 new ClassRankPanel().bind();
-new TeamBattleRepairPanel({
-  read: async (path) => { const r = await fetch(await authedUrl(path), { cache: "no-store" }); if (!r.ok) throw new Error(String(r.status)); return r.json(); },
-  patch: async (values) => { const r = await fetch(await authedUrl(""), { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(values) }); if (!r.ok) throw new Error(String(r.status)); }
-}, { check: "tbRepairCheck", apply: "tbRepairApply", left: "tbRepairLeft", msg: "tbRepairMsg", box: "tbRepairBox" }).bind();
+/* 30번 정상화·MVP 비교 도구가 교사 토큰으로 데이터베이스를 읽고 쓰는 통로(상태 없음) */
+class AdminRestIo {
+  async read(path) { const r = await fetch(await authedUrl(path), { cache: "no-store" }); if (!r.ok) throw new Error(String(r.status)); return r.json(); }
+  async patch(values) { const r = await fetch(await authedUrl(""), { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(values) }); if (!r.ok) throw new Error(String(r.status)); }
+}
+new TeamBattleRepairPanel(new AdminRestIo(), { check: "tbRepairCheck", apply: "tbRepairApply", left: "tbRepairLeft", msg: "tbRepairMsg", box: "tbRepairBox" }).bind();
+new MvpLabPanel(new AdminRestIo(), (id) => StudentStatsWindow.roleOf(id).name, { backup: "tbMvpBackup", compare: "tbMvpCompare", bonus: "tbMvpBonus", msg: "tbMvpMsg", box: "tbMvpBox" }).bind();
 
 window.__portalBooted = true;
 if (!cfg.isAdminReady()) {
