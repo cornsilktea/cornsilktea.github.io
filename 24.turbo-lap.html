@@ -5612,7 +5612,10 @@ class TurboRandomMatch {
       const id = racerOf(side), p = id ? BT.players[id] : null;
       return p ? { nick: p.nickname || "?", car: p.car || "", bot: isBot(id), me: id === BT.myId, rate: TurboLapRates.cardOf(p.rate) } : null;
     };
-    this.versus.render(BT.course, racer("left"), racer("right"), (ticket.rivals || [])[0] || "🤖 AI");
+    this.versus.render(TurboRandomMatch.courseOf(ticket), racer("left"), racer("right"), (ticket.rivals || [])[0] || "🤖 AI");
+  }
+  static courseOf(ticket) {
+    return COURSES.find(key => TRACKS[key].name === ticket.map) || BT.course;
   }
   player(team, t) {
     const player = newPlayer(team, t), rate = this.rates.forRoom();
