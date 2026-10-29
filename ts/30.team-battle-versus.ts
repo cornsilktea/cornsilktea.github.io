@@ -31,10 +31,13 @@ class TeamBattleVersusCards {
 
   static fromStats(node: AccountStatsNode | null, known: (charId: string) => boolean): TeamBattleVersusCard | null {
     if (!node) return null;
-    const random = node.rm || AccountStatsMath.normalizeRandom(null);
-    const picks = Object.keys(random.c).filter(known).map((c) => ({ c, n: random.c[c].n, w: random.c[c].w })).filter((pick) => pick.n > 0);
+    const chars = AccountShape.slots(node.c);
+    const picks = Object.keys(chars).filter(known).map((c) => {
+      const item = (chars[c] && typeof chars[c] === "object" ? chars[c] : {}) as Record<string, unknown>;
+      return { c, n: AccountNumbers.count(item.n), w: AccountNumbers.count(item.w) };
+    }).filter((pick) => pick.n > 0);
     picks.sort((a, b) => b.n - a.n || b.w - a.w || a.c.localeCompare(b.c));
-    return { g: random.g, w: random.w, top: picks.slice(0, TeamBattleVersusCards.TOP) };
+    return { g: AccountNumbers.count(node.g), w: AccountNumbers.count(node.w), top: picks.slice(0, TeamBattleVersusCards.TOP) };
   }
 
   static toRoom(card: TeamBattleVersusCard): TeamBattleVersusRoomCard {

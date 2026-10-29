@@ -291,20 +291,6 @@
             "rg": { ".validate": "newData.isNumber() && newData.val() >= 0" },
             "rw": { ".validate": "newData.isNumber() && newData.val() >= 0" },
             "m": { ".validate": "newData.isNumber() && newData.val() >= 0" },
-            "rm": {
-              ".validate": "newData.hasChildren(['g', 'w']) && newData.child('w').val() <= newData.child('g').val() && (!data.exists() || newData.child('g').val() === data.child('g').val() || newData.child('g').val() === data.child('g').val() + 1 || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3'))",
-              "g": { ".validate": "newData.isNumber() && newData.val() >= 0" },
-              "w": { ".validate": "newData.isNumber() && newData.val() >= 0" },
-              "c": {
-                "$char": {
-                  ".validate": "$char.matches(/^(warrior|knight|ranger|mage|rogue|necro|sniper|thrower|lancer|blacksmith|priest|hitman|guardian|frost|dancer|duelist|stormbow|cleric|shaman|engineer|druid|giant|astrologer)$/) && newData.hasChildren(['n', 'w']) && newData.child('w').val() <= newData.child('n').val()",
-                  "n": { ".validate": "newData.isNumber() && newData.val() >= 0" },
-                  "w": { ".validate": "newData.isNumber() && newData.val() >= 0" },
-                  "$other": { ".validate": false }
-                }
-              },
-              "$other": { ".validate": false }
-            },
             "ids": {
               "$id": { ".validate": "$id.length >= 1 && $id.length <= 60 && newData.isNumber() && (!data.exists() || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3'))" }
             },

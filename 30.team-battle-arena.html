@@ -289,8 +289,8 @@
 <script charset="utf-8" src="character-maker.js?v=20261026a"></script>
 <script>new CharacterMakerDialog(undefined, false);</script>
 <script charset="utf-8" src="account-match-kit.js?v=20261029c"></script>
-<script charset="utf-8" src="account-stats.js?v=20261029f"></script>
-<script charset="utf-8" src="30.team-battle-versus.js?v=20261029c"></script>
+<script charset="utf-8" src="account-stats.js?v=20261029g"></script>
+<script charset="utf-8" src="30.team-battle-versus.js?v=20261029d"></script>
 <script charset="utf-8" src="patch-notes.js?v=20261029b"></script>
 <script type="module">
 import * as THREE from "three";
@@ -8787,7 +8787,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     snapshot() { var services = this.services, room = services.session.room, myId = services.session.myId;
       if (!room || !room.roster || !room.roster[myId]) return null;
       return { entries: services.resultBoard.roster.entries, present: Object.assign({}, services.session.players), roster: Object.assign({}, room.roster), myId: myId,
-               mode: room.mode, winner: room.winner, final: room.final, matchId: this.matchIdOf(room), random: !!this.services.randomMatch.ticket() };
+               mode: room.mode, winner: room.winner, final: room.final, matchId: this.matchIdOf(room) };
     }
     build(snap, iLeft, progress, liveScore) { var self = this;
       var myIndex = -1, rows = this.services.resultBoard.roster.rows(snap.entries), f = snap.final || liveScore || {};
@@ -8796,7 +8796,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         return self.lineOf(row, row.id === snap.myId ? iLeft : !snap.present[row.id], snap.roster[row.id] && snap.roster[row.id].ai);
       });
       return { matchId: snap.matchId, mode: snap.mode, winnerTeam: AccountReportBuilder.TEAMS.indexOf(snap.winner), myIndex: myIndex, players: players,
-               score: [+f.blue || 0, +f.red || 0], progress: progress, iLeft: iLeft, random: !!snap.random };
+               score: [+f.blue || 0, +f.red || 0], progress: progress, iLeft: iLeft };
     }
   }
   class AccountMatchRecorder {
