@@ -169,7 +169,7 @@ class MvpLabWeightSet {
     kill: TeamBattleScore.KILL, assist: TeamBattleScore.ASSIST, death: TeamBattleScore.DEATH, dmg: 1, heal: 1, blocked: 1,
     stunSec: TeamBattleScore.STUN_PER_SEC, slowSec: TeamBattleScore.SLOW_PER_SEC
   };
-  static readonly REWEIGHTED: MvpLabWeights = Object.assign({}, MvpLabWeightSet.CURRENT, { heal: 0.5, blocked: 0.5, death: 150 });
+  static readonly REWEIGHTED: MvpLabWeights = Object.assign({}, MvpLabWeightSet.CURRENT, { assist: 80, heal: 0.7, stunSec: 40, slowSec: 20 });
 }
 
 /* 팀 처치 차이(블루 − 레드)를 피해·회복·막은 피해·기절·둔화의 팀 합계 차이로 설명하는 능형 회귀.

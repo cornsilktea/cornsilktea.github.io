@@ -7,7 +7,7 @@ const names = ["AccountNumbers", "AccountRates", "AccountMatchKey", "AccountKeyL
   "ZombiePlan", "ZombieCodec", "ZombieStatsMath", "ZombieProfile", "ZombieStatsView", "SnAccountPlan", "SnAccountCodec", "SnAccountMath", "SnAccountProfile", "SnAccountView", "SnReportBuilder",
   "WbAccountPlan", "WbAccountCodec", "WbAccountMath", "WbAccountProfile", "WbAccountView", "WbReportBuilder",
   "AccountClassRank", "RandomMatchPlan", "RandomMatchCodec", "RandomMatchMath", "RandomMatchProfile", "RandomMatchView",
-  "AccountPendingCodec", "AccountMatchSender", "AccountPendingGuard", "MkStreakMath", "TeamBattleRepairPlanner", "TeamBattleRepairNames", "TurboLapClock", "MvpLabCollector", "MvpLabAudit", "MvpLabBackup", "MvpLabStats", "MvpWeightFitter", "MvpFormulaReport", "CurrentMvpFormula", "TeamShareMvpFormula", "MvpLabMatch", "TeamBattleScore"];
+  "AccountPendingCodec", "AccountMatchSender", "AccountPendingGuard", "MkStreakMath", "TeamBattleRepairPlanner", "TeamBattleRepairNames", "TurboLapClock", "MvpLabCollector", "MvpLabAudit", "MvpLabBackup", "MvpLabStats", "MvpWeightFitter", "MvpFormulaReport", "CurrentMvpFormula", "TeamShareMvpFormula", "MvpLabMatch", "TeamBattleScore", "MvpLabWeightSet"];
 const src = files.map((f) => fs.readFileSync(path.join(root, f), "utf8")).join("\n") + "\n;({" + names.join(",") + "})";
 const K = vm.runInNewContext(src, { console, Math, Set, Map, Array, Object, Number, String, JSON, isFinite, Date, Promise, window: {}, WbBalance: { RATE: 30 } });
 
@@ -428,6 +428,8 @@ check("24번 결과 시간: 0.01초까지 같은 기록끼리만 0.001초까지"
   check("MVP 비교: 팀 비중 — 처치·피해를 다 한 가가 같은 팀 다보다 높음", share.score(m.players[0], m, 0) > share.score(m.players[2], m, 0) && share.score(m.players[2], m, 0) === 0, m.players.map((l) => share.score(l, m, 0)));
   const rep = new K.MvpFormulaReport(current, lab.matches, 0);
   check("MVP 비교: 보고서 — MVP 가 이긴 팀, 캐릭터별 판 수", rep.winnerMvpRate === 1 && rep.chars.warrior.games === 1 && rep.chars.warrior.mvp === 1, rep);
+  const rw = K.MvpLabWeightSet.REWEIGHTED;
+  check("MVP 비교: 가중치 조정안(2026-10-29) — 어시스트 80·회복 0.7·기절 40·둔화 20, 나머지는 지금 식", rw.kill === 100 && rw.assist === 80 && rw.death === 100 && rw.dmg === 1 && rw.heal === 0.7 && rw.blocked === 1 && rw.stunSec === 40 && rw.slowSec === 20, rw);
   check("MVP 비교: 상관 계산", Math.abs(K.MvpLabStats.pearson([1, 2, 3, 4], [2, 4, 6, 8]) - 1) < 1e-9 && K.MvpLabStats.pearson([1, 2], [1, 2]) === null);
   const fake = [];
   for (let i = 0; i < 40; i++) {
