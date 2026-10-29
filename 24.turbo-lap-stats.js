@@ -283,6 +283,30 @@ class TurboLapVersusView {
         return AccountHtml.esc(label) + " <em>" + Math.round(pair.w / pair.g * 100) + "%</em> <small>" + pair.w + "승 " + (pair.g - pair.w) + "패</small>";
     }
 }
+/* 결과표 정리와 승자 판정(2026-10-29, 랜덤 매칭 승자 기록이 사라진 문제).
+   상대가 경기 중에 사라졌는데 방장이 '나간 편'(quitSide)으로 판정하지 못하면 결과표에 승자 한 줄만 남았다.
+   그러면 승자의 보고는 "2명 이상인 판만 기록"에 걸려 저장되지 않고 미리 적은 칸까지 지워졌다(나간 학생은 미리 적은 패배로 남음).
+   경기 중에 본 선수가 결과표에 없으면 나간 줄로 붙이고, 완주한 사람이 없어도 상대 편이 모두 나갔으면 남은 편이 이긴 것으로 본다 */
+class TurboLapOutcome {
+    static withLeavers(rows, seen) {
+        const listed = {};
+        rows.forEach((row) => { listed[row.id] = true; });
+        const leavers = Object.keys(seen).filter((id) => !listed[id] && TurboLapOutcome.RACING_TEAMS.indexOf(seen[id].team) >= 0)
+            .map((id) => ({ id, nick: seen[id].nick, team: seen[id].team, car: seen[id].car, fin: 0, prog: seen[id].prog, quit: 1 }));
+        return rows.concat(leavers);
+    }
+    static winner(rows, quitWinner) {
+        if (quitWinner)
+            return quitWinner;
+        if (rows.length && rows[0].fin && !rows[0].quit)
+            return rows[0];
+        if (!rows.some((row) => row.quit))
+            return null;
+        const staying = rows.filter((row) => !row.quit && TurboLapOutcome.RACING_TEAMS.indexOf(row.team) >= 0);
+        return staying.length && staying.every((row) => row.team === staying[0].team) ? staying[0] : null;
+    }
+}
+TurboLapOutcome.RACING_TEAMS = ["left", "right"];
 /* 결과표의 완주 시간: 보통은 0.01초까지, 0.01초까지 같은 완주 기록이 둘 이상이면 그 기록들만 0.001초까지(2026-10-29 선생님 요청).
    순위는 원래 0.001초 단위로 정해지는데 화면이 같은 시간으로 보여 왜 졌는지 알 수 없었다. 게임 결과 화면과 최근 매치 결과 창이 함께 쓴다 */
 class TurboLapClock {

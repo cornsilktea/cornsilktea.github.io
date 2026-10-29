@@ -557,7 +557,7 @@
 <script charset="utf-8" src="character-maker.js?v=20261026a"></script>
 <script charset="utf-8" src="match-kit.js?v=20261029c"></script>
 <script charset="utf-8" src="account-match-kit.js?v=20261029b"></script>
-<script charset="utf-8" src="24.turbo-lap-stats.js?v=20261029a"></script>
+<script charset="utf-8" src="24.turbo-lap-stats.js?v=20261029b"></script>
 <script>new CharacterMakerDialog(undefined, false);</script>
 <script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }</script>
 <script type="module">
@@ -5051,7 +5051,8 @@ function progText(prog) {
 }
 function renderResult() {
   const r = BT.result || {};
-  const rows = okeys(r).map(id => Object.assign({ id }, r[id])).sort((a, b) => (a.quit ? 1 : 0) - (b.quit ? 1 : 0) || rankCmp(a, b));
+  const listed = okeys(r).map(id => Object.assign({ id }, r[id]));
+  const rows = (BT.status === "ended" && listed.length ? TurboLapOutcome.withLeavers(listed, raceRoster.seen) : listed).sort((a, b) => (a.quit ? 1 : 0) - (b.quit ? 1 : 0) || rankCmp(a, b));
   const finishes = rows.map(x => x.quit ? 0 : x.fin || 0);
   $("bDoneCourse").textContent = TRACKS[BT.course].name;
   setHtml($("bDoneRows"), rows.length ? rows.map((x, i) => '<tr><td>' + (i + 1) + "위</td><td>" +
@@ -5060,7 +5061,7 @@ function renderResult() {
     : '<tr><td colspan="3">결과를 불러오는 중…</td></tr>');
   const mine = rows.findIndex(x => x.id === BT.myId);
   let msg = "";
-  const quitWinner = BT.quitSide && rows.find(x => x.team !== BT.quitSide && (x.team === "left" || x.team === "right"));
+  const quitWinner = (BT.quitSide && rows.find(x => x.team !== BT.quitSide && (x.team === "left" || x.team === "right"))) || (rows.length && !rows[0].fin ? TurboLapOutcome.winner(rows, null) : null);
   if (quitWinner) msg = quitWinner.id === BT.myId ? "🏆 상대가 나가서 승리했습니다!" : "🏆 상대가 나가서 " + quitWinner.nick + " 승리";
   else if (rows.length && mine === 0 && rows[0].fin) msg = "🏆 승리했습니다!";
   else if (mine > 0) msg = "아쉽게 " + (mine + 1) + "위! 다시 도전해 보세요.";
@@ -5422,7 +5423,7 @@ function hostTick() {
   BT.statusSent = "ended";
   const result = {};
   st.forEach(r => { const p = BT.players[r.id] || {}; result[r.id] = { nick: p.nickname || "?", team: p.team || "left", car: p.car || "", fin: r.fin || 0, prog: +(+r.prog).toFixed(4) }; });
-  raceRoster.leavers(st, quitSide).forEach(r => { result[r.id] = { nick: r.nick, team: r.team, car: r.car, fin: 0, prog: r.prog, quit: 1 }; });
+  raceRoster.leavers(st).forEach(r => { result[r.id] = { nick: r.nick, team: r.team, car: r.car, fin: 0, prog: r.prog, quit: 1 }; });
   BT.ref.update({ status: "ended", endedAt: t, result, quitSide: quitSide || null });
 }
 class RaceRoster {
@@ -5431,11 +5432,8 @@ class RaceRoster {
   note(st) {
     st.forEach(r => { const p = BT.players[r.id]; if (p) this.seen[r.id] = { nick: p.nickname || "?", team: p.team || "left", car: p.car || "", prog: Math.max(0, +(+r.prog).toFixed(4)) }; });
   }
-  leavers(st, quitSide) {
-    if (!quitSide) return [];
-    const here = {};
-    st.forEach(r => { here[r.id] = true; });
-    return okeys(this.seen).filter(id => !here[id] && this.seen[id].team === quitSide).map(id => Object.assign({ id }, this.seen[id]));
+  leavers(st) {
+    return TurboLapOutcome.withLeavers(st.map(r => ({ id: r.id })), this.seen).filter(r => r.quit);
   }
 }
 const raceRoster = new RaceRoster();
@@ -5736,7 +5734,7 @@ class TurboRandomMatch {
     this.flow.matchEnded({ result, rivals: this.resultRivals(rows, mine) }, () => { $("bDoneHint").textContent = this.flow.endHint(); });
   }
   resultOf(rows, quitWinner, ticket) {
-    const winner = quitWinner || (rows[0].fin ? rows[0] : null);
+    const winner = TurboLapOutcome.winner(rows, quitWinner);
     return !winner ? "draw" : winner.team === SIDES[ticket.side] ? "win" : "lose";
   }
   record(report) {

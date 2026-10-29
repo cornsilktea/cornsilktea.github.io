@@ -7,7 +7,7 @@ const names = ["AccountNumbers", "AccountRates", "AccountMatchKey", "AccountKeyL
   "ZombiePlan", "ZombieCodec", "ZombieStatsMath", "ZombieProfile", "ZombieStatsView", "SnAccountPlan", "SnAccountCodec", "SnAccountMath", "SnAccountProfile", "SnAccountView", "SnReportBuilder",
   "WbAccountPlan", "WbAccountCodec", "WbAccountMath", "WbAccountProfile", "WbAccountView", "WbReportBuilder",
   "AccountClassRank", "RandomMatchPlan", "RandomMatchCodec", "RandomMatchMath", "RandomMatchProfile", "RandomMatchView",
-  "AccountPendingCodec", "AccountMatchSender", "AccountPendingGuard", "MkStreakMath", "TurboLapClock", "TeamBattleScore", "PatchNoteCodec", "PatchNoteSeen"];
+  "AccountPendingCodec", "AccountMatchSender", "AccountPendingGuard", "MkStreakMath", "TurboLapClock", "TurboLapOutcome", "TeamBattleScore", "PatchNoteCodec", "PatchNoteSeen"];
 const src = files.map((f) => fs.readFileSync(path.join(root, f), "utf8")).join("\n") + "\n;({" + names.join(",") + "})";
 const fakeStorage = { data: {}, getItem(k) { return this.data[k] === undefined ? null : this.data[k]; }, setItem(k, v) { this.data[k] = String(v); } };
 const K = vm.runInNewContext(src, { localStorage: fakeStorage, console, Math, Set, Map, Array, Object, Number, String, JSON, isFinite, Date, Promise, window: {}, WbBalance: { RATE: 30 } });
@@ -261,6 +261,19 @@ const turboReport = (extra) => Object.assign({ matchId: "m24", course: "seoul", 
   rows: [{ nick: "가".repeat(25), side: 0, fin: 65432, prog: 1, car: "porsche:blue", bot: false }, { nick: "나", side: 1, fin: 0, prog: 0.4217, car: "audi:red", bot: false }] }, extra || {});
 {
   check("24번 판정: 사람끼리 승리는 최근·누적 모두", (() => { const p = new K.TurboLapPlan(turboReport()); return p.recordsRecent && p.countsStats && p.win; })());
+  (() => {
+    const seen = { a: { nick: "가", team: "left", car: "c1", prog: 0.4 }, b: { nick: "나", team: "right", car: "c2", prog: 1 } };
+    const onlyMe = [{ id: "b", nick: "나", team: "right", fin: 65000, prog: 3 }];
+    const rows = K.TurboLapOutcome.withLeavers(onlyMe, seen);
+    check("24번 결과표: 경기 중 사라진 상대를 나간 줄로 붙임(승자 기록이 1줄이라 빠지던 문제)", rows.length === 2 && rows[1].id === "a" && rows[1].quit === 1 && rows[1].fin === 0, rows);
+    check("24번 결과표: 이미 있는 줄은 다시 붙이지 않음", K.TurboLapOutcome.withLeavers(rows, seen).length === 2);
+    check("24번 승자: 완주한 1위", K.TurboLapOutcome.winner(rows, null).id === "b");
+    const noFinish = [{ id: "b", nick: "나", team: "right", fin: 0, prog: 1.2 }, { id: "a", nick: "가", team: "left", fin: 0, prog: 0.4, quit: 1 }];
+    check("24번 승자: 아무도 완주 못 했어도 상대가 모두 나갔으면 남은 편", (K.TurboLapOutcome.winner(noFinish, null) || {}).id === "b");
+    check("24번 승자: 아무도 나가지 않고 완주도 없으면 무승부", K.TurboLapOutcome.winner([{ id: "a", team: "left", fin: 0, prog: 1 }, { id: "b", team: "right", fin: 0, prog: 2 }], null) === null);
+    const plan = new K.TurboLapPlan({ matchId: "m", course: "seoul", result: "win", myIndex: 0, rows: rows.map((r) => ({ nick: r.nick, side: r.team === "right" ? 1 : 0, fin: r.fin, prog: r.prog, car: r.car || "", bot: false })) });
+    check("24번 판정: 상대가 사라진 판의 승자도 최근·누적 기록", plan.recordsRecent && plan.countsStats && plan.win);
+  })();
   check("24번 판정: 무승부는 기록 없음", !new K.TurboLapPlan(turboReport({ result: "draw" })).recordsRecent);
   const withBot = turboReport(); withBot.rows[1].bot = true;
   check("24번 판정: AI 상대는 최근 매치만", (() => { const p = new K.TurboLapPlan(withBot); return p.recordsRecent && !p.countsStats && p.withAi; })());
