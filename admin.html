@@ -478,6 +478,18 @@
         <div class="actions"><button id="rankRefresh" type="button" disabled>🔄 새로고침</button></div>
         <p class="msg" id="rankMsg"></p>
         <div id="rankTable" class="stats-box"></div>
+        <!-- 30번 통계 정상화(2026-10-29): 경기 끝에 화면이 닫혀 몇 명만 기록된 판을, 다른 학생의 최근 20매치에 남은 결과표로 채운다.
+             미리 보기에서 users 전체를 한 번 읽고, 적용할 때 다시 읽은 뒤 PATCH 한 번. 계산은 teambattle-stats-repair.js -->
+        <hr class="rank-divider">
+        <h3>30번 팀 배틀 통계 정상화</h3>
+        <p class="msg">같은 판인데 몇 명만 기록된 경우, 다른 학생의 최근 20매치에 남은 결과표로 빠진 학생의 통계·최근 매치·반 별 통계를 채웁니다.</p>
+        <div class="actions">
+          <button id="tbRepairCheck" type="button">빠진 기록 찾기</button>
+          <button id="tbRepairApply" type="button" disabled>적용</button>
+          <label><input id="tbRepairLeft" type="checkbox" checked> 중간에 나간 학생도 패배로 넣기</label>
+        </div>
+        <p class="msg" id="tbRepairMsg"></p>
+        <div id="tbRepairBox" class="stats-box"></div>
       </div>
     </div>
 
@@ -514,8 +526,9 @@
 <!-- 반 별 통계에서 학생 이름을 누르면 여는 개인 통계 창이 게임과 같은 계산·되살리기·표 클래스를 쓰려고 불러온다.
      30번은 StudentStatsWindow(account-stats.js), 나머지는 각 게임 통계 모듈의 Profile·View + AccountStatsDialog(StudentAccountWindow).
      통계가 있는 새 게임을 만들면 그 게임의 통계 .js 를 여기 한 줄 더하고 ClassRankPanel.GAMES 에 account 를 넘긴다. -->
-<script charset="utf-8" src="account-match-kit.js?v=20261028d"></script>
-<script charset="utf-8" src="account-stats.js?v=20261028e"></script>
+<script charset="utf-8" src="account-match-kit.js?v=20261029a"></script>
+<script charset="utf-8" src="account-stats.js?v=20261029a"></script>
+<script charset="utf-8" src="teambattle-stats-repair.js?v=20261029a"></script>
 <script charset="utf-8" src="24.turbo-lap-stats.js?v=20261028d"></script>
 <script charset="utf-8" src="25.fps-survival-stats.js?v=20261028c"></script>
 <script charset="utf-8" src="31.zombie-outbreak-stats.js?v=20261028c"></script>
@@ -2292,6 +2305,10 @@ $("recToggle").addEventListener("click", () => {
 
 /* 반 별 통계도 접어 두고, 펼친 뒤 게임·반 버튼을 눌러야 그 한 곳만 읽습니다 */
 new ClassRankPanel().bind();
+new TeamBattleRepairPanel({
+  read: async (path) => { const r = await fetch(await authedUrl(path), { cache: "no-store" }); if (!r.ok) throw new Error(String(r.status)); return r.json(); },
+  patch: async (values) => { const r = await fetch(await authedUrl(""), { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(values) }); if (!r.ok) throw new Error(String(r.status)); }
+}, { check: "tbRepairCheck", apply: "tbRepairApply", left: "tbRepairLeft", msg: "tbRepairMsg", box: "tbRepairBox" }).bind();
 
 window.__portalBooted = true;
 if (!cfg.isAdminReady()) {

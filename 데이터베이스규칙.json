@@ -281,7 +281,8 @@
         },
         "stats": {
           "teambattle": {
-            ".validate": "newData.hasChildren(['g', 'w', 'l', 'bg', 'bw', 'rg', 'rw', 'm']) && ((!data.exists() && newData.child('g').val() === 1) || (data.exists() && newData.child('g').val() === data.child('g').val() + 1 && newData.child('w').val() >= data.child('w').val() && newData.child('l').val() >= data.child('l').val() && newData.child('m').val() >= data.child('m').val() && newData.child('m').val() <= data.child('m').val() + 1 && newData.child('bg').val() >= data.child('bg').val() && newData.child('rg').val() >= data.child('rg').val())) && newData.child('w').val() + newData.child('l').val() === newData.child('g').val() && newData.child('m').val() <= newData.child('g').val() && newData.child('bg').val() + newData.child('rg').val() === newData.child('g').val() && newData.child('bw').val() <= newData.child('bg').val() && newData.child('rw').val() <= newData.child('rg').val() && newData.child('bw').val() + newData.child('rw').val() === newData.child('w').val()",
+            ".write": "auth != null && (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')",
+            ".validate": "newData.hasChildren(['g', 'w', 'l', 'bg', 'bw', 'rg', 'rw', 'm']) && ((auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3') || (!data.exists() && newData.child('g').val() === 1) || (data.exists() && newData.child('g').val() === data.child('g').val() + 1 && newData.child('w').val() >= data.child('w').val() && newData.child('l').val() >= data.child('l').val() && newData.child('m').val() >= data.child('m').val() && newData.child('m').val() <= data.child('m').val() + 1 && newData.child('bg').val() >= data.child('bg').val() && newData.child('rg').val() >= data.child('rg').val())) && newData.child('w').val() + newData.child('l').val() === newData.child('g').val() && newData.child('m').val() <= newData.child('g').val() && newData.child('bg').val() + newData.child('rg').val() === newData.child('g').val() && newData.child('bw').val() <= newData.child('bg').val() && newData.child('rw').val() <= newData.child('rg').val() && newData.child('bw').val() + newData.child('rw').val() === newData.child('w').val()",
             "g": { ".validate": "newData.isNumber() && newData.val() >= 0" },
             "w": { ".validate": "newData.isNumber() && newData.val() >= 0" },
             "l": { ".validate": "newData.isNumber() && newData.val() >= 0" },
@@ -291,11 +292,11 @@
             "rw": { ".validate": "newData.isNumber() && newData.val() >= 0" },
             "m": { ".validate": "newData.isNumber() && newData.val() >= 0" },
             "ids": {
-              "$id": { ".validate": "$id.length >= 1 && $id.length <= 60 && newData.isNumber() && !data.exists()" }
+              "$id": { ".validate": "$id.length >= 1 && $id.length <= 60 && newData.isNumber() && (!data.exists() || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3'))" }
             },
             "c": {
               "$char": {
-                ".validate": "$char.matches(/^(warrior|knight|ranger|mage|rogue|necro|sniper|thrower|lancer|blacksmith|priest|hitman|guardian|frost|dancer|duelist|stormbow|cleric|shaman|engineer|druid|giant|astrologer)$/) && newData.hasChildren(['n', 'w', 'bg', 'bw', 'rg', 'rw', 'm', 'kn', 'k', 'd', 'a', 'dmg', 'hl', 'bl', 'st', 'sl']) && ((!data.exists() && newData.child('n').val() === 1) || (data.exists() && newData.child('n').val() === data.child('n').val() + 1)) && newData.child('w').val() <= newData.child('n').val() && newData.child('m').val() <= newData.child('n').val() && newData.child('kn').val() <= newData.child('n').val() && newData.child('bg').val() + newData.child('rg').val() === newData.child('n').val() && newData.child('bw').val() <= newData.child('bg').val() && newData.child('rw').val() <= newData.child('rg').val() && newData.child('sc').exists() === newData.child('scn').exists() && (!newData.child('scn').exists() || newData.child('scn').val() <= newData.child('n').val())",
+                ".validate": "$char.matches(/^(warrior|knight|ranger|mage|rogue|necro|sniper|thrower|lancer|blacksmith|priest|hitman|guardian|frost|dancer|duelist|stormbow|cleric|shaman|engineer|druid|giant|astrologer)$/) && newData.hasChildren(['n', 'w', 'bg', 'bw', 'rg', 'rw', 'm', 'kn', 'k', 'd', 'a', 'dmg', 'hl', 'bl', 'st', 'sl']) && ((auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3') || (!data.exists() && newData.child('n').val() === 1) || (data.exists() && newData.child('n').val() === data.child('n').val() + 1)) && newData.child('w').val() <= newData.child('n').val() && newData.child('m').val() <= newData.child('n').val() && newData.child('kn').val() <= newData.child('n').val() && newData.child('bg').val() + newData.child('rg').val() === newData.child('n').val() && newData.child('bw').val() <= newData.child('bg').val() && newData.child('rw').val() <= newData.child('rg').val() && newData.child('sc').exists() === newData.child('scn').exists() && (!newData.child('scn').exists() || newData.child('scn').val() <= newData.child('n').val())",
                 "n": { ".validate": "newData.isNumber() && newData.val() >= 0" },
                 "w": { ".validate": "newData.isNumber() && newData.val() >= 0" },
                 "bg": { ".validate": "newData.isNumber() && newData.val() >= 0" },
@@ -312,7 +313,7 @@
                 "bl": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 5000" },
                 "st": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 600" },
                 "sl": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 600" },
-                "scn": { ".validate": "newData.isNumber() && newData.val() === (data.exists() ? data.val() : 0) + 1" },
+                "scn": { ".validate": "newData.isNumber() && (newData.val() === (data.exists() ? data.val() : 0) + 1 || ((auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3') && newData.val() >= 0))" },
                 "sc": { ".validate": "newData.isNumber() && newData.val() >= -10000 && newData.val() <= 100000" },
                 "$other": { ".validate": false }
               }
@@ -450,11 +451,12 @@
         },
         "recent": {
          "teambattle": {
+          ".write": "auth != null && (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')",
           "$slot": {
             ".validate": "$slot.matches(/^([0-9]|1[0-9])$/) && newData.hasChildren(['v', 'id', 'at', 'r', 'ai', 'me', 's', 'p'])",
             "v": { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 99" },
             "id": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 60" },
-            "at": { ".validate": "newData.val() === now" },
+            "at": { ".validate": "newData.val() === now || ((auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3') && newData.isNumber() && newData.val() <= now)" },
             "r": { ".validate": "newData.val() === 0 || newData.val() === 1" },
             "ai": { ".validate": "newData.val() === 0 || newData.val() === 1" },
             "me": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 5" },
@@ -632,6 +634,7 @@
         },
         "pending": {
           "$game": {
+            ".write": "auth != null && $game === 'teambattle' && (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')",
             ".validate": "$game.matches(/^(teambattle|turbolap|fpsbattle|zombieoutbreak|snowroyale|waterballoon|minigames|volleyball|soccer)$/) && newData.hasChildren(['id', 'rep'])",
             "id": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 60" },
             "rep": { ".validate": "newData.isString() && newData.val().length >= 2 && newData.val().length <= 6000" },

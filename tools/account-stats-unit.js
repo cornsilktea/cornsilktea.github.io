@@ -1,13 +1,13 @@
 const fs = require("fs"), vm = require("vm"), path = require("path");
 const root = path.join(__dirname, "..");
-const files = ["match-kit.js", "account-match-kit.js", "account-stats.js", "24.turbo-lap-stats.js", "25.fps-survival-stats.js", "31.zombie-outbreak-stats.js", "38.snow-account.js", "39.balloon-account.js"];
+const files = ["match-kit.js", "account-match-kit.js", "account-stats.js", "24.turbo-lap-stats.js", "25.fps-survival-stats.js", "31.zombie-outbreak-stats.js", "38.snow-account.js", "39.balloon-account.js", "teambattle-stats-repair.js"];
 const names = ["AccountNumbers", "AccountRates", "AccountMatchKey", "AccountKeyLedger", "AccountForfeit", "AccountShape", "AccountRecentHeadCodec", "RecentMatchRing", "AccountLoginNotice", "RecentBlockList", "AccountGameProfile", "AccountMatchStore",
   "TeamBattleRates", "AccountMvpJudge", "TeamBattlePlan", "TeamBattleCodec", "TeamBattleRing", "AccountStatsMath", "AccountStatsTable", "ClassStatsSummary", "TeamBattleProfile", "AccountStatsStore",
   "TurboLapPlan", "TurboLapCodec", "TurboLapStatsMath", "TurboLapProfile", "TurboLapStatsView", "FpsPlan", "FpsCodec", "FpsStatsMath", "FpsProfile", "FpsStatsView",
   "ZombiePlan", "ZombieCodec", "ZombieStatsMath", "ZombieProfile", "ZombieStatsView", "SnAccountPlan", "SnAccountCodec", "SnAccountMath", "SnAccountProfile", "SnAccountView", "SnReportBuilder",
   "WbAccountPlan", "WbAccountCodec", "WbAccountMath", "WbAccountProfile", "WbAccountView", "WbReportBuilder",
   "AccountClassRank", "RandomMatchPlan", "RandomMatchCodec", "RandomMatchMath", "RandomMatchProfile", "RandomMatchView",
-  "AccountPendingCodec", "AccountMatchSender", "AccountPendingGuard", "MkStreakMath"];
+  "AccountPendingCodec", "AccountMatchSender", "AccountPendingGuard", "MkStreakMath", "TeamBattleRepairPlanner", "TeamBattleRepairNames"];
 const src = files.map((f) => fs.readFileSync(path.join(root, f), "utf8")).join("\n") + "\n;({" + names.join(",") + "})";
 const K = vm.runInNewContext(src, { console, Math, Set, Map, Array, Object, Number, String, JSON, isFinite, Date, Promise, window: {}, WbBalance: { RATE: 30 } });
 
@@ -170,7 +170,8 @@ class RuleNode {
 }
 
 class RuleChecker {
-  static evaluate(expr, nv, ov, vars) {
+  static evaluate(expr, nv, ov, given) {
+    const vars = Object.assign({ auth: { uid: "u1" } }, given);
     const names = Object.keys(vars);
     return !!new Function("newData", "data", "now", ...names, "return (" + expr + ");")(new RuleNode(nv), new RuleNode(ov), RULE_NOW, ...names.map((n) => vars[n]));
   }
@@ -356,6 +357,56 @@ const randomReport = (extra) => Object.assign({ matchId: "rm1", result: "win", r
   const rankPatch = K.AccountClassRank.patch("soccer", user, "2-5", { g: 3, w: 2, x: 0 });
   check("반별 순위 요약: 반 칸에 쓰고 미분류 칸은 지움", rankPatch["gameRanks/soccer/2-5/u1"].g === 3 && rankPatch["gameRanks/soccer/none/u1"] === null && K.AccountClassRank.classKey("3-1") === "none");
 }
+/* 30번 통계 정상화(2026-10-29): 다른 학생의 최근 매치에 남은 판으로 빠진 학생을 채운다 */
+(() => {
+  const TEACHER = { uid: "use16pcii5RbEATuPtWhRDArmoj2" };
+  const base = report({ players: players({ 0: { kills: 3, dmg: 900 }, 2: { kills: 1, dmg: 200 }, 4: { left: true, dmg: 50 } }) });
+  const stored = (me, win, at) => Object.assign(JSON.parse(JSON.stringify(K.TeamBattleCodec.encode(Object.assign({}, base, { myIndex: me }), "room1_1000", win))), { at });
+  const user = (name, cls, extra) => Object.assign({ profile: { name, cls } }, extra || {});
+  const users = {
+    ua: user("20101 가", "2-1", { recent: { teambattle: { 0: stored(0, true, 5000) } }, stats: { teambattle: { g: 1, w: 1, l: 0, bg: 1, bw: 1, rg: 0, rw: 0, m: 1, ids: { room1_1000: 5000 } } } }),
+    ub: user("20102 나", "2-1", { recent: { teambattle: { 0: stored(1, true, 5001) } } }),
+    uc: user("20103 다", "2-1", { pending: { teambattle: { id: "room1_1000", rep: "{}" } } }),
+    ud: user("20104 라", "2-1"),
+    ue: user("20105 마", "2-1"),
+    ue2: user("20201 마", "2-2"),
+    uf: user("20106 바", "2-1"),
+    uf2: user("20107 바", "2-1")
+  };
+  const plan = new K.TeamBattleRepairPlanner(true).plan(users);
+  const fixOf = (uid) => plan.fixes.find((f) => f.uid === uid);
+  const patch = plan.patch();
+  const c = fixOf("uc"), d = fixOf("ud"), e = fixOf("ue");
+  check("정상화: 닉네임은 학번 떼고 4자", K.TeamBattleRepairNames.nickOf("20101 홍길동전설") === "홍길동전" && K.TeamBattleRepairNames.nickOf("교사") === "교사");
+  check("정상화: 판을 가진 학생(가·나)은 그대로, 빠진 다·라·마(같은 반)만 채움, 바는 같은 닉네임 둘이라 건너뜀",
+    !fixOf("ua") && !fixOf("ub") && !!c && !!d && !!e && !fixOf("ue2") && !fixOf("uf") && plan.skips.some((x) => x.name === "바"), [plan.fixes.map((f) => f.uid), plan.skips]);
+  check("정상화: 블루 다는 승리·MVP 아님(가가 MVP), 레드 라는 패배", c.additions[0].win && !c.additions[0].mvp && !d.additions[0].win && c.statsNode.g === 1 && c.statsNode.w === 1 && d.statsNode.l === 1, [c.additions, d.additions]);
+  check("정상화: 나간 학생(마)은 패배로, 최근 매치 me·r 은 그 학생 기준, 시각은 원래 판 시각",
+    e.additions[0].left && !e.additions[0].win && patch["users/ue/recent/teambattle/0"].me === 4 && patch["users/ue/recent/teambattle/0"].r === 0 && patch["users/uc/recent/teambattle/0"].at === 5000, patch["users/ue/recent/teambattle/0"]);
+  check("정상화: 반 별 통계도 새 누적값, 같은 판 미리 적기는 지움",
+    patch["classStats/2-1/uc"].g === 1 && patch["classStats/2-1/uc"].w === 1 && patch["classStats/none/uc"] === null && patch["users/uc/pending/teambattle"] === null && patch["users/ud/pending/teambattle"] === undefined);
+  const noLeft = new K.TeamBattleRepairPlanner(false).plan(users);
+  check("정상화: '나간 학생 넣기'를 끄면 마는 건너뜀", !noLeft.fixes.some((f) => f.uid === "ue") && noLeft.skips.some((x) => x.name === "마"));
+  const again = new K.TeamBattleRepairPlanner(true).plan(Object.assign({}, users, { uc: Object.assign({}, users.uc, { stats: { teambattle: c.statsNode } }) }));
+  check("정상화: 이미 채운 학생은 다시 채우지 않음", !again.fixes.some((f) => f.uid === "uc"));
+  const withAi = report({ players: players({ 5: { ai: true } }) });
+  const aiUsers = { ua: user("20101 가", "2-1", { recent: { teambattle: { 0: Object.assign(JSON.parse(JSON.stringify(K.TeamBattleCodec.encode(withAi, "ai_1", true))), { at: 7000 }) } } }), ub: user("20102 나", "2-1") };
+  const aiFix = new K.TeamBattleRepairPlanner(true).plan(aiUsers).fixes[0];
+  check("정상화: AI 판은 최근 매치만(누적 통계 그대로)", aiFix && aiFix.uid === "ub" && !aiFix.statsNode && !aiFix.additions[0].countsStats && aiFix.additions[0].intoRecent);
+  const full = {}; for (let i = 0; i < 20; i++) full[i] = Object.assign({}, stored(0, true, 9000 + i), { id: "x" + i });
+  const old = new K.TeamBattleRepairPlanner(true).plan(Object.assign({}, users, { uc: user("20103 다", "2-1", { recent: { teambattle: full } }) }));
+  check("정상화: 최근 20칸이 모두 더 새로운 판이면 두 번 세지 않게 건너뜀", !old.fixes.some((f) => f.uid === "uc") && old.skips.some((x) => x.name === "다"));
+  const errors = [];
+  const before = { g: 2, w: 1, l: 1, bg: 1, bw: 1, rg: 1, rw: 0, m: 0, ids: { a: 1, b: 2 }, c: { knight: { n: 2, w: 1, bg: 1, bw: 1, rg: 1, rw: 0, m: 0, kn: 2, k: 1, d: 1, a: 1, dmg: 100, hl: 0, bl: 0, st: 0, sl: 0 } } };
+  const fixed = new K.TeamBattleRepairPlanner(true).plan(Object.assign({}, users, { uc: Object.assign({}, users.uc, { stats: { teambattle: before } }) })).fixes.find((f) => f.uid === "uc").statsNode;
+  RuleChecker.validate(RULES.stats.teambattle, fixed, before, { auth: TEACHER }, "stats/teambattle", errors);
+  RuleChecker.validate(RULES.recent.teambattle, { 0: patch["users/uc/recent/teambattle/0"] }, {}, { auth: TEACHER }, "recent/teambattle", errors);
+  check("정상화 규칙: 선생님 계정은 기존 통계에 한 번에 여러 판·옛 시각으로 써도 통과", errors.length === 0 && fixed.g === 3, errors);
+  const studentErrors = [];
+  RuleChecker.validate(RULES.stats.teambattle, Object.assign({}, fixed, { g: 9, l: 8 }), before, {}, "stats/teambattle", studentErrors);
+  RuleChecker.validate(RULES.recent.teambattle, { 0: patch["users/uc/recent/teambattle/0"] }, {}, {}, "recent/teambattle", studentErrors);
+  check("정상화 규칙: 학생 계정은 여전히 판 수 건너뛰기·옛 시각 쓰기 거부", studentErrors.length >= 2, studentErrors);
+})();
 /* 미리 적어 둔 패배(2026-10-27): 쓰기를 실제로 반영하는 가짜 데이터베이스로 판 시작 → 정상 종료 / 결과 없이 사라짐 → 정산을 흉내 낸다 */
 class LiveDb {
   constructor(seed) { this.tree = { users: { u1: JSON.parse(JSON.stringify(seed || {})) } }; this.writes = []; }
@@ -414,6 +465,37 @@ const pendingChecks = (async () => {
   await pendingCase("랜덤 승패(축구)", "soccer", (db) => new K.AccountMatchStore(db, pendingUser, new K.RandomMatchProfile("soccer")), randomReport({ result: "lose" }), randomReport(), null);
   const leftReport = report({ iLeft: true, progress: 1, players: players({ 0: { left: true } }) });
   await pendingCase("30번", "teambattle", (db) => new K.AccountStatsStore(db, pendingUser), leftReport, report(), judge);
+  const closed = new LiveDb();
+  await new K.AccountStatsStore(closed, pendingUser).arm(leftReport);
+  await new K.AccountStatsStore(closed, pendingUser).stash(report());
+  await new K.AccountStatsStore(closed, pendingUser).settlePending();
+  const closedRecent = closed.at("users/u1/recent/teambattle") || {}, closedStats = closed.at("users/u1/stats/teambattle");
+  const closedRule = RuleChecker.check("teambattle", closed.writes[closed.writes.length - 1], undefined, undefined);
+  check("30번 끝난 직후 화면이 닫힘: 진짜 결과(승·MVP)로 정산, pending 지움, 규칙 통과",
+    !closed.at("users/u1/pending/teambattle") && closedRecent[0] && closedRecent[0].r === 1 && closedStats.w === 1 && closedStats.m === 1 && closedStats.c.warrior.k === 3 && closedRule.errors.length === 0, [closedStats, closedRule.errors]);
+
+  const ordered = new LiveDb();
+  const tbSender = new K.AccountMatchSender(() => new K.AccountStatsStore(ordered, pendingUser));
+  tbSender.arm(leftReport);
+  tbSender.stash(report());
+  tbSender.disarm("room1_1000");
+  tbSender.record(report(), judge);
+  await new Promise((r) => setTimeout(r, 20));
+  check("30번 기록 창구: 미리 적기 → 결과 미리 적기 → 늦은 disarm → 진짜 기록 = 승 1판, pending 없음",
+    !ordered.at("users/u1/pending/teambattle") && ordered.at("users/u1/stats/teambattle").g === 1 && ordered.at("users/u1/stats/teambattle").w === 1, ordered.at("users/u1/stats/teambattle"));
+
+  class RejectingDb extends LiveDb {
+    updateRoot(values) {
+      if (Object.keys(values).some((k) => k.indexOf("/recent/") >= 0) && Object.keys(values).some((k) => values[k] && values[k].id === "bad_match")) return Promise.reject(new Error("401"));
+      return super.updateRoot(values);
+    }
+  }
+  const stuck = new RejectingDb();
+  await new K.AccountStatsStore(stuck, pendingUser).arm(report({ matchId: "bad_match", iLeft: true }));
+  await new K.AccountStatsStore(stuck, pendingUser).record(report({ matchId: "next_match" }), judge);
+  check("30번 규칙이 거부하는 남은 보고: 지우고 다음 판은 기록(막히지 않음)",
+    !stuck.at("users/u1/pending/teambattle") && stuck.at("users/u1/stats/teambattle").g === 1 && Object.values(stuck.at("users/u1/recent/teambattle")).map((r) => r.id).join() === "next_match");
+
   check("보고 묶음: 너무 긴 보고는 미리 적지 않음", K.AccountPendingCodec.encode("k", { x: "가".repeat(7000) }) === null && K.AccountPendingCodec.decode({ id: "k", rep: "{bad" }).report === null);
 
   const order = new LiveDb();

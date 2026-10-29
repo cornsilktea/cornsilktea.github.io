@@ -348,9 +348,9 @@ class TeamBattleProfile extends AccountGameProfile<AccountMatchReport, TeamBattl
     return new TeamBattlePlan(report, judge);
   }
 
-  /* 미리 적어 둔 패배는 나간 판(iLeft)이라 MVP 가 될 수 없어 점수 계산이 필요 없다 */
+  /* 미리 적기 칸에는 나간 판의 패배뿐 아니라 끝난 판의 진짜 결과(stash)도 남으므로 MVP 를 결과 창과 같은 점수로 판정한다 */
   abandonedContext(): AccountMvpJudge {
-    return new AccountMvpJudge(() => 0);
+    return new AccountMvpJudge((line) => TeamBattleScore.of(line));
   }
 
   encodeRecent(report: AccountMatchReport, key: string, win: boolean): object {

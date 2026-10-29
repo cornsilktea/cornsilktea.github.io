@@ -342,6 +342,17 @@ class AccountMatchStore<R, P extends AccountMatchPlanBase, N, E extends AccountR
     return "armed";
   }
 
+  /* 판이 끝난 순간 진짜 결과를 미리 적기 칸에 덮어 둔다(2026-10-29). 결과를 쓰기 전(SETTLE_MS 안)에 화면이 닫혀도
+     다음에 그 게임을 기록할 때 이 결과로 정산되어, 이긴 판이 사라지거나 0점짜리 패배로 남지 않는다 */
+  async stash(report: R): Promise<string> {
+    const key = this.keyOf(report);
+    await this.settleOtherThan(key);
+    const stored = AccountPendingCodec.encode(key, report);
+    if (!stored) return "skip";
+    await this.database.updateRoot({ [this.pendingAddress()]: stored });
+    return "stashed";
+  }
+
   async disarm(key: string): Promise<void> {
     const pending = await this.readPending();
     if (pending && pending.id === key) await this.database.updateRoot({ [this.pendingAddress()]: null });
@@ -359,13 +370,27 @@ class AccountMatchStore<R, P extends AccountMatchPlanBase, N, E extends AccountR
     return "users/" + this.user.uid + "/" + this.profile.pendingPath;
   }
 
-  /* 다른 판의 패배 보고가 남아 있으면 먼저 패배로 기록하고 지운다. 지금 판의 보고면 그대로 돌려준다 */
+  /* 다른 판의 보고가 남아 있으면 먼저 기록하고 지운다. 지금 판의 보고면 그대로 돌려준다.
+     남은 보고를 규칙이 거부하면(옛 모양 등) 지우고 넘어간다 — 그러지 않으면 그 학생의 다음 판들이 모두 그 앞에서 막힌다(2026-10-29) */
   private async settleOtherThan(key: string): Promise<{ id: string; report: R | null } | null> {
     const pending = await this.readPending();
     if (!pending || pending.id === key) return pending;
-    if (pending.report) await this.write(pending.report, this.profile.abandonedContext(), true);
-    else await this.database.updateRoot({ [this.pendingAddress()]: null });
+    if (!pending.report) {
+      await this.database.updateRoot({ [this.pendingAddress()]: null });
+      return null;
+    }
+    try {
+      await this.write(pending.report, this.profile.abandonedContext(), true);
+    } catch (error) {
+      if (!AccountMatchStore.rejectedByRules(error)) throw error;
+      await this.database.updateRoot({ [this.pendingAddress()]: null });
+    }
     return null;
+  }
+
+  static rejectedByRules(error: unknown): boolean {
+    const status = error && typeof error === "object" ? String((error as { message?: unknown }).message) : "";
+    return status === "400" || status === "401" || status === "403";
   }
 
   private async write(report: R, context: C, clearPending: boolean): Promise<string> {
@@ -428,6 +453,16 @@ class AccountMatchSender<R, P extends AccountMatchPlanBase, N, E extends Account
     if (key === this.sentKey || key === this.armedKey) return;
     this.armedKey = key;
     this.enqueue(() => store.arm(report));
+  }
+
+  /* 진짜 결과를 미리 적기 칸에 둔다. 미리 적은 패배를 지우는 disarm 이 뒤늦게 와도 이 결과는 지우지 않게 armedKey 를 비운다 */
+  stash(report: R): void {
+    const store = this.storeOf();
+    if (!store) return;
+    const key = store.keyOf(report);
+    if (key === this.sentKey) return;
+    this.armedKey = "";
+    this.enqueue(() => store.stash(report));
   }
 
   disarm(matchId: string): void {

@@ -281,8 +281,8 @@
 <script charset="utf-8" src="character-kit.js?v=20261011"></script>
 <script charset="utf-8" src="character-maker.js?v=20261026a"></script>
 <script>new CharacterMakerDialog(undefined, false);</script>
-<script charset="utf-8" src="account-match-kit.js?v=20261028d"></script>
-<script charset="utf-8" src="account-stats.js?v=20261028e"></script>
+<script charset="utf-8" src="account-match-kit.js?v=20261029a"></script>
+<script charset="utf-8" src="account-stats.js?v=20261029a"></script>
 <script type="module">
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
@@ -1106,6 +1106,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
 
       Dom.setText(Dom.$("lobbyCode"), code);
       services.screens.showScreen("lobby");
+      services.accountRecorder.settleLeftover();
     }
     nextHost(ps) { var services = this.services;
       var join = services.session.byJoin(ps);
@@ -8755,12 +8756,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   class AccountMatchRecorder {
     static SETTLE_MS = 2500;
-    constructor(services) { var self = this; this.services = services; this.sender = new AccountMatchSender(function () { return AccountStatsStore.open(); }); this.guard = new AccountPendingGuard(this.sender, function () { return self.forfeitReport(); }); }
+    constructor(services) { var self = this; this.services = services; this.sender = new AccountMatchSender(function () { return AccountStatsStore.open(); }); this.guard = new AccountPendingGuard(this.sender, function () { return self.forfeitReport(); }); this.leftoverSettled = false; }
     loggedIn() { return !Environment.SILENT_RUN && !!window.PORTAL_USER; }
     matchEnded() { var services = this.services, self = this;
       if (!this.loggedIn()) return;
       var snap = services.accountReport.snapshot();
       if (!snap || snap.mode !== TeamBattlePlan.CUP_MODE) return;
+      this.stash(services.accountReport.build(snap, false, 1));
       setTimeout(function () {
         var room = services.session.room;
         if (room && room.winner && !snap.winner) { snap.winner = room.winner; snap.final = room.final; }
@@ -8779,6 +8781,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     forfeitReport() { var report = this.services.randomMatch.ticket() ? this.leaveReport() : null;
       return report && report.myIndex >= 0 ? report : null;
+    }
+    stash(report) { if (report && report.myIndex >= 0) this.sender.stash(report); }
+    settleLeftover() {
+      if (this.leftoverSettled || !this.loggedIn() || !AccountStatsStore.open()) return;
+      this.leftoverSettled = true;
+      this.sender.settle();
     }
     send(report) {
       if (!report || report.myIndex < 0) return;
