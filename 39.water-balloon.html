@@ -130,6 +130,48 @@
   #lobbyGuestInfo { margin-top: 10px; font-weight: 800; color: #B8D8F0; }
   @media (max-width: 560px) { #resultBox .card { padding: 12px 8px; } #resultBox table { font-size: 12px; } #resultBox th, #resultBox td { padding: 4px 3px; } #resultTitle { font-size: 26px; } }
   #btnAgain { margin-top: 14px; width: 100%; min-height: 48px; font: inherit; font-size: 18px; font-weight: 800; border-radius: 8px; border: none; background: #D97B4F; color: #fff; cursor: pointer; }
+  .wbv-curtain { position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2.2vh; padding: calc(env(safe-area-inset-top, 0px) + 50px) 3vw 3vh;
+    background: radial-gradient(ellipse at 50% 38%, rgba(26, 64, 112, .94), rgba(6, 14, 30, .97)), #06101F; color: #fff; font-family: var(--sg-font); transition: opacity .35s ease; overflow-x: hidden; overflow-y: auto; }
+  .wbv-curtain[hidden] { display: none; }
+  .wbv-curtain.out { opacity: 0; }
+  .wbv-head { text-align: center; font-size: clamp(24px, 3.6vw, 52px); font-weight: 900; color: #6EC8FF; text-shadow: 0 0 20px rgba(110, 200, 255, .65), 0 3px 0 #1A5C99; animation: wbvBob 2.4s ease-in-out infinite; }
+  .wbv-sub { text-align: center; font-size: clamp(13px, 1.5vw, 22px); font-weight: 800; color: #CFE6FF; margin-top: -1vh; }
+  .wbv-grid { display: grid; grid-template-columns: repeat(var(--wbv-cols), minmax(0, 1fr)); gap: 2vh 1.4vw; width: min(100%, 1560px); }
+  .wbv-teams { display: flex; align-items: stretch; justify-content: center; gap: 1.2vw; width: min(100%, 1600px); }
+  .wbv-team { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 1.2vh; padding: 1.4vh .9vw; border: 3px solid var(--wbv-c); border-radius: 16px;
+    background: color-mix(in srgb, var(--wbv-c) 15%, rgba(10, 22, 44, .7)); box-shadow: 0 0 22px color-mix(in srgb, var(--wbv-c) 35%, transparent); }
+  .wbv-team-name { font-size: clamp(15px, 1.6vw, 26px); font-weight: 900; color: var(--wbv-c); }
+  .wbv-team .wbv-card { border-width: 2px; box-shadow: none; }
+  .wbv-team .wbv-card.me { box-shadow: 0 0 0 3px #D97B4F; }
+  .wbv-vs { display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+  .wbv-vs b { font-size: clamp(22px, 3vw, 50px); font-style: italic; font-weight: 900; color: #fff; text-shadow: 0 0 16px #D97B4F, 0 3px 0 rgba(0, 0, 0, .5); animation: wbvPulse 1s ease-in-out infinite; }
+  .wbv-card { position: relative; display: flex; flex-direction: column; gap: .7vh; min-width: 0; padding: 1.6vh 1.1vw; border: 3px solid var(--wbv-c); border-radius: 14px;
+    background: rgba(10, 22, 44, .8); box-shadow: 0 0 18px color-mix(in srgb, var(--wbv-c) 40%, transparent); }
+  .wbv-card.me { box-shadow: 0 0 0 3px #D97B4F, 0 0 24px rgba(217, 123, 79, .6); }
+  .wbv-tag { font-size: clamp(11px, .95vw, 15px); font-weight: 800; color: var(--wbv-c); }
+  .wbv-card.me .wbv-tag { color: #FFB08C; }
+  .wbv-name { font-size: clamp(16px, 1.9vw, 32px); font-weight: 900; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .wbv-card.waiting .wbv-name { color: #A9C2DC; animation: wbvBlink 1s ease-in-out infinite; }
+  .wbv-line { font-size: clamp(12px, 1.2vw, 20px); color: #DBE8F7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .wbv-line em { font-style: normal; font-weight: 900; color: #FFD37A; }
+  .wbv-line small { font-weight: 700; color: #9FB6CF; }
+  .wbv-enter .wbv-card, .wbv-enter .wbv-team { animation: wbvDrop .55s cubic-bezier(.2, 1.4, .4, 1) both; animation-delay: calc(var(--wbv-i) * 70ms); }
+  .wbv-enter .wbv-team .wbv-card { animation: none; }
+  .wbv-enter .wbv-vs b { animation: wbvSlam .6s ease-out both, wbvPulse 1s ease-in-out .6s infinite; }
+  @keyframes wbvDrop { 0% { opacity: 0; transform: translateY(-6vh) scale(.85); } 100% { opacity: 1; transform: none; } }
+  @keyframes wbvSlam { 0% { opacity: 0; transform: scale(2.6); } 100% { opacity: 1; transform: scale(1); } }
+  @keyframes wbvPulse { 50% { transform: scale(1.14); } }
+  @keyframes wbvBob { 50% { transform: translateY(-.6vh); } }
+  @keyframes wbvBlink { 50% { opacity: .45; } }
+  @media (max-width: 760px) {
+    .wbv-curtain { justify-content: flex-start; gap: 12px; padding-top: calc(env(safe-area-inset-top, 0px) + 50px); }
+    .wbv-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    .wbv-teams { flex-direction: column; gap: 6px; }
+    .wbv-team { flex: 0 0 auto; padding: 8px; gap: 6px; display: grid; grid-template-columns: 1fr 1fr; }
+    .wbv-team-name { grid-column: 1 / -1; }
+    .wbv-card { padding: 8px 10px; gap: 2px; }
+    .wbv-vs b { font-size: 20px; }
+  }
 </style>
 </head>
 <body>
@@ -238,6 +280,7 @@
     </div>
   </div>
 </div>
+<div id="versusCurtain" class="wbv-curtain" hidden></div>
 <div id="netMeter"></div>
 <script charset="utf-8" src="character-kit.js?v=20261011"></script>
 <script charset="utf-8" src="fold-card.js"></script>
@@ -249,9 +292,10 @@
 <script charset="utf-8" src="39.balloon-bot.js?v=11"></script>
 <script charset="utf-8" src="39.balloon-views.js?v=11"></script>
 <script charset="utf-8" src="39.balloon-hud.js?v=11"></script>
-<script charset="utf-8" src="39.balloon-net.js?v=20261026b"></script>
-<script charset="utf-8" src="39.balloon-account.js?v=20261027b"></script>
-<script charset="utf-8" src="39.water-balloon.js?v=20261028c"></script>
+<script charset="utf-8" src="39.balloon-net.js?v=20261029"></script>
+<script charset="utf-8" src="39.balloon-account.js?v=20261029"></script>
+<script charset="utf-8" src="39.balloon-versus.js?v=20261029"></script>
+<script charset="utf-8" src="39.water-balloon.js?v=20261029"></script>
 <script type="module">
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";

@@ -10,9 +10,12 @@
      - 항목: 가둔 수(traps) · 처치(kills: 가둔 사람을 마무리하거나 시간 초과로 탈락시킨 수) · 구출(rescues, 팀전) · 부술 상자(boxes) · 자폭(selfKills) ·
        평균 생존 시간(탈락 시각, 끝까지 남았으면 경기 끝 시각) · 평균 순위 · 한 판 최다 처치. 갇힌 횟수는 엔진이 세지 않아 넣지 않았다.
      - 모드(개인전/팀전)는 합산하고 판 수만 따로 센다.
+     - 랜덤 매칭 칸 rm(2026-10-29 선생님 결정, 대결 화면용): 랜덤 매칭 판만, 봇이 섞인 판도 센다. 판·1위·팀전 판·처치·구출. 이날부터 쌓인다.
+       봇이 섞인 랜덤 매칭 판은 rm 만 오르고 위 누적 칸은 그대로다.
 
    저장:
-     users/<uid>/stats/waterballoon  { g, w, l, gs 개인전 판, gt 팀전 판, kl 처치, tp 가둔 수, rs 구출, bx 상자, sk 자폭, sv 생존 초 합, rk 순위 합, mk 한 판 최다 처치, ids }
+     users/<uid>/stats/waterballoon  { g, w, l, gs 개인전 판, gt 팀전 판, kl 처치, tp 가둔 수, rs 구출, bx 상자, sk 자폭, sv 생존 초 합, rk 순위 합, mk 한 판 최다 처치, ids,
+       rm { g, w, gt, kl, rs } }
      users/<uid>/recent/waterballoon/<0~19>  { v, id, at, r, ai, md 0개인전/1팀전, me, p [[이름, 편, 순위, 생존 초, 처치, 가둔 수, 구출, 상자, 자폭, 나감 0/1, AI 0/1]] }
    ===================================================================== */
 class WbAccountKeys {
@@ -28,7 +31,9 @@ class WbAccountPlan {
         const me = report.players[report.myIndex];
         this.withAi = report.players.some((line) => line.ai);
         this.recordsRecent = !!me && !AccountForfeit.leftEarly(report.iLeft, report.progress);
-        this.countsStats = this.recordsRecent && !this.withAi;
+        this.countsMain = this.recordsRecent && !this.withAi;
+        this.countsRandom = this.recordsRecent && !!report.random;
+        this.countsStats = this.countsMain || this.countsRandom;
         this.win = !!me && !report.iLeft && me.rank === 1;
     }
 }
@@ -67,9 +72,28 @@ class WbAccountCodec {
 WbAccountCodec.VERSION = 1;
 WbAccountCodec.NAME_MAX = 20;
 WbAccountCodec.CELLS = 11;
+class WbRandomTallyMath {
+    static empty() {
+        return { g: 0, w: 0, gt: 0, kl: 0, rs: 0 };
+    }
+    static normalize(raw) {
+        const tally = WbRandomTallyMath.empty();
+        if (!raw || typeof raw !== "object")
+            return tally;
+        const source = raw;
+        WbRandomTallyMath.NUMBERS.forEach((key) => { tally[key] = AccountNumbers.count(source[key]); });
+        return tally;
+    }
+    static add(before, report, win) {
+        const me = report.players[report.myIndex];
+        return { g: before.g + 1, w: before.w + (win ? 1 : 0), gt: before.gt + (WbAccountKeys.modeIndex(report.mode) === 1 ? 1 : 0),
+            kl: before.kl + AccountNumbers.count(me.kills), rs: before.rs + AccountNumbers.count(me.rescues) };
+    }
+}
+WbRandomTallyMath.NUMBERS = ["g", "w", "gt", "kl", "rs"];
 class WbAccountMath {
     static empty() {
-        return { g: 0, w: 0, l: 0, gs: 0, gt: 0, kl: 0, tp: 0, rs: 0, bx: 0, sk: 0, sv: 0, rk: 0, mk: 0, ids: {} };
+        return { g: 0, w: 0, l: 0, gs: 0, gt: 0, kl: 0, tp: 0, rs: 0, bx: 0, sk: 0, sv: 0, rk: 0, mk: 0, ids: {}, rm: WbRandomTallyMath.empty() };
     }
     static normalize(raw) {
         const node = WbAccountMath.empty();
@@ -79,6 +103,7 @@ class WbAccountMath {
         WbAccountKeys.NUMBERS.forEach((key) => { node[key] = AccountNumbers.count(source[key]); });
         const ids = AccountShape.slots(source.ids);
         Object.keys(ids).forEach((key) => { node.ids[key] = Number(ids[key]) || 0; });
+        node.rm = WbRandomTallyMath.normalize(source.rm);
         return node;
     }
     static apply(raw, report, win, key, at) {
@@ -88,11 +113,13 @@ class WbAccountMath {
         const me = report.players[report.myIndex];
         const team = WbAccountKeys.modeIndex(report.mode) === 1;
         const kills = AccountNumbers.count(me.kills);
-        const node = {
+        const main = !report.players.some((line) => line.ai);
+        const rm = report.random ? WbRandomTallyMath.add(before.rm, report, win) : before.rm;
+        const node = !main ? Object.assign({}, before, { ids: Object.assign({}, before.ids), rm }) : {
             g: before.g + 1, w: before.w + (win ? 1 : 0), l: before.l + (win ? 0 : 1), gs: before.gs + (team ? 0 : 1), gt: before.gt + (team ? 1 : 0),
             kl: before.kl + kills, tp: before.tp + AccountNumbers.count(me.traps), rs: before.rs + AccountNumbers.count(me.rescues), bx: before.bx + AccountNumbers.count(me.boxes),
             sk: before.sk + AccountNumbers.count(me.selfKills), sv: before.sv + AccountNumbers.whole(Math.max(0, me.secs)), rk: before.rk + Math.max(1, AccountNumbers.count(me.rank)), mk: Math.max(before.mk, kills),
-            ids: Object.assign({}, before.ids)
+            ids: Object.assign({}, before.ids), rm
         };
         node.ids[key] = at;
         const evicted = AccountKeyLedger.overflowKeys(node.ids);
@@ -104,9 +131,11 @@ class WbAccountProfile extends AccountGameProfile {
     constructor() {
         super(...arguments);
         this.gameKey = "waterballoon";
+        this.mainChanged = true;
     }
     matchIdOf(report) { return report.matchId; }
     rankFields(node) { return { g: node.g, w: node.w, x: node.kl }; }
+    extraPatch(user, extraRaw, node) { return this.mainChanged ? super.extraPatch(user, extraRaw, node) : {}; }
     planOf(report) { return new WbAccountPlan(report); }
     encodeRecent(report, key, win) { return WbAccountCodec.encode(report, key, win); }
     decodeRecent(raw) { return WbAccountCodec.decode(raw); }
@@ -115,9 +144,13 @@ class WbAccountProfile extends AccountGameProfile {
         const change = WbAccountMath.apply(raw, report, plan.win, key, at);
         if (!change)
             return null;
+        this.mainChanged = plan.countsMain;
         const node = change.node;
         const patch = {};
-        WbAccountKeys.NUMBERS.forEach((name) => { patch[name] = node[name]; });
+        if (plan.countsMain)
+            WbAccountKeys.NUMBERS.forEach((name) => { patch[name] = node[name]; });
+        if (plan.countsRandom)
+            patch.rm = Object.assign({}, node.rm);
         patch["ids/" + key] = node.ids[key];
         change.evicted.forEach((id) => { patch["ids/" + id] = null; });
         return { node, patch };
@@ -170,7 +203,7 @@ class WbAccountView {
     }
 }
 class WbReportBuilder {
-    static fromEnd(matchId, match, end, myId) {
+    static fromEnd(matchId, match, end, myId, random = false) {
         const members = match.teams.flatMap((team) => team.members.map((member) => ({ member, team: team.color })));
         const players = members.map((item, index) => {
             const stat = (end.stats && end.stats[index]) || [];
@@ -179,13 +212,13 @@ class WbReportBuilder {
             return { name: item.member.nick, team: item.team, rank: end.ranks[index] || members.length, secs: ticks / WbBalance.RATE, kills: stat[0] || 0, traps: stat[1] || 0,
                 rescues: stat[2] || 0, boxes: stat[3] || 0, selfKills: stat[4] || 0, left: false, ai: item.member.bot };
         });
-        return { matchId, mode: match.mode, myIndex: members.findIndex((item) => item.member.id === myId), players, progress: 1, iLeft: false };
+        return { matchId, mode: match.mode, myIndex: members.findIndex((item) => item.member.id === myId), players, progress: 1, iLeft: false, random };
     }
-    static fromEngine(matchId, engine, myIndex, progress) {
+    static fromEngine(matchId, engine, myIndex, progress, random = false) {
         const ranks = WbScoreboard.ranks(engine);
         const players = engine.players.map((p) => ({ name: p.nick, team: p.team, rank: ranks[p.index], secs: (p.outTick >= 0 ? p.outTick : engine.tick) / WbBalance.RATE, kills: p.kills, traps: p.traps,
             rescues: p.rescues, boxes: p.boxes, selfKills: p.selfKills, left: p.index === myIndex, ai: p.bot }));
-        return { matchId, mode: engine.mode, myIndex, players, progress, iLeft: true };
+        return { matchId, mode: engine.mode, myIndex, players, progress, iLeft: true, random };
     }
 }
 class WbAccount extends AccountGameAccount {

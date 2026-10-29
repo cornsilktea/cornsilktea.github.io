@@ -1,11 +1,11 @@
 const fs = require("fs"), vm = require("vm"), path = require("path");
 const root = path.join(__dirname, "..");
-const files = ["match-kit.js", "account-match-kit.js", "account-stats.js", "24.turbo-lap-stats.js", "25.fps-survival-stats.js", "31.zombie-outbreak-stats.js", "38.snow-account.js", "38.snow-versus.js", "39.balloon-account.js", "patch-notes.js"];
+const files = ["match-kit.js", "account-match-kit.js", "account-stats.js", "24.turbo-lap-stats.js", "25.fps-survival-stats.js", "31.zombie-outbreak-stats.js", "38.snow-account.js", "38.snow-versus.js", "39.balloon-account.js", "39.balloon-versus.js", "patch-notes.js"];
 const names = ["AccountNumbers", "AccountRates", "AccountMatchKey", "AccountKeyLedger", "AccountForfeit", "AccountShape", "AccountRecentHeadCodec", "RecentMatchRing", "AccountLoginNotice", "RecentBlockList", "AccountGameProfile", "AccountMatchStore",
   "TeamBattleRates", "AccountMvpJudge", "TeamBattlePlan", "TeamBattleCodec", "TeamBattleRing", "AccountStatsMath", "AccountStatsTable", "ClassStatsSummary", "TeamBattleProfile", "AccountStatsStore",
   "TurboLapPlan", "TurboLapCodec", "TurboLapStatsMath", "TurboLapProfile", "TurboLapStatsView", "FpsPlan", "FpsCodec", "FpsStatsMath", "FpsProfile", "FpsStatsView",
   "ZombiePlan", "ZombieCodec", "ZombieStatsMath", "ZombieProfile", "ZombieStatsView", "SnAccountPlan", "SnAccountCodec", "SnAccountMath", "SnAccountProfile", "SnAccountView", "SnReportBuilder", "SnVersusCards",
-  "WbAccountPlan", "WbAccountCodec", "WbAccountMath", "WbAccountProfile", "WbAccountView", "WbReportBuilder",
+  "WbAccountPlan", "WbAccountCodec", "WbAccountMath", "WbAccountProfile", "WbAccountView", "WbReportBuilder", "WbRandomTallyMath", "WbVersusCards", "WbVersusLineupBuilder",
   "AccountClassRank", "RandomMatchPlan", "RandomMatchCodec", "RandomMatchMath", "RandomMatchProfile", "RandomMatchView",
   "AccountPendingCodec", "AccountMatchSender", "AccountPendingGuard", "MkStreakMath", "TurboLapClock", "TurboLapOutcome", "TeamBattleScore", "PatchNoteCodec", "PatchNoteSeen"];
 const src = files.map((f) => fs.readFileSync(path.join(root, f), "utf8")).join("\n") + "\n;({" + names.join(",") + "})";
@@ -163,6 +163,7 @@ class RuleNode {
   constructor(v) { this.v = v === null ? undefined : v; }
   val() { return this.v && this.v[".sv"] ? RULE_NOW : this.v === undefined ? null : this.v; }
   exists() { return this.v !== undefined; }
+  hasChild(name) { return !!this.v && typeof this.v === "object" && this.v[name] !== undefined && this.v[name] !== null; }
   child(name) { return new RuleNode(this.v && typeof this.v === "object" ? this.v[name] : undefined); }
   hasChildren(list) { return !!this.v && typeof this.v === "object" && list.every((k) => this.v[k] !== undefined && this.v[k] !== null); }
   isNumber() { return typeof this.v === "number"; }
@@ -357,6 +358,20 @@ const wbEnd = { match: 1, ranks: [1, 1, 2, 2], outTicks: [-1, 600, 300, 450], at
   const a = K.WbAccountMath.apply(null, report, true, "k1", 1);
   const b = K.WbAccountMath.apply(JSON.parse(JSON.stringify(a.node)), K.WbReportBuilder.fromEnd("m2", wbMatch, wbEnd, "c"), false, "k2", 2);
   check("39번 누적: 가둔 수·처치·구출·상자·생존·순위 합계", b.node.g === 2 && b.node.tp === 4 && b.node.kl === 3 && b.node.rs === 1 && b.node.bx === 4 && b.node.sv === 40 && b.node.rk === 3 && b.node.gt === 2 && b.node.mk === 2, b.node);
+  check("39번 랜덤 매칭 칸: 일반 방 판은 rm 그대로", b.node.rm.g === 0 && !new K.WbAccountPlan(report).countsRandom);
+  const botMatch = JSON.parse(JSON.stringify(wbMatch)); botMatch.teams[1].members[1].bot = true;
+  const botRandom = K.WbReportBuilder.fromEnd("m3", botMatch, wbEnd, "a", true);
+  const botPlan = new K.WbAccountPlan(botRandom);
+  check("39번 랜덤 매칭 칸: 봇이 섞인 랜덤 매칭 판은 rm 만 셈", botPlan.countsStats && botPlan.countsRandom && !botPlan.countsMain && !new K.WbAccountPlan(K.WbReportBuilder.fromEnd("m4", botMatch, wbEnd, "a")).countsStats);
+  const c = K.WbAccountMath.apply(JSON.parse(JSON.stringify(b.node)), botRandom, true, "k3", 3);
+  check("39번 랜덤 매칭 칸: 봇 섞인 판은 누적 칸 그대로·rm 판·1위·팀전·처치·구출 +", c.node.g === 2 && c.node.kl === 3 && c.node.rm.g === 1 && c.node.rm.w === 1 && c.node.rm.gt === 1 && c.node.rm.kl === 2 && c.node.rm.rs === 1 && !!c.node.ids.k3, c.node);
+  const d = K.WbAccountMath.apply(JSON.parse(JSON.stringify(c.node)), K.WbReportBuilder.fromEnd("m5", wbMatch, wbEnd, "c", true), false, "k4", 4);
+  check("39번 랜덤 매칭 칸: 사람끼리 랜덤 매칭 판은 둘 다 셈", d.node.g === 3 && d.node.rm.g === 2 && d.node.rm.w === 1 && d.node.rm.kl === 3, d.node);
+  check("39번 대결 화면 카드: rm 만 읽고 판이 없으면 기록 없음", K.WbVersusCards.fromStats(d.node).g === 2 && K.WbVersusCards.fromStats(b.node) === null && K.WbVersusCards.fromRoom({ g: 2, w: 1, gt: 1, kl: 3, rs: 1 }).kl === 3 && K.WbVersusCards.fromRoom({ g: 0 }) === null && K.WbVersusCards.fromRoom("x") === null);
+  const people = new Map([["a", { nick: "에이", vs: { g: 4, w: 1, gt: 2, kl: 6, rs: 1 } }]]);
+  const lineup = K.WbVersusLineupBuilder.build("team", [{ color: 2, members: [{ id: "a", nick: "", bot: false }, { id: "b", nick: "비", bot: false }] }, { color: 0, members: [{ id: "bot1", nick: "봇 1", bot: true }, { id: "bot2", nick: "봇 2", bot: true }] }], people, "a");
+  const seats = lineup.units[0].seats;
+  check("39번 대결 화면 줄: 나·입장하는 중·봇", lineup.units[0].color === 2 && seats[0].me && seats[0].card.kl === 6 && seats[1].waiting && seats[1].nick === "비" && lineup.units[1].seats[0].ai, lineup);
 }
 
 const randomReport = (extra) => Object.assign({ matchId: "rm1", result: "win", rank: 2, of: 6, map: "맵".repeat(25), rivals: ["가".repeat(25), "나"] }, extra || {});
@@ -531,6 +546,30 @@ const gameChecks = (async () => {
     check("38번 랜덤 매칭 칸 규칙: 판 +1 통과, 2판·순위 0·처치 100 은 거부", legal(undefined, first) && legal(first, { g: 2, w: 1, k: 5, rk: 4 }) && !legal(first, { g: 3, w: 1, k: 5, rk: 7 }) && !legal(first, { g: 2, w: 1, k: 5, rk: 1 }) && !legal(first, { g: 2, w: 1, k: 103, rk: 3 }));
   })();
   await balloon.verifyStore(K.WbReportBuilder.fromEnd("m39", wbMatch, wbEnd, "a"));
+  {
+    const botMatch = JSON.parse(JSON.stringify(wbMatch)); botMatch.teams[1].members[1].bot = true;
+    const botRandom = K.WbReportBuilder.fromEnd("r1", botMatch, wbEnd, "a", true);
+    const first = balloon.store({});
+    check("39번 랜덤 매칭 칸: 봇 섞인 첫 판 저장", (await first.store.record(botRandom, null)) === "stats" && first.writes.length === 1);
+    const w1 = first.writes[0] || {};
+    check("39번 랜덤 매칭 칸: 누적 칸·반별 순위는 쓰지 않음", !("users/u1/stats/waterballoon/g" in w1) && !!w1["users/u1/stats/waterballoon/rm"] && !Object.keys(w1).some((k) => k.indexOf("gameRanks/") === 0), Object.keys(w1));
+    const ruled1 = RuleChecker.check("waterballoon", w1, undefined, undefined);
+    check("39번 랜덤 매칭 칸: 누적 칸 없이 rm 만 쓰는 첫 판이 규칙 통과", ruled1.errors.length === 0, ruled1.errors);
+    const second = balloon.store({ "stats/waterballoon": ruled1.stats, "recent/waterballoon": ruled1.slots });
+    await second.store.record(K.WbReportBuilder.fromEnd("r2", wbMatch, wbEnd, "a", true), null);
+    const w2 = second.writes[0] || {};
+    const ruled2 = RuleChecker.check("waterballoon", w2, ruled1.stats, ruled1.slots);
+    check("39번 랜덤 매칭 칸: 그다음 사람끼리 판은 누적 첫 판 + rm 둘째 판으로 통과", ruled2.errors.length === 0 && ruled2.stats.g === 1 && ruled2.stats.rm.g === 2, [ruled2.errors, ruled2.stats]);
+    const third = balloon.store({ "stats/waterballoon": ruled2.stats, "recent/waterballoon": ruled2.slots });
+    await third.store.record(K.WbReportBuilder.fromEnd("r3", botMatch, wbEnd, "a", true), null);
+    const w3 = third.writes[0] || {};
+    const ruled3 = RuleChecker.check("waterballoon", w3, ruled2.stats, ruled2.slots);
+    check("39번 랜덤 매칭 칸: 누적 칸이 있을 때 봇 섞인 판(rm 만)도 통과", ruled3.errors.length === 0 && ruled3.stats.g === 1 && ruled3.stats.rm.g === 3, ruled3.errors);
+    const cheat = JSON.parse(JSON.stringify(w3)); cheat["users/u1/stats/waterballoon/kl"] = ruled2.stats.kl + 5;
+    check("39번 랜덤 매칭 칸: rm 만 올리며 누적 처치를 바꾸면 거부", RuleChecker.check("waterballoon", cheat, ruled2.stats, ruled2.slots).errors.length > 0);
+    const cheat2 = JSON.parse(JSON.stringify(w3)); cheat2["users/u1/stats/waterballoon/rm"] = Object.assign({}, cheat2["users/u1/stats/waterballoon/rm"], { g: ruled2.stats.rm.g + 2 });
+    check("39번 랜덤 매칭 칸: rm 판 수를 한 번에 2 올리면 거부", RuleChecker.check("waterballoon", cheat2, ruled2.stats, ruled2.slots).errors.length > 0);
+  }
   for (const key of ["minigames", "volleyball", "soccer"]) await new GameCase(key, new K.RandomMatchProfile(key), K.RandomMatchCodec, key).verifyStore(randomReport());
 })();
 Promise.all([done, gameChecks, pendingChecks]).then(() => {

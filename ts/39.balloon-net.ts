@@ -1,4 +1,4 @@
-interface WbPlayerRecord extends RkPlayerRecord {}
+interface WbPlayerRecord extends RkPlayerRecord { vs?: WbRandomTally }
 interface WbMatchRecord { id: number; seed: number; mode: WbMode; map: string; teams: WbRosterTeam[]; startAt: number }
 interface WbEndRecord { match: number; ranks: number[]; outTicks: number[]; at: number; stats?: number[][]; endTick?: number }
 interface WbRemoteState { x: number; z: number; face: number; move: number; alt: number; kPress: number; match: number }
@@ -10,7 +10,7 @@ class WbRoomRules {
   static readonly SEATS = 8;
   static readonly SPECTATOR_SLOT = 9;
   static readonly RULES: RkRoomRules = { root: WbRoomRules.ROOT, seatCount: WbRoomRules.SEATS, spectatorSlot: WbRoomRules.SPECTATOR_SLOT, seatOrder: [0, 2, 4, 6, 1, 3, 5, 7], spectatorLimit: 12 };
-  static readonly VALUES: readonly string[] = ["mode", "map", "level", "bots", "match", "snap", "ev", "board", "end"];
+  static readonly VALUES: readonly string[] = ["mode", "map", "level", "bots", "match", "snap", "ev", "board", "end", "vsAt", "assign"];
   static readonly SEND_MS = 100;
   static readonly KEEPALIVE_MS = 1000;
   static readonly BOARD_MS = 2000;
