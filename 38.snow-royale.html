@@ -158,6 +158,56 @@
   #lobbyScreen.matched [data-slot] { pointer-events: none; }
   #netMeter { position: fixed; right: 10px; bottom: 6px; z-index: 30; font-size: 12px; color: #24364A; font-weight: 800; }
   #btnResultLeave { margin-top: 8px; width: 100%; min-height: 44px; font: inherit; font-size: 16px; font-weight: 800; border-radius: 8px; border: 2px solid rgba(255,255,255,.5); background: transparent; color: #fff; cursor: pointer; }
+  .snv-curtain { position: fixed; inset: 0; z-index: 30; display: flex; align-items: center; justify-content: center; overflow-y: auto; padding: calc(env(safe-area-inset-top, 0px) + 54px) 3vw 3vh;
+    background: radial-gradient(ellipse at center, rgba(24, 40, 66, .94), rgba(8, 14, 26, .97)); color: #EEF3F8; font-family: var(--sg-font); transition: opacity .35s ease; }
+  .snv-curtain[hidden] { display: none; }
+  .snv-curtain.out { opacity: 0; }
+  .snv-in { width: min(1400px, 100%); margin: auto 0; }
+  .snv-head { text-align: center; font-size: clamp(22px, 3.4vw, 44px); font-weight: 900; text-shadow: 0 0 18px rgba(143, 211, 255, .6); }
+  .snv-hint { margin-top: 2.4vh; text-align: center; font-size: clamp(14px, 1.7vw, 20px); color: #B9C8DA; }
+  .snv-mode { margin: 1.4vh 0 2.4vh; text-align: center; font-size: clamp(15px, 1.9vw, 24px); font-weight: 800; color: #8FD3FF; }
+  .snv-arena.duos { display: flex; align-items: stretch; gap: 1.2vw; }
+  .snv-team { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 1.6vh; padding: 1.6vh 1.2vw; border: 3px solid var(--snv-team); border-radius: 14px; background: rgba(18, 28, 46, .7); animation: snvBob 2s var(--snv-delay, 0s) ease-in-out infinite; }
+  .snv-team-name { align-self: center; padding: .3vh 1.4vw; border-radius: 6px; background: var(--snv-team); color: #fff; font-size: clamp(14px, 1.7vw, 22px); font-weight: 900; text-shadow: 0 1px 2px rgba(0, 0, 0, .45); }
+  .snv-seat { display: flex; flex-direction: column; gap: .6vh; min-width: 0; padding: 1.6vh 1.2vw; border-radius: 10px; border: 2px solid var(--snv-team); background: rgba(255, 255, 255, .05); }
+  .snv-seat.me { box-shadow: inset 0 0 0 3px #D97B4F; }
+  .snv-seat b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: clamp(18px, 2.5vw, 34px); color: #fff; }
+  .snv-seat b small { font-size: .6em; color: #FFB08C; }
+  .snv-seat.waiting b { animation: snvBlink 1s ease-in-out infinite; }
+  .snv-seat.ai b, .snv-seat.ai .snv-line { color: #B9C8DA; }
+  .snv-line { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: clamp(13px, 1.55vw, 21px); color: #DDE6F0; }
+  .snv-line em { font-style: normal; font-weight: 900; color: #BFE6FF; }
+  .snv-line small { font-weight: 700; color: #93A6BC; }
+  .snv-arena.solo { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.6vh 1.4vw; max-width: 1000px; margin: 0 auto; }
+  .snv-arena.solo.wide { grid-template-columns: repeat(3, minmax(0, 1fr)); max-width: none; }
+  .snv-cell { min-width: 0; display: flex; animation: snvBob 2s var(--snv-delay, 0s) ease-in-out infinite; }
+  .snv-cell .snv-seat { flex: 1; border-width: 3px; background: rgba(18, 28, 46, .7); }
+  .snv-vs { position: relative; flex: 0 0 auto; display: flex; align-items: center; justify-content: center; width: clamp(44px, 6vw, 96px); }
+  .snv-vs b { position: relative; font-size: clamp(28px, 4.4vw, 64px); font-style: italic; font-weight: 900; color: #fff; text-shadow: 0 0 14px #D97B4F, 0 3px 0 rgba(0, 0, 0, .5); animation: snvPulse 1s ease-in-out infinite; }
+  .snv-spark { position: absolute; left: 50%; top: 50%; width: 9vw; height: 9vw; margin: -4.5vw 0 0 -4.5vw; border-radius: 50%; background: radial-gradient(circle, rgba(191, 230, 255, .8), rgba(143, 211, 255, 0) 70%); animation: snvSpark 1s ease-out infinite; }
+  .snv-last { display: flex; align-items: center; justify-content: center; gap: 1vw; margin-top: 2vh; font-size: clamp(16px, 2vw, 26px); font-weight: 900; color: #FFB08C; }
+  #snvBody.snv-enter .snv-team, #snvBody.snv-enter .snv-cell { animation: snvDrop .6s var(--snv-delay, 0s) cubic-bezier(.2, .9, .3, 1.25) both, snvBob 2s calc(var(--snv-delay, 0s) + .6s) ease-in-out infinite; }
+  #snvBody.snv-enter .snv-vs b { animation: snvSlam .45s .45s both, snvPulse 1s .9s ease-in-out infinite; }
+  @keyframes snvDrop { from { transform: translateY(-60px) scale(.9); opacity: 0; } to { transform: none; opacity: 1; } }
+  @keyframes snvSlam { from { transform: scale(3); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  @keyframes snvPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.14); } }
+  @keyframes snvSpark { from { transform: scale(.4); opacity: .9; } to { transform: scale(1.5); opacity: 0; } }
+  @keyframes snvBob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+  @keyframes snvBlink { 0%, 100% { opacity: .45; } 50% { opacity: .9; } }
+  @media (max-width: 760px) {
+    .snv-arena.duos { flex-direction: column; gap: 1vh; }
+    .snv-arena.duos .snv-vs { width: auto; height: 34px; }
+    .snv-arena.duos .snv-vs b { font-size: 26px; }
+    .snv-team { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px; }
+    .snv-team-name { flex: 0 0 100%; text-align: center; }
+    .snv-team .snv-seat { flex: 1 1 0; }
+    .snv-arena.solo, .snv-arena.solo.wide { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    .snv-seat { padding: 8px; gap: 2px; }
+    .snv-seat b { font-size: 17px; }
+    .snv-line { font-size: 12px; white-space: normal; }
+    .snv-spark { width: 60px; height: 60px; margin: -30px 0 0 -30px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .snv-curtain *, #snvBody.snv-enter * { animation: none !important; } }
 </style>
 </head>
 <body>
@@ -189,6 +239,13 @@
   <table><thead><tr><th>순위</th><th>이름</th><th>생존</th><th>처치</th><th>준 피해</th><th>모은 눈</th><th>만든 벽</th></tr></thead><tbody id="resultRows"></tbody></table>
   <div id="resultStreak" class="mk-notice"></div>
   <button type="button" id="btnAgain">다시 하기</button><button type="button" id="btnResultLeave">방 나가기</button></div></div>
+<div id="versusCurtain" class="snv-curtain" hidden>
+  <div class="snv-in">
+    <div class="snv-head">❄ 상대를 찾았어요!</div>
+    <div id="snvBody"></div>
+    <div class="snv-hint">곧 낙하가 시작돼요. 잠시만 기다려 주세요.</div>
+  </div>
+</div>
 <div id="startScreen" data-account-home class="st-screen" hidden>
   <div class="st-wrap">
     <div class="st-hero"><h1 class="st-title">눈싸움<span>배틀로얄</span></h1></div>
@@ -271,9 +328,10 @@
 <script charset="utf-8" src="38.snow-bot.js?v=20261021d"></script>
 <script charset="utf-8" src="38.snow-views.js?v=20261021d"></script>
 <script charset="utf-8" src="38.snow-hud.js?v=20261021d"></script>
-<script charset="utf-8" src="38.snow-net.js?v=20261026b"></script>
-<script charset="utf-8" src="38.snow-account.js?v=20261027b"></script>
-<script charset="utf-8" src="38.snow-royale.js?v=20261028c"></script>
+<script charset="utf-8" src="38.snow-net.js?v=20261029a"></script>
+<script charset="utf-8" src="38.snow-account.js?v=20261029a"></script>
+<script charset="utf-8" src="38.snow-versus.js?v=20261029a"></script>
+<script charset="utf-8" src="38.snow-royale.js?v=20261029a"></script>
 <script type="module">
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";

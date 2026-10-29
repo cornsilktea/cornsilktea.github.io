@@ -389,6 +389,14 @@
             "rk": { ".validate": "newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 6" },
             "t3": { ".validate": "newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 1" },
             "mk": { ".validate": "newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= 99" },
+            "rm": {
+              ".validate": "newData.hasChildren(['g', 'w', 'k', 'rk']) && newData.child('w').val() <= newData.child('g').val() && newData.child('rk').val() >= newData.child('g').val() && newData.child('rk').val() <= newData.child('g').val() * 6 && ((!data.exists() && newData.child('g').val() === 1) || (data.exists() && newData.child('g').val() === data.child('g').val() + 1))",
+              "g": { ".validate": "newData.isNumber() && newData.val() === (data.exists() ? data.val() : 0) + 1" },
+              "w": { ".validate": "newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 1" },
+              "k": { ".validate": "newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 99" },
+              "rk": { ".validate": "newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) + 1 && newData.val() <= (data.exists() ? data.val() : 0) + 6" },
+              "$other": { ".validate": false }
+            },
             "ids": {
               "$id": { ".validate": "$id.length >= 1 && $id.length <= 60 && newData.isNumber() && !data.exists()" }
             },
