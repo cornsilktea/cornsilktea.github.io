@@ -1536,7 +1536,8 @@ class StudentAccountWindow {
 
 /* ---------------- 30번 렉 진단 ----------------
    perfDiag/teambattle/<YYYYMMDD>/<push 키> = 기기 하나가 경기 하나에서 잰 요약(교사 계정만 읽기). 날짜마다 한 번 읽는다.
-   묶음(기기 모델·반·빌드, 고르면 모드까지)마다 단순 평균을 내고, 멈춤·순간이동은 경기 길이로 나눠 1분당 횟수로 보인다. */
+   묶음(기기 모델·반·빌드, 고르면 모드까지)마다 단순 평균을 내고, 멈춤·순간이동은 경기 길이로 나눠 1분당 횟수로 보인다.
+   st 간격·순간이동은 다른 기기 캐릭터를 잰 기록(stN > 0)만 센다(2026-10-29 — 연습모드·AI 방 방장의 0 이 평균을 좋게 보이게 하던 것). */
 class LagDiagPanel {
   static COLUMNS = [
     ["묶음", (g) => g.label],
@@ -1546,11 +1547,12 @@ class LagDiagPanel {
     ["하위 5% FPS", (g) => g.avg("fps5").toFixed(1)],
     ["50ms 끊김/분", (g) => g.perMinute("j50")],
     ["200ms 멈춤/분", (g) => g.perMinute("j200")],
-    ["st 간격 중앙", (g) => LagDiagPanel.ms(g.avg("st50"))],
-    ["st 간격 95%", (g) => LagDiagPanel.ms(g.avg("st95"))],
-    ["가장 늦은 캐릭터 95%", (g) => LagDiagPanel.ms(g.avg("st95w"))],
-    ["st 최대", (g) => LagDiagPanel.ms(g.max("stMax"))],
-    ["순간이동/분", (g) => g.perMinute("snap")],
+    ["원격 잰 기록", (g) => String(g.rows.filter((r) => g.num(r, "stN") > 0).length)],
+    ["st 간격 중앙", (g) => g.has("stN") ? LagDiagPanel.ms(g.avgWhere("st50", "stN")) : "-"],
+    ["st 간격 95%", (g) => g.has("stN") ? LagDiagPanel.ms(g.avgWhere("st95", "stN")) : "-"],
+    ["가장 늦은 캐릭터 95%", (g) => g.has("stN") ? LagDiagPanel.ms(g.avgWhere("st95w", "stN")) : "-"],
+    ["st 최대", (g) => g.has("stN") ? LagDiagPanel.ms(g.max("stMax")) : "-"],
+    ["순간이동/분", (g) => g.has("stN") ? g.perMinuteWhere("snap", "stN") : "-"],
     ["RTT 중앙", (g) => g.has("rttN") ? LagDiagPanel.ms(g.avgWhere("rtt50", "rttN")) : "-"],
     ["RTT 최대", (g) => g.has("rttN") ? LagDiagPanel.ms(g.max("rttMax")) : "-"],
     ["화질 배율", (g) => g.avg("pix").toFixed(2)],
@@ -1632,9 +1634,15 @@ class LagDiagGroup {
     const picked = this.rows.filter((r) => this.num(r, countKey) > 0);
     return picked.length ? picked.reduce((s, r) => s + this.num(r, key), 0) / picked.length : 0;
   }
-  perMinute(key) {
-    const minutes = this.sum("dur") / 60;
-    return minutes > 0 ? (this.sum(key) / minutes).toFixed(1) : "-";
+  perMinute(key) { return LagDiagGroup.rate(this.rows, key, (r) => this.num(r, key), (r) => this.num(r, "dur")); }
+  /* 원격 캐릭터 도착을 잰 기록(연습모드·AI 만 있는 방의 방장은 0)만으로 나눠, 잴 것이 없던 기록이 평균을 좋게 끌어내리지 않게 한다 */
+  perMinuteWhere(key, countKey) {
+    const picked = this.rows.filter((r) => this.num(r, countKey) > 0);
+    return LagDiagGroup.rate(picked, key, (r) => this.num(r, key), (r) => this.num(r, "dur"));
+  }
+  static rate(rows, key, value, seconds) {
+    const minutes = rows.reduce((s, r) => s + seconds(r), 0) / 60;
+    return minutes > 0 ? (rows.reduce((s, r) => s + value(r), 0) / minutes).toFixed(1) : "-";
   }
 }
 
