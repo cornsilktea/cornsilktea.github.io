@@ -96,13 +96,13 @@ class TeamBattleVersusView {
 
   private picksHtml(top: TeamBattleVersusPick[]): string {
     const slots: string[] = [];
-    for (let i = 0; i < TeamBattleVersusCards.TOP; i++) slots.push(top[i] ? this.pickHtml(top[i]) : '<div class="tbv-pick empty"><i></i><span>&nbsp;</span></div>');
+    for (let i = 0; i < TeamBattleVersusCards.TOP; i++) slots.push(top[i] ? this.pickHtml(top[i]) : '<div class="tbv-pick empty"><i></i><b class="tbv-pick-name">&nbsp;</b><span>&nbsp;</span></div>');
     return '<div class="tbv-picks">' + slots.join("") + "</div>";
   }
 
   private pickHtml(pick: TeamBattleVersusPick): string {
     const name = this.look.nameOf(pick.c);
     return '<div class="tbv-pick" title="' + AccountHtml.esc(name) + '"><i><img src="' + AccountHtml.esc(this.look.faceOf(pick.c)) + '" alt="' + AccountHtml.esc(name) + '"></i>'
-      + "<span>" + pick.n + "회 / " + Math.round(pick.w / pick.n * 100) + "%</span></div>";
+      + '<b class="tbv-pick-name">' + AccountHtml.esc(name) + "</b><span>" + pick.n + "회 / " + Math.round(pick.w / pick.n * 100) + "%</span></div>";
   }
 }
