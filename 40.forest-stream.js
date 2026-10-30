@@ -47,6 +47,7 @@ class FrStream {
                 if (chunk.done)
                     break;
                 this.bytes += chunk.value.length;
+                FrStream.received += chunk.value.length;
                 buffer += decoder.decode(chunk.value, { stream: true });
                 let split = buffer.indexOf("\n\n");
                 while (split >= 0) {
@@ -90,3 +91,4 @@ class FrStream {
 }
 FrStream.RETRY_MS = 1500;
 FrStream.REFRESH_MS = 50 * 60 * 1000;
+FrStream.received = 0;

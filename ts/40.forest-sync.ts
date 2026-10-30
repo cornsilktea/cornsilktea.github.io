@@ -3,7 +3,7 @@ interface FrNode { apply(rest: string[], value: unknown): void }
 interface FrMember { no: number; name: string; look: unknown; adm: boolean }
 interface FrPresenceRow { area: string; sleeping: boolean; day: number; at: number }
 interface FrRemotePose { x: number; z: number; y: number; dir: number; anim: number; vx: number; vz: number; at: number }
-interface FrAdminState { notice: { text: string; at: number } | null; lock: boolean; commands: Record<string, { type: string; at: number }> }
+interface FrAdminState { notice: { text: string; at: number } | null; lock: boolean; commands: Record<string, FrAdminCommand> }
 
 class FrWire {
   static readonly ANIMS = ["idle", "run", "walk", "chop", "pickaxe", "dig", "sleep", "fish", "work"];
@@ -216,27 +216,29 @@ class FrPoseNode extends FrMapNode {
   }
 }
 
+interface FrAdminCommand { type: string; at: number; id?: string; n?: number }
+
 class FrAdminNode extends FrMapNode {
   readonly state: FrAdminState = { notice: null, lock: false, commands: {} };
   onNotice: (text: string) => void = () => undefined;
-  onCommand: (uid: string, type: string) => void = () => undefined;
+  onCommand: (uid: string, type: string, id: string, n: number) => void = () => undefined;
   selfUid = "";
   protected replaceAll(table: Record<string, unknown>): void {
     this.state.lock = table.lock === true || table.lock === 1;
     const notice = table.notice as { text: string; at: number } | undefined;
     this.state.notice = notice || null;
-    const commands = (table.cmd || {}) as Record<string, { type: string; at: number }>;
+    const commands = (table.cmd || {}) as Record<string, FrAdminCommand>;
     Object.keys(commands).forEach((uid) => this.command(uid, commands[uid], false));
   }
   protected setOne(rest: string[], value: unknown): void {
     if (rest[0] === "lock") this.state.lock = value === true || value === 1;
     else if (rest[0] === "notice") { this.state.notice = (value as { text: string; at: number }) || null; if (this.state.notice) this.onNotice(this.state.notice.text); }
-    else if (rest[0] === "cmd" && rest.length >= 2) this.command(rest[1], value as { type: string; at: number }, true);
+    else if (rest[0] === "cmd" && rest.length >= 2) this.command(rest[1], value as FrAdminCommand, true);
   }
-  private command(uid: string, value: { type: string; at: number } | null, live: boolean): void {
+  private command(uid: string, value: FrAdminCommand | null, live: boolean): void {
     if (!value) { delete this.state.commands[uid]; return; }
     this.state.commands[uid] = value;
-    if (live && uid === this.selfUid) this.onCommand(uid, value.type);
+    if (live && uid === this.selfUid) this.onCommand(uid, value.type, value.id || "", value.n || 0);
   }
 }
 

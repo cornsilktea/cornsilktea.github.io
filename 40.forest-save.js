@@ -70,6 +70,7 @@ class FrAccountSave {
             seen: stored && stored.seen ? stored.seen : [],
             lastAt: stored && stored.lastAt ? stored.lastAt : 0,
             chest: stored && stored.chest ? stored.chest : {},
+            bonus: stored && typeof stored.bonus === "number" ? stored.bonus : 0,
         };
     }
     queue(data) {

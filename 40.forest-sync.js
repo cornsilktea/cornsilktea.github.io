@@ -297,7 +297,7 @@ class FrAdminNode extends FrMapNode {
         }
         this.state.commands[uid] = value;
         if (live && uid === this.selfUid)
-            this.onCommand(uid, value.type);
+            this.onCommand(uid, value.type, value.id || "", value.n || 0);
     }
 }
 class FrClockNode {

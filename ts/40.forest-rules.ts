@@ -347,11 +347,12 @@ class FrVillageBuildSource extends FrMaterialSource {
 
 class FrActionPoints {
   current: number;
+  bonus = 0;
   constructor(public ringLevel: number, current?: number) {
     this.current = current === undefined ? this.max() : Math.min(current, this.max());
   }
   max(): number {
-    return Math.min(FrBalance.MAX_ACTION_POINTS_CAP, FrBalance.BASE_ACTION_POINTS + this.ringLevel * FrBalance.RING_ACTION_POINTS_PER_LEVEL);
+    return Math.min(FrBalance.MAX_ACTION_POINTS_CAP, FrBalance.BASE_ACTION_POINTS + this.ringLevel * FrBalance.RING_ACTION_POINTS_PER_LEVEL + this.bonus);
   }
   canSpend(cost: number): boolean { return this.current >= cost; }
   spend(cost: number): boolean {

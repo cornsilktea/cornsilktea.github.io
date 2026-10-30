@@ -3,6 +3,7 @@ interface FrStreamSink { onValue(path: string[], value: unknown): void }
 class FrStream {
   static readonly RETRY_MS = 1500;
   static readonly REFRESH_MS = 50 * 60 * 1000;
+  static received = 0;
   bytes = 0;
   events = 0;
   connected = false;
@@ -46,6 +47,7 @@ class FrStream {
         const chunk = await reader.read();
         if (chunk.done) break;
         this.bytes += chunk.value.length;
+        FrStream.received += chunk.value.length;
         buffer += decoder.decode(chunk.value, { stream: true });
         let split = buffer.indexOf("\n\n");
         while (split >= 0) {

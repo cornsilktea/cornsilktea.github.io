@@ -165,6 +165,7 @@ class FrSession {
       lastAt: Date.now(),
       stats: this.stats.data,
       chest: this.personal.snapshot(),
+      bonus: this.ap.bonus,
     };
   }
 
@@ -172,6 +173,7 @@ class FrSession {
     this.bag.slots.length = 0;
     data.bag.forEach((s) => this.bag.slots.push({ id: s.id, count: s.count, uses: s.uses }));
     this.ap.ringLevel = data.ring;
+    this.ap.bonus = data.bonus || 0;
     this.ap.current = Math.min(data.ap, this.ap.max());
     Object.keys(data.pity).forEach((k) => { this.pity[k] = data.pity[k]; });
     data.seen.forEach((id) => this.seen.add(id));

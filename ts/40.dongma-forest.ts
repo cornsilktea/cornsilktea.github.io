@@ -278,8 +278,10 @@ class FrGame {
     this.startSync(world, clock, island);
     this.buildWindows(session);
     if (this.isAdmin()) {
-      const panel = this.windows.register(new FrAdminWindow(session, this.toast, new FrAdminTools(this.backend, island, clock, world), this.roster, this.adminNode, clock, island));
+      const panel = this.windows.register(new FrAdminWindow(session, this.toast, new FrAdminTools(this.backend, island, clock, world, nick), this.roster, this.adminNode, clock, island));
       panel.focus = () => (this.player ? this.player.cell() : null);
+      panel.travel = (areaId) => this.adminTravel(areaId);
+      panel.teleport = (x, z) => { if (this.player && !this.areaWorld) this.player.place(x, z); };
       this.adminWindow = panel;
     }
     session.onChange(() => { if (this.expedition) this.expedition.remember(); else save.queue(session.toSave()); this.refreshHud(); });
@@ -294,7 +296,7 @@ class FrGame {
     this.adminNode = new FrAdminNode();
     this.adminNode.selfUid = this.uid;
     this.adminNode.onNotice = (text) => this.toast.show("공지: " + text, 10000);
-    this.adminNode.onCommand = (uid, type) => { this.runCommand(type); void this.backend.set("forest/" + island + "/admin/cmd/" + uid, null); };
+    this.adminNode.onCommand = (uid, type, id, n) => { this.runCommand(type, id, n); void this.backend.set("forest/" + island + "/admin/cmd/" + uid, null); };
     const hub = new FrSyncHub();
     hub.register("jungle", new FrJungleNode(world));
     hub.register("blocks", new FrBlocksNode(world));
@@ -316,8 +318,9 @@ class FrGame {
     this.posePublisher = new FrPosePublisher(this.backend, island, this.uid);
   }
 
-  private runCommand(type: string): void {
+  private runCommand(type: string, id = "", n = 0): void {
     if (!this.player || !this.world) return;
+    if (this.runItemCommand(type, id, n)) return;
     if (type === "plaza") {
       const plaza = this.world.terrain.anchors.plaza;
       this.player.place(plaza.x, plaza.z + 3);
@@ -328,6 +331,26 @@ class FrGame {
       void this.fade.lift(900);
       this.toast.show("선생님이 깨웠어요");
     }
+  }
+
+  private runItemCommand(type: string, id: string, n: number): boolean {
+    const session = this.session;
+    if (!session) return false;
+    if (type === "give" && FrCatalog.material(id) && n > 0) {
+      const lost = session.gain(id, Math.min(n, 900));
+      this.toast.show("선생님이 " + FrItemNames.label(id) + " " + n + "개를 보냈어요" + (lost > 0 ? " (가방이 가득 차서 일부는 못 받았어요)" : ""), 3200);
+    } else if (type === "apfill") { session.ap.fill(); session.changed(); this.toast.show("선생님이 행동력을 채워 줬어요"); }
+    else if (type === "apbonus") { session.ap.bonus = Math.min(100, session.ap.bonus + n); session.ap.fill(); session.changed(); this.toast.show("선생님이 최대 행동력을 " + n + " 늘려 줬어요"); }
+    else if (type === "exit") { this.toast.show("선생님이 섬으로 데려와요"); if (this.areaWorld) void this.leaveArea(); }
+    else return false;
+    return true;
+  }
+
+  private adminTravel(areaId: string): void {
+    if (!this.session || this.travelling) return;
+    if (areaId === "island") { if (this.areaWorld) void this.leaveArea(); return; }
+    if (this.areaWorld) { this.toast.show("먼저 섬으로 나가세요"); return; }
+    void this.enterArea(areaId as FrAreaId, 1, "start");
   }
 
   private onSkipped(): void {

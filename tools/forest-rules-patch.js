@@ -17,12 +17,13 @@ class ForestRulesPatch {
     const A = ForestRulesPatch.admin();
     return {
       ".write": "auth != null && auth.uid === $uid && (" + ForestRulesPatch.school() + " || " + ForestRulesPatch.anonymous() + " || " + A + ")",
-      "home": { ".validate": "newData.isString() && newData.val().matches(/^([1-3]-[1-5]|test)_[123]$/) && (!data.exists() || " + A + ") && (!(" + ForestRulesPatch.anonymous() + ") || newData.val() === 'test_1')" },
+      "home": { ".write": "auth != null && " + A, ".validate": "newData.isString() && newData.val().matches(/^([1-3]-[1-5]|test)_[123]$/) && (!data.exists() || " + A + ") && (!(" + ForestRulesPatch.anonymous() + ") || newData.val() === 'test_1')" },
       "probe": { ".validate": "newData.isNumber() && newData.val() === now" },
       "save": {
         ".validate": "newData.hasChildren(['bag', 'ap', 'ring']) && newData.child('ap').isNumber() && newData.child('ap').val() >= 0 && newData.child('ap').val() <= 200 && newData.child('ring').isNumber() && newData.child('ring').val() >= 0 && newData.child('ring').val() <= 10",
         "ap": { ".validate": "newData.isNumber()" },
         "ring": { ".validate": "newData.isNumber()" },
+        "bonus": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100" },
         "lastAt": { ".validate": "newData.isNumber()" },
         "bag": { "$i": { ".validate": "$i.matches(/^([0-9]|[1-3][0-9])$/) && newData.hasChildren(['id', 'count', 'uses']) && newData.child('id').isString() && newData.child('id').val().length <= 40 && newData.child('count').isNumber() && newData.child('count').val() >= 1 && newData.child('count').val() <= 30 && newData.child('uses').isNumber() && newData.child('uses').val() >= 0 && newData.child('uses').val() <= 200" } },
         "pity": { "$k": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000" } },
