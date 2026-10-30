@@ -125,6 +125,7 @@
   한글이 든 파일은 Edit·Write 도구나 UTF-8 을 명시한 코드로만 쓴다(`Add-Content`·`Get-Content | Set-Content` 금지). 안내 문구의 숫자는 `data-balance` 속성으로 `WarBalance` 값에서 가져온다.
 - **38번(눈싸움 배틀로얄) 작업은 시작 전에 `38.snow-royale-notes.md`(명세서·진행 상태)와 사양 `38.snow-royale-proposal.md` 를 읽는다.** 규칙 엔진(`ts/38.snow-rules.ts`)은 화면을 몰라서 `node .claude/snow-unit.js`·`node .claude/snow-sim.js` 로 검사한다. 여러 명 접속은 `.claude/snow-multi.html`(가짜 Firebase) 로 본다.
 - **39번(물풍선 대작전) 작업은 시작 전에 `39.water-balloon-notes.md` 와 사양 `39.water-balloon-proposal.md` 를 읽는다.** 규칙 엔진(`ts/39.balloon-rules.ts`)은 화면을 몰라서 `node tools/balloon-unit.js`·`node tools/balloon-sim.js` 로 검사한다(다른 컴퓨터에서도 쓰도록 검사 도구는 `tools/` 에 커밋).
+- **40번(모여봐요 동마의 숲) 작업은 시작 전에 `40.dongma-forest-notes.md`(명세서·진행 상태)와 확정안 `40.dongma-forest-proposal.md`, 진행 방식 `40.dongma-forest-prompt.md` 를 읽는다.** 규칙 엔진은 화면을 몰라서 `node tools/forest-unit.js`·`node tools/forest-sim.js` 로 검사한다.
 - **랜덤 매칭(24·25·30·31·32·34·35·38·39번) 작업은 시작 전에 `random-match-prompt.md`(랜덤 매칭 노트: 공용 `match-kit.ts` 사용법·게임별 규칙·바뀐 기록)를 읽는다.** 새 게임에 붙일 때도 그 파일의 "공용 모듈 사용법"대로 한다.
 - **방(방 코드)이 있는 게임 공통 규칙**(2026-10-28 선생님 요청, 앞으로 만드는 게임 모두):
   - 시작 화면에 `관전하기`·`관전자로 입장` 버튼을 따로 두지 않는다. `입장` 하나로 들어가고, 이미 진행 중이거나 선수 자리가 찬 방이면 남은 관전 자리로 자동 입장한다(`room-kit.ts` 의 `RkRoomDirectory.join` 이 그렇게 동작). 방 안에서 선수↔관전 바꾸기 버튼은 둘 수 있다.
