@@ -44,9 +44,35 @@ class FrTerrainData {
         this.tops[z * this.w + x] = file.tops[z].charAt(x);
       }
     }
+    this.levelBridgeLandings();
     this.original = this.heights.slice();
     this.originalTops = this.tops.slice();
     this.markShielded();
+  }
+
+  private static readonly LANDING_REACH = 3;
+
+  private levelBridgeLandings(): void {
+    const bridges = this.anchors.bridges || {};
+    Object.keys(bridges).forEach((id) => {
+      const cells = bridges[id];
+      if (!cells || cells.length === 0) return;
+      const alongX = cells.every(([, z]) => z === cells[0][1]);
+      const step: [number, number] = alongX ? [1, 0] : [0, 1];
+      const side: [number, number] = alongX ? [0, 1] : [1, 0];
+      const ends: Array<[[number, number], number]> = [[cells[0], -1], [cells[cells.length - 1], 1]];
+      ends.forEach(([[ex, ez], dir]) => {
+        [0, 1].forEach((row) => {
+          for (let k = 1; k <= FrTerrainData.LANDING_REACH; k++) {
+            const x = ex + step[0] * dir * k + side[0] * row, z = ez + step[1] * dir * k + side[1] * row;
+            if (!this.inside(x, z) || this.isWater(x, z)) continue;
+            const i = this.index(x, z);
+            if (this.heights[i] !== 1) break;
+            this.heights[i] = 0;
+          }
+        });
+      });
+    });
   }
 
   index(x: number, z: number): number { return z * this.w + x; }
@@ -185,10 +211,10 @@ class FrTerrainTiles {
   static readonly ROWS = 2;
   static readonly NAMES: readonly string[] = ["grassTop", "grassSide", "dirt", "stone", "sand", "snowTop", "snowSide", "riverBed", "plank", "caveFloor", "caveRock", "crystal", "dark", "lava", "seaBed", "stoneDark"];
   private static readonly TOP: Readonly<Record<string, string>> = {
-    G: "grassTop", D: "dirt", S: "stone", N: "sand", W: "snowTop", R: "riverBed", O: "seaBed", P: "plank", C: "caveFloor", T: "caveRock", V: "crystal", K: "dark", L: "lava",
+    G: "grassTop", D: "dirt", S: "stone", N: "sand", W: "snowTop", R: "riverBed", O: "riverBed", P: "plank", C: "caveFloor", T: "caveRock", V: "crystal", K: "dark", L: "lava",
   };
   private static readonly SIDE: Readonly<Record<string, [string, string]>> = {
-    G: ["grassSide", "dirt"], D: ["dirt", "dirt"], S: ["stone", "stoneDark"], N: ["sand", "sand"], W: ["snowSide", "stone"], R: ["dirt", "dirt"], O: ["seaBed", "seaBed"],
+    G: ["grassSide", "dirt"], D: ["dirt", "dirt"], S: ["stone", "stoneDark"], N: ["sand", "sand"], W: ["snowSide", "stone"], R: ["dirt", "dirt"], O: ["dirt", "dirt"],
     P: ["plank", "plank"], C: ["caveRock", "caveRock"], T: ["caveRock", "caveRock"], V: ["crystal", "caveRock"], K: ["dark", "dark"], L: ["lava", "dark"],
   };
 
@@ -275,5 +301,37 @@ class FrTerrainMesher {
     const at = (k: number) => corners[(k + spin) % 4];
     const order: Array<[number[], [number, number]]> = [[a, at(0)], [b, at(1)], [c, at(2)], [a, at(0)], [c, at(2)], [d, at(3)]];
     order.forEach(([p, uv]) => { positions.push(p[0], p[1], p[2]); colors.push(color[0], color[1], color[2]); uvs.push(uv[0], uv[1]); });
+  }
+}
+
+class FrWaterDepth {
+  static readonly DEEP = 7;
+
+  static compute(terrain: FrTerrainData): Uint8Array {
+    const depth = new Uint8Array(terrain.w * terrain.d);
+    const queue: number[] = [];
+    for (let z = 0; z < terrain.d; z++) for (let x = 0; x < terrain.w; x++) {
+      const i = terrain.index(x, z);
+      if (terrain.isWater(x, z)) depth[i] = FrWaterDepth.DEEP; else queue.push(i);
+    }
+    for (let head = 0; head < queue.length; head++) {
+      const i = queue[head];
+      const x = i % terrain.w, z = Math.floor(i / terrain.w);
+      [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([dx, dz]) => {
+        const nx = x + dx, nz = z + dz;
+        if (!terrain.inside(nx, nz)) return;
+        const n = terrain.index(nx, nz);
+        if (depth[n] <= depth[i] + 1) return;
+        depth[n] = depth[i] + 1;
+        queue.push(n);
+      });
+    }
+    return depth;
+  }
+
+  static shade(depth: number): [number, number, number] {
+    const t = Math.min(1, Math.max(0, (depth - 1) / (FrWaterDepth.DEEP - 1)));
+    const shallow = [0.42, 0.74, 0.9], deep = [0.12, 0.3, 0.56];
+    return [shallow[0] + (deep[0] - shallow[0]) * t, shallow[1] + (deep[1] - shallow[1]) * t, shallow[2] + (deep[2] - shallow[2]) * t];
   }
 }

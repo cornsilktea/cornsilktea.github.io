@@ -270,7 +270,7 @@ class FrTargetFinder {
   }
 
   private cellTarget(cell: FrPoint, player: FrPlayerBody): FrTarget | null {
-    if (!this.world.terrain.diggable(cell.x, cell.z) || this.world.blocked(cell.x, cell.z) || this.world.blocks.top(this.world.terrain.index(cell.x, cell.z)) > 0) return null;
+    if (!this.world.terrain.diggable(cell.x, cell.z) || this.world.blocked(cell.x, cell.z) || this.world.isSiteCell(cell.x, cell.z) || this.world.blocks.top(this.world.terrain.index(cell.x, cell.z)) > 0) return null;
     const here = player.cell();
     if (Math.abs(this.world.terrain.height(cell.x, cell.z) - this.world.terrain.height(here.x, here.z)) > 1) return null;
     const top = this.world.terrain.top(cell.x, cell.z);

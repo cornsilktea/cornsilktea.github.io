@@ -243,7 +243,7 @@ class FrProps {
   private addSiteMarker(site: FrBuildSite): void {
     const T = this.libs.THREE;
     const marker = new T.Group();
-    marker.position.set((site.x + 0.5) * FrTerrainData.BLOCK, this.world.terrain.surfaceY(site.x, site.z), (site.z + 0.5) * FrTerrainData.BLOCK);
+    marker.position.set((site.x + 0.5) * FrTerrainData.BLOCK, Math.max(0, this.world.terrain.surfaceY(site.x, site.z)), (site.z + 0.5) * FrTerrainData.BLOCK);
     marker.userData = { kind: "site", id: site.id };
     this.fillPost(marker, site);
     this.group.add(marker);
@@ -375,18 +375,25 @@ class FrWaterSurface {
     if (this.inner) { this.group.remove(this.inner); this.inner.geometry.dispose(); }
     const positions: number[] = [];
     const uvs: number[] = [];
+    const colors: number[] = [];
     const y = FrWaterSurface.LEVEL;
+    const depth = FrWaterDepth.compute(terrain);
+    const depthAt = (x: number, z: number) => (terrain.inside(x, z) ? depth[terrain.index(x, z)] : FrWaterDepth.DEEP);
+    const corner = (cx: number, cz: number) => FrWaterDepth.shade((depthAt(cx - 1, cz - 1) + depthAt(cx, cz - 1) + depthAt(cx - 1, cz) + depthAt(cx, cz)) / 4);
     for (let z = 0; z < terrain.d; z++) {
       for (let x = 0; x < terrain.w; x++) {
         if (!terrain.isWater(x, z)) continue;
         const x0 = x * B, x1 = x0 + B, z0 = z * B, z1 = z0 + B;
         positions.push(x0, y, z0, x0, y, z1, x1, y, z1, x0, y, z0, x1, y, z1, x1, y, z0);
         uvs.push(x0 / 8, z0 / 8, x0 / 8, z1 / 8, x1 / 8, z1 / 8, x0 / 8, z0 / 8, x1 / 8, z1 / 8, x1 / 8, z0 / 8);
+        const a = corner(x, z), b = corner(x, z + 1), c = corner(x + 1, z + 1), d = corner(x + 1, z);
+        [a, b, c, a, c, d].forEach((rgb) => colors.push(rgb[0], rgb[1], rgb[2]));
       }
     }
     const geometry = new T.BufferGeometry();
     geometry.setAttribute("position", new T.Float32BufferAttribute(positions, 3));
     geometry.setAttribute("uv", new T.Float32BufferAttribute(uvs, 2));
+    geometry.setAttribute("color", new T.Float32BufferAttribute(colors, 3));
     geometry.computeVertexNormals();
     this.inner = new T.Mesh(geometry, this.material);
     this.inner.receiveShadow = true;
@@ -402,6 +409,10 @@ class FrWaterSurface {
       const uv = geometry.getAttribute("uv");
       const pos = geometry.getAttribute("position");
       for (let i = 0; i < uv.count; i++) uv.setXY(i, pos.getX(i) / 8, pos.getZ(i) / 8);
+      const deep = FrWaterDepth.shade(FrWaterDepth.DEEP);
+      const colors: number[] = [];
+      for (let i = 0; i < pos.count; i++) colors.push(deep[0], deep[1], deep[2]);
+      geometry.setAttribute("color", new T.Float32BufferAttribute(colors, 3));
       this.group.add(new T.Mesh(geometry, this.material));
     });
   }
@@ -549,7 +560,7 @@ class FrWorldView implements FrWorldListener {
     const waterTexture = FrSurfaceTextures.water(libs).clone();
     waterTexture.needsUpdate = true;
     this.waterTexture = waterTexture;
-    this.waterSurface = new FrWaterSurface(libs, new T.MeshPhongMaterial({ color: 0x3f86d0, map: waterTexture, specular: 0x88bbff, shininess: 60, transparent: true, opacity: 0.82, depthWrite: false }));
+    this.waterSurface = new FrWaterSurface(libs, new T.MeshPhongMaterial({ color: 0xffffff, vertexColors: true, map: waterTexture, specular: 0x88bbff, shininess: 60, transparent: true, opacity: 0.82, depthWrite: false }));
     this.water = this.waterSurface.group;
     this.scene.add(this.water);
     this.treeGroup = new T.Group();
@@ -788,7 +799,7 @@ class FrWorldView implements FrWorldListener {
     const pointer = new T.Vector2(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
     const raycaster = new T.Raycaster();
     raycaster.setFromCamera(pointer, this.rig.camera);
-    const prop = raycaster.intersectObjects(this.propGroup.children, true)[0];
+    const prop = raycaster.intersectObjects(this.propGroup.children, true).find((hit) => !(hit.object as Three<"Sprite">).isSprite);
     const ground = raycaster.intersectObjects(this.terrainGroup.children, false)[0];
     const treeHit = this.trees.pick(raycaster);
     const best = (o: { distance: number } | undefined) => (o ? o.distance : Infinity);

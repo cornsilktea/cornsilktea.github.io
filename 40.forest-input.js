@@ -1,4 +1,16 @@
 "use strict";
+class FrPageGuard {
+    constructor() {
+        document.addEventListener("contextmenu", (event) => { if (!FrPageGuard.editable(event.target))
+            event.preventDefault(); });
+        document.addEventListener("selectstart", (event) => { if (!FrPageGuard.editable(event.target))
+            event.preventDefault(); });
+    }
+    static editable(target) {
+        const node = target;
+        return !!node && !!node.closest && !!node.closest("input, textarea, select");
+    }
+}
 class FrHoverCell {
     constructor() {
         this.x = 0;

@@ -49,6 +49,7 @@ abstract class FrWindow {
   readonly root: HTMLDivElement;
   protected readonly body: HTMLDivElement;
   private opened = false;
+  onItem: (id: string) => void = () => undefined;
 
   constructor(title: string, protected readonly session: FrSession, protected readonly toast: FrToast) {
     this.root = FrDom.make("div", "fr-win");
@@ -81,8 +82,18 @@ abstract class FrWindow {
   protected needLine(id: string, have: number, need: number): HTMLDivElement {
     const line = FrDom.make("div", have >= need ? "fr-need ok" : "fr-need lack");
     line.title = FrItemNames.label(id);
-    line.append(FrIcons.image(id, 22), FrDom.make("span", "", " " + have + " / " + need));
+    line.append(this.itemIcon(id, 22), FrDom.make("span", "", " " + have + " / " + need));
     return line;
+  }
+
+  protected itemIcon(id: string, size: number): HTMLElement {
+    const icon = FrIcons.image(id, size);
+    if (!FrCatalog.material(id)) return icon;
+    const holder = FrDom.make("span", "fr-item-link");
+    holder.title = FrItemNames.label(id) + " · 눌러서 자세히";
+    holder.appendChild(icon);
+    holder.addEventListener("click", (event) => { event.stopPropagation(); this.onItem(id); });
+    return holder;
   }
 }
 
@@ -350,7 +361,7 @@ class FrCookWindow extends FrWindow {
         const have = ingredient.item ? source.total(ingredient.item) : FrCatalog.groupMembers(ingredient.group as FrIngredientGroup).reduce((s, id) => s + source.total(id), 0);
         const line = FrDom.make("div", have >= ingredient.count ? "fr-need ok" : "fr-need lack");
         line.title = label;
-        line.append(ingredient.item ? FrIcons.image(ingredient.item, 22) : FrDom.make("span", "", label), FrDom.make("span", "", " " + have + " / " + ingredient.count));
+        line.append(ingredient.item ? this.itemIcon(ingredient.item, 22) : FrDom.make("span", "", label), FrDom.make("span", "", " " + have + " / " + ingredient.count));
         row.appendChild(line);
       });
       row.appendChild(FrDom.make("div", "fr-note", "먹으면 행동력 +" + FrFoodRules.islandGain(recipe.star)));
@@ -645,6 +656,8 @@ class FrCurrencyWindow extends FrWindow {
 
   showItem(id: string): void { this.open(); this.pick(id); }
 
+  showInfo(id: string): void { this.info.show(id, this.session); }
+
   override close(): void { super.close(); this.info.hide(); }
 
   private pick(id: string): void {
@@ -850,7 +863,6 @@ class FrMiniGameView {
 
 class FrDungeonWindow extends FrWindow {
   onEnter: (difficulty: FrDifficulty) => void = () => undefined;
-  onItem: (id: string) => void = () => undefined;
   constructor(session: FrSession, toast: FrToast) { super("던전 (서쪽 포탈)", session, toast); }
 
   render(): void {
@@ -966,8 +978,10 @@ class FrIslandMapPainter {
   static paint(g: CanvasRenderingContext2D, world: FrWorld, P: number, others: FrMapDot[], me: FrMapDot | null): void {
     const terrain = world.terrain;
     const image = g.createImageData(terrain.w * P, terrain.d * P);
+    const depth = FrWaterDepth.compute(terrain);
     for (let z = 0; z < terrain.d; z++) for (let x = 0; x < terrain.w; x++) {
-      const base = FrIslandMapPainter.TOP_COLORS[terrain.top(x, z)] || FrIslandMapPainter.TOP_COLORS.G;
+      const water = terrain.isWater(x, z) ? FrWaterDepth.shade(depth[terrain.index(x, z)]).map((v) => v * 255) : null;
+      const base = water || FrIslandMapPainter.TOP_COLORS[terrain.top(x, z)] || FrIslandMapPainter.TOP_COLORS.G;
       const light = terrain.isWater(x, z) ? 1 : 0.86 + Math.max(0, terrain.height(x, z)) * 0.025;
       const block = world.blocks.top(terrain.index(x, z)) > 0;
       const color = block ? [205, 170, 120] : base.map((v) => Math.min(255, v * light));
@@ -1026,7 +1040,7 @@ class FrIslandMapPainter {
 interface FrMapMarks { me: FrMapDot | null; others: FrMapDot[]; island: boolean }
 
 class FrMapWindow extends FrWindow {
-  private static readonly CELL_PIXELS = 5;
+  private static readonly CELL_PIXELS = 8;
   private readonly canvas: HTMLCanvasElement;
   private timer = 0;
 
@@ -1085,6 +1099,7 @@ class FrSlotDrag {
     cell.style.touchAction = "none";
     if (!filled) return;
     cell.addEventListener("pointerdown", (event) => {
+      if (event.pointerType === "mouse") event.preventDefault();
       this.from = index;
       this.startX = event.clientX;
       this.startY = event.clientY;

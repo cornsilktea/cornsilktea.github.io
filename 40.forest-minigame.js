@@ -129,6 +129,15 @@ class FrMiniGameFactory {
     static create(task, tier) {
         return FrMiniGameFactory.BUILDERS[task](tier);
     }
+    static ease(task, tier) {
+        return FrMiniGameFactory.TOOL_FREE.indexOf(task) >= 0 ? 0.5 : tier / 3;
+    }
+    static createVaried(task, tier, roll) {
+        if (!FrMiniGameFactory.create(task, tier))
+            return null;
+        const pick = Math.min(FrMiniGameFactory.KINDS.length - 1, Math.floor(roll * FrMiniGameFactory.KINDS.length));
+        return FrMiniGameFactory.KINDS[pick](FrMiniGameFactory.ease(task, tier));
+    }
 }
 FrMiniGameFactory.BUILDERS = {
     shake: () => new FrMashGauge(12),
@@ -141,3 +150,10 @@ FrMiniGameFactory.BUILDERS = {
     vein: (t) => new FrCenterStop(FrBalance.PICK_VEIN_GREEN[t], 1),
     hardRock: (t) => (FrBalance.PICK_HARD_MASH[t] > 0 ? new FrMashGauge(FrBalance.PICK_HARD_MASH[t]) : null),
 };
+FrMiniGameFactory.TOOL_FREE = ["shake", "gatherRing", "harvest"];
+FrMiniGameFactory.KINDS = [
+    (e) => new FrMashGauge(Math.round(14 - 6 * e)),
+    (e) => new FrCenterStop(0.12 + 0.12 * e, e < 0.5 ? 2 : 1),
+    (e) => new FrShrinkRing(0.1 + 0.06 * e),
+    (e) => new FrHoldRelease(0.18 + 0.12 * e),
+];

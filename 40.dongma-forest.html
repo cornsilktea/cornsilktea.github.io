@@ -43,7 +43,8 @@
   #hudApText { position: relative; text-align: center; font-size: 13px; font-weight: 900; line-height: 14px; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.8); font-variant-numeric: tabular-nums; }
   .fr-cell[draggable="true"] { cursor: grab; }
   .fr-cell.drop-over { box-shadow: 0 0 0 3px #9BE08A; }
-  .fr-map canvas { display: block; width: min(100%, 64vh); height: auto; margin: 0 auto; border-radius: 8px; image-rendering: pixelated; }
+  .fr-map { width: min(1000px, 96vw); max-height: 94vh; }
+  .fr-map canvas { display: block; width: min(100%, 78vh); height: auto; margin: 0 auto; border-radius: 8px; image-rendering: pixelated; }
   .fr-map-legend { display: flex; flex-wrap: wrap; gap: 10px; font-size: 13px; color: #C9D6E4; margin-top: 8px; }
   .fr-map-legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 4px; vertical-align: -1px; }
   #hudAreaBox { position: fixed; top: 8px; left: 50%; transform: translateX(-50%); z-index: 5; text-align: center; font-size: 16px; white-space: nowrap; }
@@ -147,6 +148,9 @@
   .fr-board-line { margin: 6px 0; font-weight: 800; }
   .fr-board-store { display: flex; flex-wrap: wrap; gap: 6px; max-width: 44vw; }
   .fr-board-item { display: inline-flex; align-items: center; gap: 3px; font-size: 14px; }
+  .fr-item-link { display: inline-flex; cursor: pointer; border-radius: 4px; }
+  .fr-item-link:hover { background: rgba(217,123,79,.35); }
+  .fr-win-body, .fr-cell, #hotbar { -webkit-user-select: none !important; user-select: none !important; }
   .fr-info { z-index: 24; width: min(560px, 92vw); max-height: 76vh; }
   .fr-info .fr-detail h3 { font-size: 14px; color: #FFD7BF; margin-bottom: 6px; }
   .fr-uses { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 6px; }
@@ -237,39 +241,39 @@
 </div>
 <script charset="utf-8" src="character-kit.js?v=20261011"></script>
 <script charset="utf-8" src="fold-card.js"></script>
-<script charset="utf-8" src="40.forest-furniture.js?v=10"></script>
-<script charset="utf-8" src="40.forest-data.js?v=10"></script>
-<script charset="utf-8" src="40.forest-rules.js?v=10"></script>
-<script charset="utf-8" src="40.forest-clock.js?v=10"></script>
-<script charset="utf-8" src="40.forest-minigame.js?v=10"></script>
-<script charset="utf-8" src="40.forest-terrain.js?v=10"></script>
+<script charset="utf-8" src="40.forest-furniture.js?v=11"></script>
+<script charset="utf-8" src="40.forest-data.js?v=11"></script>
+<script charset="utf-8" src="40.forest-rules.js?v=11"></script>
+<script charset="utf-8" src="40.forest-clock.js?v=11"></script>
+<script charset="utf-8" src="40.forest-minigame.js?v=11"></script>
+<script charset="utf-8" src="40.forest-terrain.js?v=11"></script>
 <script charset="utf-8" src="room-kit.js?v=11"></script>
-<script charset="utf-8" src="40.forest-stream.js?v=10"></script>
-<script charset="utf-8" src="40.forest-net.js?v=10"></script>
-<script charset="utf-8" src="40.forest-blocks.js?v=10"></script>
-<script charset="utf-8" src="40.forest-farm.js?v=10"></script>
-<script charset="utf-8" src="40.forest-village.js?v=10"></script>
-<script charset="utf-8" src="40.forest-world.js?v=10"></script>
-<script charset="utf-8" src="40.forest-save.js?v=10"></script>
-<script charset="utf-8" src="40.forest-session.js?v=10"></script>
-<script charset="utf-8" src="40.forest-sync.js?v=10"></script>
-<script charset="utf-8" src="40.forest-input.js?v=10"></script>
-<script charset="utf-8" src="40.forest-nature.js?v=10"></script>
-<script charset="utf-8" src="40.forest-blocklayer.js?v=10"></script>
-<script charset="utf-8" src="40.forest-views.js?v=10"></script>
-<script charset="utf-8" src="40.forest-village-view.js?v=10"></script>
-<script charset="utf-8" src="40.forest-icons.js?v=10"></script>
-<script charset="utf-8" src="40.forest-fx.js?v=10"></script>
-<script charset="utf-8" src="40.forest-hud.js?v=10"></script>
-<script charset="utf-8" src="40.forest-admin.js?v=10"></script>
-<script charset="utf-8" src="40.forest-play.js?v=10"></script>
-<script charset="utf-8" src="40.forest-areas.js?v=10"></script>
-<script charset="utf-8" src="40.forest-areaview.js?v=10"></script>
-<script charset="utf-8" src="40.forest-areaplay.js?v=10"></script>
-<script charset="utf-8" src="40.forest-fishing.js?v=10"></script>
-<script charset="utf-8" src="40.forest-dungeon.js?v=10"></script>
-<script charset="utf-8" src="40.forest-monsters.js?v=10"></script>
-<script charset="utf-8" src="40.dongma-forest.js?v=12"></script>
+<script charset="utf-8" src="40.forest-stream.js?v=11"></script>
+<script charset="utf-8" src="40.forest-net.js?v=11"></script>
+<script charset="utf-8" src="40.forest-blocks.js?v=11"></script>
+<script charset="utf-8" src="40.forest-farm.js?v=11"></script>
+<script charset="utf-8" src="40.forest-village.js?v=11"></script>
+<script charset="utf-8" src="40.forest-world.js?v=11"></script>
+<script charset="utf-8" src="40.forest-save.js?v=11"></script>
+<script charset="utf-8" src="40.forest-session.js?v=11"></script>
+<script charset="utf-8" src="40.forest-sync.js?v=11"></script>
+<script charset="utf-8" src="40.forest-input.js?v=11"></script>
+<script charset="utf-8" src="40.forest-nature.js?v=11"></script>
+<script charset="utf-8" src="40.forest-blocklayer.js?v=11"></script>
+<script charset="utf-8" src="40.forest-views.js?v=11"></script>
+<script charset="utf-8" src="40.forest-village-view.js?v=11"></script>
+<script charset="utf-8" src="40.forest-icons.js?v=11"></script>
+<script charset="utf-8" src="40.forest-fx.js?v=11"></script>
+<script charset="utf-8" src="40.forest-hud.js?v=11"></script>
+<script charset="utf-8" src="40.forest-admin.js?v=11"></script>
+<script charset="utf-8" src="40.forest-play.js?v=11"></script>
+<script charset="utf-8" src="40.forest-areas.js?v=11"></script>
+<script charset="utf-8" src="40.forest-areaview.js?v=11"></script>
+<script charset="utf-8" src="40.forest-areaplay.js?v=11"></script>
+<script charset="utf-8" src="40.forest-fishing.js?v=11"></script>
+<script charset="utf-8" src="40.forest-dungeon.js?v=11"></script>
+<script charset="utf-8" src="40.forest-monsters.js?v=11"></script>
+<script charset="utf-8" src="40.dongma-forest.js?v=13"></script>
 <script type="module">
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";

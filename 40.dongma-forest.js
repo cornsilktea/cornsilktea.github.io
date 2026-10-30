@@ -79,6 +79,7 @@ class FrGame {
         this.slotDrag = null;
         this.mapWindow = null;
         this.hover = new FrHoverCell();
+        this.guard = new FrPageGuard();
         this.lastSleepBoard = 0;
         this.world = null;
         this.session = null;
@@ -422,8 +423,9 @@ class FrGame {
         this.pouchWindow = this.windows.register(new FrPouchWindow(session, this.toast));
         this.dungeonWindow = this.windows.register(new FrDungeonWindow(session, this.toast));
         this.dungeonWindow.onEnter = (difficulty) => void this.startDungeon(difficulty);
-        this.dungeonWindow.onItem = (id) => { if (this.currencyWindow)
-            this.windows.openOnly(this.currencyWindow, () => this.currencyWindow.showItem(id)); };
+        const currency = this.currencyWindow;
+        [this.craftWindow, this.forgeWindow, this.cookWindow, this.ovenWindow, this.kitchenWindow, this.buildWindow, this.dungeonWindow, this.chestWindow, this.personalChestWindow].forEach((w) => { if (w)
+            w.onItem = (id) => currency.showInfo(id); });
     }
     enterGame() {
         if (!this.world || !this.session || !this.clock)
@@ -1161,7 +1163,7 @@ class FrGame {
             return;
         }
         const tier = this.session.bag.bestTier(task.toolKind);
-        const game = FrMiniGameFactory.create(task.kind, tier);
+        const game = FrMiniGameFactory.createVaried(task.kind, tier, this.random.next());
         if (!game) {
             this.toast.show(task.missingTool || "도구가 필요해요");
             return;

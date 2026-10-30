@@ -32,7 +32,10 @@ class FrWorld {
     FrTreeField.generate(terrain).forEach((spot) => this.trees.set(terrain.index(spot.x, spot.z), spot));
     this.sites = FrSiteBook.build(terrain);
     this.sites.forEach((site) => site.cells.forEach((c) => this.siteOfCell.set(terrain.index(c.x, c.z), site)));
+    this.sites.forEach((site) => { if (site.small) site.cells.forEach((c) => { for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) this.trees.delete(terrain.index(c.x + dx, c.z + dz)); }); });
   }
+
+  isSiteCell(x: number, z: number): boolean { return this.siteOfCell.has(this.terrain.index(x, z)); }
 
   isBuilt(siteId: string): boolean { return this.builtKeys.has(siteId); }
 

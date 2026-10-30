@@ -109,7 +109,25 @@ class FrMiniGameFactory {
     hardRock: (t) => (FrBalance.PICK_HARD_MASH[t] > 0 ? new FrMashGauge(FrBalance.PICK_HARD_MASH[t]) : null),
   };
 
+  private static readonly TOOL_FREE: ReadonlyArray<FrTaskKind> = ["shake", "gatherRing", "harvest"];
+  private static readonly KINDS: ReadonlyArray<(ease: number) => FrMiniGame> = [
+    (e) => new FrMashGauge(Math.round(14 - 6 * e)),
+    (e) => new FrCenterStop(0.12 + 0.12 * e, e < 0.5 ? 2 : 1),
+    (e) => new FrShrinkRing(0.1 + 0.06 * e),
+    (e) => new FrHoldRelease(0.18 + 0.12 * e),
+  ];
+
   static create(task: FrTaskKind, tier: FrTier): FrMiniGame | null {
     return FrMiniGameFactory.BUILDERS[task](tier);
+  }
+
+  static ease(task: FrTaskKind, tier: FrTier): number {
+    return FrMiniGameFactory.TOOL_FREE.indexOf(task) >= 0 ? 0.5 : tier / 3;
+  }
+
+  static createVaried(task: FrTaskKind, tier: FrTier, roll: number): FrMiniGame | null {
+    if (!FrMiniGameFactory.create(task, tier)) return null;
+    const pick = Math.min(FrMiniGameFactory.KINDS.length - 1, Math.floor(roll * FrMiniGameFactory.KINDS.length));
+    return FrMiniGameFactory.KINDS[pick](FrMiniGameFactory.ease(task, tier));
   }
 }

@@ -4,6 +4,18 @@ interface FrInputHandlers {
   key(code: string): void;
 }
 
+class FrPageGuard {
+  constructor() {
+    document.addEventListener("contextmenu", (event) => { if (!FrPageGuard.editable(event.target)) event.preventDefault(); });
+    document.addEventListener("selectstart", (event) => { if (!FrPageGuard.editable(event.target)) event.preventDefault(); });
+  }
+
+  private static editable(target: EventTarget | null): boolean {
+    const node = target as HTMLElement | null;
+    return !!node && !!node.closest && !!node.closest("input, textarea, select");
+  }
+}
+
 class FrHoverCell {
   x = 0;
   y = 0;

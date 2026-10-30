@@ -259,7 +259,7 @@ class FrTargetFinder {
         return empty ? { kind: "house", label: "집 짓기", cell: null, lot: lotIndex } : null;
     }
     cellTarget(cell, player) {
-        if (!this.world.terrain.diggable(cell.x, cell.z) || this.world.blocked(cell.x, cell.z) || this.world.blocks.top(this.world.terrain.index(cell.x, cell.z)) > 0)
+        if (!this.world.terrain.diggable(cell.x, cell.z) || this.world.blocked(cell.x, cell.z) || this.world.isSiteCell(cell.x, cell.z) || this.world.blocks.top(this.world.terrain.index(cell.x, cell.z)) > 0)
             return null;
         const here = player.cell();
         if (Math.abs(this.world.terrain.height(cell.x, cell.z) - this.world.terrain.height(here.x, here.z)) > 1)

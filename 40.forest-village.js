@@ -18,10 +18,10 @@ class FrSiteBook {
     static build(terrain) {
         const sites = [];
         const one = (def, n, name, x, z) => sites.push(new FrBuildSite(def, n, name, x, z, [{ x, z }]));
-        one("workbench", 1, "작업대", 55, 64);
-        one("forge", 1, "대장간", 52, 64);
-        one("oven", 1, "화덕", 55, 68);
-        one("kitchen", 1, "섬 부엌", 52, 68);
+        one("workbench", 1, "작업대", 47, 64);
+        one("forge", 1, "대장간", 47, 59);
+        one("oven", 1, "화덕", 55, 72);
+        one("kitchen", 1, "섬 부엌", 55, 77);
         one("farm_expand", 1, "텃밭 넓히기", 66, 78);
         one("farm_expand", 2, "텃밭 넓히기", 68, 78);
         FrSiteBook.bridges(terrain, sites);
