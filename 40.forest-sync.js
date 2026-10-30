@@ -51,6 +51,27 @@ class FrRoster {
         });
         return list;
     }
+    sleepRows(day, self) {
+        const rows = [self];
+        this.members.forEach((member, uid) => {
+            if (uid === self.uid || member.adm)
+                return;
+            const row = this.presence.get(uid);
+            const online = !!row && this.alive(uid);
+            const area = row ? row.area : "island";
+            rows.push({ uid, no: member.no, name: member.name, state: FrRoster.sleepStateOf(online, row, day), area, self: false });
+        });
+        return rows.sort((a, b) => a.no - b.no || a.name.localeCompare(b.name));
+    }
+    static sleepStateOf(online, row, day) {
+        if (!online || !row)
+            return "offline";
+        if (row.sleeping)
+            return "asleep";
+        if (row.day !== day)
+            return "idle";
+        return FrSleepVote.canSleep(FrBalance.DUSK_MINUTE, row.area) ? "awake" : "away";
+    }
 }
 FrRoster.STALE_MS = 75000;
 class FrMapNode {

@@ -1,16 +1,28 @@
 class FrSiteModels {
-  constructor(private readonly libs: ThreeLibs, private readonly world: FrWorld) {}
+  private static readonly STONE_COLORS: ReadonlySet<number> = new Set([0xb9bcc4, 0x8d9098, 0x9fa2aa, 0x7d808a, 0xaeb1b9, 0x8f929b, 0x6d707a, 0x7b7e88, 0x9a9da6, 0x6f727c]);
+  private static readonly WOOD_COLORS: ReadonlySet<number> = new Set([0x9a6a38, 0x6f4a26, 0x6b4a2a]);
+
+  constructor(private readonly libs: ThreeLibs, private readonly world: FrWorld, private readonly nature: FrNatureModels) {}
+
+  private surface(color: number): Three<"MeshLambertMaterial"> {
+    const T = this.libs.THREE;
+    if (FrSiteModels.STONE_COLORS.has(color)) return new T.MeshLambertMaterial({ color, map: FrSurfaceTextures.stone(this.libs) });
+    if (FrSiteModels.WOOD_COLORS.has(color)) return new T.MeshLambertMaterial({ color: new T.Color(color).multiplyScalar(1.35), map: FrSurfaceTextures.wood(this.libs) });
+    return new T.MeshLambertMaterial({ color });
+  }
 
   fill(site: FrBuildSite, marker: Three<"Group">): void {
     const T = this.libs.THREE;
     const B = FrTerrainData.BLOCK;
     const originX = (site.x + 0.5) * B, originZ = (site.z + 0.5) * B, originY = this.world.terrain.surfaceY(site.x, site.z);
-    const lit = (color: number) => new T.MeshLambertMaterial({ color });
+    const lit = (color: number) => this.surface(color);
     const glow = (color: number) => new T.MeshBasicMaterial({ color });
     const put = (w: number, h: number, d: number, x: number, y: number, z: number, material: Three<"Material">, turn = 0) => {
       const mesh = new T.Mesh(new T.BoxGeometry(w, h, d), material);
       mesh.position.set(x, y, z);
       mesh.rotation.y = turn;
+      mesh.castShadow = !(material as Three<"MeshBasicMaterial">).isMeshBasicMaterial;
+      mesh.receiveShadow = true;
       marker.add(mesh);
       return mesh;
     };
@@ -54,9 +66,15 @@ class FrSiteModels {
         put(0.7, 1.2, 0.12, cx, sum.y + 6.2, cz + B - 0.15, glow(0xffe29a));
       },
       lamp: () => {
-        put(0.28, 4.2, 0.28, 0, 2.1, 0, lit(0x3d3f46));
-        put(0.9, 0.9, 0.9, 0, 4.6, 0, glow(0xffe29a));
-        put(1.1, 0.2, 1.1, 0, 5.15, 0, lit(0x3d3f46));
+        if (this.nature.has("lantern")) {
+          const lantern = this.nature.build("lantern");
+          lantern.scale.setScalar(1.3);
+          marker.add(lantern);
+          put(0.5, 0.5, 0.5, 0, 4.6, 0, glow(0xffe29a));
+        } else {
+          put(0.28, 4.2, 0.28, 0, 2.1, 0, lit(0x3d3f46));
+          put(0.9, 0.9, 0.9, 0, 4.6, 0, glow(0xffe29a));
+        }
         const halo = new T.Sprite(new T.SpriteMaterial({ map: FrFxTextures.radial(this.libs, "rgba(255,220,140,0.55)", "rgba(255,220,140,0)", 64), blending: T.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.7 }));
         halo.scale.set(4.2, 4.2, 1);
         halo.position.y = 4.6;

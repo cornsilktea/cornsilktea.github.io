@@ -1,8 +1,9 @@
 "use strict";
 class FrAreaScene {
-    constructor(libs, area, material, light) {
+    constructor(libs, area, material, light, nature) {
         this.libs = libs;
         this.area = area;
+        this.nature = nature;
         this.chunks = new Map();
         this.featureGroups = new Map();
         this.torchFlames = [];
@@ -74,17 +75,24 @@ class FrAreaScene {
     tree(holder, feature, fruit) {
         const T = this.libs.THREE;
         const scale = 0.85 + (feature.variant % 3) * 0.12;
-        const trunk = new T.Mesh(new T.BoxGeometry(0.55, 2.6, 0.55).translate(0, 1.3, 0), this.mat(0x7a5230));
-        const crown = new T.Mesh(new T.IcosahedronGeometry(1.55, 0).scale(1, 0.92, 1).translate(0, 3.5, 0), this.mat(fruit ? 0x3f8f3e : 0x2f7a35 + feature.variant * 0x010400));
-        trunk.scale.setScalar(scale);
-        crown.scale.setScalar(scale);
-        holder.add(trunk, crown);
+        const name = fruit ? "Tree_1_A_Color1" : FrAreaScene.JUNGLE_TREES[feature.variant % FrAreaScene.JUNGLE_TREES.length];
+        if (this.nature.has(name)) {
+            const model = this.nature.build(name);
+            model.scale.setScalar(scale * FrAreaScene.TREE_SCALE);
+            model.rotation.y = feature.variant * 1.3;
+            holder.add(model);
+        }
+        else {
+            const crown = new T.Mesh(new T.IcosahedronGeometry(1.55, 0).translate(0, 3.5, 0), this.mat(0x3f8f3e));
+            crown.scale.setScalar(scale);
+            holder.add(crown);
+        }
         if (fruit) {
             const colors = [0xe5483f, 0xf29a2e, 0xc8d95a, 0xf7a9a0, 0xf5b93a];
-            for (let i = 0; i < 6; i++) {
-                const angle = (i / 6) * Math.PI * 2 + feature.variant, lift = 3.0 + (i % 3) * 0.55;
-                const apple = new T.Mesh(new T.SphereGeometry(0.28, 8, 6), new T.MeshBasicMaterial({ color: colors[(feature.variant + (i % 2)) % colors.length] }));
-                apple.position.set(Math.cos(angle) * 1.35 * scale, lift * scale, Math.sin(angle) * 1.35 * scale);
+            for (let i = 0; i < 8; i++) {
+                const angle = (i / 8) * Math.PI * 2 + feature.variant, lift = 3.6 + (i % 3) * 0.7;
+                const apple = new T.Mesh(new T.SphereGeometry(0.32, 10, 8), new T.MeshLambertMaterial({ color: colors[(feature.variant + (i % 2)) % colors.length], emissive: 0x331100 }));
+                apple.position.set(Math.cos(angle) * 2.0 * scale, lift * scale, Math.sin(angle) * 2.0 * scale);
                 holder.add(apple);
             }
         }
@@ -202,3 +210,5 @@ class FrAreaScene {
         this.group.clear();
     }
 }
+FrAreaScene.JUNGLE_TREES = ["Tree_2_B_Color1", "Tree_1_B_Color1", "Tree_2_A_Color1"];
+FrAreaScene.TREE_SCALE = 1.45;

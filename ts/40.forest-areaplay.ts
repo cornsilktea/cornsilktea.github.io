@@ -113,6 +113,7 @@ class FrAreaOutcome {
     if (feature && stat[feature.kind]) this.session.stats.add(stat[feature.kind]);
     if (feature) {
       feature.availableAt = this.absoluteMinute() + cooldown;
+      if (feature.kind === "jungleTree") feature.felled = true;
       if (after === "gone") this.scene.setTaken(feature, true); else this.scene.showFruitless(feature);
     }
     return this.describe(gains) + (lost > 0 ? " · 가방이 가득 차서 " + lost + "개를 놓고 왔어요" : "");

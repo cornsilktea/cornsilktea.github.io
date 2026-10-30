@@ -35,9 +35,17 @@
   #hudClockBox { position: fixed; top: 8px; right: 12px; z-index: 5; text-align: center; font-size: 17px; font-variant-numeric: tabular-nums; }
   #hudButtons { position: fixed; top: 52px; right: 12px; z-index: 5; display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
   #hudButtons button { font: inherit; font-size: 14px; color: #fff; cursor: pointer; border-top: 0; border-right: 0; border-bottom: 0; }
-  #hudAp { position: fixed; top: 54px; left: 12px; z-index: 5; width: 190px; font-size: 14px; }
-  #hudApBar { height: 10px; margin-top: 4px; background: rgba(255,255,255,.2); border-radius: 5px; overflow: hidden; }
-  #hudApFill { height: 100%; background: linear-gradient(90deg, #F2C14E, #D97B4F); width: 100%; }
+  #hudAp { position: fixed; left: 50%; bottom: 76px; transform: translateX(-50%); z-index: 5; width: 456px; max-width: 94vw; }
+  #hudApBar { position: relative; height: 18px; background: rgba(16, 24, 38, .75); border: 2px solid rgba(255,255,255,.35); border-radius: 9px; overflow: hidden; }
+  #hudApFill { position: absolute; left: 0; top: 0; bottom: 0; background: #5FC84E; width: 100%; transition: width .25s, background-color .25s; }
+  #hudApFill.mid { background: #F29A2E; }
+  #hudApFill.low { background: #E5483F; }
+  #hudApText { position: relative; text-align: center; font-size: 13px; font-weight: 900; line-height: 14px; color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.8); font-variant-numeric: tabular-nums; }
+  .fr-cell[draggable="true"] { cursor: grab; }
+  .fr-cell.drop-over { box-shadow: 0 0 0 3px #9BE08A; }
+  .fr-map canvas { display: block; width: min(100%, 64vh); height: auto; margin: 0 auto; border-radius: 8px; image-rendering: pixelated; }
+  .fr-map-legend { display: flex; flex-wrap: wrap; gap: 10px; font-size: 13px; color: #C9D6E4; margin-top: 8px; }
+  .fr-map-legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 4px; vertical-align: -1px; }
   #hudAreaBox { position: fixed; top: 8px; left: 50%; transform: translateX(-50%); z-index: 5; text-align: center; font-size: 16px; white-space: nowrap; }
   #hudSleep { font-size: 13px; margin-top: 6px; color: #FFE2C9; }
   #toast { position: fixed; left: 50%; top: 104px; transform: translateX(-50%); z-index: 12; max-width: 88vw; text-align: center; font-size: 16px; font-weight: 800; background: rgba(16, 24, 38, .88); border-left: 3px solid #D97B4F; border-radius: 6px; padding: 8px 14px; pointer-events: none; }
@@ -46,7 +54,7 @@
   #joyBase { position: absolute; left: 24px; bottom: 24px; width: 132px; height: 132px; border-radius: 50%; background: rgba(255,255,255,.14); border: 2px solid rgba(255,255,255,.3); pointer-events: auto; touch-action: none; display: none; }
   #joyKnob { position: absolute; left: 41px; top: 41px; width: 50px; height: 50px; border-radius: 50%; background: rgba(255,255,255,.55); }
   #btnAction { position: absolute; right: 26px; bottom: 26px; width: 104px; height: 104px; border-radius: 50%; border: 3px solid rgba(255,255,255,.6); background: rgba(217,123,79,.85); color: #fff; font: inherit; font-size: 20px; font-weight: 800; pointer-events: auto; touch-action: none; }
-  @media (pointer: coarse) { #joyBase { display: block; } #hotbar { bottom: 160px; } }
+  @media (pointer: coarse) { #joyBase { display: block; } #hotbar { bottom: 160px; } #hudAp { bottom: 226px; } }
   .fr-cell { position: relative; width: 52px; height: 52px; border: 2px solid #B8BEC9; border-radius: 6px; background: rgba(16, 24, 38, .8); display: flex; align-items: center; justify-content: center; cursor: pointer; flex: 0 0 auto; }
   .fr-cell.empty { border-color: rgba(255,255,255,.18); }
   .fr-cell.selected { box-shadow: 0 0 0 3px #D97B4F; }
@@ -139,6 +147,30 @@
   .fr-board-line { margin: 6px 0; font-weight: 800; }
   .fr-board-store { display: flex; flex-wrap: wrap; gap: 6px; max-width: 44vw; }
   .fr-board-item { display: inline-flex; align-items: center; gap: 3px; font-size: 14px; }
+  .fr-info { z-index: 24; width: min(560px, 92vw); max-height: 76vh; }
+  .fr-info .fr-detail h3 { font-size: 14px; color: #FFD7BF; margin-bottom: 6px; }
+  .fr-uses { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 6px; }
+  .fr-use { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 4px; background: rgba(255,255,255,.06); border-radius: 8px; text-align: center; }
+  .fr-use.link { cursor: pointer; }
+  .fr-use.link:hover { background: rgba(217,123,79,.25); }
+  .fr-use-name { font-size: 13px; font-weight: 800; }
+  .fr-use-kind { font-size: 11px; color: #A9B8C8; }
+  .fr-use-mark { font-size: 26px; line-height: 34px; }
+  .fr-pouch-item { cursor: pointer; }
+  .fr-pouch-item.picked { box-shadow: 0 0 0 3px #D97B4F; }
+  .fr-sleep-board { position: fixed; left: 0; top: 0; bottom: 0; width: 50vw; z-index: 41; padding: 56px 28px 24px; overflow-y: auto; background: linear-gradient(90deg, rgba(3,6,16,.55) 0%, rgba(3,6,16,.35) 75%, rgba(3,6,16,0) 100%); display: flex; flex-direction: column; gap: 8px; }
+  .fr-sleep-title { font-size: 22px; font-weight: 900; color: #DCE6FF; }
+  .fr-sleep-summary { font-size: 15px; font-weight: 800; color: #FFE2C9; }
+  .fr-sleep-legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 13px; color: #B8C4D6; }
+  .fr-sleep-legend span { display: inline-flex; align-items: center; gap: 5px; }
+  .fr-sleep-list { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+  .fr-sleep-row { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-radius: 8px; background: rgba(255,255,255,.05); font-size: 17px; }
+  .fr-sleep-row.me { background: rgba(217,123,79,.22); }
+  .fr-sleep-dot { flex: 0 0 auto; width: 14px; height: 14px; border-radius: 50%; display: inline-block; }
+  .fr-sleep-name { font-weight: 800; flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fr-sleep-state { font-size: 13px; color: #B8C4D6; white-space: nowrap; }
+  .fr-sleep-wake { align-self: flex-start; margin-top: 8px; }
+  @media (max-width: 720px) { .fr-sleep-board { width: 70vw; padding: 52px 14px 16px; } .fr-sleep-row { font-size: 15px; } }
   .st-input { width: 100%; font: inherit; font-size: 18px; padding: 10px 12px; border-radius: 8px; border: 2px solid rgba(255,255,255,.3); background: rgba(0,0,0,.35); color: #fff; margin: 8px 0; text-align: center; }
   @media (max-width: 720px) { .fr-cols { grid-template-columns: 1fr; } .fr-grid { grid-template-columns: repeat(auto-fill, 52px); } }
 </style>
@@ -151,8 +183,8 @@
 <div id="hurt"></div>
 <div id="hud" hidden>
   <div id="hudClockBox" class="hud-box"><div id="hudClock">06:00 · 1일째</div></div>
-  <div id="hudButtons"><button type="button" class="hud-box" id="btnBag">가방 (I)</button><button type="button" class="hud-box" id="btnCurrency">재화 (C)</button><button type="button" class="hud-box" id="btnBook">레시피 (K)</button><button type="button" class="hud-box" id="btnStats">기록판 (L)</button><button type="button" class="hud-box" id="btnSleep" hidden>잠자기 (Z)</button><button type="button" class="hud-box" id="btnAdmin" hidden>운영 (F2)</button></div>
-  <div id="hudAp" class="hud-box"><div id="hudApText">⚡ 100 / 100</div><div id="hudApBar"><div id="hudApFill"></div></div></div>
+  <div id="hudButtons"><button type="button" class="hud-box" id="btnBook">레시피 (R)</button><button type="button" class="hud-box" id="btnStats">기록판 (Y)</button><button type="button" class="hud-box" id="btnCurrency">재화 (U)</button><button type="button" class="hud-box" id="btnBag">가방 (I)</button><button type="button" class="hud-box" id="btnMap">지도 (M)</button><button type="button" class="hud-box" id="btnSleep" hidden>잠자기 (Z)</button><button type="button" class="hud-box" id="btnAdmin" hidden>운영 (F2)</button></div>
+  <div id="hudAp"><div id="hudApBar"><div id="hudApFill"></div><div id="hudApText">100 / 100</div></div></div>
   <div id="hudHp" class="hud-box" hidden><div id="hudHpText">❤ 100 / 100</div><div id="hudHpBar"><div id="hudHpFill"></div></div></div>
   <div id="hudAreaBox" class="hud-box"><div id="hudArea">마을</div><div id="hudSleep" hidden></div></div>
   <div id="hotbar"></div>
@@ -184,8 +216,11 @@
       <h2>조작 방법</h2>
       <div class="st-keys">
         <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd></span><span>이동</span>
-        <span><kbd>Space</kbd></span><span>나무 베기 · 땅 파기 · 창고 · 요리 · 건설 (오른쪽 큰 버튼)</span>
-        <span><kbd>I</kbd> <kbd>Z</kbd> <kbd>1</kbd>~<kbd>8</kbd></span><span>가방 · 잠자기(밤) · 핫바 음식 먹기</span>
+        <span><kbd>Space</kbd></span><span>나무 베기 · 땅 파기 · 창고 · 요리 (오른쪽 큰 버튼)</span>
+        <span><kbd>클릭</kbd></span><span>짓기 · 블록 놓기 · 집터 · 창고와 작업대 열기 (화면을 눌러요)</span>
+        <span><kbd>R</kbd> <kbd>Y</kbd> <kbd>U</kbd> <kbd>I</kbd> <kbd>M</kbd></span><span>레시피 · 기록판 · 재화 · 가방 · 지도</span>
+        <span><kbd>Q</kbd> <kbd>E</kbd> <kbd>T</kbd></span><span>블록 높이 내리기 · 올리기 · 돌리기</span>
+        <span><kbd>Z</kbd> <kbd>1</kbd>~<kbd>8</kbd></span><span>잠자기(밤) · 핫바 고르기(두 번 누르면 먹기)</span>
         <span><kbd>태블릿</kbd></span><span>왼쪽 조이스틱으로 이동, 오른쪽 큰 버튼으로 행동</span>
       </div>
     </div>
@@ -202,38 +237,39 @@
 </div>
 <script charset="utf-8" src="character-kit.js?v=20261011"></script>
 <script charset="utf-8" src="fold-card.js"></script>
-<script charset="utf-8" src="40.forest-furniture.js?v=9"></script>
-<script charset="utf-8" src="40.forest-data.js?v=9"></script>
-<script charset="utf-8" src="40.forest-rules.js?v=9"></script>
-<script charset="utf-8" src="40.forest-clock.js?v=9"></script>
-<script charset="utf-8" src="40.forest-minigame.js?v=9"></script>
-<script charset="utf-8" src="40.forest-terrain.js?v=9"></script>
+<script charset="utf-8" src="40.forest-furniture.js?v=10"></script>
+<script charset="utf-8" src="40.forest-data.js?v=10"></script>
+<script charset="utf-8" src="40.forest-rules.js?v=10"></script>
+<script charset="utf-8" src="40.forest-clock.js?v=10"></script>
+<script charset="utf-8" src="40.forest-minigame.js?v=10"></script>
+<script charset="utf-8" src="40.forest-terrain.js?v=10"></script>
 <script charset="utf-8" src="room-kit.js?v=11"></script>
-<script charset="utf-8" src="40.forest-stream.js?v=9"></script>
-<script charset="utf-8" src="40.forest-net.js?v=9"></script>
-<script charset="utf-8" src="40.forest-blocks.js?v=9"></script>
-<script charset="utf-8" src="40.forest-farm.js?v=9"></script>
-<script charset="utf-8" src="40.forest-village.js?v=9"></script>
-<script charset="utf-8" src="40.forest-world.js?v=9"></script>
-<script charset="utf-8" src="40.forest-save.js?v=9"></script>
-<script charset="utf-8" src="40.forest-session.js?v=9"></script>
-<script charset="utf-8" src="40.forest-sync.js?v=9"></script>
-<script charset="utf-8" src="40.forest-input.js?v=9"></script>
-<script charset="utf-8" src="40.forest-blocklayer.js?v=9"></script>
-<script charset="utf-8" src="40.forest-views.js?v=9"></script>
-<script charset="utf-8" src="40.forest-village-view.js?v=9"></script>
-<script charset="utf-8" src="40.forest-icons.js?v=9"></script>
-<script charset="utf-8" src="40.forest-fx.js?v=9"></script>
-<script charset="utf-8" src="40.forest-hud.js?v=9"></script>
-<script charset="utf-8" src="40.forest-admin.js?v=9"></script>
-<script charset="utf-8" src="40.forest-play.js?v=9"></script>
-<script charset="utf-8" src="40.forest-areas.js?v=9"></script>
-<script charset="utf-8" src="40.forest-areaview.js?v=9"></script>
-<script charset="utf-8" src="40.forest-areaplay.js?v=9"></script>
-<script charset="utf-8" src="40.forest-fishing.js?v=9"></script>
-<script charset="utf-8" src="40.forest-dungeon.js?v=9"></script>
-<script charset="utf-8" src="40.forest-monsters.js?v=9"></script>
-<script charset="utf-8" src="40.dongma-forest.js?v=11"></script>
+<script charset="utf-8" src="40.forest-stream.js?v=10"></script>
+<script charset="utf-8" src="40.forest-net.js?v=10"></script>
+<script charset="utf-8" src="40.forest-blocks.js?v=10"></script>
+<script charset="utf-8" src="40.forest-farm.js?v=10"></script>
+<script charset="utf-8" src="40.forest-village.js?v=10"></script>
+<script charset="utf-8" src="40.forest-world.js?v=10"></script>
+<script charset="utf-8" src="40.forest-save.js?v=10"></script>
+<script charset="utf-8" src="40.forest-session.js?v=10"></script>
+<script charset="utf-8" src="40.forest-sync.js?v=10"></script>
+<script charset="utf-8" src="40.forest-input.js?v=10"></script>
+<script charset="utf-8" src="40.forest-nature.js?v=10"></script>
+<script charset="utf-8" src="40.forest-blocklayer.js?v=10"></script>
+<script charset="utf-8" src="40.forest-views.js?v=10"></script>
+<script charset="utf-8" src="40.forest-village-view.js?v=10"></script>
+<script charset="utf-8" src="40.forest-icons.js?v=10"></script>
+<script charset="utf-8" src="40.forest-fx.js?v=10"></script>
+<script charset="utf-8" src="40.forest-hud.js?v=10"></script>
+<script charset="utf-8" src="40.forest-admin.js?v=10"></script>
+<script charset="utf-8" src="40.forest-play.js?v=10"></script>
+<script charset="utf-8" src="40.forest-areas.js?v=10"></script>
+<script charset="utf-8" src="40.forest-areaview.js?v=10"></script>
+<script charset="utf-8" src="40.forest-areaplay.js?v=10"></script>
+<script charset="utf-8" src="40.forest-fishing.js?v=10"></script>
+<script charset="utf-8" src="40.forest-dungeon.js?v=10"></script>
+<script charset="utf-8" src="40.forest-monsters.js?v=10"></script>
+<script charset="utf-8" src="40.dongma-forest.js?v=12"></script>
 <script type="module">
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";

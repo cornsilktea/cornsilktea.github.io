@@ -4,6 +4,31 @@ interface FrInputHandlers {
   key(code: string): void;
 }
 
+class FrHoverCell {
+  x = 0;
+  y = 0;
+  active = false;
+  dirty = false;
+  cell: FrPoint | null = null;
+
+  moved(x: number, y: number): void {
+    this.x = x;
+    this.y = y;
+    this.active = true;
+    this.dirty = true;
+  }
+
+  left(): void {
+    this.active = false;
+    this.cell = null;
+  }
+
+  settle(cell: FrPoint | null): void {
+    this.cell = cell;
+    this.dirty = false;
+  }
+}
+
 class FrJoystick {
   static readonly RADIUS = 52;
   static readonly DEAD_ZONE = 0.18;

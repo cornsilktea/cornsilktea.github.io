@@ -76,6 +76,10 @@ class FrGame {
         this.clips = new Map();
         this.backend = new FrLocalBackend(false);
         this.uid = "local";
+        this.slotDrag = null;
+        this.mapWindow = null;
+        this.hover = new FrHoverCell();
+        this.lastSleepBoard = 0;
         this.world = null;
         this.session = null;
         this.clock = null;
@@ -154,7 +158,8 @@ class FrGame {
             this.dungeonData[kind] = (await (await fetch("assets/forest/dungeon-cave-" + kind + ".json?v=1")).json());
         this.assets = new CharacterAssets(this.libs);
         const tools = new FrToolClips(this.libs);
-        await Promise.all([this.assets.load(), tools.load()]);
+        this.nature = new FrNatureModels(this.libs);
+        await Promise.all([this.assets.load(), tools.load(), this.nature.load()]);
         this.assets.clips.forEach((clip, name) => this.clips.set(name, clip));
         tools.clips.forEach((clip, name) => this.clips.set(name, clip));
         this.factory = new CharacterModelFactory(this.libs, this.assets);
@@ -163,11 +168,13 @@ class FrGame {
         this.fishing = new FrFishingScreen(this.random);
         this.monsterAssets = new FrMonsterAssets(this.libs);
         this.profile = new PlayerProfile();
-        const editor = new ProfileEditor(this.libs, this.factory, this.assets, this.profile);
-        editor.mount(FrDom.el("profileHost"));
+        this.editor = new ProfileEditor(this.libs, this.factory, this.assets, this.profile);
+        this.editor.mount(FrDom.el("profileHost"));
+        this.editor.setActive(true);
         FoldCard.bindAll(document);
+        this.sleepBoard = new FrSleepBoard(() => void this.toggleSleep());
         const preview = new FrWorld("preview", new FrTerrainData(this.terrainFile), new FrLocalBackend(false));
-        this.view = new FrWorldView(this.libs, FrDom.el("view"), preview, this.touch);
+        this.view = new FrWorldView(this.libs, FrDom.el("view"), preview, this.touch, this.nature);
         this.view.onVillageLevel = (level) => this.toast.show("마을이 " + level + "단계 " + FrVillageLevels.label(level) + "이(가) 됐어요!", 3600);
         this.backdrop = new FrMenuBackdrop(this.libs, this.view, this.factory, this.clips, preview.terrain.anchors.campfire);
         this.backdrop.start();
@@ -260,8 +267,10 @@ class FrGame {
             save.queue(session.toSave());
         }
         FrExpedition.clear();
+        session.ap.unlimited = session.admin;
         if (loaded.lastAt === 0) {
-            session.gainAll(FrFarmRules.FIRST_SEEDS);
+            for (const id of Object.keys(FrFarmRules.FIRST_SEEDS))
+                await world.putPublic(id, FrFarmRules.FIRST_SEEDS[id], nick);
             save.queue(session.toSave());
         }
         this.view.useWorld(world);
@@ -392,7 +401,9 @@ class FrGame {
         }, 700);
     }
     buildWindows(session) {
-        this.bagWindow = this.windows.register(new FrBagWindow(session, this.toast));
+        this.slotDrag = new FrSlotDrag(session);
+        this.bagWindow = this.windows.register(new FrBagWindow(session, this.toast, this.slotDrag));
+        this.mapWindow = this.windows.register(new FrMapWindow(session, this.toast, () => this.mapMarks()));
         this.chestWindow = this.windows.register(new FrChestWindow(session, this.toast));
         this.personalChestWindow = this.windows.register(new FrPersonalChestWindow(session, this.toast));
         this.personalChestWindow.onRemove = () => { if (this.personalChestCell)
@@ -425,6 +436,7 @@ class FrGame {
         }
         this.backdrop.stop();
         this.start.hide();
+        this.editor.setActive(false);
         FrDom.el("hud").hidden = false;
         FrDom.el("controls").hidden = false;
         const player = new FrPlayerBody(this.world);
@@ -446,8 +458,9 @@ class FrGame {
             this.actedDay = this.clock.day();
         window.addEventListener("pagehide", () => { if (this.presencePublisher)
             void this.presencePublisher.leave(); });
-        this.hotbar = new FrHotbar(this.session, (slot) => this.useHotbar(slot));
+        this.hotbar = new FrHotbar(this.session, (slot) => this.useHotbar(slot), this.slotDrag);
         FrDom.el("btnBag").addEventListener("click", () => this.toggleBag());
+        FrDom.el("btnMap").addEventListener("click", () => this.toggleWindow(this.mapWindow));
         FrDom.el("btnCurrency").addEventListener("click", () => this.toggleWindow(this.currencyWindow));
         FrDom.el("btnStats").addEventListener("click", () => this.toggleWindow(this.statsWindow));
         FrDom.el("btnBook").addEventListener("click", () => this.toggleWindow(this.bookWindow));
@@ -459,6 +472,9 @@ class FrGame {
         this.view.rig.snap(new this.libs.THREE.Vector3(player.x, player.y, player.z));
         this.lastDay = this.clock.day();
         this.view.canvas.addEventListener("click", (event) => this.clickWorld(event.clientX, event.clientY));
+        this.view.canvas.addEventListener("pointermove", (event) => { if (event.pointerType === "mouse")
+            this.hover.moved(event.clientX, event.clientY); });
+        this.view.canvas.addEventListener("pointerleave", () => this.hover.left());
         this.input.enabled = true;
         this.playing = true;
         this.refreshHud();
@@ -467,8 +483,8 @@ class FrGame {
     refreshHud() {
         if (!this.session || !this.hud || !this.hotbar)
             return;
-        this.hud.showAp(this.session.ap);
         this.hotbar.render();
+        this.hud.showAp(this.session.ap, this.session.admin);
     }
     clickWorld(clientX, clientY) {
         if (!this.playing || !this.session || !this.player || !this.finder || this.currentTask || this.windows.anyOpen() || this.session.sleeping)
@@ -489,14 +505,12 @@ class FrGame {
         const pick = this.view.pick(clientX, clientY);
         if (!pick)
             return;
-        if (pick.kind === "ground" && pick.cell) {
-            const blockTarget = this.finder.blockTarget(pick.cell, this.finderContext());
-            const B = FrTerrainData.BLOCK;
-            if (blockTarget && Math.hypot(this.player.x - (pick.cell.x + 0.5) * B, this.player.z - (pick.cell.z + 0.5) * B) <= 6) {
-                this.act(blockTarget);
-                return;
-            }
+        if (this.adminNode.state.lock && !this.isAdmin()) {
+            this.toast.show("선생님이 잠시 멈췄어요. 걷기만 할 수 있어요.");
+            return;
         }
+        if (pick.kind === "ground" && pick.cell && this.clickBuild(pick.cell))
+            return;
         const result = this.finder.fromPick(pick, this.player);
         if (result.far) {
             this.toast.show("조금 더 가까이 가서 눌러 주세요");
@@ -504,11 +518,52 @@ class FrGame {
         }
         if (!result.target)
             return;
-        if (this.adminNode.state.lock && !this.isAdmin()) {
-            this.toast.show("선생님이 잠시 멈췄어요. 걷기만 할 수 있어요.");
-            return;
-        }
         this.act(result.target);
+    }
+    clickBuild(cell) {
+        if (!this.finder || !this.player || !this.session)
+            return false;
+        const context = this.finderContext();
+        const blockTarget = this.finder.blockTarget(cell, context);
+        if (blockTarget) {
+            if (this.withinBuildReach(cell)) {
+                this.act(blockTarget);
+                return true;
+            }
+            if (context.held) {
+                this.toast.show("조금 더 가까이 가서 눌러 주세요");
+                return true;
+            }
+        }
+        if (context.held)
+            return false;
+        const lot = this.finder.lotTargetAt(cell, this.player, context);
+        if (lot.far) {
+            this.toast.show("집터 가까이 가서 눌러 주세요");
+            return true;
+        }
+        if (!lot.target)
+            return false;
+        this.act(lot.target);
+        return true;
+    }
+    withinBuildReach(cell) {
+        if (!this.player)
+            return false;
+        const B = FrTerrainData.BLOCK;
+        return Math.hypot(this.player.x - (cell.x + 0.5) * B, this.player.z - (cell.z + 0.5) * B) <= FrTargetFinder.BUILD_REACH;
+    }
+    hoverPlacement() {
+        if (!this.finder || !this.session || !this.session.heldBlock() || !this.hover.active)
+            return null;
+        if (this.hover.dirty) {
+            const pick = this.view.pick(this.hover.x, this.hover.y);
+            this.hover.settle(pick && pick.kind === "ground" && pick.cell ? pick.cell : null);
+        }
+        const cell = this.hover.cell;
+        if (!cell || !this.withinBuildReach(cell))
+            return null;
+        return this.finder.blockTarget(cell, this.finderContext());
     }
     pressFeedback(game, hitsBefore) {
         const hitsNow = game instanceof FrCenterStop ? Math.round(game.progress() * game.hitsNeeded) : hitsBefore;
@@ -572,23 +627,27 @@ class FrGame {
             this.toggleBag();
             return;
         }
-        if (code === "KeyK") {
+        if (code === "KeyR") {
             this.toggleWindow(this.bookWindow);
             return;
         }
-        if (code === "KeyC") {
+        if (code === "KeyU") {
             this.toggleWindow(this.currencyWindow);
             return;
         }
-        if (code === "KeyL") {
+        if (code === "KeyY") {
             this.toggleWindow(this.statsWindow);
             return;
         }
-        if (code === "KeyR") {
+        if (code === "KeyM") {
+            this.toggleWindow(this.mapWindow);
+            return;
+        }
+        if (code === "KeyE") {
             this.adjustLevel(1);
             return;
         }
-        if (code === "KeyF") {
+        if (code === "KeyQ") {
             this.adjustLevel(-1);
             return;
         }
@@ -654,7 +713,7 @@ class FrGame {
         if (already && FrFoodRules.canEat(item.id))
             this.toast.show(this.session.eat(item.id) ? "냠냠! 행동력이 찼어요" : "행동력이 가득해요");
         else if (item.id.indexOf("block_") === 0 || FrFurnitureCatalog.isFurniture(item.id))
-            this.toast.show(FrItemNames.label(item.id) + " — 앞 칸에 놓아요 (R/F 높이, T 돌리기)");
+            this.toast.show(FrItemNames.label(item.id) + " — 놓을 칸을 눌러요 (Q/E 높이, T 돌리기)");
         else
             this.toast.show(FrItemNames.label(item.id) + (FrFoodRules.canEat(item.id) ? " — 한 번 더 누르면 먹어요" : ""));
     }
@@ -680,9 +739,9 @@ class FrGame {
     adjustLevel(direction) {
         if (!this.player || !this.world || !this.session || !this.session.heldBlock())
             return;
-        const front = this.player.frontCell();
-        const current = FrBlockRules.chooseLevel(this.world, front.x, front.z, this.levelPick);
-        this.levelPick = FrBlockRules.stepLevel(this.world, front.x, front.z, current, direction);
+        const cell = this.hover.cell || this.player.frontCell();
+        const current = FrBlockRules.chooseLevel(this.world, cell.x, cell.z, this.levelPick);
+        this.levelPick = FrBlockRules.stepLevel(this.world, cell.x, cell.z, current, direction);
     }
     async placeHere(target) {
         if (!this.session || !this.world || !target.plan || !target.check)
@@ -783,11 +842,13 @@ class FrGame {
             return;
         }
         if (target.kind === "lot" && target.lot !== undefined) {
-            void this.claimLot(target.lot);
+            if (window.confirm("이 집터를 내 집터로 정할까요? 한 사람에 하나만 정할 수 있어요."))
+                void this.claimLot(target.lot);
             return;
         }
         if (target.kind === "house" && target.lot !== undefined) {
-            void this.buildHouse(target.lot);
+            if (window.confirm("목재 30 · 돌 20 · 노끈 10 으로 작은 집을 지을까요?"))
+                void this.buildHouse(target.lot);
             return;
         }
         if (target.kind === "portal" && target.portal) {
@@ -844,6 +905,7 @@ class FrGame {
     setupFight(area, scene) {
         const terrain = area.terrain;
         this.fight = new FrDungeonFight(this.pendingDifficulty, this.random, area.spawnSpots, (x, z) => terrain.top(terrain.cellOf(x), terrain.cellOf(z)) === "C", this.session ? this.session.pity.dungeon || 0 : 0);
+        this.fight.invincible = !!this.session && this.session.admin;
         this.monsterLayer = new FrMonsterLayer(this.libs, scene.group, this.monsterAssets, this.clips);
         this.fightEnding = false;
         FrDom.el("btnAttack").hidden = false;
@@ -945,7 +1007,7 @@ class FrGame {
             const data = this.dungeonData[FrDungeonInfo.KIND[this.pendingDifficulty]];
             light = new FrCaveLight(data.torches, data.kind === "moss" ? [0.8, 1.1, 0.85] : data.kind === "crystal" ? [0.8, 0.95, 1.2] : [1.15, 0.85, 0.8]);
         }
-        const scene = new FrAreaScene(this.libs, area, this.view.groundMaterial(), light);
+        const scene = new FrAreaScene(this.libs, area, this.view.groundMaterial(), light, this.nature);
         scene.syncAvailability(this.clock.absoluteMinute());
         if (this.areaScene)
             this.view.hideArea();
@@ -1155,14 +1217,26 @@ class FrGame {
         if (!this.session || !this.clock)
             return [];
         const self = { uid: this.uid, name: this.session.nick, area: this.session.area, sleeping: this.session.sleeping, actedToday: true };
-        const others = this.roster.asPresences(this.clock.day(), this.uid, self);
-        return this.isAdmin() ? others.filter((p) => p.uid !== this.uid) : others;
+        const everyone = this.roster.asPresences(this.clock.day(), this.uid, self);
+        return this.isAdmin() && !this.session.sleeping ? everyone.filter((p) => p.uid !== this.uid) : everyone;
+    }
+    mapMarks() {
+        const onIsland = !this.areaWorld;
+        const me = this.player && onIsland && this.session ? { x: this.player.x / FrTerrainData.BLOCK, z: this.player.z / FrTerrainData.BLOCK, name: "나" } : null;
+        return { me, others: FrIslandMapPainter.othersOf(this.roster, this.uid, true), island: onIsland };
+    }
+    sleepRows() {
+        if (!this.session || !this.clock)
+            return [];
+        const self = { uid: this.uid, no: this.session.no, name: this.session.nick, state: this.session.sleeping ? "asleep" : "awake", area: this.session.area, self: true };
+        return this.roster.sleepRows(this.clock.day(), self);
     }
     async toggleSleep() {
         if (!this.session || !this.clock)
             return;
         if (this.session.sleeping) {
             this.session.sleeping = false;
+            this.sleepBoard.hide();
             void this.fade.lift(700);
             this.toast.show("일어났어요");
             await this.publishPresence(true);
@@ -1173,7 +1247,8 @@ class FrGame {
         this.cancelTask();
         this.windows.closeAll();
         this.session.sleeping = true;
-        void this.fade.dim(0.55, 2600);
+        this.sleepBoard.show(this.sleepRows(), FrSleepVote.banner(this.presences()));
+        void this.fade.dim(FrGame.SLEEP_DIM, 2600);
         await this.publishPresence(true);
         await this.tryMorning();
     }
@@ -1193,7 +1268,7 @@ class FrGame {
         if (!this.session.sleeping)
             return;
         if (!FrSleepVote.allAsleep(this.presences())) {
-            void this.fade.dim(0.55, 900);
+            void this.fade.dim(FrGame.SLEEP_DIM, 900);
             return;
         }
         try {
@@ -1263,7 +1338,9 @@ class FrGame {
         }
         else {
             this.target = blocked ? null : this.finder.find(player, this.finderContext());
-            const place = this.target && this.target.kind === "place" ? this.target : null;
+            if (player.moving)
+                this.hover.dirty = true;
+            const place = blocked ? null : this.hoverPlacement();
             if (place && place.plan)
                 this.view.setPreview(place.cell, place.plan.y, !!place.check && place.check.ok);
             else
@@ -1285,6 +1362,12 @@ class FrGame {
         if (session.sleeping && time - this.lastSleepCheck > 1) {
             this.lastSleepCheck = time;
             void this.tryMorning();
+        }
+        if (!session.sleeping)
+            this.sleepBoard.hide();
+        else if (time - this.lastSleepBoard > 0.5) {
+            this.lastSleepBoard = time;
+            this.sleepBoard.show(this.sleepRows(), FrSleepVote.banner(this.presences()));
         }
         this.view.applyClock(minute);
         this.hud.showClock(minute, day);
@@ -1323,3 +1406,4 @@ class FrGame {
     }
 }
 FrGame.CODE_PATTERN_HINT = "섬 코드를 입력해 주세요.";
+FrGame.SLEEP_DIM = 0.84;

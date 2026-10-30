@@ -31,10 +31,16 @@ class FrWorld {
     applyTerrainLocal(x, z, edit) {
         this.terrain.edit(x, z, edit);
         this.listeners.forEach((l) => l.onTerrainEdited(x, z));
+        this.refreshWater();
     }
     revertTerrainLocal(x, z) {
         this.terrain.restore(x, z);
         this.listeners.forEach((l) => l.onTerrainEdited(x, z));
+        this.refreshWater();
+    }
+    refreshWater() {
+        const changed = this.terrain.refreshFlood((index) => this.blocks.top(index) > 0);
+        changed.forEach((index) => { const x = index % this.terrain.w, z = Math.floor(index / this.terrain.w); this.listeners.forEach((l) => l.onTerrainEdited(x, z)); });
     }
     applySiteEffects(key, built) {
         const site = this.siteOf(key);
@@ -108,6 +114,7 @@ class FrWorld {
         Object.keys(build || {}).forEach((key) => { this.builtKeys.add(key); this.village.markBuilt(key.replace(/_\d+$/, "")); this.applySiteEffects(key, true); });
         this.publicStore.restore(publicAmounts || {}, logs.map(([, line]) => line));
         logs.forEach(([key]) => this.logKeys.add(key));
+        this.refreshWater();
     }
     isFelled(index) { return this.felled.has(index); }
     standingTree(index) { return this.felled.has(index) ? null : this.trees.get(index) || null; }
@@ -145,6 +152,7 @@ class FrWorld {
             return false;
         this.terrain.edit(x, z, after);
         this.listeners.forEach((l) => l.onTerrainEdited(x, z));
+        this.refreshWater();
         return true;
     }
     async digSnow(x, z, day) {
@@ -303,6 +311,7 @@ class FrWorld {
         if (!this.blocks.set(this.terrain.index(x, z), y, record))
             return;
         this.listeners.forEach((l) => l.onBlockChanged(x, z, y, record));
+        this.refreshWater();
     }
     remoteBlock(index, y, record) {
         const x = index % this.terrain.w, z = Math.floor(index / this.terrain.w);
@@ -319,6 +328,7 @@ class FrWorld {
             this.blocks.set(index, y, null);
         this.blocks.set(index, y, record);
         this.listeners.forEach((l) => l.onBlockChanged(x, z, y, record));
+        this.refreshWater();
     }
     async plant(index, record) {
         const result = await this.backend.transaction(this.path("farm/" + index), (current) => (current === null ? record : undefined));
@@ -382,6 +392,7 @@ class FrWorld {
             return;
         this.terrain.edit(x, z, edit);
         this.listeners.forEach((l) => l.onTerrainEdited(x, z));
+        this.refreshWater();
     }
     remoteSnow(index, day) {
         if (day === null)

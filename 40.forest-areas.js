@@ -7,8 +7,9 @@ class FrFeature {
         this.variant = variant;
         this.item = item;
         this.availableAt = 0;
+        this.felled = false;
     }
-    get blocks() { return this.kind === "fruitTree" || this.kind === "jungleTree"; }
+    get blocks() { return !this.felled && (this.kind === "fruitTree" || this.kind === "jungleTree"); }
     get gatherable() { return this.kind === "fruitTree" || this.kind === "jungleTree" || this.kind === "flower" || this.kind === "shoreSpot"; }
 }
 class FrAreaInfo {

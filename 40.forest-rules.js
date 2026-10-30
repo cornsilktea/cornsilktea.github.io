@@ -202,6 +202,19 @@ class FrBag {
         return id;
     }
     freeSlots() { return FrBalance.BAG_SLOTS - this.slots.length; }
+    move(from, to) {
+        if (from < 0 || from >= this.slots.length || to < 0 || from === to)
+            return false;
+        if (to >= this.slots.length) {
+            const [slot] = this.slots.splice(from, 1);
+            this.slots.push(slot);
+            return true;
+        }
+        const held = this.slots[to];
+        this.slots[to] = this.slots[from];
+        this.slots[from] = held;
+        return true;
+    }
 }
 class FrPublicStore {
     constructor() {
@@ -345,15 +358,18 @@ class FrActionPoints {
     constructor(ringLevel, current) {
         this.ringLevel = ringLevel;
         this.bonus = 0;
+        this.unlimited = false;
         this.current = current === undefined ? this.max() : Math.min(current, this.max());
     }
     max() {
         return Math.min(FrBalance.MAX_ACTION_POINTS_CAP, FrBalance.BASE_ACTION_POINTS + this.ringLevel * FrBalance.RING_ACTION_POINTS_PER_LEVEL + this.bonus);
     }
-    canSpend(cost) { return this.current >= cost; }
+    canSpend(cost) { return this.unlimited || this.current >= cost; }
     spend(cost) {
         if (!this.canSpend(cost))
             return false;
+        if (this.unlimited)
+            return true;
         this.current -= cost;
         return true;
     }

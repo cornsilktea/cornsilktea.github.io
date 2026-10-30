@@ -85,7 +85,7 @@ class FrBlockRules {
     }
     static check(world, x, z, y, me, bodies) {
         const terrain = world.terrain;
-        if (!terrain.inside(x, z) || terrain.isWater(x, z))
+        if (!terrain.inside(x, z) || (terrain.isWater(x, z) && !terrain.isFlooded(x, z)))
             return { ok: false, reason: "여기에는 놓을 수 없어요" };
         if (y < 0 || y >= FrBlockRules.MAX_LEVEL)
             return { ok: false, reason: "더 높이 쌓을 수 없어요 (8칸까지)" };

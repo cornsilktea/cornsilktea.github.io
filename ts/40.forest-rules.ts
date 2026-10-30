@@ -209,6 +209,19 @@ class FrBag implements FrStore {
   }
 
   freeSlots(): number { return FrBalance.BAG_SLOTS - this.slots.length; }
+
+  move(from: number, to: number): boolean {
+    if (from < 0 || from >= this.slots.length || to < 0 || from === to) return false;
+    if (to >= this.slots.length) {
+      const [slot] = this.slots.splice(from, 1);
+      this.slots.push(slot);
+      return true;
+    }
+    const held = this.slots[to];
+    this.slots[to] = this.slots[from];
+    this.slots[from] = held;
+    return true;
+  }
 }
 
 class FrPublicStore implements FrStore {
@@ -354,9 +367,11 @@ class FrActionPoints {
   max(): number {
     return Math.min(FrBalance.MAX_ACTION_POINTS_CAP, FrBalance.BASE_ACTION_POINTS + this.ringLevel * FrBalance.RING_ACTION_POINTS_PER_LEVEL + this.bonus);
   }
-  canSpend(cost: number): boolean { return this.current >= cost; }
+  unlimited = false;
+  canSpend(cost: number): boolean { return this.unlimited || this.current >= cost; }
   spend(cost: number): boolean {
     if (!this.canSpend(cost)) return false;
+    if (this.unlimited) return true;
     this.current -= cost;
     return true;
   }

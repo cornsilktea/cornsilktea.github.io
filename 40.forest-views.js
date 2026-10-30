@@ -18,6 +18,8 @@ class FrAvatar {
         this.group = new libs.THREE.Group();
         this.group.add(model);
         this.group.scale.setScalar(FrAvatar.SCALE_UP);
+        model.traverse((node) => { if (node.isMesh)
+            node.castShadow = true; });
         this.mixer = new libs.THREE.AnimationMixer(model);
         Object.keys(FrAvatar.CLIP_NAMES).forEach((key) => {
             const clip = clips.get(FrAvatar.CLIP_NAMES[key]);
@@ -76,98 +78,126 @@ FrSky.DAY_SKY = [0.56, 0.78, 0.95];
 FrSky.NIGHT_SKY = [0.03, 0.06, 0.15];
 FrSky.DUSK_SKY = [0.96, 0.58, 0.38];
 class FrTreeLayer {
-    constructor(libs, world, group) {
+    constructor(libs, world, group, nature) {
         this.libs = libs;
         this.world = world;
         this.group = group;
         this.slots = new Map();
-        this.spots = [];
+        this.models = [];
+        this.ghosts = new Map();
         this.ghosted = [];
-        this.matrices = new Map();
         const T = libs.THREE;
-        const trunkGeometry = new T.BoxGeometry(0.55, 2.6, 0.55).translate(0, 1.3, 0);
-        const crownGeometry = new T.IcosahedronGeometry(1.55, 0).scale(1, 0.92, 1).translate(0, 3.5, 0);
-        const spots = Array.from(world.trees.values());
-        this.trunks = new T.InstancedMesh(trunkGeometry, new T.MeshLambertMaterial({ color: 0x7a5230 }), spots.length);
-        this.crowns = new T.InstancedMesh(crownGeometry, new T.MeshLambertMaterial({ color: 0xffffff }), spots.length);
-        this.trunks.frustumCulled = false;
-        this.crowns.frustumCulled = false;
-        const matrix = new T.Matrix4();
-        const color = new T.Color();
-        spots.forEach((spot, slot) => {
-            this.spots.push(spot);
-            this.slots.set(world.terrain.index(spot.x, spot.z), slot);
-            const jitterX = (FrTreeField.hash(spot.x, spot.z, 22) - 0.5) * 0.8, jitterZ = (FrTreeField.hash(spot.x, spot.z, 23) - 0.5) * 0.8;
-            const scale = 0.85 + FrTreeField.hash(spot.x, spot.z, 24) * 0.4 + (spot.zone >= 0 ? 0.1 : 0);
-            matrix.compose(new T.Vector3((spot.x + 0.5) * FrTerrainData.BLOCK + jitterX, world.terrain.surfaceY(spot.x, spot.z), (spot.z + 0.5) * FrTerrainData.BLOCK + jitterZ), new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 1, 0), FrTreeField.hash(spot.x, spot.z, 25) * 6.28), new T.Vector3(scale, scale, scale));
-            this.trunks.setMatrixAt(slot, matrix);
-            this.crowns.setMatrixAt(slot, matrix);
-            this.matrices.set(slot, matrix.clone());
-            color.setHSL(0.30 + FrTreeField.hash(spot.x, spot.z, 26) * 0.06, 0.5, 0.26 + FrTreeField.hash(spot.x, spot.z, 27) * 0.1);
-            this.crowns.setColorAt(slot, color);
-            if (world.isFelled(world.terrain.index(spot.x, spot.z)))
-                this.hide(slot);
+        const plans = new Map();
+        world.trees.forEach((spot) => {
+            const key = this.variantOf(spot) + "|" + FrRegionGrid.keyOf(spot.x, spot.z, FrRegionGrid.TREE_CELLS);
+            if (!plans.has(key))
+                plans.set(key, []);
+            plans.get(key).push(spot);
         });
-        this.ghosts = new T.InstancedMesh(crownGeometry, new T.MeshLambertMaterial({ color: 0x3f7a3a, transparent: true, opacity: 0.32, depthWrite: false }), FrTreeLayer.GHOST_LIMIT);
-        this.ghosts.count = 0;
-        this.ghosts.frustumCulled = false;
-        group.add(this.trunks, this.crowns, this.ghosts);
+        plans.forEach((spots, key) => {
+            const variant = key.split("|")[0];
+            const model = new FrInstancedModel(libs, nature.partsOf(variant), spots.length, true);
+            spots.forEach((spot, index) => {
+                const jitterX = (FrTreeField.hash(spot.x, spot.z, 22) - 0.5) * 0.8, jitterZ = (FrTreeField.hash(spot.x, spot.z, 23) - 0.5) * 0.8;
+                const scale = FrTreeLayer.SCALE * (0.85 + FrTreeField.hash(spot.x, spot.z, 24) * 0.35 + (spot.zone >= 0 ? 0.1 : 0));
+                const matrix = new T.Matrix4().compose(new T.Vector3((spot.x + 0.5) * FrTerrainData.BLOCK + jitterX, world.terrain.surfaceY(spot.x, spot.z), (spot.z + 0.5) * FrTerrainData.BLOCK + jitterZ), new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 1, 0), FrTreeField.hash(spot.x, spot.z, 25) * 6.28), new T.Vector3(scale, scale, scale));
+                model.set(index, matrix);
+                this.slots.set(world.terrain.index(spot.x, spot.z), { spot, model, index, variant, matrix });
+            });
+            model.commit();
+            model.addTo(group);
+            this.models.push(model);
+            if (!this.ghosts.has(variant)) {
+                const ghost = new FrInstancedModel(libs, nature.partsOf(variant), FrTreeLayer.GHOST_LIMIT, false, FrTreeLayer.GHOST_OPACITY);
+                ghost.setCount(0);
+                ghost.meshes.forEach((m) => { m.frustumCulled = false; });
+                ghost.addTo(group);
+                this.ghosts.set(variant, ghost);
+            }
+        });
+        this.slots.forEach((slot, cell) => { if (world.isFelled(cell)) {
+            slot.model.hide(slot.index);
+            slot.model.commit(false);
+        } });
+    }
+    variantOf(spot) {
+        const list = spot.zone >= 0 ? FrTreeLayer.JUNGLE : this.world.terrain.height(spot.x, spot.z) >= 3 ? FrTreeLayer.HILL : FrTreeLayer.MEADOW;
+        return list[Math.floor(FrTreeField.hash(spot.x, spot.z, 31) * list.length)];
     }
     pick(raycaster) {
-        const hits = raycaster.intersectObjects([this.trunks, this.crowns], false).filter((h) => h.instanceId !== undefined);
-        if (hits.length === 0)
+        const meshes = [];
+        this.models.forEach((m) => m.meshes.forEach((mesh) => meshes.push(mesh)));
+        const hit = raycaster.intersectObjects(meshes, false).find((h) => h.instanceId !== undefined);
+        if (!hit)
             return null;
-        const hit = hits[0];
-        return { spot: this.spots[hit.instanceId], distance: hit.distance };
+        const model = this.models.find((m) => m.owns(hit.object));
+        if (!model)
+            return null;
+        let found = null;
+        this.slots.forEach((slot) => { if (slot.model === model && slot.index === hit.instanceId)
+            found = slot; });
+        const slot = found;
+        if (!slot || this.world.isFelled(this.world.terrain.index(slot.spot.x, slot.spot.z)))
+            return null;
+        return { spot: slot.spot, distance: hit.distance };
     }
     fadeAround(cellX, cellZ) {
         const wanted = [];
         for (let dz = -1; dz <= FrTreeLayer.GHOST_RADIUS; dz++) {
             for (let dx = -FrTreeLayer.GHOST_RADIUS; dx <= FrTreeLayer.GHOST_RADIUS; dx++) {
-                const slot = this.slots.get(this.world.terrain.index(cellX + dx, cellZ + dz));
-                if (slot !== undefined && !this.world.isFelled(this.world.terrain.index(cellX + dx, cellZ + dz)) && wanted.length < FrTreeLayer.GHOST_LIMIT)
+                const cell = this.world.terrain.index(cellX + dx, cellZ + dz);
+                const slot = this.slots.get(cell);
+                if (slot && !this.world.isFelled(cell) && wanted.length < FrTreeLayer.GHOST_LIMIT)
                     wanted.push(slot);
             }
         }
         if (wanted.length === this.ghosted.length && wanted.every((slot, i) => slot === this.ghosted[i]))
             return;
-        this.ghosted.forEach((slot) => { const m = this.matrices.get(slot); if (m)
-            this.crowns.setMatrixAt(slot, m); });
-        wanted.forEach((slot, i) => {
-            const m = this.matrices.get(slot);
-            this.ghosts.setMatrixAt(i, m);
-            this.crowns.setMatrixAt(slot, new this.libs.THREE.Matrix4().makeScale(0, 0, 0));
+        this.restoreGhosted();
+        const counts = new Map();
+        wanted.forEach((slot) => {
+            const ghost = this.ghosts.get(slot.variant);
+            const n = counts.get(slot.variant) || 0;
+            ghost.set(n, slot.matrix);
+            counts.set(slot.variant, n + 1);
+            slot.model.hide(slot.index);
+            slot.model.commit(false);
         });
-        this.ghosts.count = wanted.length;
+        this.ghosts.forEach((ghost, variant) => { ghost.setCount(counts.get(variant) || 0); ghost.commit(false); });
         this.ghosted = wanted;
-        this.ghosts.instanceMatrix.needsUpdate = true;
-        this.crowns.instanceMatrix.needsUpdate = true;
     }
-    hide(slot) {
-        const empty = new this.libs.THREE.Matrix4().makeScale(0, 0, 0);
-        this.trunks.setMatrixAt(slot, empty);
-        this.crowns.setMatrixAt(slot, empty);
-        this.trunks.instanceMatrix.needsUpdate = true;
-        this.crowns.instanceMatrix.needsUpdate = true;
+    restoreGhosted() {
+        this.ghosted.forEach((slot) => {
+            if (this.world.isFelled(this.world.terrain.index(slot.spot.x, slot.spot.z)))
+                return;
+            slot.model.set(slot.index, slot.matrix);
+            slot.model.commit(false);
+        });
+        this.ghosts.forEach((ghost) => ghost.setCount(0));
+        this.ghosted = [];
     }
     remove(spot) {
         const slot = this.slots.get(this.world.terrain.index(spot.x, spot.z));
-        if (slot === undefined)
+        if (!slot)
             return;
-        this.ghosted.forEach((g) => { const m = this.matrices.get(g); if (m)
-            this.crowns.setMatrixAt(g, m); });
-        this.ghosts.count = 0;
-        this.ghosted = [];
-        this.hide(slot);
+        this.restoreGhosted();
+        slot.model.hide(slot.index);
+        slot.model.commit(false);
     }
 }
+FrTreeLayer.MEADOW = ["Tree_1_A_Color1", "Tree_2_A_Color1"];
+FrTreeLayer.JUNGLE = ["Tree_2_B_Color1", "Tree_2_A_Color1", "Tree_1_A_Color1"];
+FrTreeLayer.HILL = ["Tree_4_A_Color1"];
+FrTreeLayer.SCALE = 1.45;
 FrTreeLayer.GHOST_LIMIT = 48;
 FrTreeLayer.GHOST_RADIUS = 3;
+FrTreeLayer.GHOST_OPACITY = 0.3;
 class FrProps {
-    constructor(libs, world, group) {
+    constructor(libs, world, group, nature) {
         this.libs = libs;
         this.world = world;
         this.group = group;
+        this.nature = nature;
         this.portalRings = [];
         this.chest = null;
         this.siteMarkers = new Map();
@@ -180,24 +210,35 @@ class FrProps {
         this.fire = new FrCampfireFx(libs, campfire);
         group.add(campfire);
         this.buildPortals();
-        this.buildChestPlaceholder();
-        this.models = new FrSiteModels(libs, world);
+        this.buildChest();
+        this.models = new FrSiteModels(libs, world, nature);
         world.sites.forEach((site) => this.addSiteMarker(site));
     }
-    buildChestPlaceholder() {
+    placeModel(parent, name, scale, x, y, z, turn = 0) {
+        const model = this.nature.build(name);
+        model.scale.setScalar(scale);
+        model.position.set(x, y, z);
+        model.rotation.y = turn;
+        parent.add(model);
+        return model;
+    }
+    buildChest() {
         const T = this.libs.THREE;
         const a = this.world.terrain.anchors.publicChest;
         const B = FrTerrainData.BLOCK;
         const holder = new T.Group();
         holder.position.set((a.x + 1) * B, this.world.terrain.surfaceY(a.x, a.z), (a.z + 1) * B);
         holder.userData = { kind: "chest" };
-        const box = new T.Mesh(new T.BoxGeometry(3.8, 2.2, 2.6), new T.MeshLambertMaterial({ color: 0x9a6a38 }));
-        box.position.y = 1.1;
-        const lid = new T.Mesh(new T.BoxGeometry(3.9, 0.5, 2.7), new T.MeshLambertMaterial({ color: 0x7a4f27 }));
-        lid.position.y = 2.35;
-        const band = new T.Mesh(new T.BoxGeometry(0.4, 2.8, 2.8), new T.MeshLambertMaterial({ color: 0xd6b34a }));
-        band.position.y = 1.3;
-        holder.add(box, lid, band);
+        if (this.nature.has("chest")) {
+            this.placeModel(holder, "chest", 2.3, 0, 0, 0);
+            this.placeModel(holder, "barrel_small", 1.5, 2.9, 0, -0.6, 0.4);
+            this.placeModel(holder, "crates_stacked", 1.05, -3.1, 0, -0.9, -0.3);
+        }
+        else {
+            const box = new T.Mesh(new T.BoxGeometry(3.8, 2.2, 2.6), new T.MeshLambertMaterial({ color: 0x9a6a38 }));
+            box.position.y = 1.1;
+            holder.add(box);
+        }
         this.group.add(holder);
         this.chest = holder;
     }
@@ -206,7 +247,7 @@ class FrProps {
         const marker = new T.Group();
         marker.position.set((site.x + 0.5) * FrTerrainData.BLOCK, this.world.terrain.surfaceY(site.x, site.z), (site.z + 0.5) * FrTerrainData.BLOCK);
         marker.userData = { kind: "site", id: site.id };
-        this.fillPost(marker);
+        this.fillPost(marker, site);
         this.group.add(marker);
         this.siteMarkers.set(site.id, marker);
         if (this.world.isBuilt(site.id))
@@ -217,15 +258,24 @@ class FrProps {
         if (!marker)
             return;
         marker.clear();
-        this.fillPost(marker);
+        this.fillPost(marker, site);
     }
-    fillPost(marker) {
+    fillPost(marker, site) {
         const T = this.libs.THREE;
-        const post = new T.Mesh(new T.BoxGeometry(0.25, 2.2, 0.25), new T.MeshLambertMaterial({ color: 0x8a5a2b }));
-        post.position.y = 1.1;
-        const sign = new T.Mesh(new T.BoxGeometry(1.6, 0.9, 0.12), new T.MeshLambertMaterial({ color: 0xe7c98a }));
-        sign.position.y = 2.1;
-        marker.add(post, sign);
+        const wood = new T.MeshLambertMaterial({ map: FrSurfaceTextures.wood(this.libs), color: 0x9a6c42 });
+        const piece = (w, h, d, x, y, z, material) => {
+            const mesh = new T.Mesh(new T.BoxGeometry(w, h, d), material);
+            mesh.position.set(x, y, z);
+            mesh.castShadow = true;
+            marker.add(mesh);
+            return mesh;
+        };
+        piece(0.45, 3.0, 0.45, 0, 1.5, 0, wood);
+        const face = new T.MeshLambertMaterial({ map: FrSignTexture.of(this.libs, site.name) });
+        const edge = new T.MeshLambertMaterial({ map: FrSurfaceTextures.wood(this.libs), color: 0xd8b07a });
+        piece(2.8, 1.4, 0.32, 0, 2.6, 0.12, [edge, edge, edge, edge, face, face]);
+        piece(3.0, 0.18, 0.44, 0, 3.38, 0.12, wood);
+        piece(1.4, 0.3, 1.0, 0.9, 0.15, 0.8, edge).rotation.y = 0.3;
     }
     showBuilt(site) {
         const T = this.libs.THREE;
@@ -234,35 +284,43 @@ class FrProps {
             return;
         marker.clear();
         const mat = (color) => new T.MeshLambertMaterial({ color });
-        const box = (w, h, d, x, y, z, color) => { const m = new T.Mesh(new T.BoxGeometry(w, h, d), mat(color)); m.position.set(x, y, z); marker.add(m); return m; };
+        const box = (w, h, d, x, y, z, color) => { const m = new T.Mesh(new T.BoxGeometry(w, h, d), mat(color)); m.position.set(x, y, z); m.castShadow = true; marker.add(m); return m; };
+        const stoneBox = (w, h, d, x, y, z) => { const m = new T.Mesh(new T.BoxGeometry(w, h, d), new T.MeshLambertMaterial({ map: FrSurfaceTextures.stone(this.libs), color: 0xb4b6bd })); m.position.set(x, y, z); m.castShadow = true; marker.add(m); return m; };
+        const has = (name) => this.nature.has(name);
         const builders = {
             workbench: () => {
+                if (has("table_medium")) {
+                    this.placeModel(marker, "table_medium", 1.6, 0, 0, 0);
+                    this.placeModel(marker, "Wood_Log_Stack", 1.1, 2.6, 0, 0.4, 0.5);
+                    if (has("anvil"))
+                        this.placeModel(marker, "anvil", 0.9, -0.2, 1.6, 0, 0.2);
+                    return;
+                }
                 box(3.2, 0.35, 1.8, 0, 1.7, 0, 0xb98a52);
-                [[-1.3, -0.7], [1.3, -0.7], [-1.3, 0.7], [1.3, 0.7]].forEach(([dx, dz]) => box(0.3, 1.6, 0.3, dx, 0.8, dz, 0x8a5a2b));
-                box(1.2, 0.12, 0.35, 0.3, 1.95, 0, 0xc9ced6);
             },
             forge: () => {
-                box(3.4, 1.6, 2.4, 0, 0.8, 0, 0x7a7d86);
-                box(2.4, 0.5, 1.6, 0, 1.85, 0, 0x4a4c54);
-                const coals = new T.Mesh(new T.BoxGeometry(1.6, 0.2, 1), new T.MeshBasicMaterial({ color: 0xff6a20 }));
-                coals.position.set(0, 2.15, 0);
+                stoneBox(3.0, 1.8, 2.2, -1.0, 0.9, -0.4);
+                const coals = new T.Mesh(new T.BoxGeometry(2.0, 0.2, 1.4), new T.MeshBasicMaterial({ color: 0xff6a20 }));
+                coals.position.set(-1.0, 1.9, -0.4);
                 marker.add(coals);
-                box(0.8, 1.1, 0.8, 1.1, 2.3, -0.8, 0x6a6c74);
+                stoneBox(0.9, 2.2, 0.9, -1.9, 2.9, -1.0);
+                if (has("anvil"))
+                    this.placeModel(marker, "anvil", 1.8, 1.6, 0, 0.6, -0.4);
             },
             oven: () => {
+                if (has("oven")) {
+                    this.placeModel(marker, "oven", 1.5, 0, 0, 0);
+                    return;
+                }
                 box(3, 0.6, 3, 0, 0.3, 0, 0x8a8d96);
-                const dome = new T.Mesh(new T.SphereGeometry(1.5, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), mat(0xc87f56));
-                dome.position.y = 0.6;
-                marker.add(dome);
-                const mouth = new T.Mesh(new T.CircleGeometry(0.6, 12), new T.MeshBasicMaterial({ color: 0xff9a30 }));
-                mouth.position.set(0, 1.1, 1.45);
-                marker.add(mouth);
             },
             kitchen: () => {
+                if (has("stove_multi")) {
+                    this.placeModel(marker, "stove_multi", 1.4, -1.4, 0, 0);
+                    this.placeModel(marker, "kitchencounter_straight_A", 1.4, 1.4, 0, 0);
+                    return;
+                }
                 box(4, 1.5, 1.6, 0, 0.75, 0, 0xd9c9a3);
-                box(4.2, 0.2, 1.8, 0, 1.6, 0, 0x8a5a2b);
-                box(1.2, 0.5, 0.9, -1, 1.95, 0, 0xc8ccd4);
-                box(0.8, 0.9, 0.8, 1.3, 2.15, 0, 0xe05a4a);
             },
             farm_expand: () => {
                 [[-1, 0], [1, 0]].forEach(([dx]) => box(0.25, 2.2, 0.25, dx, 1.1, 0, 0x8a5a2b));
@@ -287,8 +345,16 @@ class FrProps {
             const color = colors[id] || 0xffffff;
             const ring = new T.Mesh(new T.TorusGeometry(2.4, 0.28, 10, 28).translate(0, 3, 0), new T.MeshBasicMaterial({ color }));
             const disc = new T.Mesh(new T.CircleGeometry(2.2, 28).translate(0, 3, 0), new T.MeshBasicMaterial({ color, transparent: true, opacity: 0.35, side: T.DoubleSide, depthWrite: false, blending: T.AdditiveBlending }));
-            const base = new T.Mesh(new T.CylinderGeometry(2.8, 3.2, 0.4, 20).translate(0, 0.2, 0), new T.MeshLambertMaterial({ color: 0x777b84 }));
+            const stone = new T.MeshLambertMaterial({ map: FrSurfaceTextures.stone(this.libs), color: 0xa0a3ab });
+            const base = new T.Mesh(new T.CylinderGeometry(2.8, 3.2, 0.5, 20).translate(0, 0.25, 0), stone);
+            base.receiveShadow = true;
             holder.add(base, ring, disc);
+            [-1, 1].forEach((side) => {
+                const pillar = new T.Mesh(new T.BoxGeometry(0.7, 5.6, 0.7).translate(side * 3.3, 2.8, 0), stone);
+                pillar.castShadow = true;
+                const cap = new T.Mesh(new T.SphereGeometry(0.42, 10, 8).translate(side * 3.3, 5.9, 0), new T.MeshBasicMaterial({ color }));
+                holder.add(pillar, cap);
+            });
             this.group.add(holder);
             this.portalRings.push({ ring, disc, phase: i * 1.4 });
         });
@@ -298,6 +364,61 @@ class FrProps {
         this.portalRings.forEach((p) => { p.ring.rotation.y = time * 0.8 + p.phase; p.disc.material.opacity = 0.28 + 0.14 * Math.sin(time * 2.4 + p.phase); });
     }
 }
+class FrWaterSurface {
+    constructor(libs, material) {
+        this.libs = libs;
+        this.material = material;
+        this.inner = null;
+        this.outerBuilt = false;
+        this.group = new libs.THREE.Group();
+    }
+    rebuild(terrain) {
+        const T = this.libs.THREE;
+        const B = FrTerrainData.BLOCK;
+        if (!this.outerBuilt) {
+            this.buildOuter(terrain.w * B, terrain.d * B);
+            this.outerBuilt = true;
+        }
+        if (this.inner) {
+            this.group.remove(this.inner);
+            this.inner.geometry.dispose();
+        }
+        const positions = [];
+        const uvs = [];
+        const y = FrWaterSurface.LEVEL;
+        for (let z = 0; z < terrain.d; z++) {
+            for (let x = 0; x < terrain.w; x++) {
+                if (!terrain.isWater(x, z))
+                    continue;
+                const x0 = x * B, x1 = x0 + B, z0 = z * B, z1 = z0 + B;
+                positions.push(x0, y, z0, x0, y, z1, x1, y, z1, x0, y, z0, x1, y, z1, x1, y, z0);
+                uvs.push(x0 / 8, z0 / 8, x0 / 8, z1 / 8, x1 / 8, z1 / 8, x0 / 8, z0 / 8, x1 / 8, z1 / 8, x1 / 8, z0 / 8);
+            }
+        }
+        const geometry = new T.BufferGeometry();
+        geometry.setAttribute("position", new T.Float32BufferAttribute(positions, 3));
+        geometry.setAttribute("uv", new T.Float32BufferAttribute(uvs, 2));
+        geometry.computeVertexNormals();
+        this.inner = new T.Mesh(geometry, this.material);
+        this.inner.receiveShadow = true;
+        this.group.add(this.inner);
+    }
+    buildOuter(width, depth) {
+        const T = this.libs.THREE;
+        const far = FrWaterSurface.OUTER;
+        const strips = [[-far, -far, width + far, 0], [-far, depth, width + far, depth + far], [-far, 0, 0, depth], [width, 0, width + far, depth]];
+        strips.forEach(([x0, z0, x1, z1]) => {
+            const geometry = new T.PlaneGeometry(x1 - x0, z1 - z0).rotateX(-Math.PI / 2).translate((x0 + x1) / 2, FrWaterSurface.LEVEL, (z0 + z1) / 2);
+            const uv = geometry.getAttribute("uv");
+            const pos = geometry.getAttribute("position");
+            for (let i = 0; i < uv.count; i++)
+                uv.setXY(i, pos.getX(i) / 8, pos.getZ(i) / 8);
+            this.group.add(new T.Mesh(geometry, this.material));
+        });
+    }
+}
+FrWaterSurface.LEVEL = -0.9;
+FrWaterSurface.OUTER = 600;
 class FrCropLayer {
     constructor(libs, world, parent) {
         this.libs = libs;
@@ -365,7 +486,7 @@ FrCropLayer.COLORS = {
 class FrCameraRig {
     constructor(libs) {
         this.libs = libs;
-        this.camera = new libs.THREE.PerspectiveCamera(42, 1, 0.5, 500);
+        this.camera = new libs.THREE.PerspectiveCamera(42, 1, 0.5, FrCameraRig.FAR);
         this.focus = new libs.THREE.Vector3();
     }
     follow(target, dt) {
@@ -375,6 +496,7 @@ class FrCameraRig {
         this.camera.lookAt(this.focus.x, this.focus.y + 2.5, this.focus.z);
     }
     snap(target) { this.focus.copy(target); this.follow(target, 1); }
+    focusPoint() { return this.focus; }
     resize(width, height) {
         this.camera.aspect = width / Math.max(1, height);
         this.camera.fov = this.camera.aspect < 1 ? 58 : 42;
@@ -383,11 +505,13 @@ class FrCameraRig {
 }
 FrCameraRig.OFFSET_Y = 38;
 FrCameraRig.OFFSET_Z = 28;
+FrCameraRig.FAR = 125;
 class FrWorldView {
-    constructor(libs, canvas, world, touchDevice) {
+    constructor(libs, canvas, world, touchDevice, nature) {
         this.libs = libs;
         this.canvas = canvas;
         this.touchDevice = touchDevice;
+        this.nature = nature;
         this.plaza = null;
         this.onVillageLevel = () => undefined;
         this.areaScene = null;
@@ -395,6 +519,10 @@ class FrWorldView {
         this.labels = null;
         this.selfUid = "";
         this.chunks = new Map();
+        this.waterDirty = true;
+        this.decor = null;
+        this.shadowsOn = true;
+        this.decorAllowed = true;
         this.governor = null;
         this.avatar = null;
         this.night = 0;
@@ -402,25 +530,32 @@ class FrWorldView {
         const T = libs.THREE;
         this.pixelRatioCap = touchDevice ? FrWorldView.MAX_PIXEL_RATIO_TOUCH : FrWorldView.MAX_PIXEL_RATIO_DESKTOP;
         this.renderer = new T.WebGLRenderer({ canvas, antialias: !touchDevice, powerPreference: "high-performance" });
+        this.renderer.shadowMap.enabled = true;
+        this.renderer.shadowMap.type = T.PCFSoftShadowMap;
         this.scene = new T.Scene();
         this.scene.background = new T.Color(0x8fc7f2);
-        this.scene.fog = new T.Fog(0x8fc7f2, 90, 200);
+        this.scene.fog = new T.Fog(0x8fc7f2, 78, FrCameraRig.FAR);
         const hemi = new T.HemisphereLight(0xffffff, 0x6a5a45, 1);
         const sun = new T.DirectionalLight(0xffffff, 1.3);
         sun.position.set(-40, 90, 30);
-        this.scene.add(hemi, sun);
+        this.setupShadow(sun);
+        this.scene.add(hemi, sun, sun.target);
         this.sky = new FrSky(libs, this.scene, hemi, sun);
         this.rig = new FrCameraRig(libs);
         this.terrainGroup = new T.Group();
         this.scene.add(this.terrainGroup);
-        this.terrainMaterial = new T.MeshLambertMaterial({ vertexColors: true, side: T.DoubleSide });
-        this.water = new T.Mesh(new T.PlaneGeometry(1, 1), new T.MeshLambertMaterial({ color: 0x3f86d0, transparent: true, opacity: 0.78, depthWrite: false }));
-        this.water.rotation.x = -Math.PI / 2;
+        this.terrainMaterial = new T.MeshLambertMaterial({ vertexColors: true, side: T.DoubleSide, map: FrTerrainAtlas.get(libs) });
+        const waterTexture = FrSurfaceTextures.water(libs).clone();
+        waterTexture.needsUpdate = true;
+        this.waterTexture = waterTexture;
+        this.waterSurface = new FrWaterSurface(libs, new T.MeshPhongMaterial({ color: 0x3f86d0, map: waterTexture, specular: 0x88bbff, shininess: 60, transparent: true, opacity: 0.82, depthWrite: false }));
+        this.water = this.waterSurface.group;
         this.scene.add(this.water);
         this.treeGroup = new T.Group();
         this.propGroup = new T.Group();
         this.blockGroup = new T.Group();
-        this.scene.add(this.treeGroup, this.propGroup, this.blockGroup);
+        this.decorGroup = new T.Group();
+        this.scene.add(this.treeGroup, this.propGroup, this.blockGroup, this.decorGroup);
         this.preview = new T.Mesh(new T.BoxGeometry(FrTerrainData.BLOCK, FrTerrainData.BLOCK, FrTerrainData.BLOCK).translate(0, FrTerrainData.BLOCK / 2, 0), new T.MeshBasicMaterial({ color: 0x9be08a, transparent: true, opacity: 0.38, depthWrite: false }));
         this.preview.visible = false;
         this.scene.add(this.preview);
@@ -429,7 +564,7 @@ class FrWorldView {
         this.scene.add(this.marker);
         this.burst = new FrBurst(libs, this.scene);
         this.useWorld(world);
-        const steps = [() => this.lowerPixelRatio()];
+        const steps = [() => this.lowerPixelRatio(), () => this.lowerPixelRatio(), () => this.turnOffShadows(), () => this.hideDecor()];
         this.governor = window.QualityGovernor ? window.QualityGovernor({ steps, storageKey: "dongmaforest_quality_v1", isPlaying: () => true, slowSec: 0.022, slowLimit: 90 }) : null;
         window.addEventListener("resize", () => this.resize());
         this.resize();
@@ -445,14 +580,15 @@ class FrWorldView {
         for (let cz = 0; cz < counts.z; cz++)
             for (let cx = 0; cx < counts.x; cx++)
                 this.rebuildChunk(cx, cz);
-        const size = world.terrain.w * FrTerrainData.BLOCK;
-        this.water.scale.set(size * 3, size * 3, 1);
-        this.water.position.set(size / 2, -0.9, size / 2);
+        this.waterSurface.rebuild(world.terrain);
+        this.waterDirty = false;
         this.treeGroup.clear();
         this.propGroup.clear();
         this.blockGroup.clear();
-        this.trees = new FrTreeLayer(this.libs, world, this.treeGroup);
-        this.props = new FrProps(this.libs, world, this.propGroup);
+        this.decorGroup.clear();
+        this.trees = new FrTreeLayer(this.libs, world, this.treeGroup, this.nature);
+        this.props = new FrProps(this.libs, world, this.propGroup, this.nature);
+        this.decor = new FrGroundDecor(this.libs, world, this.nature, this.decorGroup, (x, z) => this.decorBlocked(world, x, z));
         this.plaza = new FrPlazaDecor(this.libs, world, this.propGroup);
         this.plaza.refresh();
         this.blocksLayer = new FrBlockLayer(this.libs, world, this.blockGroup);
@@ -464,7 +600,7 @@ class FrWorldView {
         this.hideArea();
         this.areaScene = scene;
         this.areaDark = dark;
-        [this.terrainGroup, this.treeGroup, this.propGroup, this.blockGroup, this.water, this.marker, this.preview].forEach((o) => { o.visible = false; });
+        [this.terrainGroup, this.treeGroup, this.propGroup, this.blockGroup, this.decorGroup, this.water, this.marker, this.preview].forEach((o) => { o.visible = false; });
         this.scene.add(scene.group);
         if (dark) {
             this.scene.background.setRGB(0.02, 0.02, 0.035);
@@ -483,6 +619,7 @@ class FrWorldView {
         this.areaScene = null;
         this.areaDark = false;
         [this.terrainGroup, this.treeGroup, this.propGroup, this.blockGroup, this.water].forEach((o) => { o.visible = true; });
+        this.decorGroup.visible = this.decorAllowed;
     }
     updateAreaMarker(cell) {
         if (!this.areaScene)
@@ -541,6 +678,52 @@ class FrWorldView {
         this.preview.material.color.setHex(valid ? 0x9be08a : 0xff6b5a);
         this.preview.scale.setScalar(large ? 1.02 : 0.5);
     }
+    setupShadow(sun) {
+        this.sun = sun;
+        sun.castShadow = true;
+        const size = this.touchDevice ? 1024 : 2048;
+        sun.shadow.mapSize.set(size, size);
+        const box = FrWorldView.SHADOW_BOX;
+        sun.shadow.camera.left = -box;
+        sun.shadow.camera.right = box;
+        sun.shadow.camera.top = box;
+        sun.shadow.camera.bottom = -box;
+        sun.shadow.camera.near = 1;
+        sun.shadow.camera.far = 260;
+        sun.shadow.bias = -0.0008;
+        sun.shadow.normalBias = 0.35;
+    }
+    followShadow() {
+        if (!this.shadowsOn)
+            return;
+        const focus = this.rig.focusPoint();
+        const offset = FrWorldView.SUN_OFFSET;
+        this.sun.target.position.set(focus.x, focus.y, focus.z);
+        this.sun.position.set(focus.x + offset[0], focus.y + offset[1], focus.z + offset[2]);
+    }
+    hideDecor() {
+        if (!this.decorGroup.visible)
+            return false;
+        this.decorAllowed = false;
+        this.decorGroup.visible = false;
+        return true;
+    }
+    turnOffShadows() {
+        if (!this.shadowsOn)
+            return false;
+        this.shadowsOn = false;
+        this.sun.castShadow = false;
+        return true;
+    }
+    decorBlocked(world, x, z) {
+        const terrain = world.terrain;
+        const cell = terrain.index(x, z);
+        if (terrain.isShielded(x, z) || terrain.isWater(x, z) || world.trees.has(cell))
+            return true;
+        if (world.blocks.top(cell) > 0 || terrain.editOf(x, z))
+            return true;
+        return world.sites.some((site) => (Math.abs(site.x - x) <= 2 && Math.abs(site.z - z) <= 2) || site.cells.some((c) => c.x === x && c.z === z) || site.effect.some((c) => c.x === x && c.z === z));
+    }
     lowerPixelRatio() {
         if (this.pixelRatioCap <= 1)
             return false;
@@ -579,7 +762,8 @@ class FrWorldView {
             this.onVillageLevel(level);
     }
     onPublicChanged() { return; }
-    onBlockChanged(x, z, y, record) { this.blocksLayer.apply(x, z, y, record); }
+    onBlockChanged(x, z, y, record) { this.blocksLayer.apply(x, z, y, record); if (record && this.decor)
+        this.decor.clearCell(x, z); }
     onLotChanged() { if (this.lotMarkers)
         this.lotMarkers.refresh(); }
     onFarmChanged() { this.cropsDirty = true; }
@@ -590,6 +774,9 @@ class FrWorldView {
         this.crops.sync(nowMinute);
     }
     onTerrainEdited(x, z) {
+        if (this.decor)
+            this.decor.clearCell(x, z);
+        this.waterDirty = true;
         const cx = Math.floor(x / FrTerrainMesher.CHUNK), cz = Math.floor(z / FrTerrainMesher.CHUNK);
         this.rebuildChunk(cx, cz);
         if (x % FrTerrainMesher.CHUNK === 0)
@@ -660,6 +847,12 @@ class FrWorldView {
         if (this.areaScene)
             this.areaScene.update(time);
         this.burst.update(dt);
+        this.waterTexture.offset.set((time * 0.012) % 1, (time * 0.007) % 1);
+        if (this.waterDirty) {
+            this.waterDirty = false;
+            this.waterSurface.rebuild(this.world.terrain);
+        }
+        this.followShadow();
         this.renderer.render(this.scene, this.rig.camera);
         if (this.governor)
             this.governor.update(dt);
@@ -667,6 +860,8 @@ class FrWorldView {
 }
 FrWorldView.MAX_PIXEL_RATIO_TOUCH = 1.5;
 FrWorldView.MAX_PIXEL_RATIO_DESKTOP = 2;
+FrWorldView.SHADOW_BOX = 36;
+FrWorldView.SUN_OFFSET = [-40, 90, 30];
 class FrRemoteAvatars {
     constructor(libs, scene, factory, clips, labels, roster, selfUid) {
         this.libs = libs;

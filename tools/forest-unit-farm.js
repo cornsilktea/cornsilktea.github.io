@@ -18,21 +18,37 @@ const makeWorld = () => new FrWorld("t", new FrTerrainData(terrainFile), new FrL
     v.farm.set(v.terrain.index(x, z), { uid: "u", no: 1, crop: "potato", at: 0 });
     return first.ok && !FrFarmRules.canPlant(v, x, z, "potato_seed").ok && !FrFarmRules.canPlant(v, 40, 40, "potato_seed").ok && !FrFarmRules.canPlant(v, x + 1, z, "potato").ok;
   })());
-  check("강·수로 두 칸 안의 텃밭은 물가", (() => {
+  const dig = (v, x0, x1, z) => { for (let x = x0; x <= x1; x++) v.terrain.edit(x, z, { h: -1, t: "D" }); v.refreshWater(); };
+  check("강·수로 두 칸 안의 텃밭은 물가 (강과 이어진 물길만)", (() => {
     const v = makeWorld(); const x = farm.x, z = farm.z;
     const before = FrFarmRules.watered(v, x, z);
-    v.terrain.edit(x + 8, z, { h: -1, t: "R" });
+    dig(v, x + 8, x + 12, z);
     const far = FrFarmRules.watered(v, x, z);
-    v.terrain.edit(x + 7, z, { h: -1, t: "R" });
-    v.terrain.edit(x + 6, z, { h: -1, t: "R" });
+    dig(v, x + 6, x + 7, z);
     return !before && !far && FrFarmRules.watered(v, x + 5, z + 0) === true;
   })());
   check("작물 단계는 심은 뒤 시간으로 자람(물가면 1.7배 빠름)", (() => {
     const v = makeWorld(); const rec = { uid: "u", no: 1, crop: "potato", at: 0 };
     const dry = [0, 400, 900, 1440].map((m) => FrFarmRules.stage(v, farm.x, farm.z, rec, m)).join();
-    v.terrain.edit(farm.x + 7, farm.z, { h: -1, t: "R" });
+    dig(v, farm.x + 7, farm.x + 12, farm.z);
     const wet = FrFarmRules.stage(v, farm.x + 5, farm.z, rec, 1440 / 1.7 + 1);
     return dry === "0,1,2,3" && wet === 3;
+  })());
+  check("물: 강과 이어지지 않은 구덩이는 마른 채로", (() => {
+    const v = makeWorld();
+    dig(v, farm.x + 8, farm.x + 9, farm.z);
+    return !v.terrain.isWater(farm.x + 8, farm.z) && !v.terrain.isWater(farm.x + 9, farm.z);
+  })());
+  check("물: 강과 이으면 흘러들고, 물길을 블록으로 막으면 끊김", (() => {
+    const v = makeWorld(); const z = farm.z;
+    dig(v, farm.x + 8, farm.x + 12, z);
+    const flowing = v.terrain.isWater(farm.x + 8, z) && v.terrain.isFlooded(farm.x + 8, z);
+    v.blocks.set(v.terrain.index(farm.x + 11, z), 0, { t: "block_stone", n: 1, r: 0 });
+    v.refreshWater();
+    const cut = !v.terrain.isWater(farm.x + 8, z) && v.terrain.isWater(farm.x + 12, z);
+    v.blocks.set(v.terrain.index(farm.x + 11, z), 0, null);
+    v.refreshWater();
+    return flowing && cut && v.terrain.isWater(farm.x + 8, z);
   })());
   check("남은 시간 계산", (() => { const v = makeWorld(); const rec = { uid: "u", no: 1, crop: "carrot", at: 100 }; return Math.round(FrFarmRules.minutesLeft(v, farm.x, farm.z, rec, 340)) === 1200 && FrFarmRules.minutesLeft(v, farm.x, farm.z, rec, 99999) === 0; })());
   check("수로: 강에 붙은 땅·텃밭에 붙은 땅만, 텃밭·물·광장은 안 됨", (() => {

@@ -46,11 +46,18 @@ class FrWorld {
   applyTerrainLocal(x: number, z: number, edit: FrTerrainEdit): void {
     this.terrain.edit(x, z, edit);
     this.listeners.forEach((l) => l.onTerrainEdited(x, z));
+    this.refreshWater();
   }
 
   revertTerrainLocal(x: number, z: number): void {
     this.terrain.restore(x, z);
     this.listeners.forEach((l) => l.onTerrainEdited(x, z));
+    this.refreshWater();
+  }
+
+  refreshWater(): void {
+    const changed = this.terrain.refreshFlood((index) => this.blocks.top(index) > 0);
+    changed.forEach((index) => { const x = index % this.terrain.w, z = Math.floor(index / this.terrain.w); this.listeners.forEach((l) => l.onTerrainEdited(x, z)); });
   }
 
   private applySiteEffects(key: string, built: boolean): void {
@@ -124,6 +131,7 @@ class FrWorld {
     Object.keys(build || {}).forEach((key) => { this.builtKeys.add(key); this.village.markBuilt(key.replace(/_\d+$/, "")); this.applySiteEffects(key, true); });
     this.publicStore.restore(publicAmounts || {}, logs.map(([, line]) => line));
     logs.forEach(([key]) => this.logKeys.add(key));
+    this.refreshWater();
   }
 
   isFelled(index: number): boolean { return this.felled.has(index); }
@@ -156,6 +164,7 @@ class FrWorld {
     if (!result.committed) return false;
     this.terrain.edit(x, z, after);
     this.listeners.forEach((l) => l.onTerrainEdited(x, z));
+    this.refreshWater();
     return true;
   }
 
@@ -302,6 +311,7 @@ class FrWorld {
   private applyBlock(x: number, z: number, y: number, record: FrBlockRecord | null): void {
     if (!this.blocks.set(this.terrain.index(x, z), y, record)) return;
     this.listeners.forEach((l) => l.onBlockChanged(x, z, y, record));
+    this.refreshWater();
   }
 
   remoteBlock(index: number, y: number, record: FrBlockRecord | null): void {
@@ -313,6 +323,7 @@ class FrWorld {
     if (now !== null) this.blocks.set(index, y, null);
     this.blocks.set(index, y, record);
     this.listeners.forEach((l) => l.onBlockChanged(x, z, y, record));
+    this.refreshWater();
   }
 
   async plant(index: number, record: FrCropRecord): Promise<boolean> {
@@ -369,6 +380,7 @@ class FrWorld {
     if (now && now.h === edit.h && now.t === edit.t) return;
     this.terrain.edit(x, z, edit);
     this.listeners.forEach((l) => l.onTerrainEdited(x, z));
+    this.refreshWater();
   }
 
   remoteSnow(index: number, day: number | null): void {

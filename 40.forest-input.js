@@ -1,4 +1,27 @@
 "use strict";
+class FrHoverCell {
+    constructor() {
+        this.x = 0;
+        this.y = 0;
+        this.active = false;
+        this.dirty = false;
+        this.cell = null;
+    }
+    moved(x, y) {
+        this.x = x;
+        this.y = y;
+        this.active = true;
+        this.dirty = true;
+    }
+    left() {
+        this.active = false;
+        this.cell = null;
+    }
+    settle(cell) {
+        this.cell = cell;
+        this.dirty = false;
+    }
+}
 class FrJoystick {
     constructor(base, knob) {
         this.base = base;

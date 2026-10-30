@@ -91,6 +91,8 @@ const sourceOf = (bag, pub = new FrPublicStore(), chest = new FrChestStore()) =>
   check("재료 모자라면 제작 실패", (() => { const b = new FrBag(); b.add("iron", 2); return !FrCraftRules.craftGear("pickaxe", 2, sourceOf(b), b); })());
   check("도구 100번 쓰면 없어짐", (() => { const b = new FrBag(); b.add("gear_pickaxe_1", 1); let broke = null; for (let i = 0; i < 100; i++) broke = b.wear("pickaxe") || broke; return broke === "gear_pickaxe_1" && b.bestTier("pickaxe") === 0; })());
   check("무기 200번", (() => { const b = new FrBag(); b.add("gear_weapon_3", 1); for (let i = 0; i < 199; i++) b.wear("weapon"); const alive = b.bestTier("weapon") === 3; b.wear("weapon"); return alive && b.bestTier("weapon") === 0; })());
+  check("가방 칸 옮기기: 있는 칸끼리는 바꾸고, 빈 칸 쪽이면 맨 뒤로", (() => { const b = new FrBag(); b.add("wood", 5); b.add("stone", 5); b.add("sand", 5); b.move(2, 0); const swapped = b.slots.map((s) => s.id).join(); b.move(0, 30); return swapped === "sand,stone,wood" && b.slots.map((s) => s.id).join() === "stone,wood,sand"; })());
+  check("운영자 행동력은 줄지 않음", (() => { const ap = new FrActionPoints(0, 5); ap.unlimited = true; return ap.canSpend(40) && ap.spend(40) && ap.current === 5; })());
   check("높은 등급 도구부터 닳음", (() => { const b = new FrBag(); b.add("gear_axe_1", 1); b.add("gear_axe_3", 1); b.wear("axe"); return b.slots.find((s) => s.id === "gear_axe_3").uses === 99 && b.slots.find((s) => s.id === "gear_axe_1").uses === 100; })());
 }
 

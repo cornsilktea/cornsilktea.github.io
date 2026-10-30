@@ -11,8 +11,9 @@ type FrFeatureKind = "fruitTree" | "jungleTree" | "flower" | "shoreSpot" | "torc
 
 class FrFeature {
   availableAt = 0;
+  felled = false;
   constructor(readonly kind: FrFeatureKind, readonly x: number, readonly z: number, readonly variant: number, readonly item = "") {}
-  get blocks(): boolean { return this.kind === "fruitTree" || this.kind === "jungleTree"; }
+  get blocks(): boolean { return !this.felled && (this.kind === "fruitTree" || this.kind === "jungleTree"); }
   get gatherable(): boolean { return this.kind === "fruitTree" || this.kind === "jungleTree" || this.kind === "flower" || this.kind === "shoreSpot"; }
 }
 

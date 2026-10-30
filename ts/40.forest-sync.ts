@@ -3,6 +3,8 @@ interface FrNode { apply(rest: string[], value: unknown): void }
 interface FrMember { no: number; name: string; look: unknown; adm: boolean }
 interface FrPresenceRow { area: string; sleeping: boolean; day: number; at: number }
 interface FrRemotePose { x: number; z: number; y: number; dir: number; anim: number; vx: number; vz: number; at: number }
+type FrSleepState = "asleep" | "awake" | "away" | "idle" | "offline";
+interface FrSleepRow { uid: string; no: number; name: string; state: FrSleepState; area: string; self: boolean }
 interface FrAdminState { notice: { text: string; at: number } | null; lock: boolean; commands: Record<string, FrAdminCommand> }
 
 class FrWire {
@@ -56,6 +58,25 @@ class FrRoster {
       list.push({ uid, name: member ? member.name : "?", area: row.area, sleeping: row.sleeping, actedToday: row.day === day });
     });
     return list;
+  }
+
+  sleepRows(day: number, self: FrSleepRow): FrSleepRow[] {
+    const rows: FrSleepRow[] = [self];
+    this.members.forEach((member, uid) => {
+      if (uid === self.uid || member.adm) return;
+      const row = this.presence.get(uid);
+      const online = !!row && this.alive(uid);
+      const area = row ? row.area : "island";
+      rows.push({ uid, no: member.no, name: member.name, state: FrRoster.sleepStateOf(online, row, day), area, self: false });
+    });
+    return rows.sort((a, b) => a.no - b.no || a.name.localeCompare(b.name));
+  }
+
+  private static sleepStateOf(online: boolean, row: FrPresenceRow | undefined, day: number): FrSleepState {
+    if (!online || !row) return "offline";
+    if (row.sleeping) return "asleep";
+    if (row.day !== day) return "idle";
+    return FrSleepVote.canSleep(FrBalance.DUSK_MINUTE, row.area) ? "awake" : "away";
   }
 }
 

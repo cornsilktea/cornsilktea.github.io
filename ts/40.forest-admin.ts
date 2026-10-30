@@ -354,7 +354,6 @@ class FrAdminWindow extends FrWindow {
 
 class FrBoardPage {
   static readonly CELL_PIXELS = 3;
-  private static readonly TOP_COLORS: Readonly<Record<string, string>> = { G: "#6FA352", D: "#96704A", S: "#808084", N: "#E2D096", W: "#F6F8FA", R: "#4682C8", O: "#28508C", P: "#C4A86E" };
 
   private readonly views: Array<{ island: string; world: FrWorld; clock: FrClockSync; roster: FrRoster; canvas: HTMLCanvasElement; info: HTMLDivElement; hub: FrSyncHub }> = [];
 
@@ -405,24 +404,7 @@ class FrBoardPage {
 
   private drawMap(view: { world: FrWorld; roster: FrRoster; canvas: HTMLCanvasElement }): void {
     const g = view.canvas.getContext("2d") as CanvasRenderingContext2D;
-    const P = FrBoardPage.CELL_PIXELS, terrain = view.world.terrain;
-    for (let z = 0; z < terrain.d; z++) for (let x = 0; x < terrain.w; x++) {
-      g.fillStyle = FrBoardPage.TOP_COLORS[terrain.top(x, z)] || "#6FA352";
-      g.fillRect(x * P, z * P, P, P);
-    }
-    view.world.trees.forEach((spot, index) => { if (!view.world.isFelled(index)) { g.fillStyle = "rgba(30,90,40,0.8)"; g.fillRect(spot.x * P, spot.z * P, P, P); } });
-    const a = terrain.anchors;
-    g.fillStyle = "#FF8C00";
-    g.fillRect(a.campfire.x * P - 2, a.campfire.z * P - 2, P + 4, P + 4);
-    view.roster.aliveUids().forEach((uid) => {
-      const pose = view.roster.poses.get(uid), member = view.roster.members.get(uid);
-      if (!pose || !member || member.adm) return;
-      const px = (pose.x / FrTerrainData.BLOCK) * P, pz = (pose.z / FrTerrainData.BLOCK) * P;
-      g.fillStyle = "#FFFFFF";
-      g.beginPath(); g.arc(px, pz, 4, 0, Math.PI * 2); g.fill();
-      g.fillStyle = "#D97B4F";
-      g.beginPath(); g.arc(px, pz, 2.5, 0, Math.PI * 2); g.fill();
-    });
+    FrIslandMapPainter.paint(g, view.world, FrBoardPage.CELL_PIXELS, FrIslandMapPainter.othersOf(view.roster, ""), null);
   }
 
   private drawInfo(view: { clock: FrClockSync; roster: FrRoster; world: FrWorld; info: HTMLDivElement }): void {

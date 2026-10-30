@@ -126,6 +126,8 @@ class FrAreaOutcome {
             this.session.stats.add(stat[feature.kind]);
         if (feature) {
             feature.availableAt = this.absoluteMinute() + cooldown;
+            if (feature.kind === "jungleTree")
+                feature.felled = true;
             if (after === "gone")
                 this.scene.setTaken(feature, true);
             else

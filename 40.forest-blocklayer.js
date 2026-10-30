@@ -280,6 +280,7 @@ class FrLotMarkers {
                 bar.position.set(x, y + 0.12, z);
                 frame.add(bar);
             });
+            this.addWoodwork(frame, S);
             frame.position.set(lot.x * B, world.terrain.surfaceY(lot.x, lot.z), lot.z * B);
             this.group.add(frame);
             this.frames.push(frame);
@@ -287,25 +288,41 @@ class FrLotMarkers {
         this.refresh();
     }
     groupObject() { return this.group; }
+    addWoodwork(frame, S) {
+        const T = this.libs.THREE;
+        const wood = new T.MeshLambertMaterial({ map: FrSurfaceTextures.wood(this.libs), color: 0xc9a06c });
+        const dark = new T.MeshLambertMaterial({ map: FrSurfaceTextures.wood(this.libs), color: 0x8a6440 });
+        const piece = (w, h, d, x, y, z, material) => {
+            const mesh = new T.Mesh(new T.BoxGeometry(w, h, d), material);
+            mesh.position.set(x, y, z);
+            mesh.castShadow = true;
+            mesh.userData = { woodwork: true };
+            frame.add(mesh);
+        };
+        [[0.3, 0.3], [S - 0.3, 0.3], [0.3, S - 0.3], [S - 0.3, S - 0.3]].forEach(([x, z]) => { piece(0.42, 1.3, 0.42, x, 0.65, z, dark); piece(0.56, 0.16, 0.56, x, 1.36, z, wood); });
+        piece(0.4, 2.4, 0.4, S / 2 - 1.2, 1.2, 0.3, dark);
+        piece(0.4, 2.4, 0.4, S / 2 + 1.2, 1.2, 0.3, dark);
+        piece(3.2, 1.25, 0.3, S / 2, 2.15, 0.3, wood);
+        piece(3.45, 0.18, 0.4, S / 2, 2.85, 0.3, dark);
+    }
     refresh() {
         const B = FrTerrainData.BLOCK;
         this.frames.forEach((frame, index) => {
             const lot = this.world.lots.get(index);
             const color = !lot ? 0xffffff : lot.uid === this.selfUid ? 0x9be08a : 0xd97b4f;
-            frame.children.forEach((bar) => { bar.material.color.setHex(color); });
+            frame.children.forEach((bar) => { if (!bar.userData.woodwork && bar.isMesh)
+                bar.material.color.setHex(color); });
             const old = this.signs.get(index);
             if (old) {
                 frame.remove(old);
                 this.signs.delete(index);
             }
-            if (lot) {
-                const sign = this.labels.create(lot.name + "의 집", "#FFE2C9");
-                sign.scale.set(3.4, 0.85, 1);
-                const anchor = this.world.terrain.anchors.lots[index];
-                sign.position.set(anchor.size * B / 2, 2.2, 0.6);
-                frame.add(sign);
-                this.signs.set(index, sign);
-            }
+            const sign = this.labels.create(lot ? lot.name + "의 집" : "빈 집터", lot ? "#FFE2C9" : "#FFFFFF");
+            sign.scale.set(3.0, 0.75, 1);
+            const anchor = this.world.terrain.anchors.lots[index];
+            sign.position.set(anchor.size * B / 2, 2.2, 0.55);
+            frame.add(sign);
+            this.signs.set(index, sign);
         });
     }
 }

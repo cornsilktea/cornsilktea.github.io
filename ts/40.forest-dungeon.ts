@@ -40,6 +40,7 @@ class FrDungeonFight {
   readonly monsters: FrMonster[] = [];
   timeLeft = FrBalance.DUNGEON_SECONDS;
   health = FrBalance.PLAYER_HEALTH;
+  invincible = false;
   kills = 0;
   ended: "time" | "dead" | "left" | null = null;
   stun = 0;
@@ -143,7 +144,7 @@ class FrDungeonFight {
       m.timer -= dt;
       if (m.timer <= 0) {
         if (distance <= FrDungeonFight.HIT_RANGE) {
-          const damage = FrDungeonRules.damageTaken(m.def.attack, gear.reduction);
+          const damage = this.invincible ? 0 : FrDungeonRules.damageTaken(m.def.attack, gear.reduction);
           this.health = Math.max(0, this.health - damage);
           events.push({ t: "hurt", damage });
         }

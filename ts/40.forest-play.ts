@@ -181,6 +181,9 @@ interface FrFinderContext {
 }
 
 class FrTargetFinder {
+  static readonly LOT_REACH = 6;
+  static readonly BUILD_REACH = 6;
+
   constructor(private readonly world: FrWorld) {}
 
   find(player: FrPlayerBody, context?: FrFinderContext): FrTarget | null {
@@ -194,6 +197,7 @@ class FrTargetFinder {
       if (near((p.x + 0.5) * B, (p.z + 0.5) * B, 6.2)) return { kind: "portal", label: FrAreaInfo.label(id), cell: null, portal: id };
     }
     for (const site of this.world.sites) {
+      if (!this.openableStation(site)) continue;
       if (near((site.x + 0.5) * B, (site.z + 0.5) * B, site.small ? 4.8 : 6.2)) return { kind: "site", label: this.siteLabel(site), cell: null, site };
     }
     if (context) {
@@ -202,10 +206,6 @@ class FrTargetFinder {
       if (farmTarget) return farmTarget;
       const chestY = this.personalChestAt(front, context.me);
       if (chestY >= 0 && !context.held) return { kind: "pchest", label: "내 창고", cell: front, removeY: chestY };
-      const blockTarget = this.blockTarget(front, context);
-      if (blockTarget) return blockTarget;
-      const lotTarget = this.lotTarget(player, context);
-      if (lotTarget) return lotTarget;
     }
     const tree = this.nearestTree(player);
     if (tree) return { kind: "tree", label: "베기", cell: { x: tree.x, z: tree.z }, tree };
@@ -216,6 +216,10 @@ class FrTargetFinder {
     const column = this.world.blocks.column(this.world.terrain.index(cell.x, cell.z));
     const found = column.find(([, record]) => record.t === FrFurnitureCatalog.idOf("box") && record.n === me.no);
     return found ? found[0] : -1;
+  }
+
+  private openableStation(site: FrBuildSite): boolean {
+    return FrSiteBook.STATIONS.indexOf(site.defId) >= 0 && this.world.isBuilt(site.id);
   }
 
   siteLabel(site: FrBuildSite): string {
@@ -246,10 +250,17 @@ class FrTargetFinder {
     return y >= 0 ? { kind: "remove", label: "치우기", cell, removeY: y } : null;
   }
 
-  private lotTarget(player: FrPlayerBody, context: FrFinderContext): FrTarget | null {
-    const here = player.cell();
-    const lotIndex = FrBlockRules.lotIndexAt(this.world, here.x, here.z);
-    if (lotIndex < 0) return null;
+  lotTargetAt(cell: FrPoint, player: FrPlayerBody, context: FrFinderContext): { target: FrTarget | null; far: boolean } {
+    const lotIndex = FrBlockRules.lotIndexAt(this.world, cell.x, cell.z);
+    if (lotIndex < 0) return { target: null, far: false };
+    const anchor = this.world.terrain.anchors.lots[lotIndex];
+    const B = FrTerrainData.BLOCK;
+    const center = { x: (anchor.x + anchor.size / 2) * B, z: (anchor.z + anchor.size / 2) * B };
+    if (Math.hypot(player.x - center.x, player.z - center.z) > (anchor.size / 2) * B + FrTargetFinder.LOT_REACH) return { target: null, far: true };
+    return { target: this.lotTarget(lotIndex, context), far: false };
+  }
+
+  private lotTarget(lotIndex: number, context: FrFinderContext): FrTarget | null {
     const lot = this.world.lots.get(lotIndex);
     if (!lot) return FrBlockRules.ownLot(this.world, context.me.uid) < 0 ? { kind: "lot", label: "집터 정하기", cell: null, lot: lotIndex } : null;
     if (lot.uid !== context.me.uid) return null;
@@ -274,7 +285,7 @@ class FrTargetFinder {
     const B = FrTerrainData.BLOCK;
     const near = (cx: number, cz: number, range: number) => Math.hypot(player.x - cx, player.z - cz) <= range;
     if (pick.kind === "cook") return near((a.campfire.x + 0.5) * B, (a.campfire.z + 0.5) * B, 7.5) ? { target: { kind: "cook", label: "요리", cell: null }, far: false } : { target: null, far: true };
-    if (pick.kind === "chest") return near((a.publicChest.x + a.publicChest.size / 2) * B, (a.publicChest.z + a.publicChest.size / 2) * B, 8.5) ? { target: { kind: "chest", label: "창고", cell: null }, far: false } : { target: null, far: true };
+    if (pick.kind === "chest") return { target: { kind: "chest", label: "창고", cell: null }, far: false };
     if (pick.kind === "portal" && pick.siteId) {
       const p = a.portals[pick.siteId];
       if (!p) return { target: null, far: false };
@@ -283,6 +294,7 @@ class FrTargetFinder {
     if (pick.kind === "site") {
       const site = this.world.siteOf(pick.siteId || "");
       if (!site) return { target: null, far: false };
+      if (this.openableStation(site)) return { target: { kind: "site", label: this.siteLabel(site), cell: null, site }, far: false };
       return near((site.x + 0.5) * B, (site.z + 0.5) * B, 6.8) ? { target: { kind: "site", label: this.siteLabel(site), cell: null, site }, far: false } : { target: null, far: true };
     }
     if (pick.kind === "tree" && pick.spot) {
@@ -380,9 +392,10 @@ class FrTaskOutcome {
   private async canal(cell: FrPoint): Promise<string> {
     const terrain = this.world.terrain;
     const before: FrTerrainEdit = { h: terrain.height(cell.x, cell.z), t: terrain.top(cell.x, cell.z) };
-    if (!(await this.world.editTerrain(cell.x, cell.z, before, { h: before.h - 1, t: FrTerrainData.RIVER }))) return "다른 친구가 먼저 팠어요";
+    if (!(await this.world.editTerrain(cell.x, cell.z, before, { h: before.h - 1, t: FrTerrainData.DUG_TOP }))) return "다른 친구가 먼저 팠어요";
     this.session.stats.add("canal");
-    return "수로를 팠어요! 물이 닿는 텃밭은 작물이 더 빨리 자라요";
+    if (terrain.isFlooded(cell.x, cell.z)) return "물이 흘러 들어왔어요! 물이 닿는 텃밭은 작물이 더 빨리 자라요";
+    return "수로를 팠어요. 물 높이까지 더 파고 물길과 이어지면 물이 흘러 들어와요";
   }
 
   private async harvest(cell: FrPoint): Promise<string> {

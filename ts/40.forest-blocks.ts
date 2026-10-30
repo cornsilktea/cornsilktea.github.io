@@ -94,7 +94,7 @@ class FrBlockRules {
 
   static check(world: FrWorld, x: number, z: number, y: number, me: FrBlockPlayer, bodies: ReadonlyArray<FrPoint>): FrPlaceCheck {
     const terrain = world.terrain;
-    if (!terrain.inside(x, z) || terrain.isWater(x, z)) return { ok: false, reason: "여기에는 놓을 수 없어요" };
+    if (!terrain.inside(x, z) || (terrain.isWater(x, z) && !terrain.isFlooded(x, z))) return { ok: false, reason: "여기에는 놓을 수 없어요" };
     if (y < 0 || y >= FrBlockRules.MAX_LEVEL) return { ok: false, reason: "더 높이 쌓을 수 없어요 (8칸까지)" };
     if (world.blocked(x, z)) return { ok: false, reason: "나무가 있어서 놓을 수 없어요" };
     if (bodies.some((b) => b.x === x && b.z === z)) return { ok: false, reason: "누가 서 있어요" };

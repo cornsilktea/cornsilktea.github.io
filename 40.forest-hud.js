@@ -85,8 +85,9 @@ class FrWindow {
     }
 }
 class FrBagWindow extends FrWindow {
-    constructor(session, toast) {
-        super("가방", session, toast);
+    constructor(session, toast, drag) {
+        super("가방 (I)", session, toast);
+        this.drag = drag;
         this.selected = -1;
     }
     equipmentRow() {
@@ -118,11 +119,13 @@ class FrBagWindow extends FrWindow {
                 cell.classList.add("selected");
             if (i < FrBalance.HOTBAR_SLOTS)
                 cell.classList.add("hot");
-            cell.addEventListener("click", () => { this.selected = i; this.render(); });
+            cell.addEventListener("click", () => { if (this.drag.justDropped())
+                return; this.selected = i; this.render(); });
+            this.drag.attach(cell, i, !!slot);
             grid.appendChild(cell);
         }
         this.body.appendChild(grid);
-        this.body.appendChild(FrDom.make("div", "fr-note", "앞 8칸(굵은 테두리)이 아래 핫바예요. 숫자 1~8 로 먹을 수 있어요."));
+        this.body.appendChild(FrDom.make("div", "fr-note", "앞 8칸(굵은 테두리)이 아래 핫바예요. 아이템을 끌어서 핫바 칸이나 다른 칸에 놓으면 자리가 바뀌어요."));
         const slot = this.session.bag.slots[this.selected];
         if (!slot)
             return;
@@ -483,7 +486,7 @@ class FrSeedWindow extends FrWindow {
         FrDom.clear(this.body);
         const seeds = FrCatalog.CROPS.map((c) => ({ crop: c, id: c.id + "_seed" })).filter((s) => this.session.bag.count(s.id) > 0);
         if (seeds.length === 0)
-            this.body.appendChild(FrDom.make("div", "fr-note", "씨앗이 없어요. 과일 숲에서 과일나무를 흔들면 가끔 나와요."));
+            this.body.appendChild(FrDom.make("div", "fr-note", "가방에 씨앗이 없어요. 공용 창고에서 꺼내 오거나, 과일 숲에서 과일나무를 흔들면 가끔 나와요."));
         const list = FrDom.make("div", "fr-list");
         seeds.forEach(({ crop, id }) => {
             const row = FrDom.make("div", "fr-recipe");
@@ -498,7 +501,7 @@ class FrSeedWindow extends FrWindow {
     }
 }
 class FrRecipeBookWindow extends FrWindow {
-    constructor(session, toast) { super("레시피 책 (K)", session, toast); }
+    constructor(session, toast) { super("레시피 책 (R)", session, toast); }
     render() {
         FrDom.clear(this.body);
         const stationNames = { campfire: "모닥불", oven: "화덕", kitchen: "섬 부엌" };
@@ -528,12 +531,148 @@ class FrRecipeBookWindow extends FrWindow {
         }
     }
 }
+class FrItemInfoPopup {
+    constructor() {
+        this.onItem = () => undefined;
+        this.root = FrDom.make("div", "fr-win fr-info");
+        this.root.hidden = true;
+        const head = FrDom.make("div", "fr-win-head");
+        this.title = FrDom.make("b", "", "");
+        const close = FrDom.make("button", "fr-win-close", "✕");
+        close.type = "button";
+        close.addEventListener("click", () => this.hide());
+        head.append(this.title, close);
+        this.body = FrDom.make("div", "fr-win-body");
+        this.root.append(head, this.body);
+        document.body.appendChild(this.root);
+    }
+    get isOpen() { return !this.root.hidden; }
+    hide() { this.root.hidden = true; }
+    show(id, session) {
+        const material = FrCatalog.material(id);
+        if (!material)
+            return;
+        FrDom.clear(this.body);
+        this.title.textContent = material.name;
+        const head = FrDom.make("div", "fr-head");
+        head.append(FrIcons.image(id, 56), FrDom.make("div", "", (material.grade === "legend" ? "전설" : material.grade === "rare" ? "희귀" : "일반") + " · 가방 " + session.bag.count(id) + " · 공용 창고 " + session.world.publicStore.count(id)));
+        this.body.appendChild(head);
+        this.section("얻는 곳", [FrDom.make("div", "", material.howToGet)]);
+        const makes = FrCraftMenu.options().filter((o) => o.output === id);
+        if (makes.length > 0)
+            this.section("만드는 법", makes.map((o) => this.costLine(o.label, o.cost)));
+        const products = FrItemUses.of(id);
+        this.section("이 재화로 만들 수 있는 것", products.length > 0 ? [this.productGrid(products)] : [FrDom.make("div", "fr-note", "아직 쓰이는 곳이 없어요")]);
+        this.root.hidden = false;
+    }
+    section(title, nodes) {
+        const box = FrDom.make("div", "fr-detail");
+        box.appendChild(FrDom.make("h3", "", title));
+        nodes.forEach((n) => box.appendChild(n));
+        this.body.appendChild(box);
+    }
+    costLine(label, cost) {
+        const line = FrDom.make("div", "fr-line");
+        line.appendChild(FrDom.make("b", "", label + " ← "));
+        Object.keys(cost).forEach((c) => {
+            const chip = FrDom.make("span", "fr-need");
+            chip.title = FrItemNames.label(c);
+            chip.append(FrIcons.image(c, 22), FrDom.make("span", "", "×" + cost[c] + " "));
+            line.appendChild(chip);
+        });
+        return line;
+    }
+    productGrid(products) {
+        const grid = FrDom.make("div", "fr-uses");
+        products.forEach((use) => {
+            const card = FrDom.make("div", "fr-use");
+            card.appendChild(use.icon ? FrIcons.image(use.icon, 34) : FrDom.make("span", "fr-use-mark", "🏗"));
+            card.appendChild(FrDom.make("div", "fr-use-name", use.name));
+            card.appendChild(FrDom.make("div", "fr-use-kind", use.kind));
+            if (use.icon && FrCatalog.material(use.icon)) {
+                card.classList.add("link");
+                card.addEventListener("click", () => this.onItem(use.icon));
+            }
+            grid.appendChild(card);
+        });
+        return grid;
+    }
+}
+class FrItemUses {
+    static of(id) {
+        const uses = [];
+        FrCraftMenu.options().forEach((o) => { if (o.cost[id])
+            uses.push({ name: o.label, kind: o.station === "forge" ? "대장간" : "작업대", icon: o.output }); });
+        FrCatalog.RECIPES.forEach((r) => { if (r.ingredients.some((i) => i.item === id || (i.group && FrCatalog.groupMembers(i.group).indexOf(id) >= 0)))
+            uses.push({ name: r.name, kind: "요리 ★" + r.star, icon: r.id }); });
+        FrCatalog.CONSTRUCTIONS.forEach((c) => { if (c.cost[id])
+            uses.push({ name: c.name, kind: "공동 건설", icon: null }); });
+        return uses;
+    }
+}
+class FrSleepBoard {
+    constructor(onWake) {
+        this.root = FrDom.make("div", "fr-sleep-board");
+        this.root.hidden = true;
+        this.root.appendChild(FrDom.make("div", "fr-sleep-title", "💤 모두 잠들면 아침이 와요"));
+        this.summary = FrDom.make("div", "fr-sleep-summary");
+        this.list = FrDom.make("div", "fr-sleep-list");
+        const wake = FrDom.make("button", "fr-btn fr-sleep-wake", "일어나기 (Z)");
+        wake.type = "button";
+        wake.addEventListener("click", onWake);
+        const legend = FrDom.make("div", "fr-sleep-legend");
+        ["asleep", "awake", "idle", "offline"].forEach((state) => {
+            const item = FrDom.make("span", "");
+            item.append(this.dot(state), FrDom.make("span", "", FrSleepBoard.STATES[state].text.split(" · ")[0]));
+            legend.appendChild(item);
+        });
+        this.root.append(this.summary, legend, this.list, wake);
+        document.body.appendChild(this.root);
+    }
+    show(rows, banner) {
+        this.summary.textContent = banner;
+        FrDom.clear(this.list);
+        rows.forEach((row) => {
+            const line = FrDom.make("div", row.self ? "fr-sleep-row me" : "fr-sleep-row");
+            line.appendChild(this.dot(row.state));
+            line.appendChild(FrDom.make("span", "fr-sleep-name", (row.no > 0 ? row.no + " " : "") + row.name + (row.self ? " (나)" : "")));
+            const where = row.state === "away" || (row.state === "awake" && row.area !== "island") ? " · " + FrSleepVote.areaLabel(row.area) : "";
+            line.appendChild(FrDom.make("span", "fr-sleep-state", FrSleepBoard.STATES[row.state].text + where));
+            this.list.appendChild(line);
+        });
+        this.root.hidden = false;
+    }
+    hide() { if (!this.root.hidden)
+        this.root.hidden = true; }
+    dot(state) {
+        const dot = FrDom.make("span", "fr-sleep-dot");
+        dot.style.background = FrSleepBoard.STATES[state].color;
+        if (state === "awake" || state === "away")
+            dot.style.boxShadow = "0 0 8px " + FrSleepBoard.STATES[state].color;
+        return dot;
+    }
+}
+FrSleepBoard.STATES = {
+    asleep: { color: "#7BA8FF", text: "자는 중" },
+    awake: { color: "#FF7A5A", text: "깨어 있음" },
+    away: { color: "#F2C14E", text: "깨어 있음" },
+    idle: { color: "#9AA5B4", text: "오늘 안 움직임 · 안 기다려요" },
+    offline: { color: "#4A5361", text: "접속 안 함" },
+};
 class FrCurrencyWindow extends FrWindow {
     constructor(session, toast) {
-        super("재화 현황 (C)", session, toast);
+        super("재화 현황 (U)", session, toast);
         this.selected = "";
+        this.info = new FrItemInfoPopup();
+        this.info.onItem = (id) => this.pick(id);
     }
-    showItem(id) { this.selected = id; this.open(); }
+    showItem(id) { this.open(); this.pick(id); }
+    close() { super.close(); this.info.hide(); }
+    pick(id) {
+        this.selected = id;
+        this.info.show(id, this.session);
+        this.render();
+    }
     render() {
         FrDom.clear(this.body);
         const rank = { common: 0, rare: 1, legend: 2 };
@@ -547,43 +686,22 @@ class FrCurrencyWindow extends FrWindow {
                 const known = this.session.seen.has(m.id);
                 if (!known)
                     cell.style.opacity = "0.4";
+                if (m.id === this.selected)
+                    cell.classList.add("picked");
                 cell.append(FrIcons.image(m.id, 34), FrDom.make("span", "fr-cur-count", this.session.bag.count(m.id) + " / " + this.session.world.publicStore.count(m.id)));
-                cell.addEventListener("click", () => { this.selected = m.id; this.render(); });
+                cell.addEventListener("click", () => this.pick(m.id));
                 grid.appendChild(cell);
             });
             this.body.appendChild(grid);
         });
-        this.body.appendChild(FrDom.make("div", "fr-note", "숫자는 가방 / 공용 창고예요. 흐린 것은 아직 못 얻은 재화예요. 누르면 얻는 법이 나와요."));
-        if (this.selected)
-            this.body.appendChild(this.detail(this.selected));
-    }
-    detail(id) {
-        const material = FrCatalog.material(id);
-        const box = FrDom.make("div", "fr-detail");
-        const head = FrDom.make("div", "fr-head");
-        head.append(FrIcons.image(id, 40), FrDom.make("b", "", material.name + " · " + (material.grade === "legend" ? "전설" : material.grade === "rare" ? "희귀" : "일반")));
-        box.appendChild(head);
-        box.appendChild(FrDom.make("div", "", "얻는 곳: " + material.howToGet));
-        const makes = FrCraftMenu.options().filter((o) => o.output === id).map((o) => o.label + " (" + Object.keys(o.cost).map((c) => FrItemNames.label(c) + " " + o.cost[c]).join(", ") + ")");
-        if (makes.length > 0)
-            box.appendChild(FrDom.make("div", "", "만드는 법: " + makes.join(" / ")));
-        const uses = [];
-        FrCatalog.RECIPES.forEach((r) => { if (r.ingredients.some((i) => i.item === id || (i.group && FrCatalog.groupMembers(i.group).indexOf(id) >= 0)))
-            uses.push(r.name); });
-        FrCatalog.CONSTRUCTIONS.forEach((c) => { if (c.cost[id])
-            uses.push(c.name); });
-        FrCraftMenu.options().forEach((o) => { if (o.cost[id])
-            uses.push(o.label); });
-        if (uses.length > 0)
-            box.appendChild(FrDom.make("div", "fr-note", "쓰이는 곳: " + uses.slice(0, 14).join(", ") + (uses.length > 14 ? " 외 " + (uses.length - 14) + "곳" : "")));
-        return box;
+        this.body.appendChild(FrDom.make("div", "fr-note", "숫자는 가방 / 공용 창고예요. 흐린 것은 아직 못 얻은 재화예요. 누르면 얻는 곳과 만들 수 있는 것이 나와요."));
     }
 }
 FrCurrencyWindow.ORDER = ["wood", "beach", "fish", "mineral", "crop", "dungeon", "crafted", "block"];
 FrCurrencyWindow.CATEGORY_NAMES = { wood: "목재·과일·꽃", beach: "해변", fish: "물고기", mineral: "광물·얼음", crop: "작물·씨앗", dungeon: "던전", crafted: "가공품", block: "블록" };
 class FrStatsWindow extends FrWindow {
     constructor(session, toast, backend, island, roster) {
-        super("기록판 (L)", session, toast);
+        super("기록판 (Y)", session, toast);
         this.backend = backend;
         this.island = island;
         this.roster = roster;
@@ -800,14 +918,26 @@ class FrStatusHud {
         this.area = FrDom.el("hudArea");
         this.sleepBand = FrDom.el("hudSleep");
         this.sleepButton = FrDom.el("btnSleep");
+        this.apBox = FrDom.el("hudAp");
         this.hp = FrDom.el("hudHp");
         this.hpFill = FrDom.el("hudHpFill");
         this.hpText = FrDom.el("hudHpText");
     }
     showClock(minute, day) { this.clock.textContent = FrClock.label(minute) + " · " + day + "일째"; }
-    showAp(ap) {
-        this.apText.textContent = "⚡ " + Math.round(ap.current) + " / " + ap.max();
-        this.apFill.style.width = (ap.current / ap.max()) * 100 + "%";
+    showAp(ap, unlimited = false) {
+        const hotbar = FrDom.el("hotbar");
+        if (hotbar.offsetWidth > 0)
+            this.apBox.style.width = hotbar.offsetWidth + "px";
+        if (unlimited) {
+            this.apText.textContent = "운영자 · 제한 없음";
+            this.apFill.style.width = "100%";
+            this.apFill.className = "";
+            return;
+        }
+        const current = Math.round(ap.current);
+        this.apText.textContent = "⚡ " + current + " / " + ap.max();
+        this.apFill.style.width = Math.max(0, Math.min(1, ap.current / ap.max())) * 100 + "%";
+        this.apFill.className = current < FrStatusHud.AP_LOW ? "low" : current < FrStatusHud.AP_MID ? "mid" : "";
     }
     showArea(text) { this.area.textContent = text; }
     showHealth(visible, health = 0) {
@@ -820,10 +950,13 @@ class FrStatusHud {
     showSleepBand(text) { this.sleepBand.textContent = text; this.sleepBand.hidden = text === ""; }
     showSleepButton(visible, sleeping) { this.sleepButton.hidden = !visible; this.sleepButton.textContent = sleeping ? "일어나기 (Z)" : "잠자기 (Z)"; }
 }
+FrStatusHud.AP_MID = 35;
+FrStatusHud.AP_LOW = 20;
 class FrHotbar {
-    constructor(session, onUse) {
+    constructor(session, onUse, drag) {
         this.session = session;
         this.onUse = onUse;
+        this.drag = drag;
         this.root = FrDom.el("hotbar");
     }
     render() {
@@ -834,8 +967,228 @@ class FrHotbar {
             cell.appendChild(FrDom.make("div", "fr-cell-key", String(i + 1)));
             if (i === this.session.selected)
                 cell.classList.add("selected");
-            cell.addEventListener("click", () => this.onUse(i));
+            cell.addEventListener("click", () => { if (!this.drag.justDropped())
+                this.onUse(i); });
+            this.drag.attach(cell, i, !!slot);
             this.root.appendChild(cell);
         }
     }
 }
+class FrIslandMapPainter {
+    static othersOf(roster, selfUid, islandOnly = false) {
+        const dots = [];
+        roster.aliveUids().forEach((uid) => {
+            const pose = roster.poses.get(uid), member = roster.members.get(uid), row = roster.presence.get(uid);
+            if (uid === selfUid || !pose || !member || member.adm)
+                return;
+            if (islandOnly && row && row.area !== "island")
+                return;
+            dots.push({ x: pose.x / FrTerrainData.BLOCK, z: pose.z / FrTerrainData.BLOCK, name: member.name });
+        });
+        return dots;
+    }
+    static paint(g, world, P, others, me) {
+        const terrain = world.terrain;
+        const image = g.createImageData(terrain.w * P, terrain.d * P);
+        for (let z = 0; z < terrain.d; z++)
+            for (let x = 0; x < terrain.w; x++) {
+                const base = FrIslandMapPainter.TOP_COLORS[terrain.top(x, z)] || FrIslandMapPainter.TOP_COLORS.G;
+                const light = terrain.isWater(x, z) ? 1 : 0.86 + Math.max(0, terrain.height(x, z)) * 0.025;
+                const block = world.blocks.top(terrain.index(x, z)) > 0;
+                const color = block ? [205, 170, 120] : base.map((v) => Math.min(255, v * light));
+                for (let py = 0; py < P; py++)
+                    for (let px = 0; px < P; px++) {
+                        const k = ((z * P + py) * terrain.w * P + x * P + px) * 4;
+                        image.data[k] = color[0];
+                        image.data[k + 1] = color[1];
+                        image.data[k + 2] = color[2];
+                        image.data[k + 3] = 255;
+                    }
+            }
+        g.putImageData(image, 0, 0);
+        g.fillStyle = "rgba(28,84,38,0.85)";
+        world.trees.forEach((spot, index) => { if (!world.isFelled(index)) {
+            g.beginPath();
+            g.arc((spot.x + 0.5) * P, (spot.z + 0.5) * P, P * 0.55, 0, Math.PI * 2);
+            g.fill();
+        } });
+        world.sites.forEach((site) => {
+            if (!world.isBuilt(site.id))
+                return;
+            g.fillStyle = "#6E7079";
+            site.cells.forEach((c) => g.fillRect(c.x * P, c.z * P, P, P));
+        });
+        const a = terrain.anchors;
+        g.strokeStyle = "rgba(255,255,255,0.7)";
+        g.lineWidth = 1;
+        a.lots.forEach((lot) => g.strokeRect(lot.x * P + 0.5, lot.z * P + 0.5, lot.size * P - 1, lot.size * P - 1));
+        g.fillStyle = "#FF8C00";
+        g.beginPath();
+        g.arc((a.campfire.x + 0.5) * P, (a.campfire.z + 0.5) * P, P * 1.6, 0, Math.PI * 2);
+        g.fill();
+        g.fillStyle = "#8A5A2B";
+        g.fillRect(a.publicChest.x * P, a.publicChest.z * P, a.publicChest.size * P, a.publicChest.size * P);
+        g.font = "bold " + Math.max(10, P * 3) + "px \"Nanum Gothic\", \"Malgun Gothic\", sans-serif";
+        g.textAlign = "center";
+        Object.keys(a.portals).forEach((id) => {
+            const p = a.portals[id];
+            const cx = (p.x + 0.5) * P, cz = (p.z + 0.5) * P;
+            g.fillStyle = FrIslandMapPainter.PORTAL_COLORS[id] || "#FFFFFF";
+            g.beginPath();
+            g.arc(cx, cz, P * 2, 0, Math.PI * 2);
+            g.fill();
+            FrIslandMapPainter.label(g, FrAreaInfo.label(id), cx, cz - P * 2.6);
+        });
+        others.forEach((dot) => FrIslandMapPainter.dot(g, dot, P, "#7BA8FF", false));
+        if (me)
+            FrIslandMapPainter.dot(g, me, P, "#D97B4F", true);
+    }
+    static dot(g, dot, P, color, big) {
+        const r = big ? P * 1.8 : P * 1.3;
+        g.fillStyle = "#FFFFFF";
+        g.beginPath();
+        g.arc(dot.x * P, dot.z * P, r + 2, 0, Math.PI * 2);
+        g.fill();
+        g.fillStyle = color;
+        g.beginPath();
+        g.arc(dot.x * P, dot.z * P, r, 0, Math.PI * 2);
+        g.fill();
+        if (dot.name)
+            FrIslandMapPainter.label(g, dot.name, dot.x * P, dot.z * P - r - 4);
+    }
+    static label(g, text, x, y) {
+        g.lineWidth = 3;
+        g.strokeStyle = "rgba(0,0,0,0.7)";
+        g.strokeText(text, x, y);
+        g.fillStyle = "#FFFFFF";
+        g.fillText(text, x, y);
+    }
+}
+FrIslandMapPainter.TOP_COLORS = {
+    G: [111, 163, 82], D: [150, 112, 74], S: [128, 128, 132], N: [226, 208, 150], W: [246, 248, 250], R: [70, 130, 200], O: [40, 80, 140], P: [196, 168, 110],
+};
+FrIslandMapPainter.PORTAL_COLORS = { fruit: "#EC40B0", beach: "#00D2E6", mine: "#FFD600", dungeon: "#9640DC" };
+class FrMapWindow extends FrWindow {
+    constructor(session, toast, marks) {
+        super("지도 (M)", session, toast);
+        this.marks = marks;
+        this.timer = 0;
+        this.root.classList.add("fr-map");
+        this.canvas = FrDom.make("canvas");
+        this.canvas.width = session.world.terrain.w * FrMapWindow.CELL_PIXELS;
+        this.canvas.height = session.world.terrain.d * FrMapWindow.CELL_PIXELS;
+    }
+    open() { super.open(); window.clearInterval(this.timer); this.timer = window.setInterval(() => { if (this.isOpen)
+        this.paint(); }, 1000); }
+    close() { super.close(); window.clearInterval(this.timer); }
+    render() {
+        FrDom.clear(this.body);
+        const marks = this.marks();
+        if (!marks.island)
+            this.body.appendChild(FrDom.make("div", "fr-note", "지금은 섬 밖에 있어요. 섬 지도를 보여 줘요."));
+        this.body.appendChild(this.canvas);
+        const legend = FrDom.make("div", "fr-map-legend");
+        [["#D97B4F", "나"], ["#7BA8FF", "친구"], ["#1C5426", "나무"], ["#6E7079", "지은 건물"], ["#CDAA78", "블록"], ["#FF8C00", "모닥불"], ["#8A5A2B", "공용 창고"]].forEach(([color, text]) => {
+            const item = FrDom.make("span");
+            const box = FrDom.make("i");
+            box.style.background = color;
+            item.append(box, FrDom.make("span", "", text));
+            legend.appendChild(item);
+        });
+        this.body.appendChild(legend);
+        this.paint();
+    }
+    paint() {
+        const marks = this.marks();
+        FrIslandMapPainter.paint(this.canvas.getContext("2d"), this.session.world, FrMapWindow.CELL_PIXELS, marks.others, marks.me);
+    }
+}
+FrMapWindow.CELL_PIXELS = 5;
+class FrSlotDrag {
+    constructor(session) {
+        this.session = session;
+        this.from = -1;
+        this.startX = 0;
+        this.startY = 0;
+        this.ghost = null;
+        this.over = null;
+        this.droppedAt = 0;
+        window.addEventListener("pointermove", (event) => this.move(event));
+        window.addEventListener("pointerup", (event) => this.end(event));
+        window.addEventListener("pointercancel", () => this.cancel());
+    }
+    attach(cell, index, filled) {
+        cell.dataset.slot = String(index);
+        cell.style.touchAction = "none";
+        if (!filled)
+            return;
+        cell.addEventListener("pointerdown", (event) => {
+            this.from = index;
+            this.startX = event.clientX;
+            this.startY = event.clientY;
+        });
+    }
+    justDropped() { return Date.now() - this.droppedAt < FrSlotDrag.CLICK_GUARD_MS; }
+    move(event) {
+        if (this.from < 0)
+            return;
+        if (!this.ghost) {
+            if (Math.hypot(event.clientX - this.startX, event.clientY - this.startY) < FrSlotDrag.START_DISTANCE)
+                return;
+            const slot = this.session.bag.slots[this.from];
+            if (!slot) {
+                this.cancel();
+                return;
+            }
+            this.ghost = FrItemCell.render(slot.id, slot.count, slot.uses);
+            this.ghost.style.cssText = "position:fixed;z-index:60;pointer-events:none;opacity:.85;transform:translate(-50%,-50%) scale(1.1);";
+            document.body.appendChild(this.ghost);
+        }
+        this.ghost.style.left = event.clientX + "px";
+        this.ghost.style.top = event.clientY + "px";
+        const target = this.targetAt(event.clientX, event.clientY);
+        if (target !== this.over) {
+            if (this.over)
+                this.over.classList.remove("drop-over");
+            if (target)
+                target.classList.add("drop-over");
+            this.over = target;
+        }
+    }
+    end(event) {
+        if (this.from < 0)
+            return;
+        const dragging = !!this.ghost;
+        const target = dragging ? this.targetAt(event.clientX, event.clientY) : null;
+        const from = this.from;
+        this.cancel();
+        if (!dragging)
+            return;
+        this.droppedAt = Date.now();
+        if (!target)
+            return;
+        const to = Number(target.dataset.slot);
+        if (this.session.bag.move(from, to)) {
+            this.session.selected = Math.min(to, this.session.bag.slots.length - 1);
+            this.session.changed();
+        }
+    }
+    cancel() {
+        this.from = -1;
+        if (this.ghost) {
+            this.ghost.remove();
+            this.ghost = null;
+        }
+        if (this.over) {
+            this.over.classList.remove("drop-over");
+            this.over = null;
+        }
+    }
+    targetAt(x, y) {
+        const node = document.elementFromPoint(x, y);
+        const cell = node ? node.closest("[data-slot]") : null;
+        return cell;
+    }
+}
+FrSlotDrag.START_DISTANCE = 6;
+FrSlotDrag.CLICK_GUARD_MS = 250;
