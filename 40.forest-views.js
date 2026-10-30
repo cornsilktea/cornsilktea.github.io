@@ -41,7 +41,7 @@ class FrAvatar {
     update(dt) { this.mixer.update(dt); }
 }
 FrAvatar.CLIP_NAMES = {
-    idle: "Idle_A", run: "Running_A", walk: "Walking_A", chop: "Chopping", pickaxe: "Pickaxing", dig: "Digging", work: "Working_A", sleep: "Death_A_Pose",
+    idle: "Idle_A", run: "Running_A", walk: "Walking_A", chop: "Chopping", pickaxe: "Pickaxing", dig: "Digging", work: "Working_A", sleep: "Death_A_Pose", fish: "Fishing_Idle",
 };
 FrAvatar.SCALE_UP = 2;
 class FrSky {
@@ -168,6 +168,7 @@ class FrProps {
         this.libs = libs;
         this.world = world;
         this.group = group;
+        this.portalRings = [];
         this.chest = null;
         this.siteMarkers = new Map();
         const T = libs.THREE;
@@ -178,6 +179,7 @@ class FrProps {
         campfire.userData = { kind: "cook" };
         this.fire = new FrCampfireFx(libs, campfire);
         group.add(campfire);
+        this.buildPortals();
         this.buildChestPlaceholder();
         FrBuildSites.STAGE_TWO.forEach((site) => this.addSiteMarker(site));
     }
@@ -230,7 +232,29 @@ class FrProps {
         saw.position.set(0.3, 1.95, 0);
         marker.add(top, saw);
     }
-    update(dt, time, night) { this.fire.update(dt, time, night); }
+    buildPortals() {
+        const T = this.libs.THREE;
+        const B = FrTerrainData.BLOCK;
+        const colors = { fruit: 0xec40b0, beach: 0x00d2e6, mine: 0xffd600, dungeon: 0x9640dc };
+        const anchors = this.world.terrain.anchors.portals;
+        Object.keys(anchors).forEach((id, i) => {
+            const p = anchors[id];
+            const holder = new T.Group();
+            holder.position.set((p.x + 0.5) * B, this.world.terrain.surfaceY(p.x, p.z), (p.z + 0.5) * B);
+            holder.userData = { kind: "portal", id };
+            const color = colors[id] || 0xffffff;
+            const ring = new T.Mesh(new T.TorusGeometry(2.4, 0.28, 10, 28).translate(0, 3, 0), new T.MeshBasicMaterial({ color }));
+            const disc = new T.Mesh(new T.CircleGeometry(2.2, 28).translate(0, 3, 0), new T.MeshBasicMaterial({ color, transparent: true, opacity: 0.35, side: T.DoubleSide, depthWrite: false, blending: T.AdditiveBlending }));
+            const base = new T.Mesh(new T.CylinderGeometry(2.8, 3.2, 0.4, 20).translate(0, 0.2, 0), new T.MeshLambertMaterial({ color: 0x777b84 }));
+            holder.add(base, ring, disc);
+            this.group.add(holder);
+            this.portalRings.push({ ring, disc, phase: i * 1.4 });
+        });
+    }
+    update(dt, time, night) {
+        this.fire.update(dt, time, night);
+        this.portalRings.forEach((p) => { p.ring.rotation.y = time * 0.8 + p.phase; p.disc.material.opacity = 0.28 + 0.14 * Math.sin(time * 2.4 + p.phase); });
+    }
 }
 class FrCameraRig {
     constructor(libs) {
@@ -258,6 +282,8 @@ class FrWorldView {
         this.libs = libs;
         this.canvas = canvas;
         this.touchDevice = touchDevice;
+        this.areaScene = null;
+        this.areaDark = false;
         this.labels = null;
         this.selfUid = "";
         this.chunks = new Map();
@@ -300,6 +326,7 @@ class FrWorldView {
         this.resize();
     }
     terrainData() { return this.world.terrain; }
+    groundMaterial() { return this.terrainMaterial; }
     useWorld(world) {
         this.world = world;
         this.chunks.forEach((mesh) => { this.terrainGroup.remove(mesh); mesh.geometry.dispose(); });
@@ -320,6 +347,65 @@ class FrWorldView {
         this.blocksLayer = new FrBlockLayer(this.libs, world, this.blockGroup);
         this.rebuildLotMarkers();
         world.listen(this);
+    }
+    showArea(scene, dark) {
+        this.hideArea();
+        this.areaScene = scene;
+        this.areaDark = dark;
+        [this.terrainGroup, this.treeGroup, this.propGroup, this.blockGroup, this.water, this.marker, this.preview].forEach((o) => { o.visible = false; });
+        this.scene.add(scene.group);
+        if (dark) {
+            this.scene.background.setRGB(0.02, 0.02, 0.035);
+            if (this.scene.fog)
+                this.scene.fog.color.setRGB(0.02, 0.02, 0.035);
+            this.sky.hemi.intensity = 1.05;
+            this.sky.sun.intensity = 0.35;
+            this.sky.hemi.color.setRGB(0.95, 0.9, 0.85);
+        }
+    }
+    hideArea() {
+        if (!this.areaScene)
+            return;
+        this.scene.remove(this.areaScene.group);
+        this.areaScene.dispose();
+        this.areaScene = null;
+        this.areaDark = false;
+        [this.terrainGroup, this.treeGroup, this.propGroup, this.blockGroup, this.water].forEach((o) => { o.visible = true; });
+    }
+    updateAreaMarker(cell) {
+        if (!this.areaScene)
+            return;
+        if (!cell) {
+            this.marker.visible = false;
+            return;
+        }
+        this.marker.visible = true;
+        const terrain = this.areaScene.area.terrain;
+        this.marker.position.set((cell.x + 0.5) * FrTerrainData.BLOCK, Math.max(0, terrain.surfaceY(cell.x, cell.z)) + 0.12, (cell.z + 0.5) * FrTerrainData.BLOCK);
+    }
+    pickArea(clientX, clientY) {
+        const scene = this.areaScene;
+        if (!scene)
+            return null;
+        const T = this.libs.THREE;
+        const rect = this.canvas.getBoundingClientRect();
+        const raycaster = new T.Raycaster();
+        raycaster.setFromCamera(new T.Vector2(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1), this.rig.camera);
+        const feature = raycaster.intersectObjects(scene.featureObjects(), true)[0];
+        const ground = raycaster.intersectObjects(scene.groundObjects(), false)[0];
+        if (feature && (!ground || feature.distance <= ground.distance + 4)) {
+            let node = feature.object;
+            while (node) {
+                const data = node.userData;
+                if (data.kind === "feature")
+                    return { kind: "feature", x: data.x, z: data.z };
+                node = node.parent;
+            }
+        }
+        if (!ground)
+            return null;
+        const point = ground.point.clone().addScaledVector(raycaster.ray.direction, 0.05);
+        return { kind: "ground", x: Math.floor(point.x / FrTerrainData.BLOCK), z: Math.floor(point.z / FrTerrainData.BLOCK) };
     }
     setLabels(labels, selfUid) {
         this.labels = labels;
@@ -422,7 +508,13 @@ class FrWorldView {
         const point = ground.point.clone().addScaledVector(raycaster.ray.direction, 0.05);
         return { kind: "ground", cell: { x: this.world.terrain.cellOf(point.x), z: this.world.terrain.cellOf(point.z) } };
     }
-    applyClock(minuteOfDay) { this.night = this.sky.apply(minuteOfDay); }
+    applyClock(minuteOfDay) {
+        if (this.areaDark) {
+            this.night = 0.6;
+            return;
+        }
+        this.night = this.sky.apply(minuteOfDay);
+    }
     resize() {
         const width = window.innerWidth, height = window.innerHeight;
         this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, this.pixelRatioCap));
@@ -433,6 +525,8 @@ class FrWorldView {
         if (this.avatar)
             this.avatar.update(dt);
         this.props.update(dt, time, this.night);
+        if (this.areaScene)
+            this.areaScene.update(time);
         this.burst.update(dt);
         this.renderer.render(this.scene, this.rig.camera);
         if (this.governor)
@@ -452,8 +546,8 @@ class FrRemoteAvatars {
         this.selfUid = selfUid;
         this.entries = new Map();
     }
-    update(dt) {
-        const alive = new Set(this.roster.aliveUids().filter((uid) => uid !== this.selfUid && this.roster.poses.has(uid) && this.roster.members.has(uid) && !this.roster.members.get(uid).adm));
+    update(dt, area) {
+        const alive = new Set(this.roster.aliveUids().filter((uid) => uid !== this.selfUid && this.roster.poses.has(uid) && this.roster.members.has(uid) && !this.roster.members.get(uid).adm && this.roster.presence.get(uid).area === area));
         this.entries.forEach((entry, uid) => { if (!alive.has(uid))
             this.drop(uid, entry); });
         alive.forEach((uid) => this.show(uid, dt));

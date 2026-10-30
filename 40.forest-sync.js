@@ -22,7 +22,7 @@ class FrWire {
         return { x: p[0] / 10, z: p[1] / 10, y: p[2] / 10, dir: (p[3] / 16) * Math.PI * 2, anim: p[4], vx: (p[5] || 0) / 10, vz: (p[6] || 0) / 10, at: Date.now() };
     }
 }
-FrWire.ANIMS = ["idle", "run", "walk", "chop", "pickaxe", "dig", "sleep"];
+FrWire.ANIMS = ["idle", "run", "walk", "chop", "pickaxe", "dig", "sleep", "fish", "work"];
 class FrRoster {
     constructor() {
         this.members = new Map();

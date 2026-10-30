@@ -29,6 +29,35 @@ class FrWorld {
   }
 
   listen(listener: FrWorldListener): void { this.listeners.push(listener); }
+
+  private static readonly PASSABLE_BLOCKS = ["block_door", "block_torch"];
+
+  private solidBlock(record: FrBlockRecord | null): boolean { return !!record && FrWorld.PASSABLE_BLOCKS.indexOf(record.t) < 0; }
+
+  surfaceAt(x: number, z: number): number {
+    const index = this.terrain.index(x, z);
+    let stack = 0;
+    while (stack < FrBlockRules.MAX_LEVEL && this.solidBlock(this.blocks.get(index, stack))) stack += 1;
+    return this.terrain.height(x, z) + stack;
+  }
+
+  overhead(x: number, z: number, groundHeight: number): boolean {
+    const index = this.terrain.index(x, z);
+    const base = this.terrain.height(x, z);
+    for (let y = 0; y < FrBlockRules.MAX_LEVEL; y++) {
+      const level = base + y;
+      if (level >= groundHeight + 2) break;
+      if (level >= groundHeight && this.solidBlock(this.blocks.get(index, y))) return true;
+    }
+    return false;
+  }
+
+  solid(x: number, z: number): boolean {
+    const a = this.terrain.anchors;
+    if (x === a.campfire.x && z === a.campfire.z) return true;
+    if (x >= a.publicChest.x && x < a.publicChest.x + a.publicChest.size && z >= a.publicChest.z && z < a.publicChest.z + a.publicChest.size) return true;
+    return FrBuildSites.STAGE_TWO.some((s) => s.x === x && s.z === z);
+  }
   private path(rest: string): string { return "forest/" + this.island + "/" + rest; }
 
   async load(): Promise<void> {

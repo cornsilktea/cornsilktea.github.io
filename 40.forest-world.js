@@ -17,6 +17,34 @@ class FrWorld {
         FrTreeField.generate(terrain).forEach((spot) => this.trees.set(terrain.index(spot.x, spot.z), spot));
     }
     listen(listener) { this.listeners.push(listener); }
+    solidBlock(record) { return !!record && FrWorld.PASSABLE_BLOCKS.indexOf(record.t) < 0; }
+    surfaceAt(x, z) {
+        const index = this.terrain.index(x, z);
+        let stack = 0;
+        while (stack < FrBlockRules.MAX_LEVEL && this.solidBlock(this.blocks.get(index, stack)))
+            stack += 1;
+        return this.terrain.height(x, z) + stack;
+    }
+    overhead(x, z, groundHeight) {
+        const index = this.terrain.index(x, z);
+        const base = this.terrain.height(x, z);
+        for (let y = 0; y < FrBlockRules.MAX_LEVEL; y++) {
+            const level = base + y;
+            if (level >= groundHeight + 2)
+                break;
+            if (level >= groundHeight && this.solidBlock(this.blocks.get(index, y)))
+                return true;
+        }
+        return false;
+    }
+    solid(x, z) {
+        const a = this.terrain.anchors;
+        if (x === a.campfire.x && z === a.campfire.z)
+            return true;
+        if (x >= a.publicChest.x && x < a.publicChest.x + a.publicChest.size && z >= a.publicChest.z && z < a.publicChest.z + a.publicChest.size)
+            return true;
+        return FrBuildSites.STAGE_TWO.some((s) => s.x === x && s.z === z);
+    }
     path(rest) { return "forest/" + this.island + "/" + rest; }
     async load() {
         const [jungle, terrain, snow, build, publicAmounts, logs, blocks, lots] = await Promise.all([
@@ -301,3 +329,4 @@ class FrWorld {
 }
 FrWorld.SNOW_TOP = "W";
 FrWorld.BARE_TOP = "S";
+FrWorld.PASSABLE_BLOCKS = ["block_door", "block_torch"];

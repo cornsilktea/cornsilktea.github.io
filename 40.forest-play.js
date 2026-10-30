@@ -91,6 +91,7 @@ class FrPlayerBody {
         this.vz = 0;
         this.ground = 0;
     }
+    useWorld(world) { this.world = world; }
     place(cellX, cellZ) {
         this.x = (cellX + 0.5) * FrTerrainData.BLOCK;
         this.z = (cellZ + 0.5) * FrTerrainData.BLOCK;
@@ -101,26 +102,22 @@ class FrPlayerBody {
     frontCell(distance = FrPlayerBody.FRONT) {
         return { x: this.world.terrain.cellOf(this.x + Math.sin(this.facing) * distance), z: this.world.terrain.cellOf(this.z + Math.cos(this.facing) * distance) };
     }
-    solid(x, z) {
-        const a = this.world.terrain.anchors;
-        if (x === a.campfire.x && z === a.campfire.z)
-            return true;
-        if (x >= a.publicChest.x && x < a.publicChest.x + a.publicChest.size && z >= a.publicChest.z && z < a.publicChest.z + a.publicChest.size)
-            return true;
-        return FrBuildSites.STAGE_TWO.some((s) => s.x === x && s.z === z);
-    }
     bodyFits(px, pz) {
         const terrain = this.world.terrain;
         const r = FrPlayerBody.RADIUS;
+        const base = this.swimming ? Math.max(this.ground, 1) : this.ground;
         return FrPlayerBody.SAMPLES.every(([dx, dz]) => {
             const cx = terrain.cellOf(px + dx * r), cz = terrain.cellOf(pz + dz * r);
             if (!terrain.inside(cx, cz) || terrain.top(cx, cz) === FrTerrainData.OCEAN)
                 return false;
-            if (this.world.blocked(cx, cz) || this.solid(cx, cz))
+            if (this.world.blocked(cx, cz) || this.world.solid(cx, cz))
                 return false;
             if (terrain.isWater(cx, cz))
                 return true;
-            return terrain.height(cx, cz) - this.ground <= 1;
+            const surface = this.world.surfaceAt(cx, cz);
+            if (surface - base > 1)
+                return false;
+            return !this.world.overhead(cx, cz, Math.max(base, surface));
         });
     }
     groundUnder(px, pz) {
@@ -130,7 +127,7 @@ class FrPlayerBody {
         FrPlayerBody.SAMPLES.forEach(([dx, dz]) => {
             const cx = terrain.cellOf(px + dx * r), cz = terrain.cellOf(pz + dz * r);
             if (!terrain.isWater(cx, cz))
-                best = Math.max(best, terrain.height(cx, cz));
+                best = Math.max(best, this.world.surfaceAt(cx, cz));
         });
         return best === -99 ? terrain.height(terrain.cellOf(px), terrain.cellOf(pz)) : best;
     }
@@ -176,6 +173,11 @@ class FrTargetFinder {
             return { kind: "cook", label: "요리", cell: null };
         if (near((a.publicChest.x + a.publicChest.size / 2) * B, (a.publicChest.z + a.publicChest.size / 2) * B, 6.4))
             return { kind: "chest", label: "창고", cell: null };
+        for (const id of Object.keys(a.portals)) {
+            const p = a.portals[id];
+            if (near((p.x + 0.5) * B, (p.z + 0.5) * B, 6.2))
+                return { kind: "portal", label: FrAreaInfo.label(id), cell: null, portal: id };
+        }
         for (const site of FrBuildSites.STAGE_TWO) {
             if (near((site.x + 0.5) * B, (site.z + 0.5) * B, 4.8))
                 return { kind: "site", label: this.world.village.builtCount(site.id) > 0 ? "열기" : "짓기", cell: null, site };
@@ -240,6 +242,12 @@ class FrTargetFinder {
             return near((a.campfire.x + 0.5) * B, (a.campfire.z + 0.5) * B, 7.5) ? { target: { kind: "cook", label: "요리", cell: null }, far: false } : { target: null, far: true };
         if (pick.kind === "chest")
             return near((a.publicChest.x + a.publicChest.size / 2) * B, (a.publicChest.z + a.publicChest.size / 2) * B, 8.5) ? { target: { kind: "chest", label: "창고", cell: null }, far: false } : { target: null, far: true };
+        if (pick.kind === "portal" && pick.siteId) {
+            const p = a.portals[pick.siteId];
+            if (!p)
+                return { target: null, far: false };
+            return near((p.x + 0.5) * B, (p.z + 0.5) * B, 8.5) ? { target: { kind: "portal", label: FrAreaInfo.label(pick.siteId), cell: null, portal: pick.siteId }, far: false } : { target: null, far: true };
+        }
         if (pick.kind === "site") {
             const site = FrBuildSites.find(pick.siteId || "");
             if (!site)

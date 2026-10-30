@@ -1,4 +1,4 @@
-type FrAvatarClip = "idle" | "run" | "walk" | "chop" | "pickaxe" | "dig" | "work" | "sleep";
+type FrAvatarClip = "idle" | "run" | "walk" | "chop" | "pickaxe" | "dig" | "work" | "sleep" | "fish";
 
 class FrToolClips {
   static readonly FILE = "assets/kaykit/animations/rig_medium_tools.glb";
@@ -12,7 +12,7 @@ class FrToolClips {
 
 class FrAvatar {
   private static readonly CLIP_NAMES: Readonly<Record<FrAvatarClip, string>> = {
-    idle: "Idle_A", run: "Running_A", walk: "Walking_A", chop: "Chopping", pickaxe: "Pickaxing", dig: "Digging", work: "Working_A", sleep: "Death_A_Pose",
+    idle: "Idle_A", run: "Running_A", walk: "Walking_A", chop: "Chopping", pickaxe: "Pickaxing", dig: "Digging", work: "Working_A", sleep: "Death_A_Pose", fish: "Fishing_Idle",
   };
   static readonly SCALE_UP = 2;
   readonly group: Three<"Group">;
@@ -73,7 +73,7 @@ class FrSky {
   }
 }
 
-interface FrPick { kind: "cook" | "chest" | "site" | "tree" | "ground"; siteId?: string; spot?: FrTreeSpot; cell?: FrPoint }
+interface FrPick { kind: "cook" | "chest" | "site" | "tree" | "ground" | "portal"; siteId?: string; spot?: FrTreeSpot; cell?: FrPoint }
 
 class FrTreeLayer {
   private readonly trunks: Three<"InstancedMesh">;
@@ -168,6 +168,7 @@ class FrTreeLayer {
 
 class FrProps {
   readonly fire: FrCampfireFx;
+  private readonly portalRings: Array<{ ring: Three<"Mesh">; disc: Three<"Mesh">; phase: number }> = [];
   private chest: Three<"Object3D"> | null = null;
   private readonly siteMarkers = new Map<string, Three<"Group">>();
 
@@ -180,6 +181,7 @@ class FrProps {
     campfire.userData = { kind: "cook" };
     this.fire = new FrCampfireFx(libs, campfire);
     group.add(campfire);
+    this.buildPortals();
     this.buildChestPlaceholder();
     FrBuildSites.STAGE_TWO.forEach((site) => this.addSiteMarker(site));
   }
@@ -234,7 +236,30 @@ class FrProps {
     marker.add(top, saw);
   }
 
-  update(dt: number, time: number, night: number): void { this.fire.update(dt, time, night); }
+  private buildPortals(): void {
+    const T = this.libs.THREE;
+    const B = FrTerrainData.BLOCK;
+    const colors: Record<string, number> = { fruit: 0xec40b0, beach: 0x00d2e6, mine: 0xffd600, dungeon: 0x9640dc };
+    const anchors = this.world.terrain.anchors.portals;
+    Object.keys(anchors).forEach((id, i) => {
+      const p = anchors[id];
+      const holder = new T.Group();
+      holder.position.set((p.x + 0.5) * B, this.world.terrain.surfaceY(p.x, p.z), (p.z + 0.5) * B);
+      holder.userData = { kind: "portal", id };
+      const color = colors[id] || 0xffffff;
+      const ring = new T.Mesh(new T.TorusGeometry(2.4, 0.28, 10, 28).translate(0, 3, 0), new T.MeshBasicMaterial({ color }));
+      const disc = new T.Mesh(new T.CircleGeometry(2.2, 28).translate(0, 3, 0), new T.MeshBasicMaterial({ color, transparent: true, opacity: 0.35, side: T.DoubleSide, depthWrite: false, blending: T.AdditiveBlending }));
+      const base = new T.Mesh(new T.CylinderGeometry(2.8, 3.2, 0.4, 20).translate(0, 0.2, 0), new T.MeshLambertMaterial({ color: 0x777b84 }));
+      holder.add(base, ring, disc);
+      this.group.add(holder);
+      this.portalRings.push({ ring, disc, phase: i * 1.4 });
+    });
+  }
+
+  update(dt: number, time: number, night: number): void {
+    this.fire.update(dt, time, night);
+    this.portalRings.forEach((p) => { p.ring.rotation.y = time * 0.8 + p.phase; (p.disc.material as Three<"MeshBasicMaterial">).opacity = 0.28 + 0.14 * Math.sin(time * 2.4 + p.phase); });
+  }
 }
 
 class FrCameraRig {
@@ -276,6 +301,8 @@ class FrWorldView implements FrWorldListener {
   readonly burst: FrBurst;
   props!: FrProps;
   blocksLayer!: FrBlockLayer;
+  private areaScene: FrAreaScene | null = null;
+  private areaDark = false;
   lotMarkers!: FrLotMarkers;
   readonly preview: Three<"Mesh">;
   private labels: RkLabelFactory | null = null;
@@ -334,6 +361,8 @@ class FrWorldView implements FrWorldListener {
 
   terrainData(): FrTerrainData { return this.world.terrain; }
 
+  groundMaterial(): Three<"Material"> { return this.terrainMaterial; }
+
   useWorld(world: FrWorld): void {
     this.world = world;
     this.chunks.forEach((mesh) => { this.terrainGroup.remove(mesh); mesh.geometry.dispose(); });
@@ -352,6 +381,60 @@ class FrWorldView implements FrWorldListener {
     this.blocksLayer = new FrBlockLayer(this.libs, world, this.blockGroup);
     this.rebuildLotMarkers();
     world.listen(this);
+  }
+
+  showArea(scene: FrAreaScene, dark: boolean): void {
+    this.hideArea();
+    this.areaScene = scene;
+    this.areaDark = dark;
+    [this.terrainGroup, this.treeGroup, this.propGroup, this.blockGroup, this.water, this.marker, this.preview].forEach((o) => { o.visible = false; });
+    this.scene.add(scene.group);
+    if (dark) {
+      (this.scene.background as Three<"Color">).setRGB(0.02, 0.02, 0.035);
+      if (this.scene.fog) (this.scene.fog as Three<"Fog">).color.setRGB(0.02, 0.02, 0.035);
+      this.sky.hemi.intensity = 1.05;
+      this.sky.sun.intensity = 0.35;
+      this.sky.hemi.color.setRGB(0.95, 0.9, 0.85);
+    }
+  }
+
+  hideArea(): void {
+    if (!this.areaScene) return;
+    this.scene.remove(this.areaScene.group);
+    this.areaScene.dispose();
+    this.areaScene = null;
+    this.areaDark = false;
+    [this.terrainGroup, this.treeGroup, this.propGroup, this.blockGroup, this.water].forEach((o) => { o.visible = true; });
+  }
+
+  updateAreaMarker(cell: FrPoint | null): void {
+    if (!this.areaScene) return;
+    if (!cell) { this.marker.visible = false; return; }
+    this.marker.visible = true;
+    const terrain = this.areaScene.area.terrain;
+    this.marker.position.set((cell.x + 0.5) * FrTerrainData.BLOCK, Math.max(0, terrain.surfaceY(cell.x, cell.z)) + 0.12, (cell.z + 0.5) * FrTerrainData.BLOCK);
+  }
+
+  pickArea(clientX: number, clientY: number): FrAreaPick | null {
+    const scene = this.areaScene;
+    if (!scene) return null;
+    const T = this.libs.THREE;
+    const rect = this.canvas.getBoundingClientRect();
+    const raycaster = new T.Raycaster();
+    raycaster.setFromCamera(new T.Vector2(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1), this.rig.camera);
+    const feature = raycaster.intersectObjects(scene.featureObjects(), true)[0];
+    const ground = raycaster.intersectObjects(scene.groundObjects(), false)[0];
+    if (feature && (!ground || feature.distance <= ground.distance + 4)) {
+      let node: Three<"Object3D"> | null = feature.object;
+      while (node) {
+        const data = node.userData as { kind?: string; x?: number; z?: number };
+        if (data.kind === "feature") return { kind: "feature", x: data.x as number, z: data.z as number };
+        node = node.parent;
+      }
+    }
+    if (!ground) return null;
+    const point = ground.point.clone().addScaledVector(raycaster.ray.direction, 0.05);
+    return { kind: "ground", x: Math.floor(point.x / FrTerrainData.BLOCK), z: Math.floor(point.z / FrTerrainData.BLOCK) };
   }
 
   setLabels(labels: RkLabelFactory, selfUid: string): void {
@@ -443,7 +526,10 @@ class FrWorldView implements FrWorldListener {
     return { kind: "ground", cell: { x: this.world.terrain.cellOf(point.x), z: this.world.terrain.cellOf(point.z) } };
   }
 
-  applyClock(minuteOfDay: number): void { this.night = this.sky.apply(minuteOfDay); }
+  applyClock(minuteOfDay: number): void {
+    if (this.areaDark) { this.night = 0.6; return; }
+    this.night = this.sky.apply(minuteOfDay);
+  }
 
   resize(): void {
     const width = window.innerWidth, height = window.innerHeight;
@@ -455,6 +541,7 @@ class FrWorldView implements FrWorldListener {
   render(dt: number, time: number): void {
     if (this.avatar) this.avatar.update(dt);
     this.props.update(dt, time, this.night);
+    if (this.areaScene) this.areaScene.update(time);
     this.burst.update(dt);
     this.renderer.render(this.scene, this.rig.camera);
     if (this.governor) this.governor.update(dt);
@@ -468,8 +555,8 @@ class FrRemoteAvatars {
 
   constructor(private readonly libs: ThreeLibs, private readonly scene: Three<"Scene">, private readonly factory: CharacterModelFactory, private readonly clips: Map<string, Three<"AnimationClip">>, private readonly labels: RkLabelFactory, private readonly roster: FrRoster, private readonly selfUid: string) {}
 
-  update(dt: number): void {
-    const alive = new Set(this.roster.aliveUids().filter((uid) => uid !== this.selfUid && this.roster.poses.has(uid) && this.roster.members.has(uid) && !(this.roster.members.get(uid) as FrMember).adm));
+  update(dt: number, area: string): void {
+    const alive = new Set(this.roster.aliveUids().filter((uid) => uid !== this.selfUid && this.roster.poses.has(uid) && this.roster.members.has(uid) && !(this.roster.members.get(uid) as FrMember).adm && (this.roster.presence.get(uid) as FrPresenceRow).area === area));
     this.entries.forEach((entry, uid) => { if (!alive.has(uid)) this.drop(uid, entry); });
     alive.forEach((uid) => this.show(uid, dt));
   }

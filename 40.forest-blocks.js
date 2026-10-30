@@ -154,7 +154,7 @@ class FrHouseKit {
                     const door = i === 2 && j === S - 1;
                     const window = (i === 0 && j === 2) || (i === S - 1 && j === 2) || (i === 2 && j === 0);
                     plan.push({ x, z, y: 0, t: door ? "block_door" : "block_stone", r: 0 });
-                    plan.push({ x, z, y: 1, t: window ? "block_window" : "block_wood", r: 0 });
+                    plan.push({ x, z, y: 1, t: window ? "block_window" : door ? "block_door" : "block_wood", r: 0 });
                     plan.push({ x, z, y: 2, t: "block_wood", r: 0 });
                 }
                 plan.push({ x, z, y: 3, t: "block_plank", r: 0 });

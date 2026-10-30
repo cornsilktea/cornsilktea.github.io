@@ -309,6 +309,37 @@ class FrBuildWindow extends FrWindow {
         this.session.changed();
     }
 }
+class FrPouchWindow extends FrWindow {
+    constructor(session, toast) {
+        super("이번 탐험에서 얻은 것", session, toast);
+        this.expedition = null;
+    }
+    showFor(expedition) { this.expedition = expedition; this.open(); }
+    render() {
+        FrDom.clear(this.body);
+        const e = this.expedition;
+        if (!e)
+            return;
+        this.body.appendChild(FrDom.make("div", "fr-note", FrAreaInfo.label(e.area) + " · " + e.seconds() + "초 동안 · 행동력 " + e.spentActionPoints() + " 사용"));
+        const gains = e.gains();
+        const ids = Object.keys(gains);
+        const grid = FrDom.make("div", "fr-pouch-grid");
+        if (ids.length === 0)
+            grid.appendChild(FrDom.make("div", "fr-note", "이번에는 얻은 것이 없어요"));
+        ids.forEach((id) => {
+            const cell = FrDom.make("div", "fr-pouch-item");
+            cell.style.borderColor = FrItemNames.GRADE_COLORS[FrItemNames.grade(id)];
+            cell.title = FrItemNames.label(id);
+            cell.append(FrIcons.image(id, 40), FrDom.make("b", "", "+" + gains[id]));
+            grid.appendChild(cell);
+        });
+        this.body.appendChild(grid);
+        const worn = e.wornTools();
+        if (worn.length > 0)
+            this.body.appendChild(FrDom.make("div", "fr-note", "닳은 도구: " + worn.join(", ")));
+        this.body.appendChild(this.button("닫기", () => this.close()));
+    }
+}
 class FrWindows {
     constructor() {
         this.all = [];

@@ -101,6 +101,14 @@
   .fr-confetti { position: absolute; left: 50%; top: 50%; width: 0; height: 0; }
   .fr-confetti span { position: absolute; width: 9px; height: 9px; border-radius: 2px; animation: frConfetti .95s ease-out forwards; }
   @keyframes frConfetti { 0% { transform: translate(0, 0) scale(1); opacity: 1; } 100% { transform: translate(var(--dx), var(--dy)) rotate(260deg) scale(.4); opacity: 0; } }
+  .fr-fishing { position: fixed; inset: 0; z-index: 25; background: rgba(4, 12, 24, .82); display: flex; align-items: center; justify-content: center; }
+  .fr-fishing canvas { width: min(92vw, 720px); height: auto; border-radius: 12px; border: 2px solid rgba(255,255,255,.25); touch-action: none; }
+  .fr-fishing-hint { position: absolute; left: 50%; top: calc(50% - min(26vw, 190px) - 40px); transform: translateX(-50%); font-size: 18px; font-weight: 800; background: rgba(16,24,38,.85); border-left: 3px solid #D97B4F; border-radius: 6px; padding: 6px 14px; white-space: nowrap; max-width: 94vw; }
+  .fr-fishing-exit { position: absolute; left: 14px; top: 54px; }
+  .fr-fishing-pull { position: absolute; right: 26px; bottom: 26px; width: 120px; height: 120px; border-radius: 50%; border: 3px solid rgba(255,255,255,.6); background: rgba(217,123,79,.9); color: #fff; font: inherit; font-size: 22px; font-weight: 800; touch-action: none; }
+  .fr-fishing-card { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 6px; background: rgba(16,24,38,.95); border: 4px solid #B8BEC9; border-radius: 14px; padding: 16px 28px; font-size: 20px; animation: frHit .5s ease-out; }
+  .fr-pouch-grid { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+  .fr-pouch-item { display: flex; align-items: center; gap: 4px; border: 2px solid #B8BEC9; border-radius: 8px; padding: 4px 8px; background: rgba(255,255,255,.06); font-size: 16px; }
   #fade { position: fixed; inset: 0; z-index: 40; background: #02040a; opacity: 0; pointer-events: none; }
   .fr-ring-holder { position: relative; width: 150px; height: 150px; margin: 0 auto; }
   .fr-ring { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); border-radius: 50%; }
@@ -174,28 +182,32 @@
 </div>
 <script charset="utf-8" src="character-kit.js?v=20261011"></script>
 <script charset="utf-8" src="fold-card.js"></script>
-<script charset="utf-8" src="40.forest-data.js?v=4"></script>
-<script charset="utf-8" src="40.forest-rules.js?v=4"></script>
-<script charset="utf-8" src="40.forest-clock.js?v=4"></script>
-<script charset="utf-8" src="40.forest-minigame.js?v=4"></script>
-<script charset="utf-8" src="40.forest-terrain.js?v=4"></script>
+<script charset="utf-8" src="40.forest-data.js?v=5"></script>
+<script charset="utf-8" src="40.forest-rules.js?v=5"></script>
+<script charset="utf-8" src="40.forest-clock.js?v=5"></script>
+<script charset="utf-8" src="40.forest-minigame.js?v=5"></script>
+<script charset="utf-8" src="40.forest-terrain.js?v=5"></script>
 <script charset="utf-8" src="room-kit.js?v=11"></script>
-<script charset="utf-8" src="40.forest-stream.js?v=4"></script>
-<script charset="utf-8" src="40.forest-net.js?v=4"></script>
-<script charset="utf-8" src="40.forest-blocks.js?v=4"></script>
-<script charset="utf-8" src="40.forest-world.js?v=4"></script>
-<script charset="utf-8" src="40.forest-save.js?v=4"></script>
-<script charset="utf-8" src="40.forest-session.js?v=4"></script>
-<script charset="utf-8" src="40.forest-sync.js?v=4"></script>
-<script charset="utf-8" src="40.forest-input.js?v=4"></script>
-<script charset="utf-8" src="40.forest-blocklayer.js?v=4"></script>
-<script charset="utf-8" src="40.forest-views.js?v=4"></script>
-<script charset="utf-8" src="40.forest-icons.js?v=4"></script>
-<script charset="utf-8" src="40.forest-fx.js?v=4"></script>
-<script charset="utf-8" src="40.forest-hud.js?v=4"></script>
-<script charset="utf-8" src="40.forest-admin.js?v=4"></script>
-<script charset="utf-8" src="40.forest-play.js?v=4"></script>
-<script charset="utf-8" src="40.dongma-forest.js?v=4"></script>
+<script charset="utf-8" src="40.forest-stream.js?v=5"></script>
+<script charset="utf-8" src="40.forest-net.js?v=5"></script>
+<script charset="utf-8" src="40.forest-blocks.js?v=5"></script>
+<script charset="utf-8" src="40.forest-world.js?v=5"></script>
+<script charset="utf-8" src="40.forest-save.js?v=5"></script>
+<script charset="utf-8" src="40.forest-session.js?v=5"></script>
+<script charset="utf-8" src="40.forest-sync.js?v=5"></script>
+<script charset="utf-8" src="40.forest-input.js?v=5"></script>
+<script charset="utf-8" src="40.forest-blocklayer.js?v=5"></script>
+<script charset="utf-8" src="40.forest-views.js?v=5"></script>
+<script charset="utf-8" src="40.forest-icons.js?v=5"></script>
+<script charset="utf-8" src="40.forest-fx.js?v=5"></script>
+<script charset="utf-8" src="40.forest-hud.js?v=5"></script>
+<script charset="utf-8" src="40.forest-admin.js?v=5"></script>
+<script charset="utf-8" src="40.forest-play.js?v=5"></script>
+<script charset="utf-8" src="40.forest-areas.js?v=5"></script>
+<script charset="utf-8" src="40.forest-areaview.js?v=5"></script>
+<script charset="utf-8" src="40.forest-areaplay.js?v=5"></script>
+<script charset="utf-8" src="40.forest-fishing.js?v=5"></script>
+<script charset="utf-8" src="40.dongma-forest.js?v=5"></script>
 <script type="module">
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";

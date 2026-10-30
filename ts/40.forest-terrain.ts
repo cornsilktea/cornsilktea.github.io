@@ -138,12 +138,16 @@ class FrTerrainMesher {
   private static readonly TOP_COLORS: Readonly<Record<string, [number, number, number]>> = {
     G: [0.38, 0.62, 0.29], D: [0.57, 0.42, 0.27], S: [0.50, 0.50, 0.52], N: [0.90, 0.83, 0.60],
     W: [0.96, 0.97, 0.99], R: [0.60, 0.55, 0.40], O: [0.28, 0.36, 0.42], P: [0.78, 0.67, 0.46],
+    C: [0.60, 0.52, 0.41], T: [0.34, 0.33, 0.38], V: [0.40, 0.78, 0.84], K: [0.12, 0.11, 0.14], L: [0.98, 0.42, 0.10],
   };
   private static readonly WALL_COLORS: Readonly<Record<string, [number, number, number]>> = {
     G: [0.46, 0.34, 0.22], D: [0.46, 0.34, 0.22], S: [0.42, 0.42, 0.45], N: [0.80, 0.72, 0.50],
     W: [0.55, 0.57, 0.62], R: [0.42, 0.38, 0.28], O: [0.22, 0.28, 0.34], P: [0.62, 0.52, 0.36],
+    C: [0.5, 0.44, 0.35], T: [0.42, 0.41, 0.46], V: [0.34, 0.62, 0.68], K: [0.16, 0.15, 0.18], L: [0.7, 0.3, 0.08],
   };
   private static readonly NEIGHBORS: ReadonlyArray<[number, number, number]> = [[1, 0, 0.78], [-1, 0, 0.78], [0, 1, 0.9], [0, -1, 0.66]];
+
+  light: ((x: number, z: number) => [number, number, number]) | null = null;
 
   constructor(private readonly libs: ThreeLibs, private readonly data: FrTerrainData, private readonly material: Three<"Material">) {}
 
@@ -180,13 +184,15 @@ class FrTerrainMesher {
     const y = h * B;
     const noise = 0.93 + FrTreeField.hash(x, z, 9) * 0.14;
     const heightTint = 1 + Math.max(0, h) * 0.012;
-    const top = this.shade(FrTerrainMesher.TOP_COLORS[type] || FrTerrainMesher.TOP_COLORS.G, heightTint, noise);
+    const lit = this.light ? this.light(x, z) : [1, 1, 1];
+    const top = this.shade(FrTerrainMesher.TOP_COLORS[type] || FrTerrainMesher.TOP_COLORS.G, heightTint, noise).map((v, i) => v * lit[i]) as [number, number, number];
     this.quad(positions, colors, [x * B, y, z * B], [x * B, y, (z + 1) * B], [(x + 1) * B, y, (z + 1) * B], [(x + 1) * B, y, z * B], top);
     FrTerrainMesher.NEIGHBORS.forEach(([dx, dz, factor]) => {
       const nh = this.data.height(x + dx, z + dz);
       if (nh >= h) return;
       const low = Math.max(nh, -3) * B;
-      const wall = this.shade(FrTerrainMesher.WALL_COLORS[type] || FrTerrainMesher.WALL_COLORS.G, factor, noise);
+      const neighborLit = this.light ? this.light(x + dx, z + dz) : [1, 1, 1];
+      const wall = this.shade(FrTerrainMesher.WALL_COLORS[type] || FrTerrainMesher.WALL_COLORS.G, factor, noise).map((v, i) => v * neighborLit[i]) as [number, number, number];
       const px = x * B, pz = z * B;
       if (dx === 1) this.quad(positions, colors, [px + B, y, pz], [px + B, y, pz + B], [px + B, low, pz + B], [px + B, low, pz], wall);
       else if (dx === -1) this.quad(positions, colors, [px, y, pz + B], [px, y, pz], [px, low, pz], [px, low, pz + B], wall);

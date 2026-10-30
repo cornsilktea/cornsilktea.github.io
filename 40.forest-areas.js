@@ -1,0 +1,272 @@
+"use strict";
+class FrFeature {
+    constructor(kind, x, z, variant, item = "") {
+        this.kind = kind;
+        this.x = x;
+        this.z = z;
+        this.variant = variant;
+        this.item = item;
+        this.availableAt = 0;
+    }
+    get blocks() { return this.kind === "fruitTree" || this.kind === "jungleTree"; }
+    get gatherable() { return this.kind === "fruitTree" || this.kind === "jungleTree" || this.kind === "flower" || this.kind === "shoreSpot"; }
+}
+class FrAreaInfo {
+    static label(id) { return FrAreaInfo.NAMES[id] || id; }
+    static solo(id) { return FrAreaInfo.SOLO.indexOf(id) >= 0; }
+    static shared(id) { return id === "island" || id === "beach"; }
+}
+FrAreaInfo.NAMES = { island: "마을", fruit: "과일 숲", beach: "해변", mine: "광산", dungeon: "던전" };
+FrAreaInfo.SOLO = ["fruit", "mine", "dungeon"];
+class FrAreaWorld {
+    constructor(id, terrain, spawn, dark, floor = 1) {
+        this.id = id;
+        this.terrain = terrain;
+        this.spawn = spawn;
+        this.dark = dark;
+        this.floor = floor;
+        this.features = new Map();
+        this.lava = new Set();
+        this.list = [];
+    }
+    add(feature) {
+        this.list.push(feature);
+        this.features.set(this.terrain.index(feature.x, feature.z), feature);
+    }
+    featureAt(x, z) { return this.features.get(this.terrain.index(x, z)) || null; }
+    blocked(x, z) {
+        const feature = this.featureAt(x, z);
+        return (!!feature && feature.blocks) || this.lava.has(this.terrain.index(x, z));
+    }
+    solid() { return false; }
+    surfaceAt(x, z) { return this.terrain.height(x, z); }
+    overhead() { return false; }
+    available(feature, absoluteMinute) { return feature.availableAt <= absoluteMinute; }
+}
+class FrAreaFactory {
+    static letter(h) { return String.fromCharCode(97 + h + 2); }
+    static file(w, d, height, top) {
+        const heights = [], tops = [];
+        for (let z = 0; z < d; z++) {
+            let hRow = "", tRow = "";
+            for (let x = 0; x < w; x++) {
+                hRow += FrAreaFactory.letter(height(x, z));
+                tRow += top(x, z);
+            }
+            heights.push(hRow);
+            tops.push(tRow);
+        }
+        const anchors = { plaza: { x: 0, z: 0, radius: 0, height: 0 }, campfire: { x: -9, z: -9 }, publicChest: { x: -9, z: -9, size: 0 }, portals: {}, lots: [], farm: { x: -9, z: -9, w: 0, d: 0 }, bridges: {}, jungleZones: [], paths: {} };
+        return { w, d, heights, tops, anchors };
+    }
+    static forest(seed) {
+        const random = new FrRandom(seed);
+        const N = FrAreaFactory.FOREST_SIZE;
+        const edge = (x, z) => x < 2 || z < 2 || x >= N - 2 || z >= N - 2;
+        const file = FrAreaFactory.file(N, N, (x, z) => (edge(x, z) ? 3 : (FrTreeField.hash(Math.floor(x / 4), Math.floor(z / 4), 41) > 0.82 ? 1 : 0)), (x, z) => (edge(x, z) ? "S" : "G"));
+        const area = new FrAreaWorld("fruit", new FrTerrainData(file), { x: N / 2, z: N - 4 }, false);
+        area.add(new FrFeature("exit", N / 2, N - 3, 0));
+        const taken = new Set();
+        const place = (kind, count, variants) => {
+            for (let tries = 0; tries < count * 12 && count > 0; tries++) {
+                const x = random.between(3, N - 4), z = random.between(3, N - 6);
+                const index = area.terrain.index(x, z);
+                if (taken.has(index) || Math.hypot(x - N / 2, z - (N - 4)) < 4 || area.terrain.height(x, z) !== 0)
+                    continue;
+                taken.add(index);
+                area.add(new FrFeature(kind, x, z, random.between(0, variants - 1)));
+                count--;
+            }
+        };
+        place("fruitTree", 34, 5);
+        place("jungleTree", 30, 3);
+        place("flower", 46, 4);
+        return area;
+    }
+    static beach(seed) {
+        const random = new FrRandom(seed);
+        const W = FrAreaFactory.BEACH_W, D = FrAreaFactory.BEACH_D;
+        const landEnd = 26, sandEnd = 32;
+        const file = FrAreaFactory.file(W, D, (x, z) => (x < 2 || x >= W - 2 ? 3 : z < 2 ? 3 : z >= sandEnd ? -1 : 0), (x, z) => {
+            if (x < 2 || x >= W - 2 || z < 2)
+                return "S";
+            if (z < landEnd)
+                return FrTreeField.hash(x, z, 17) > 0.55 ? "G" : "N";
+            if (z < sandEnd)
+                return "N";
+            return z >= sandEnd + 8 ? "O" : "R";
+        });
+        const area = new FrAreaWorld("beach", new FrTerrainData(file), { x: W / 2, z: 5 }, false);
+        area.add(new FrFeature("exit", W / 2, 3, 0));
+        const taken = new Set();
+        for (let n = 0, tries = 0; n < 40 && tries < 600; tries++) {
+            const x = random.between(4, W - 5), z = random.between(14, sandEnd - 1);
+            const index = area.terrain.index(x, z);
+            if (taken.has(index) || area.terrain.top(x, z) === "R")
+                continue;
+            taken.add(index);
+            const item = random.pick(FrAreaFactory.SHORE_ITEMS);
+            area.add(new FrFeature("shoreSpot", x, z, FrAreaFactory.SHORE_ITEMS.indexOf(item), item));
+            n++;
+        }
+        return area;
+    }
+    static mine(floorData, floors, seed) {
+        const random = new FrRandom(seed + floorData.level * 977);
+        const rows = floorData.rows;
+        const veins = new Set();
+        floorData.oreSpots.forEach((cluster) => cluster.forEach(([x, z]) => { if (random.chance(0.75))
+            veins.add(z * floorData.w + x); }));
+        const cell = (x, z) => (z < 0 || z >= rows.length || x < 0 || x >= floorData.w ? "#" : rows[z].charAt(x));
+        const top = (x, z) => {
+            const c = cell(x, z);
+            if (c === "#")
+                return veins.has(z * floorData.w + x) ? "V" : "T";
+            if (c === "X")
+                return "K";
+            if (c === "~")
+                return "R";
+            if (c === "^")
+                return "L";
+            return "C";
+        };
+        const height = (x, z) => { const c = cell(x, z); return c === "#" || c === "X" ? 3 : c === "~" ? -1 : 0; };
+        const file = FrAreaFactory.file(floorData.w, floorData.d, height, top);
+        const area = new FrAreaWorld("mine", new FrTerrainData(file), { x: floorData.start[0], z: floorData.start[1] }, true, floorData.level);
+        area.add(new FrFeature(floorData.level === 1 ? "exit" : "ladderUp", floorData.start[0], floorData.start[1], 0));
+        if (floorData.ladderDown && floorData.level < floors)
+            area.add(new FrFeature("ladderDown", floorData.ladderDown[0], floorData.ladderDown[1], 0));
+        floorData.torches.forEach(([x, z]) => area.add(new FrFeature("torch", x, z, 0)));
+        return area;
+    }
+}
+FrAreaFactory.FOREST_SIZE = 46;
+FrAreaFactory.BEACH_W = 64;
+FrAreaFactory.BEACH_D = 46;
+FrAreaFactory.SHORE_ITEMS = ["shell", "salt", "seaweed", "sand"];
+class FrCaveLight {
+    constructor(torches) {
+        this.torches = torches;
+    }
+    at(x, z) {
+        let glow = 0;
+        this.torches.forEach(([tx, tz]) => { const d2 = (x - tx) * (x - tx) + (z - tz) * (z - tz); glow += 1.1 / (1 + d2 * 0.05); });
+        const g = Math.min(0.55, glow);
+        return [0.86 + g * 0.55, 0.84 + g * 0.3, 0.82 - g * 0.12];
+    }
+}
+class FrGatherRules {
+    static shake(random, session) {
+        const basket = session.bag.bestTier("basket");
+        const roll = new FrFruitRoll().roll(random, { tier: 0, basketTier: basket }, session.pity.fruit || 0);
+        session.pity.fruit = roll.miss;
+        const gains = { [roll.item]: 1 };
+        if (random.chance(FrBalance.BASKET_EXTRA_CHANCE[basket]))
+            gains[roll.item] += 1;
+        if (random.chance(FrBalance.SEED_DROP_CHANCE)) {
+            const seed = new FrSeedRoll().roll(random, { tier: 0 }, session.pity.seed || 0);
+            session.pity.seed = seed.miss;
+            gains[seed.item] = (gains[seed.item] || 0) + 1;
+        }
+        return gains;
+    }
+    static chop(session) {
+        return { wood: 2 + FrBalance.AXE_WOOD_BONUS[session.bag.bestTier("axe")] };
+    }
+    static flower(random, session) {
+        const gains = { ["flower_" + random.between(0, 3)]: 1 };
+        const key = Object.keys(gains)[0];
+        if (random.chance(FrBalance.BASKET_EXTRA_CHANCE[session.bag.bestTier("basket")]))
+            gains[key] += 1;
+        return gains;
+    }
+    static shore(feature, random, session) {
+        const gains = { [feature.item]: 1 };
+        if (random.chance(FrBalance.BASKET_EXTRA_CHANCE[session.bag.bestTier("basket")]))
+            gains[feature.item] += 1;
+        return gains;
+    }
+    static vein(random, session, floor) {
+        const roll = new FrOreRoll().roll(random, { tier: session.bag.bestTier("pickaxe"), floor }, session.pity.ore || 0);
+        session.pity.ore = roll.miss;
+        return { [roll.item]: 1 };
+    }
+    static fish(random, session) {
+        const roll = new FrFishRoll().roll(random, { tier: session.bag.bestTier("rod") }, session.pity.fish || 0);
+        return roll;
+    }
+}
+class FrExpedition {
+    constructor(session, area) {
+        this.session = session;
+        this.area = area;
+        this.before = null;
+        this.enteredAt = 0;
+    }
+    begin() {
+        this.before = this.session.toSave();
+        this.enteredAt = Date.now();
+    }
+    gains() {
+        const result = {};
+        if (!this.before)
+            return result;
+        const was = new Map();
+        this.before.bag.forEach((s) => was.set(s.id, (was.get(s.id) || 0) + s.count));
+        const now = new Map();
+        this.session.bag.slots.forEach((s) => now.set(s.id, (now.get(s.id) || 0) + s.count));
+        now.forEach((n, id) => { const delta = n - (was.get(id) || 0); if (delta > 0 && FrItems.isStackable(id))
+            result[id] = delta; });
+        return result;
+    }
+    gearGained() {
+        if (!this.before)
+            return [];
+        const was = new Set(this.before.bag.filter((s) => !FrItems.isStackable(s.id)).map((s) => s.id));
+        return this.session.bag.slots.filter((s) => !FrItems.isStackable(s.id) && !was.has(s.id)).map((s) => s.id);
+    }
+    spentActionPoints() { return this.before ? Math.max(0, this.before.ap - Math.round(this.session.ap.current)) : 0; }
+    wornTools() {
+        if (!this.before)
+            return [];
+        const worn = [];
+        this.before.bag.forEach((old) => {
+            if (FrItems.durabilityOf(old.id) <= 0)
+                return;
+            const now = this.session.bag.slots.find((s) => s.id === old.id);
+            if (!now)
+                worn.push(FrItemNames.label(old.id) + " (다 닳음)");
+            else if (now.uses < old.uses)
+                worn.push(FrItemNames.label(old.id) + " -" + (old.uses - now.uses));
+        });
+        return worn;
+    }
+    seconds() { return Math.round((Date.now() - this.enteredAt) / 1000); }
+    remember() {
+        try {
+            localStorage.setItem(FrExpedition.STORAGE_KEY, JSON.stringify({ uid: this.session.uid, area: this.area, save: this.session.toSave() }));
+        }
+        catch (error) {
+            return;
+        }
+    }
+    static recall(uid) {
+        try {
+            const raw = localStorage.getItem(FrExpedition.STORAGE_KEY);
+            if (!raw)
+                return null;
+            const stored = JSON.parse(raw);
+            return stored.uid === uid ? stored.save : null;
+        }
+        catch (error) {
+            return null;
+        }
+    }
+    static clear() { try {
+        localStorage.removeItem(FrExpedition.STORAGE_KEY);
+    }
+    catch (error) {
+        return;
+    } }
+}
+FrExpedition.STORAGE_KEY = "forest_pouch_v1";

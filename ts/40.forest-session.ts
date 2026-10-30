@@ -80,6 +80,7 @@ class FrSession {
   sleeping = false;
   area = "island";
   selected = 0;
+  floor = 1;
   admin = false;
 
   constructor(readonly world: FrWorld, readonly uid: string, readonly nick: string, readonly no: number, ringLevel = 0) {

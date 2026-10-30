@@ -6,7 +6,7 @@ interface FrRemotePose { x: number; z: number; y: number; dir: number; anim: num
 interface FrAdminState { notice: { text: string; at: number } | null; lock: boolean; commands: Record<string, { type: string; at: number }> }
 
 class FrWire {
-  static readonly ANIMS = ["idle", "run", "walk", "chop", "pickaxe", "dig", "sleep"];
+  static readonly ANIMS = ["idle", "run", "walk", "chop", "pickaxe", "dig", "sleep", "fish", "work"];
 
   static pair(value: unknown): FrTerrainEdit | null {
     if (Array.isArray(value)) return { h: Number(value[0]), t: String(value[1]) };

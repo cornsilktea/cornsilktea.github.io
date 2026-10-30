@@ -122,6 +122,16 @@ class FrGame {
   private island = "";
   private adminWindow: FrAdminWindow | null = null;
   private fade!: FrFade;
+  private areaWorld: FrAreaWorld | null = null;
+  private areaScene: FrAreaScene | null = null;
+  private areaFinder: FrAreaFinder | null = null;
+  private areaOutcome: FrAreaOutcome | null = null;
+  private expedition: FrExpedition | null = null;
+  private beachWorld: FrAreaWorld | null = null;
+  private mineData: { floors: FrMineFloorData[] } | null = null;
+  private pouchWindow: FrPouchWindow | null = null;
+  private fishing!: FrFishingScreen;
+  private travelling = false;
   private levelPick: number | null = null;
   private rotation = 0;
   private morningPending = false;
@@ -138,6 +148,7 @@ class FrGame {
 
   private async boot(): Promise<void> {
     this.terrainFile = (await (await fetch("assets/forest/island-terrain.json?v=1")).json()) as FrTerrainFile;
+    this.mineData = (await (await fetch("assets/forest/mine-cave.json?v=1")).json()) as { floors: FrMineFloorData[] };
     this.assets = new CharacterAssets(this.libs);
     const tools = new FrToolClips(this.libs);
     await Promise.all([this.assets.load(), tools.load()]);
@@ -146,6 +157,7 @@ class FrGame {
     this.factory = new CharacterModelFactory(this.libs, this.assets);
     this.labels = new RkLabelFactory(this.libs);
     this.fade = new FrFade(FrDom.el("fade"));
+    this.fishing = new FrFishingScreen(this.random);
     this.profile = new PlayerProfile();
     const editor = new ProfileEditor(this.libs, this.factory, this.assets, this.profile);
     editor.mount(FrDom.el("profileHost"));
@@ -225,7 +237,11 @@ class FrGame {
     const session = new FrSession(world, this.uid, nick, FrMemberWriter.numberFor(this.uid, account ? account.name : ""));
     session.admin = this.isAdmin();
     const save = new FrAccountSave(this.backend, this.uid);
-    session.restore(await save.load());
+    const loaded = await save.load();
+    session.restore(loaded);
+    const pouch = FrExpedition.recall(this.uid);
+    if (pouch && pouch.lastAt > loaded.lastAt) { session.restore(pouch); save.queue(session.toSave()); }
+    FrExpedition.clear();
     this.view.useWorld(world);
     this.view.setLabels(this.labels, this.uid);
     this.world = world;
@@ -242,7 +258,7 @@ class FrGame {
       panel.focus = () => (this.player ? this.player.cell() : null);
       this.adminWindow = panel;
     }
-    session.onChange(() => { save.queue(session.toSave()); this.refreshHud(); });
+    session.onChange(() => { if (this.expedition) this.expedition.remember(); else save.queue(session.toSave()); this.refreshHud(); });
     document.addEventListener("visibilitychange", () => { if (document.hidden) void save.flush(); });
     this.start.enter(true, "섬: " + island + " · " + FrStatusSummary.line(session));
   }
@@ -308,6 +324,7 @@ class FrGame {
     this.craftWindow = this.windows.register(new FrCraftWindow(session, this.toast));
     this.cookWindow = this.windows.register(new FrCookWindow(session, this.toast));
     this.buildWindow = this.windows.register(new FrBuildWindow(session, this.toast));
+    this.pouchWindow = this.windows.register(new FrPouchWindow(session, this.toast));
   }
 
   private enterGame(): void {
@@ -358,6 +375,14 @@ class FrGame {
 
   private clickWorld(clientX: number, clientY: number): void {
     if (!this.playing || !this.session || !this.player || !this.finder || this.currentTask || this.windows.anyOpen() || this.session.sleeping) return;
+    if (this.areaWorld && this.areaFinder) {
+      const areaPick = this.view.pickArea(clientX, clientY);
+      if (!areaPick) return;
+      const areaResult = this.areaFinder.fromPick(areaPick, this.player);
+      if (areaResult.far) { this.toast.show("조금 더 가까이 가서 눌러 주세요"); return; }
+      if (areaResult.target) this.act(areaResult.target);
+      return;
+    }
     const pick = this.view.pick(clientX, clientY);
     if (!pick) return;
     if (pick.kind === "ground" && pick.cell) {
@@ -385,6 +410,7 @@ class FrGame {
 
   private press(): void {
     if (!this.playing || !this.session) return;
+    if (this.fishing.active) { this.fishing.pull(); return; }
     if (this.currentTask) {
       const game = this.currentTask.game;
       const before = game instanceof FrCenterStop ? Math.round(game.progress() * game.hitsNeeded) : 0;
@@ -403,7 +429,7 @@ class FrGame {
 
   private key(code: string): void {
     if (!this.playing) return;
-    if (code === "Escape") { this.windows.closeAll(); this.cancelTask(); return; }
+    if (code === "Escape") { this.windows.closeAll(); this.cancelTask(); if (this.fishing.active) this.fishing.close(); return; }
     if (code === "KeyI") { this.toggleBag(); return; }
     if (code === "KeyR") { this.adjustLevel(1); return; }
     if (code === "KeyF") { this.adjustLevel(-1); return; }
@@ -501,8 +527,114 @@ class FrGame {
     if (target.kind === "remove") { void this.removeHere(target); return; }
     if (target.kind === "lot" && target.lot !== undefined) { void this.claimLot(target.lot); return; }
     if (target.kind === "house" && target.lot !== undefined) { void this.buildHouse(target.lot); return; }
-    const task = FrTasks.forTarget(target.kind);
+    if (target.kind === "portal" && target.portal) { this.enterPortal(target.portal); return; }
+    if (target.kind === "exit") { void this.leaveArea(); return; }
+    if (target.kind === "ladderDown") { void this.changeFloor(1); return; }
+    if (target.kind === "ladderUp") { void this.changeFloor(-1); return; }
+    if (target.kind === "fish" && target.cell) { this.startFishing(target.cell); return; }
+    const task = FrTasks.forTarget(target.kind) || FrAreaTargets.forTarget(target.kind);
     if (task) this.startTask(target, task);
+  }
+
+  private enterPortal(id: string): void {
+    if (id === "dungeon") { this.toast.show("던전은 아직 문이 닫혀 있어요. 곧 열려요!"); return; }
+    void this.enterArea(id as FrAreaId, 1, "start");
+  }
+
+  private buildArea(id: FrAreaId, floor: number, arrive: "start" | "ladder"): FrAreaWorld {
+    if (id === "fruit") return FrAreaFactory.forest(Date.now() & 0xffffff);
+    if (id === "beach") { if (!this.beachWorld) this.beachWorld = FrAreaFactory.beach(7); return this.beachWorld; }
+    const data = (this.mineData as { floors: FrMineFloorData[] }).floors[floor - 1];
+    const area = FrAreaFactory.mine(data, (this.mineData as { floors: FrMineFloorData[] }).floors.length, Date.now() & 0xffffff);
+    if (arrive === "ladder" && data.ladderDown) { area.spawn.x = data.ladderDown[0]; area.spawn.z = data.ladderDown[1]; }
+    return area;
+  }
+
+  private async enterArea(id: FrAreaId, floor: number, arrive: "start" | "ladder"): Promise<void> {
+    if (!this.session || !this.player || !this.clock || this.travelling) return;
+    this.travelling = true;
+    this.cancelTask();
+    this.windows.closeAll();
+    await this.fade.blackout(380);
+    const area = this.buildArea(id, floor, arrive);
+    let light: FrCaveLight | null = null;
+    if (id === "mine") light = new FrCaveLight((this.mineData as { floors: FrMineFloorData[] }).floors[floor - 1].torches);
+    const scene = new FrAreaScene(this.libs, area, this.view.groundMaterial(), light);
+    scene.syncAvailability(this.clock.absoluteMinute());
+    if (this.areaScene) this.view.hideArea();
+    this.view.showArea(scene, area.dark);
+    this.areaWorld = area;
+    this.areaScene = scene;
+    this.player.useWorld(area);
+    this.player.place(area.spawn.x, area.spawn.z);
+    const minute = () => (this.clock as FrClockSync).absoluteMinute();
+    this.areaFinder = new FrAreaFinder(area, minute);
+    this.areaOutcome = new FrAreaOutcome(this.session, area, scene, this.random, minute);
+    this.session.area = id;
+    this.session.floor = floor;
+    if (FrAreaInfo.solo(id) && !this.expedition) { this.expedition = new FrExpedition(this.session, id); this.expedition.begin(); }
+    this.view.rig.snap(new this.libs.THREE.Vector3(this.player.x, this.player.y, this.player.z));
+    await this.publishPresence(true);
+    await this.fade.lift(450);
+    this.travelling = false;
+  }
+
+  private async changeFloor(delta: number): Promise<void> {
+    if (!this.session || this.session.area !== "mine") return;
+    const next = this.session.floor + delta;
+    if (next < 1) { await this.leaveArea(); return; }
+    if (next > 3) return;
+    await this.enterArea("mine", next, delta > 0 ? "start" : "ladder");
+  }
+
+  private async leaveArea(): Promise<void> {
+    if (!this.session || !this.player || !this.world || !this.areaWorld || this.travelling) return;
+    this.travelling = true;
+    const left = this.areaWorld.id;
+    this.cancelTask();
+    await this.fade.blackout(380);
+    this.view.hideArea();
+    this.areaWorld = null;
+    this.areaScene = null;
+    this.areaFinder = null;
+    this.areaOutcome = null;
+    this.player.useWorld(this.world);
+    const portal = this.world.terrain.anchors.portals[left];
+    const plaza = this.world.terrain.anchors.plaza;
+    this.player.place(portal.x + Math.sign(plaza.x - portal.x) * 3, portal.z + Math.sign(plaza.z - portal.z) * 3);
+    this.session.area = "island";
+    this.session.floor = 1;
+    const finished = this.expedition;
+    this.expedition = null;
+    if (finished) { FrExpedition.clear(); this.session.changed(); }
+    this.view.rig.snap(new this.libs.THREE.Vector3(this.player.x, this.player.y, this.player.z));
+    await this.publishPresence(true);
+    await this.fade.lift(450);
+    this.travelling = false;
+    if (finished && this.pouchWindow) this.windows.openOnly(this.pouchWindow, () => (this.pouchWindow as FrPouchWindow).showFor(finished));
+  }
+
+  private startFishing(cell: FrPoint): void {
+    if (!this.session || !this.player) return;
+    if (this.session.bag.bestTier("rod") === 0) { this.toast.show("낚싯대가 있어야 해요. 작업대에서 만들 수 있어요."); return; }
+    const B = FrTerrainData.BLOCK;
+    this.player.facing = Math.atan2((cell.x + 0.5) * B - this.player.x, (cell.z + 0.5) * B - this.player.z);
+    const session = this.session;
+    this.fishing.open({
+      rodTier: () => session.bag.bestTier("rod"),
+      cast: () => {
+        if (!session.ap.canSpend(FrBalance.ACTION_COST.fish)) { this.toast.show("행동력이 모자라요. 음식을 먹거나 밤에 잠을 자요."); return null; }
+        return FrGatherRules.fish(this.random, session);
+      },
+      onCatch: (roll) => {
+        session.ap.spend(FrBalance.ACTION_COST.fish);
+        session.pity.fish = roll.miss;
+        const broken = session.wearTool("rod");
+        session.gain(roll.item, 1);
+        if (broken) this.toast.show(FrItemNames.label(broken) + "이(가) 다 닳았어요");
+      },
+      onClose: () => { if (this.avatar) this.avatar.play("idle"); },
+    });
   }
 
   private openSite(site: FrBuildSite): void {
@@ -539,15 +671,17 @@ class FrGame {
     const current = this.currentTask;
     if (!current || !this.outcome) return;
     this.currentTask = null;
+    const areaOutcome = this.areaOutcome;
     if (current.game.state !== "success") { this.mini.hide(); return; }
     this.mini.celebrate();
     window.setTimeout(() => { if (!this.currentTask) this.mini.hide(); }, 950);
     if (this.player) {
       const cell = current.target.cell || this.player.frontCell();
       const B = FrTerrainData.BLOCK;
-      this.view.burst.emit((cell.x + 0.5) * B, this.view.terrainData().surfaceY(cell.x, cell.z) + 2.2, (cell.z + 0.5) * B, FrTaskColors.success(current.task.kind), 22, 7);
+      const terrain = this.areaWorld ? this.areaWorld.terrain : this.view.terrainData();
+      this.view.burst.emit((cell.x + 0.5) * B, Math.max(0, terrain.surfaceY(cell.x, cell.z)) + 2.2, (cell.z + 0.5) * B, FrTaskColors.success(current.task.kind), 22, 7);
     }
-    const message = await this.outcome.finish(current.target, current.task);
+    const message = this.areaWorld && areaOutcome ? await areaOutcome.finish(current.target, current.task) : await this.outcome.finish(current.target, current.task);
     if (message) this.toast.show(message);
   }
 
@@ -607,7 +741,8 @@ class FrGame {
     const session = this.session, clock = this.clock, player = this.player, world = this.world;
     if (!this.playing || !session || !clock || !player || !world || !this.hud || !this.avatar || !this.finder) return;
     const direction = this.input.direction();
-    const blocked = this.windows.anyOpen() || session.sleeping || this.currentTask !== null;
+    const blocked = this.windows.anyOpen() || session.sleeping || this.currentTask !== null || this.fishing.active || this.travelling;
+    if (this.fishing.active) this.fishing.update(dt);
     if (this.currentTask && Math.hypot(direction.x, direction.z) > 0.4) this.cancelTask();
     const shoes = FrBalance.SHOES_SPEED[session.bag.bestTier("shoes")];
     player.step(blocked ? { x: 0, z: 0 } : direction, dt, shoes);
@@ -615,16 +750,22 @@ class FrGame {
     this.avatar.group.rotation.y = player.facing;
     if (session.sleeping) this.avatar.play("sleep");
     else if (this.currentTask) this.avatar.play(this.currentTask.task.clip);
+    else if (this.fishing.active) this.avatar.play("fish");
     else this.avatar.play(player.moving ? (player.swimming ? "walk" : "run") : "idle");
     this.view.rig.follow(new this.libs.THREE.Vector3(player.x, player.y, player.z), dt);
-    this.view.fadeTreesAround(player.cell());
-    if (this.remotes) this.remotes.update(dt);
-    if (this.posePublisher) this.posePublisher.send(player.x, player.z, player.y, player.facing, this.poseCode(player.moving), player.vx, player.vz);
-    this.target = blocked ? null : this.finder.find(player, this.finderContext());
-    const place = this.target && this.target.kind === "place" ? this.target : null;
-    if (place && place.plan) this.view.setPreview(place.cell, place.plan.y, !!place.check && place.check.ok);
-    else this.view.setPreview(null, 0, true);
-    this.view.setMarker(this.target && this.target.cell ? this.target.cell : null);
+    if (!this.areaWorld) this.view.fadeTreesAround(player.cell());
+    if (this.remotes) this.remotes.update(dt, session.area);
+    if (this.posePublisher && FrAreaInfo.shared(session.area)) this.posePublisher.send(player.x, player.z, player.y, player.facing, this.poseCode(player.moving), player.vx, player.vz);
+    if (this.areaWorld && this.areaFinder) {
+      this.target = blocked ? null : this.areaFinder.find(player);
+      this.view.updateAreaMarker(this.target && this.target.cell && this.target.kind !== "exit" && this.target.kind !== "ladderDown" && this.target.kind !== "ladderUp" ? this.target.cell : null);
+    } else {
+      this.target = blocked ? null : this.finder.find(player, this.finderContext());
+      const place = this.target && this.target.kind === "place" ? this.target : null;
+      if (place && place.plan) this.view.setPreview(place.cell, place.plan.y, !!place.check && place.check.ok);
+      else this.view.setPreview(null, 0, true);
+      this.view.setMarker(this.target && this.target.cell ? this.target.cell : null);
+    }
     this.input.setActionLabel(this.target ? this.target.label : "·");
     if (this.currentTask) {
       this.currentTask.game.tick(dt);
@@ -638,7 +779,7 @@ class FrGame {
     if (session.sleeping && time - this.lastSleepCheck > 1) { this.lastSleepCheck = time; void this.tryMorning(); }
     this.view.applyClock(minute);
     this.hud.showClock(minute, day);
-    this.hud.showArea("마을");
+    this.hud.showArea(FrAreaInfo.label(session.area) + (session.area === "mine" ? " " + session.floor + "층" : ""));
     this.hud.showSleepButton(FrSleepVote.canSleep(minute, session.area) && !this.currentTask, session.sleeping);
     this.hud.showSleepBand(FrClock.isNight(minute) ? FrSleepVote.banner(this.presences()) : "");
     if (day !== this.lastDay) this.onNewDay(day);

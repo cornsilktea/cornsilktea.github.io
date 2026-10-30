@@ -75,6 +75,7 @@ class FrSession {
         this.sleeping = false;
         this.area = "island";
         this.selected = 0;
+        this.floor = 1;
         this.admin = false;
         this.ap = new FrActionPoints(ringLevel);
     }
