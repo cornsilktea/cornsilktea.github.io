@@ -155,7 +155,7 @@ class FrPlayerBody {
   }
 }
 
-type FrTargetKind = "farmPlant" | "farmHarvest" | "farmGrowing" | "canal" | "cook" | "chest" | "site" | "tree" | "dig" | "stone" | "snow" | "place" | "remove" | "lot" | "house" | "portal" | "shake" | "areaChop" | "flower" | "shore" | "fish" | "mineStone" | "mineVein" | "mineHard" | "exit" | "ladderDown" | "ladderUp";
+type FrTargetKind = "farmPlant" | "farmHarvest" | "farmGrowing" | "canal" | "cook" | "chest" | "site" | "tree" | "dig" | "stone" | "snow" | "place" | "remove" | "lot" | "house" | "portal" | "shake" | "areaChop" | "flower" | "shore" | "fish" | "mineStone" | "mineVein" | "mineHard" | "exit" | "ladderDown" | "ladderUp" | "pchest";
 
 interface FrTarget {
   kind: FrTargetKind;
@@ -193,13 +193,15 @@ class FrTargetFinder {
       const p = a.portals[id];
       if (near((p.x + 0.5) * B, (p.z + 0.5) * B, 6.2)) return { kind: "portal", label: FrAreaInfo.label(id), cell: null, portal: id };
     }
-    for (const site of FrBuildSites.STAGE_TWO) {
-      if (near((site.x + 0.5) * B, (site.z + 0.5) * B, 4.8)) return { kind: "site", label: this.siteLabel(site), cell: null, site };
+    for (const site of this.world.sites) {
+      if (near((site.x + 0.5) * B, (site.z + 0.5) * B, site.small ? 4.8 : 6.2)) return { kind: "site", label: this.siteLabel(site), cell: null, site };
     }
     if (context) {
       const front = player.frontCell();
       const farmTarget = this.farmTarget(front, context);
       if (farmTarget) return farmTarget;
+      const chestY = this.personalChestAt(front, context.me);
+      if (chestY >= 0 && !context.held) return { kind: "pchest", label: "내 창고", cell: front, removeY: chestY };
       const blockTarget = this.blockTarget(front, context);
       if (blockTarget) return blockTarget;
       const lotTarget = this.lotTarget(player, context);
@@ -210,9 +212,16 @@ class FrTargetFinder {
     return this.cellTarget(player.frontCell(), player);
   }
 
+  personalChestAt(cell: FrPoint, me: FrBlockPlayer): number {
+    const column = this.world.blocks.column(this.world.terrain.index(cell.x, cell.z));
+    const found = column.find(([, record]) => record.t === FrFurnitureCatalog.idOf("box") && record.n === me.no);
+    return found ? found[0] : -1;
+  }
+
   siteLabel(site: FrBuildSite): string {
-    const done = this.world.village.builtCount(site.id) >= FrVillage.definition(site.id).count;
-    if (site.id === "farm_expand") return done ? "넓힘" : "넓히기";
+    const done = this.world.isBuilt(site.id);
+    if (site.defId === "farm_expand") return done ? "넓힘" : "넓히기";
+    if (FrSiteBook.STATIONS.indexOf(site.defId) < 0) return done ? "살펴보기" : "짓기";
     return done ? "열기" : "짓기";
   }
 
@@ -272,7 +281,7 @@ class FrTargetFinder {
       return near((p.x + 0.5) * B, (p.z + 0.5) * B, 8.5) ? { target: { kind: "portal", label: FrAreaInfo.label(pick.siteId), cell: null, portal: pick.siteId }, far: false } : { target: null, far: true };
     }
     if (pick.kind === "site") {
-      const site = FrBuildSites.find(pick.siteId || "");
+      const site = this.world.siteOf(pick.siteId || "");
       if (!site) return { target: null, far: false };
       return near((site.x + 0.5) * B, (site.z + 0.5) * B, 6.8) ? { target: { kind: "site", label: this.siteLabel(site), cell: null, site }, far: false } : { target: null, far: true };
     }

@@ -171,6 +171,7 @@ class FrProps {
   private readonly portalRings: Array<{ ring: Three<"Mesh">; disc: Three<"Mesh">; phase: number }> = [];
   private chest: Three<"Object3D"> | null = null;
   private readonly siteMarkers = new Map<string, Three<"Group">>();
+  private readonly models: FrSiteModels;
 
   constructor(private readonly libs: ThreeLibs, private readonly world: FrWorld, readonly group: Three<"Group">) {
     const T = libs.THREE;
@@ -183,7 +184,8 @@ class FrProps {
     group.add(campfire);
     this.buildPortals();
     this.buildChestPlaceholder();
-    FrBuildSites.STAGE_TWO.forEach((site) => this.addSiteMarker(site));
+    this.models = new FrSiteModels(libs, world);
+    world.sites.forEach((site) => this.addSiteMarker(site));
   }
 
   private buildChestPlaceholder(): void {
@@ -209,14 +211,26 @@ class FrProps {
     const marker = new T.Group();
     marker.position.set((site.x + 0.5) * FrTerrainData.BLOCK, this.world.terrain.surfaceY(site.x, site.z), (site.z + 0.5) * FrTerrainData.BLOCK);
     marker.userData = { kind: "site", id: site.id };
+    this.fillPost(marker);
+    this.group.add(marker);
+    this.siteMarkers.set(site.id, marker);
+    if (this.world.isBuilt(site.id)) this.showBuilt(site);
+  }
+
+  hideBuilt(site: FrBuildSite): void {
+    const marker = this.siteMarkers.get(site.id);
+    if (!marker) return;
+    marker.clear();
+    this.fillPost(marker);
+  }
+
+  private fillPost(marker: Three<"Group">): void {
+    const T = this.libs.THREE;
     const post = new T.Mesh(new T.BoxGeometry(0.25, 2.2, 0.25), new T.MeshLambertMaterial({ color: 0x8a5a2b }));
     post.position.y = 1.1;
     const sign = new T.Mesh(new T.BoxGeometry(1.6, 0.9, 0.12), new T.MeshLambertMaterial({ color: 0xe7c98a }));
     sign.position.y = 2.1;
     marker.add(post, sign);
-    this.group.add(marker);
-    this.siteMarkers.set(site.id, marker);
-    if (this.world.village.builtCount(site.id) > 0) this.showBuilt(site);
   }
 
   showBuilt(site: FrBuildSite): void {
@@ -260,7 +274,7 @@ class FrProps {
         box(2.6, 0.9, 0.12, 0, 2.1, 0, 0x9be08a);
       },
     };
-    (builders[site.id] || builders.workbench)();
+    if (builders[site.defId]) builders[site.defId](); else this.models.fill(site, marker);
   }
 
   private buildPortals(): void {
@@ -371,6 +385,8 @@ class FrWorldView implements FrWorldListener {
   readonly marker: Three<"Mesh">;
   readonly burst: FrBurst;
   props!: FrProps;
+  plaza: FrPlazaDecor | null = null;
+  onVillageLevel: (level: number) => void = () => undefined;
   blocksLayer!: FrBlockLayer;
   crops!: FrCropLayer;
   private areaScene: FrAreaScene | null = null;
@@ -450,6 +466,8 @@ class FrWorldView implements FrWorldListener {
     this.blockGroup.clear();
     this.trees = new FrTreeLayer(this.libs, world, this.treeGroup);
     this.props = new FrProps(this.libs, world, this.propGroup);
+    this.plaza = new FrPlazaDecor(this.libs, world, this.propGroup);
+    this.plaza.refresh();
     this.blocksLayer = new FrBlockLayer(this.libs, world, this.blockGroup);
     this.crops = new FrCropLayer(this.libs, world, this.propGroup);
     this.rebuildLotMarkers();
@@ -548,7 +566,14 @@ class FrWorldView implements FrWorldListener {
   }
 
   onTreeFelled(spot: FrTreeSpot): void { this.trees.remove(spot); }
-  onBuilt(id: string): void { const site = FrBuildSites.find(id); if (site) this.props.showBuilt(site); }
+  onBuilt(id: string): void {
+    const site = this.world ? this.world.siteOf(id) : undefined;
+    if (site) { if (this.world && this.world.isBuilt(id)) this.props.showBuilt(site); else this.props.hideBuilt(site); }
+    if (!this.plaza) return;
+    const before = this.plaza.level;
+    const level = this.plaza.refresh();
+    if (level > before && before > 0) this.onVillageLevel(level);
+  }
   onPublicChanged(): void { return; }
   onBlockChanged(x: number, z: number, y: number, record: FrBlockRecord | null): void { this.blocksLayer.apply(x, z, y, record); }
   onLotChanged(): void { if (this.lotMarkers) this.lotMarkers.refresh(); }

@@ -101,7 +101,7 @@ class FrSnowNode extends FrMapNode {
 class FrBuildNode extends FrMapNode {
   constructor(private readonly world: FrWorld) { super(); }
   protected replaceAll(table: Record<string, unknown>): void { Object.keys(table).forEach((k) => this.world.remoteBuilt(k)); }
-  protected setOne(rest: string[], value: unknown): void { if (value !== null) this.world.remoteBuilt(rest[0]); }
+  protected setOne(rest: string[], value: unknown): void { if (value !== null) this.world.remoteBuilt(rest[0]); else this.world.remoteUnbuilt(rest[0]); }
 }
 
 class FrPublicNode extends FrMapNode {

@@ -23,6 +23,7 @@ class FrCraftMenu {
         block("block_door", "문", { plank: 3 });
         block("block_window", "창문", { glass: 2 });
         block("block_torch", "횃불 ×4", { wood: 1, coal: 1 }, 4);
+        FrFurnitureCatalog.ITEMS.forEach((f) => options.push({ id: "make_" + FrFurnitureCatalog.idOf(f.id), label: "가구 · " + f.name, cost: f.cost, output: FrFurnitureCatalog.idOf(f.id), count: 1, station: "workbench" }));
         options.push({ id: "rope_seaweed", label: "노끈 (해초 3)", cost: { seaweed: 3 }, output: "rope", count: 1, station: "workbench" });
         options.push({ id: "rope_vine", label: "노끈 (덩굴 2)", cost: { vine: 2 }, output: "rope", count: 1, station: "workbench" });
         options.push({ id: "rope_cloth", label: "노끈 (천 1)", cost: { cloth: 1 }, output: "rope", count: 1, station: "workbench" });
@@ -87,7 +88,7 @@ class FrSession {
     player() { return { uid: this.uid, no: this.no, admin: this.admin }; }
     heldBlock() {
         const slot = this.bag.slots[this.selected];
-        return slot && slot.id.indexOf("block_") === 0 ? slot.id : null;
+        return slot && (slot.id.indexOf("block_") === 0 || FrFurnitureCatalog.isFurniture(slot.id)) ? slot.id : null;
     }
     changed() {
         const ring = FrRingKit.level(this);
@@ -129,7 +130,7 @@ class FrSession {
             return false;
         source.pay(option.cost);
         this.gain(option.output, option.count);
-        this.stats.add(option.output.indexOf("gear_") === 0 ? "craftGear" : option.output.indexOf("block_") === 0 ? "craftBlocks" : "craftProcessed", option.count);
+        this.stats.add(option.output.indexOf("gear_") === 0 ? "craftGear" : option.output.indexOf("block_") === 0 || FrFurnitureCatalog.isFurniture(option.output) ? "craftBlocks" : "craftProcessed", option.count);
         return true;
     }
     cook(recipe) {
@@ -156,6 +157,7 @@ class FrSession {
             seen: Array.from(this.seen),
             lastAt: Date.now(),
             stats: this.stats.data,
+            chest: this.personal.snapshot(),
         };
     }
     restore(data) {
@@ -166,5 +168,6 @@ class FrSession {
         Object.keys(data.pity).forEach((k) => { this.pity[k] = data.pity[k]; });
         data.seen.forEach((id) => this.seen.add(id));
         this.stats.load(data.stats || null, FrStats.dayStamp(new Date()));
+        this.personal.restore(data.chest || {});
     }
 }

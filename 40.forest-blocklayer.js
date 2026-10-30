@@ -176,8 +176,22 @@ class FrBlockLayer {
         this.group = group;
         this.types = new Map();
         this.where = new Map();
+        this.roofLot = -1;
         this.matrix = new libs.THREE.Matrix4();
         world.blocks.forEach((index, y, record) => this.apply(index % world.terrain.w, Math.floor(index / world.terrain.w), y, record));
+    }
+    setRoofLot(lot) {
+        if (lot === this.roofLot)
+            return;
+        const lots = [this.roofLot, lot];
+        this.roofLot = lot;
+        this.world.blocks.forEach((index, y, record) => {
+            if (y < FrBlockLayer.ROOF_FROM)
+                return;
+            const x = index % this.world.terrain.w, z = Math.floor(index / this.world.terrain.w);
+            if (lots.indexOf(FrBlockRules.lotIndexAt(this.world, x, z)) >= 0)
+                this.apply(x, z, y, record);
+        });
     }
     count() { return this.world.blocks.total(); }
     apply(x, z, y, record) {
@@ -194,7 +208,9 @@ class FrBlockLayer {
         const type = this.typeFor(record.t);
         const B = FrTerrainData.BLOCK;
         const T = this.libs.THREE;
-        this.matrix.compose(new T.Vector3((x + 0.5) * B, this.world.terrain.surfaceY(x, z) + y * B, (z + 0.5) * B), new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 1, 0), (record.r || 0) * Math.PI / 2), new T.Vector3(1, 1, 1));
+        const hidden = this.roofLot >= 0 && y >= FrBlockLayer.ROOF_FROM && FrBlockRules.lotIndexAt(this.world, x, z) === this.roofLot;
+        const scale = hidden ? 0.0001 : 1;
+        this.matrix.compose(new T.Vector3((x + 0.5) * B, this.world.terrain.surfaceY(x, z) + y * B, (z + 0.5) * B), new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 1, 0), (record.r || 0) * Math.PI / 2), new T.Vector3(scale, scale, scale));
         type.put(key, this.matrix);
         this.where.set(key, record.t);
     }
@@ -202,8 +218,14 @@ class FrBlockLayer {
         const existing = this.types.get(id);
         if (existing)
             return existing;
-        const style = FrBlockCatalogView.style(id);
         const T = this.libs.THREE;
+        const furniture = FrFurnitureCatalog.find(id);
+        if (furniture) {
+            const type = new FrBlockType(this.libs, this.group, id, FrGeometryMerge.boxes(this.libs, furniture.boxes.map((b) => [b[0], b[1], b[2], b[3], b[4], b[5]]), (i) => furniture.boxes[i][6]), new T.MeshLambertMaterial({ vertexColors: true }));
+            this.types.set(id, type);
+            return type;
+        }
+        const style = FrBlockCatalogView.style(id);
         const make = (color, fringe = "") => new T.MeshLambertMaterial({ map: FrBlockTextures.get(this.libs, color, style.pattern, fringe), transparent: style.alpha < 1, opacity: style.alpha, depthWrite: style.alpha >= 1 });
         let geometry;
         let material;
@@ -236,6 +258,7 @@ class FrBlockLayer {
         return FrGeometryMerge.boxes(this.libs, [[2, 0.25, 0.3, 0, 0.125, 0], [2, 0.25, 0.3, 0, 1.875, 0], [0.25, 2, 0.3, -0.875, 1, 0], [0.25, 2, 0.3, 0.875, 1, 0], [1.5, 1.5, 0.12, 0, 1, 0]]);
     }
 }
+FrBlockLayer.ROOF_FROM = 3;
 class FrLotMarkers {
     constructor(libs, world, parent, labels, selfUid) {
         this.libs = libs;

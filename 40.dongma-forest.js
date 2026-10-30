@@ -88,6 +88,8 @@ class FrGame {
         this.hotbar = null;
         this.bagWindow = null;
         this.chestWindow = null;
+        this.personalChestWindow = null;
+        this.personalChestCell = null;
         this.craftWindow = null;
         this.cookWindow = null;
         this.ovenWindow = null;
@@ -166,6 +168,7 @@ class FrGame {
         FoldCard.bindAll(document);
         const preview = new FrWorld("preview", new FrTerrainData(this.terrainFile), new FrLocalBackend(false));
         this.view = new FrWorldView(this.libs, FrDom.el("view"), preview, this.touch);
+        this.view.onVillageLevel = (level) => this.toast.show("마을이 " + level + "단계 " + FrVillageLevels.label(level) + "이(가) 됐어요!", 3600);
         this.backdrop = new FrMenuBackdrop(this.libs, this.view, this.factory, this.clips, preview.terrain.anchors.campfire);
         this.backdrop.start();
         this.view.applyClock(FrBalance.DAWN_MINUTE + 240);
@@ -342,6 +345,9 @@ class FrGame {
     buildWindows(session) {
         this.bagWindow = this.windows.register(new FrBagWindow(session, this.toast));
         this.chestWindow = this.windows.register(new FrChestWindow(session, this.toast));
+        this.personalChestWindow = this.windows.register(new FrPersonalChestWindow(session, this.toast));
+        this.personalChestWindow.onRemove = () => { if (this.personalChestCell)
+            void this.removeHere(this.personalChestCell); };
         this.craftWindow = this.windows.register(new FrCraftWindow(session, this.toast, "workbench"));
         this.forgeWindow = this.windows.register(new FrCraftWindow(session, this.toast, "forge"));
         this.cookWindow = this.windows.register(new FrCookWindow(session, this.toast, "campfire"));
@@ -598,10 +604,17 @@ class FrGame {
             return;
         if (already && FrFoodRules.canEat(item.id))
             this.toast.show(this.session.eat(item.id) ? "냠냠! 행동력이 찼어요" : "행동력이 가득해요");
-        else if (item.id.indexOf("block_") === 0)
+        else if (item.id.indexOf("block_") === 0 || FrFurnitureCatalog.isFurniture(item.id))
             this.toast.show(FrItemNames.label(item.id) + " — 앞 칸에 놓아요 (R/F 높이, T 돌리기)");
         else
             this.toast.show(FrItemNames.label(item.id) + (FrFoodRules.canEat(item.id) ? " — 한 번 더 누르면 먹어요" : ""));
+    }
+    ownLotUnder(cell) {
+        if (!this.world || !this.session)
+            return -1;
+        const lot = FrBlockRules.lotIndexAt(this.world, cell.x, cell.z);
+        const record = lot >= 0 ? this.world.lots.get(lot) : undefined;
+        return record && record.uid === this.session.uid ? lot : -1;
     }
     finderContext() {
         const session = this.session;
@@ -697,6 +710,11 @@ class FrGame {
             const record = this.world.farm.get(this.world.terrain.index(target.cell.x, target.cell.z));
             if (record)
                 this.toast.show(FrItemNames.label(record.crop) + " — 다 자라려면 약 " + Math.ceil(FrFarmRules.minutesLeft(this.world, target.cell.x, target.cell.z, record, this.clock.absoluteMinute()) / 6 / 60 * 10) / 10 + "분 남았어요");
+            return;
+        }
+        if (target.kind === "pchest" && this.personalChestWindow) {
+            this.personalChestCell = target;
+            this.windows.openOnly(this.personalChestWindow);
             return;
         }
         if (target.kind === "chest" && this.chestWindow) {
@@ -985,15 +1003,15 @@ class FrGame {
     openSite(site) {
         if (!this.world || !this.craftWindow || !this.buildWindow)
             return;
-        const def = FrVillage.definition(site.id);
-        const done = this.world.village.builtCount(site.id) >= def.count;
+        const def = FrVillage.definition(site.defId);
+        const done = this.world.isBuilt(site.id);
         const windows = { workbench: this.craftWindow, forge: this.forgeWindow, oven: this.ovenWindow, kitchen: this.kitchenWindow };
         if (done) {
-            const target = windows[site.id];
+            const target = windows[site.defId];
             if (target)
                 this.windows.openOnly(target);
             else
-                this.toast.show(site.name + "은(는) 이미 모두 넓혔어요");
+                this.toast.show(site.name + "이(가) 지어져 있어요 (마을 점수 +" + def.score + ")");
             return;
         }
         if (this.world.village.level() < def.minVillageLevel) {
@@ -1001,7 +1019,7 @@ class FrGame {
             return;
         }
         this.windows.closeAll();
-        this.buildWindow.openFor(def);
+        this.buildWindow.openFor(def, site);
     }
     async plantSeed(seedId) {
         if (!this.session || !this.world || !this.clock || !this.plantCell)
@@ -1174,8 +1192,10 @@ class FrGame {
         else
             this.avatar.play(player.moving ? (player.swimming ? "walk" : "run") : "idle");
         this.view.rig.follow(new this.libs.THREE.Vector3(player.x, player.y, player.z), dt);
-        if (!this.areaWorld)
+        if (!this.areaWorld) {
             this.view.fadeTreesAround(player.cell());
+            this.view.blocksLayer.setRoofLot(this.ownLotUnder(player.cell()));
+        }
         if (this.remotes)
             this.remotes.update(dt, session.area);
         if (this.posePublisher && FrAreaInfo.shared(session.area))

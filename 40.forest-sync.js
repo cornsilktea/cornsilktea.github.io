@@ -104,7 +104,9 @@ class FrBuildNode extends FrMapNode {
     }
     replaceAll(table) { Object.keys(table).forEach((k) => this.world.remoteBuilt(k)); }
     setOne(rest, value) { if (value !== null)
-        this.world.remoteBuilt(rest[0]); }
+        this.world.remoteBuilt(rest[0]);
+    else
+        this.world.remoteUnbuilt(rest[0]); }
 }
 class FrPublicNode extends FrMapNode {
     constructor(world) {

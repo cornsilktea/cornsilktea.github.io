@@ -30,6 +30,7 @@ class FrBalance {
   static readonly BAG_SLOTS = 40;
   static readonly STACK_SIZE = 30;
   static readonly PUBLIC_SLOTS = 180;
+  static readonly PERSONAL_SLOTS = 120;
   static readonly PUBLIC_LOG_LINES = 100;
   static readonly PERSONAL_CHEST_SLOTS = 60;
   static readonly PERSONAL_CHEST_LIMIT = 2;
@@ -246,6 +247,7 @@ class FrCatalog {
     add("glass", "유리", "crafted", "common", "화덕 — 모래 2와 석탄 1");
     ["빨강", "노랑", "파랑", "초록"].forEach((c, i) => add("dye_" + i, c + " 염료", "crafted", "common", "작업대 — 꽃 2"));
     FrCatalog.BLOCK_IDS.forEach((b) => add("block_" + b[0], b[1], "block", "common", b[2]));
+    FrFurnitureCatalog.ITEMS.forEach((f) => add(FrFurnitureCatalog.idOf(f.id), f.name, "block", "common", "작업대 — 가구 만들기"));
     return list;
   }
 

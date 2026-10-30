@@ -222,6 +222,74 @@ class FrChestWindow extends FrWindow {
         this.session.changed();
     }
 }
+class FrPersonalChestWindow extends FrWindow {
+    constructor(session, toast) {
+        super("내 창고", session, toast);
+        this.onRemove = () => undefined;
+    }
+    render() {
+        FrDom.clear(this.body);
+        const columns = FrDom.make("div", "fr-cols");
+        columns.append(this.bagColumn(), this.storeColumn());
+        this.body.appendChild(columns);
+        const used = this.session.personal.slotsUsed();
+        this.body.appendChild(FrDom.make("div", "fr-note", "내 창고 " + used + " / " + FrBalance.PERSONAL_SLOTS + "칸 · 어느 섬에서도 같은 창고예요 · 만들 때 재료로도 쓰여요"));
+        if (used === 0)
+            this.body.appendChild(this.button("상자 치우기", () => { this.close(); this.onRemove(); }));
+    }
+    bagColumn() {
+        const column = FrDom.make("div", "fr-col");
+        column.appendChild(FrDom.make("h3", "", "내 가방"));
+        const totals = new Map();
+        this.session.bag.slots.forEach((s) => { if (FrItems.isStackable(s.id))
+            totals.set(s.id, (totals.get(s.id) || 0) + s.count); });
+        if (totals.size === 0)
+            column.appendChild(FrDom.make("div", "fr-note", "넣을 것이 없어요"));
+        totals.forEach((count, id) => {
+            const row = FrDom.make("div", "fr-line");
+            row.append(FrIcons.image(id, 28), FrDom.make("span", "", String(count)));
+            [1, 10, count].filter((n, i, list) => n <= count && list.indexOf(n) === i).forEach((n) => row.appendChild(this.button(n === count && n > 10 ? "전부" : "+" + n, () => this.move(id, n, true))));
+            column.appendChild(row);
+        });
+        return column;
+    }
+    storeColumn() {
+        const column = FrDom.make("div", "fr-col");
+        column.appendChild(FrDom.make("h3", "", "창고"));
+        const ids = this.session.personal.ids();
+        if (ids.length === 0)
+            column.appendChild(FrDom.make("div", "fr-note", "창고가 비어 있어요"));
+        ids.forEach((id) => {
+            const have = this.session.personal.count(id);
+            const row = FrDom.make("div", "fr-line");
+            row.append(FrIcons.image(id, 28), FrDom.make("span", "", String(have)));
+            [1, 10, have].filter((n, i, list) => n <= have && list.indexOf(n) === i).forEach((n) => row.appendChild(this.button(n === have && n > 10 ? "전부" : "-" + n, () => this.move(id, n, false))));
+            column.appendChild(row);
+        });
+        return column;
+    }
+    move(id, count, intoStore) {
+        if (intoStore) {
+            if (this.session.bag.count(id) < count)
+                return;
+            if (!this.session.personal.canPut(id, count)) {
+                this.toast.show("내 창고에 더 넣을 수 없어요");
+                return;
+            }
+            this.session.bag.take(id, count);
+            this.session.personal.put(id, count);
+        }
+        else {
+            if (this.session.bag.freeSlots() < 1 && this.session.bag.count(id) % FrBalance.STACK_SIZE === 0) {
+                this.toast.show("가방이 가득 찼어요");
+                return;
+            }
+            this.session.personal.take(id, count);
+            this.session.bag.add(id, count);
+        }
+        this.session.changed();
+    }
+}
 class FrCraftWindow extends FrWindow {
     constructor(session, toast, station = "workbench") {
         super(station === "forge" ? "대장간" : "작업대", session, toast);
@@ -323,14 +391,19 @@ class FrBuildWindow extends FrWindow {
     constructor(session, toast) {
         super("건설", session, toast);
         this.def = null;
+        this.site = null;
     }
-    openFor(def) { this.def = def; this.open(); }
+    openFor(def, site = null) { this.def = def; this.site = site; this.open(); }
     render() {
         FrDom.clear(this.body);
         const def = this.def;
         if (!def)
             return;
         this.body.appendChild(FrDom.make("h3", "", def.name));
+        const village = this.session.world.village;
+        const level = village.level();
+        const next = FrVillageLevels.nextScore(level);
+        this.body.appendChild(FrDom.make("div", "fr-note", "마을 " + level + "단계 " + FrVillageLevels.label(level) + " · 점수 " + village.score() + (next >= 0 ? " / " + next : " (가장 높은 단계)") + " · 이 건설 +" + def.score));
         this.body.appendChild(FrDom.make("div", "fr-note", "건설은 공용 창고의 재료만 써요. 가방에 있는 재료는 창고로 넣을 수 있어요."));
         const store = this.session.world.publicStore;
         let enough = true;
@@ -360,7 +433,7 @@ class FrBuildWindow extends FrWindow {
         this.session.changed();
     }
     async build(def) {
-        if (await this.session.world.build(def, this.session.nick)) {
+        if (await this.session.world.build(def, this.session.nick, this.site ? this.site.number : 0)) {
             this.session.stats.add("built");
             this.toast.show(def.name + "이(가) 지어졌어요!");
             this.close();

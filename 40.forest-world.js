@@ -5,6 +5,7 @@ class FrWorld {
         this.terrain = terrain;
         this.backend = backend;
         this.village = new FrVillage();
+        this.siteOfCell = new Map();
         this.publicStore = new FrPublicStore();
         this.snowDugDay = new Map();
         this.trees = new Map();
@@ -16,9 +17,39 @@ class FrWorld {
         this.logKeys = new Set();
         this.listeners = [];
         FrTreeField.generate(terrain).forEach((spot) => this.trees.set(terrain.index(spot.x, spot.z), spot));
+        this.sites = FrSiteBook.build(terrain);
+        this.sites.forEach((site) => site.cells.forEach((c) => this.siteOfCell.set(terrain.index(c.x, c.z), site)));
+    }
+    isBuilt(siteId) { return this.builtKeys.has(siteId); }
+    siteOf(id) { return FrSiteBook.find(this.sites, id); }
+    nextSiteNumber(defId, count) {
+        for (let n = 1; n <= count; n++)
+            if (!this.builtKeys.has(defId + "_" + n))
+                return n;
+        return 0;
+    }
+    applyTerrainLocal(x, z, edit) {
+        this.terrain.edit(x, z, edit);
+        this.listeners.forEach((l) => l.onTerrainEdited(x, z));
+    }
+    revertTerrainLocal(x, z) {
+        this.terrain.restore(x, z);
+        this.listeners.forEach((l) => l.onTerrainEdited(x, z));
+    }
+    applySiteEffects(key, built) {
+        const site = this.siteOf(key);
+        if (!site)
+            return;
+        if (built)
+            FrSiteEffects.apply(this, site);
+        else
+            FrSiteEffects.revert(this, site);
     }
     listen(listener) { this.listeners.push(listener); }
-    solidBlock(record) { return !!record && FrWorld.PASSABLE_BLOCKS.indexOf(record.t) < 0; }
+    solidBlock(record) { return !!record && FrWorld.PASSABLE_BLOCKS.indexOf(record.t) < 0 && !FrFurnitureCatalog.isFurniture(record.t); }
+    furnitureAt(index) {
+        return this.blocks.column(index).some(([, record]) => FrFurnitureCatalog.solid(record.t));
+    }
     surfaceAt(x, z) {
         const index = this.terrain.index(x, z);
         let stack = 0;
@@ -44,7 +75,10 @@ class FrWorld {
             return true;
         if (x >= a.publicChest.x && x < a.publicChest.x + a.publicChest.size && z >= a.publicChest.z && z < a.publicChest.z + a.publicChest.size)
             return true;
-        return FrBuildSites.STAGE_TWO.some((s) => s.x === x && s.z === z);
+        if (this.furnitureAt(this.terrain.index(x, z)))
+            return true;
+        const site = this.siteOfCell.get(this.terrain.index(x, z));
+        return !!site && !site.passable && (site.small || this.builtKeys.has(site.id));
     }
     path(rest) { return "forest/" + this.island + "/" + rest; }
     async load() {
@@ -71,7 +105,7 @@ class FrWorld {
             this.terrain.edit(Number(key) % this.terrain.w, Math.floor(Number(key) / this.terrain.w), { h: cell[0], t: cell[1] });
         }));
         Object.keys(snow || {}).forEach((key) => this.snowDugDay.set(Number(key), snow[key]));
-        Object.keys(build || {}).forEach((key) => { this.builtKeys.add(key); this.village.markBuilt(key.replace(/_\d+$/, "")); });
+        Object.keys(build || {}).forEach((key) => { this.builtKeys.add(key); this.village.markBuilt(key.replace(/_\d+$/, "")); this.applySiteEffects(key, true); });
         this.publicStore.restore(publicAmounts || {}, logs.map(([, line]) => line));
         logs.forEach(([key]) => this.logKeys.add(key));
     }
@@ -156,8 +190,11 @@ class FrWorld {
         this.listeners.forEach((l) => l.onPublicChanged());
         return true;
     }
-    async build(def, who) {
+    async build(def, who, wanted = 0) {
         if (this.village.builtCount(def.id) >= def.count || this.village.level() < def.minVillageLevel)
+            return false;
+        const number = wanted > 0 ? wanted : this.nextSiteNumber(def.id, def.count);
+        if (number < 1 || number > def.count || this.builtKeys.has(def.id + "_" + number))
             return false;
         const paid = [];
         const left = {};
@@ -170,7 +207,6 @@ class FrWorld {
             paid.push([id, def.cost[id]]);
             left[id] = result.value || 0;
         }
-        const number = this.village.builtCount(def.id) + 1;
         this.builtKeys.add(def.id + "_" + number);
         const slot = await this.backend.transaction(this.path("build/" + def.id + "_" + number), (current) => (current === null ? { at: Date.now(), by: who } : undefined));
         if (!slot.committed) {
@@ -181,7 +217,25 @@ class FrWorld {
         paid.forEach(([id]) => this.publicStore.setAmount(id, left[id]));
         await Promise.all(paid.map(([id, n]) => this.logLine({ at: Date.now(), who, verb: "build", item: id, count: n })));
         this.village.markBuilt(def.id);
-        this.listeners.forEach((l) => { l.onBuilt(def.id, this.village.builtCount(def.id)); l.onPublicChanged(); });
+        this.applySiteEffects(def.id + "_" + number, true);
+        this.listeners.forEach((l) => { l.onBuilt(def.id + "_" + number, this.village.builtCount(def.id)); l.onPublicChanged(); });
+        return true;
+    }
+    async unbuild(key, refundTo) {
+        if (!this.builtKeys.has(key))
+            return false;
+        const defId = key.replace(/_\d+$/, "");
+        const def = FrVillage.definition(defId);
+        await this.backend.set(this.path("build/" + key), null);
+        this.builtKeys.delete(key);
+        this.village.unmarkBuilt(defId);
+        this.applySiteEffects(key, false);
+        if (refundTo && def)
+            for (const id of Object.keys(def.cost)) {
+                const result = await this.backend.transaction(this.path("public/" + id), (current) => (current || 0) + def.cost[id]);
+                this.publicStore.setAmount(id, result.value || 0);
+            }
+        this.listeners.forEach((l) => { l.onBuilt(key, this.village.builtCount(defId)); l.onPublicChanged(); });
         return true;
     }
     async refund(paid) {
@@ -341,7 +395,17 @@ class FrWorld {
         this.builtKeys.add(key);
         const id = key.replace(/_\d+$/, "");
         this.village.markBuilt(id);
-        this.listeners.forEach((l) => { l.onBuilt(id, this.village.builtCount(id)); l.onPublicChanged(); });
+        this.applySiteEffects(key, true);
+        this.listeners.forEach((l) => { l.onBuilt(key, this.village.builtCount(id)); l.onPublicChanged(); });
+    }
+    remoteUnbuilt(key) {
+        if (!this.builtKeys.has(key))
+            return;
+        const id = key.replace(/_\d+$/, "");
+        this.builtKeys.delete(key);
+        this.village.unmarkBuilt(id);
+        this.applySiteEffects(key, false);
+        this.listeners.forEach((l) => { l.onBuilt(key, this.village.builtCount(id)); l.onPublicChanged(); });
     }
     remotePublic(id, amount) {
         if (this.publicStore.count(id) === amount)

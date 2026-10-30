@@ -472,10 +472,18 @@ class FrIcons {
         const block = /^block_(\w+)$/.exec(id);
         if (block)
             return FrIcons.blockPainter(block[1]);
+        const furniture = FrFurnitureCatalog.find(id);
+        if (furniture)
+            return FrIcons.furniturePainter(furniture);
         const recipe = FrCatalog.RECIPES.find((r) => r.id === id);
         if (recipe)
             return new FrFoodPainter(["#D9A05A", "#E8B070", "#C8794F", "#C04F3A", "#8A4FC0", "#F0C040"][recipe.star] || "#D9A05A", recipe.star);
         return new FrStonePainter("#B0B6C2");
+    }
+    static furniturePainter(furniture) {
+        const base = furniture.main;
+        const shade = (amount) => "#" + [1, 3, 5].map((i) => Math.max(0, Math.min(255, Math.round(parseInt(base.substr(i, 2), 16) * amount))).toString(16).padStart(2, "0")).join("");
+        return new FrBlockPainter(shade(1.1), shade(0.88), shade(0.72), furniture.flat ? "slab" : "cube");
     }
     static blockPainter(name) {
         const colors = {

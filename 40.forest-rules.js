@@ -275,6 +275,27 @@ class FrChestStore {
         this.amounts = new Map();
     }
     count(id) { return this.amounts.get(id) || 0; }
+    snapshot() {
+        const out = {};
+        this.amounts.forEach((n, id) => { out[id] = n; });
+        return out;
+    }
+    restore(amounts) {
+        this.amounts.clear();
+        Object.keys(amounts).forEach((id) => { if (amounts[id] > 0)
+            this.amounts.set(id, amounts[id]); });
+    }
+    slotsUsed() {
+        let used = 0;
+        this.amounts.forEach((n) => { used += Math.ceil(n / FrBalance.STACK_SIZE); });
+        return used;
+    }
+    canPut(id, amount) {
+        const now = this.count(id);
+        const extra = Math.ceil((now + amount) / FrBalance.STACK_SIZE) - Math.ceil(now / FrBalance.STACK_SIZE);
+        return FrItems.isStackable(id) && id !== "ring" && this.slotsUsed() + extra <= FrBalance.PERSONAL_SLOTS;
+    }
+    ids() { return Array.from(this.amounts.keys()); }
     put(id, amount) { this.amounts.set(id, this.count(id) + amount); }
     take(id, amount) {
         const left = this.count(id) - amount;
@@ -434,6 +455,8 @@ class FrVillage {
     }
     builtCount(id) { return this.built.get(id) || 0; }
     markBuilt(id) { this.built.set(id, this.builtCount(id) + 1); }
+    unmarkBuilt(id) { if (this.builtCount(id) > 0)
+        this.built.set(id, this.builtCount(id) - 1); }
     score() {
         return FrCatalog.CONSTRUCTIONS.reduce((sum, c) => sum + c.score * this.builtCount(c.id), 0);
     }

@@ -181,7 +181,8 @@ class FrProps {
         group.add(campfire);
         this.buildPortals();
         this.buildChestPlaceholder();
-        FrBuildSites.STAGE_TWO.forEach((site) => this.addSiteMarker(site));
+        this.models = new FrSiteModels(libs, world);
+        world.sites.forEach((site) => this.addSiteMarker(site));
     }
     buildChestPlaceholder() {
         const T = this.libs.THREE;
@@ -205,15 +206,26 @@ class FrProps {
         const marker = new T.Group();
         marker.position.set((site.x + 0.5) * FrTerrainData.BLOCK, this.world.terrain.surfaceY(site.x, site.z), (site.z + 0.5) * FrTerrainData.BLOCK);
         marker.userData = { kind: "site", id: site.id };
+        this.fillPost(marker);
+        this.group.add(marker);
+        this.siteMarkers.set(site.id, marker);
+        if (this.world.isBuilt(site.id))
+            this.showBuilt(site);
+    }
+    hideBuilt(site) {
+        const marker = this.siteMarkers.get(site.id);
+        if (!marker)
+            return;
+        marker.clear();
+        this.fillPost(marker);
+    }
+    fillPost(marker) {
+        const T = this.libs.THREE;
         const post = new T.Mesh(new T.BoxGeometry(0.25, 2.2, 0.25), new T.MeshLambertMaterial({ color: 0x8a5a2b }));
         post.position.y = 1.1;
         const sign = new T.Mesh(new T.BoxGeometry(1.6, 0.9, 0.12), new T.MeshLambertMaterial({ color: 0xe7c98a }));
         sign.position.y = 2.1;
         marker.add(post, sign);
-        this.group.add(marker);
-        this.siteMarkers.set(site.id, marker);
-        if (this.world.village.builtCount(site.id) > 0)
-            this.showBuilt(site);
     }
     showBuilt(site) {
         const T = this.libs.THREE;
@@ -257,7 +269,10 @@ class FrProps {
                 box(2.6, 0.9, 0.12, 0, 2.1, 0, 0x9be08a);
             },
         };
-        (builders[site.id] || builders.workbench)();
+        if (builders[site.defId])
+            builders[site.defId]();
+        else
+            this.models.fill(site, marker);
     }
     buildPortals() {
         const T = this.libs.THREE;
@@ -373,6 +388,8 @@ class FrWorldView {
         this.libs = libs;
         this.canvas = canvas;
         this.touchDevice = touchDevice;
+        this.plaza = null;
+        this.onVillageLevel = () => undefined;
         this.areaScene = null;
         this.areaDark = false;
         this.labels = null;
@@ -436,6 +453,8 @@ class FrWorldView {
         this.blockGroup.clear();
         this.trees = new FrTreeLayer(this.libs, world, this.treeGroup);
         this.props = new FrProps(this.libs, world, this.propGroup);
+        this.plaza = new FrPlazaDecor(this.libs, world, this.propGroup);
+        this.plaza.refresh();
         this.blocksLayer = new FrBlockLayer(this.libs, world, this.blockGroup);
         this.crops = new FrCropLayer(this.libs, world, this.propGroup);
         this.rebuildLotMarkers();
@@ -544,8 +563,21 @@ class FrWorldView {
         this.terrainGroup.add(mesh);
     }
     onTreeFelled(spot) { this.trees.remove(spot); }
-    onBuilt(id) { const site = FrBuildSites.find(id); if (site)
-        this.props.showBuilt(site); }
+    onBuilt(id) {
+        const site = this.world ? this.world.siteOf(id) : undefined;
+        if (site) {
+            if (this.world && this.world.isBuilt(id))
+                this.props.showBuilt(site);
+            else
+                this.props.hideBuilt(site);
+        }
+        if (!this.plaza)
+            return;
+        const before = this.plaza.level;
+        const level = this.plaza.refresh();
+        if (level > before && before > 0)
+            this.onVillageLevel(level);
+    }
     onPublicChanged() { return; }
     onBlockChanged(x, z, y, record) { this.blocksLayer.apply(x, z, y, record); }
     onLotChanged() { if (this.lotMarkers)

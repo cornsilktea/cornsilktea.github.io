@@ -36,6 +36,11 @@ class FrTerrainData {
         this.heights[i] = edit.h;
         this.tops[i] = edit.t;
     }
+    restore(x, z) {
+        const i = this.index(x, z);
+        this.heights[i] = this.original[i];
+        this.tops[i] = this.originalTops[i];
+    }
     editOf(x, z) {
         const i = this.index(x, z);
         if (this.heights[i] === this.original[i] && this.tops[i] === this.originalTops[i])
@@ -191,18 +196,3 @@ FrTerrainMesher.WALL_COLORS = {
     C: [0.5, 0.44, 0.35], T: [0.42, 0.41, 0.46], V: [0.34, 0.62, 0.68], K: [0.16, 0.15, 0.18], L: [0.7, 0.3, 0.08],
 };
 FrTerrainMesher.NEIGHBORS = [[1, 0, 0.78], [-1, 0, 0.78], [0, 1, 0.9], [0, -1, 0.66]];
-class FrBuildSite {
-    constructor(id, name, x, z) {
-        this.id = id;
-        this.name = name;
-        this.x = x;
-        this.z = z;
-    }
-}
-class FrBuildSites {
-    static find(id) { return FrBuildSites.STAGE_TWO.find((s) => s.id === id); }
-}
-FrBuildSites.STAGE_TWO = [
-    new FrBuildSite("workbench", "작업대", 55, 64), new FrBuildSite("forge", "대장간", 52, 64), new FrBuildSite("oven", "화덕", 55, 68),
-    new FrBuildSite("kitchen", "섬 부엌", 52, 68), new FrBuildSite("farm_expand", "텃밭 넓히기", 66, 78),
-];

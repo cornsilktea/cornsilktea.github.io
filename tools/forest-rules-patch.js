@@ -28,6 +28,7 @@ class ForestRulesPatch {
         "pity": { "$k": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000" } },
         "seen": { "$i": { ".validate": "newData.isString() && newData.val().length <= 40" } },
         "stats": { ".validate": "newData.hasChildren(['all'])" },
+        "chest": { "$id": { ".validate": "$id.matches(/^[a-z_0-9]{1,40}$/) && newData.isNumber() && newData.val() >= 1 && newData.val() <= 3600" } },
         "$other": { ".validate": false },
       },
       "$other": { ".validate": false },

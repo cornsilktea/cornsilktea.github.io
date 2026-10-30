@@ -15,6 +15,8 @@ class FrWorld {
   static readonly BARE_TOP = "S";
 
   readonly village = new FrVillage();
+  readonly sites: FrBuildSite[];
+  private readonly siteOfCell: Map<number, FrBuildSite> = new Map();
   readonly publicStore = new FrPublicStore();
   readonly snowDugDay: Map<number, number> = new Map();
   readonly trees: Map<number, FrTreeSpot> = new Map();
@@ -28,13 +30,44 @@ class FrWorld {
 
   constructor(readonly island: string, readonly terrain: FrTerrainData, private readonly backend: FrBackend) {
     FrTreeField.generate(terrain).forEach((spot) => this.trees.set(terrain.index(spot.x, spot.z), spot));
+    this.sites = FrSiteBook.build(terrain);
+    this.sites.forEach((site) => site.cells.forEach((c) => this.siteOfCell.set(terrain.index(c.x, c.z), site)));
+  }
+
+  isBuilt(siteId: string): boolean { return this.builtKeys.has(siteId); }
+
+  siteOf(id: string): FrBuildSite | undefined { return FrSiteBook.find(this.sites, id); }
+
+  nextSiteNumber(defId: string, count: number): number {
+    for (let n = 1; n <= count; n++) if (!this.builtKeys.has(defId + "_" + n)) return n;
+    return 0;
+  }
+
+  applyTerrainLocal(x: number, z: number, edit: FrTerrainEdit): void {
+    this.terrain.edit(x, z, edit);
+    this.listeners.forEach((l) => l.onTerrainEdited(x, z));
+  }
+
+  revertTerrainLocal(x: number, z: number): void {
+    this.terrain.restore(x, z);
+    this.listeners.forEach((l) => l.onTerrainEdited(x, z));
+  }
+
+  private applySiteEffects(key: string, built: boolean): void {
+    const site = this.siteOf(key);
+    if (!site) return;
+    if (built) FrSiteEffects.apply(this, site); else FrSiteEffects.revert(this, site);
   }
 
   listen(listener: FrWorldListener): void { this.listeners.push(listener); }
 
   private static readonly PASSABLE_BLOCKS = ["block_door", "block_torch"];
 
-  private solidBlock(record: FrBlockRecord | null): boolean { return !!record && FrWorld.PASSABLE_BLOCKS.indexOf(record.t) < 0; }
+  private solidBlock(record: FrBlockRecord | null): boolean { return !!record && FrWorld.PASSABLE_BLOCKS.indexOf(record.t) < 0 && !FrFurnitureCatalog.isFurniture(record.t); }
+
+  private furnitureAt(index: number): boolean {
+    return this.blocks.column(index).some(([, record]) => FrFurnitureCatalog.solid(record.t));
+  }
 
   surfaceAt(x: number, z: number): number {
     const index = this.terrain.index(x, z);
@@ -58,7 +91,9 @@ class FrWorld {
     const a = this.terrain.anchors;
     if (x === a.campfire.x && z === a.campfire.z) return true;
     if (x >= a.publicChest.x && x < a.publicChest.x + a.publicChest.size && z >= a.publicChest.z && z < a.publicChest.z + a.publicChest.size) return true;
-    return FrBuildSites.STAGE_TWO.some((s) => s.x === x && s.z === z);
+    if (this.furnitureAt(this.terrain.index(x, z))) return true;
+    const site = this.siteOfCell.get(this.terrain.index(x, z));
+    return !!site && !site.passable && (site.small || this.builtKeys.has(site.id));
   }
   private path(rest: string): string { return "forest/" + this.island + "/" + rest; }
 
@@ -86,7 +121,7 @@ class FrWorld {
       this.terrain.edit(Number(key) % this.terrain.w, Math.floor(Number(key) / this.terrain.w), { h: cell[0], t: cell[1] });
     }));
     Object.keys(snow || {}).forEach((key) => this.snowDugDay.set(Number(key), (snow as Record<string, number>)[key]));
-    Object.keys(build || {}).forEach((key) => { this.builtKeys.add(key); this.village.markBuilt(key.replace(/_\d+$/, "")); });
+    Object.keys(build || {}).forEach((key) => { this.builtKeys.add(key); this.village.markBuilt(key.replace(/_\d+$/, "")); this.applySiteEffects(key, true); });
     this.publicStore.restore(publicAmounts || {}, logs.map(([, line]) => line));
     logs.forEach(([key]) => this.logKeys.add(key));
   }
@@ -165,8 +200,10 @@ class FrWorld {
     return true;
   }
 
-  async build(def: FrConstructionDef, who: string): Promise<boolean> {
+  async build(def: FrConstructionDef, who: string, wanted = 0): Promise<boolean> {
     if (this.village.builtCount(def.id) >= def.count || this.village.level() < def.minVillageLevel) return false;
+    const number = wanted > 0 ? wanted : this.nextSiteNumber(def.id, def.count);
+    if (number < 1 || number > def.count || this.builtKeys.has(def.id + "_" + number)) return false;
     const paid: Array<[string, number]> = [];
     const left: Record<string, number> = {};
     for (const id of Object.keys(def.cost)) {
@@ -175,14 +212,30 @@ class FrWorld {
       paid.push([id, def.cost[id]]);
       left[id] = result.value || 0;
     }
-    const number = this.village.builtCount(def.id) + 1;
     this.builtKeys.add(def.id + "_" + number);
     const slot = await this.backend.transaction<FrBuildRecord>(this.path("build/" + def.id + "_" + number), (current) => (current === null ? { at: Date.now(), by: who } : undefined));
     if (!slot.committed) { this.builtKeys.delete(def.id + "_" + number); await this.refund(paid); return false; }
     paid.forEach(([id]) => this.publicStore.setAmount(id, left[id]));
     await Promise.all(paid.map(([id, n]) => this.logLine({ at: Date.now(), who, verb: "build", item: id, count: n })));
     this.village.markBuilt(def.id);
-    this.listeners.forEach((l) => { l.onBuilt(def.id, this.village.builtCount(def.id)); l.onPublicChanged(); });
+    this.applySiteEffects(def.id + "_" + number, true);
+    this.listeners.forEach((l) => { l.onBuilt(def.id + "_" + number, this.village.builtCount(def.id)); l.onPublicChanged(); });
+    return true;
+  }
+
+  async unbuild(key: string, refundTo: boolean): Promise<boolean> {
+    if (!this.builtKeys.has(key)) return false;
+    const defId = key.replace(/_\d+$/, "");
+    const def = FrVillage.definition(defId);
+    await this.backend.set(this.path("build/" + key), null);
+    this.builtKeys.delete(key);
+    this.village.unmarkBuilt(defId);
+    this.applySiteEffects(key, false);
+    if (refundTo && def) for (const id of Object.keys(def.cost)) {
+      const result = await this.backend.transaction<number>(this.path("public/" + id), (current) => (current || 0) + def.cost[id]);
+      this.publicStore.setAmount(id, result.value || 0);
+    }
+    this.listeners.forEach((l) => { l.onBuilt(key, this.village.builtCount(defId)); l.onPublicChanged(); });
     return true;
   }
 
@@ -327,7 +380,17 @@ class FrWorld {
     this.builtKeys.add(key);
     const id = key.replace(/_\d+$/, "");
     this.village.markBuilt(id);
-    this.listeners.forEach((l) => { l.onBuilt(id, this.village.builtCount(id)); l.onPublicChanged(); });
+    this.applySiteEffects(key, true);
+    this.listeners.forEach((l) => { l.onBuilt(key, this.village.builtCount(id)); l.onPublicChanged(); });
+  }
+
+  remoteUnbuilt(key: string): void {
+    if (!this.builtKeys.has(key)) return;
+    const id = key.replace(/_\d+$/, "");
+    this.builtKeys.delete(key);
+    this.village.unmarkBuilt(id);
+    this.applySiteEffects(key, false);
+    this.listeners.forEach((l) => { l.onBuilt(key, this.village.builtCount(id)); l.onPublicChanged(); });
   }
 
   remotePublic(id: string, amount: number): void {

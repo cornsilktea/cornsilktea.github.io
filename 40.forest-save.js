@@ -69,6 +69,7 @@ class FrAccountSave {
             pity: stored && stored.pity ? stored.pity : {},
             seen: stored && stored.seen ? stored.seen : [],
             lastAt: stored && stored.lastAt ? stored.lastAt : 0,
+            chest: stored && stored.chest ? stored.chest : {},
         };
     }
     queue(data) {

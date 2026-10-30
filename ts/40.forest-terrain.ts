@@ -66,6 +66,12 @@ class FrTerrainData {
     this.tops[i] = edit.t;
   }
 
+  restore(x: number, z: number): void {
+    const i = this.index(x, z);
+    this.heights[i] = this.original[i];
+    this.tops[i] = this.originalTops[i];
+  }
+
   editOf(x: number, z: number): FrTerrainEdit | null {
     const i = this.index(x, z);
     if (this.heights[i] === this.original[i] && this.tops[i] === this.originalTops[i]) return null;
@@ -206,14 +212,3 @@ class FrTerrainMesher {
   }
 }
 
-class FrBuildSite {
-  constructor(readonly id: string, readonly name: string, readonly x: number, readonly z: number) {}
-}
-
-class FrBuildSites {
-  static readonly STAGE_TWO: ReadonlyArray<FrBuildSite> = [
-    new FrBuildSite("workbench", "작업대", 55, 64), new FrBuildSite("forge", "대장간", 52, 64), new FrBuildSite("oven", "화덕", 55, 68),
-    new FrBuildSite("kitchen", "섬 부엌", 52, 68), new FrBuildSite("farm_expand", "텃밭 넓히기", 66, 78),
-  ];
-  static find(id: string): FrBuildSite | undefined { return FrBuildSites.STAGE_TWO.find((s) => s.id === id); }
-}

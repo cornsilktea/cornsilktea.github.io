@@ -280,6 +280,31 @@ class FrPublicStore implements FrStore {
 class FrChestStore implements FrStore {
   private readonly amounts: Map<string, number> = new Map();
   count(id: string): number { return this.amounts.get(id) || 0; }
+
+  snapshot(): Record<string, number> {
+    const out: Record<string, number> = {};
+    this.amounts.forEach((n, id) => { out[id] = n; });
+    return out;
+  }
+
+  restore(amounts: Record<string, number>): void {
+    this.amounts.clear();
+    Object.keys(amounts).forEach((id) => { if (amounts[id] > 0) this.amounts.set(id, amounts[id]); });
+  }
+
+  slotsUsed(): number {
+    let used = 0;
+    this.amounts.forEach((n) => { used += Math.ceil(n / FrBalance.STACK_SIZE); });
+    return used;
+  }
+
+  canPut(id: string, amount: number): boolean {
+    const now = this.count(id);
+    const extra = Math.ceil((now + amount) / FrBalance.STACK_SIZE) - Math.ceil(now / FrBalance.STACK_SIZE);
+    return FrItems.isStackable(id) && id !== "ring" && this.slotsUsed() + extra <= FrBalance.PERSONAL_SLOTS;
+  }
+
+  ids(): string[] { return Array.from(this.amounts.keys()); }
   put(id: string, amount: number): void { this.amounts.set(id, this.count(id) + amount); }
   take(id: string, amount: number): void {
     const left = this.count(id) - amount;
@@ -436,6 +461,8 @@ class FrVillage {
   builtCount(id: string): number { return this.built.get(id) || 0; }
 
   markBuilt(id: string): void { this.built.set(id, this.builtCount(id) + 1); }
+
+  unmarkBuilt(id: string): void { if (this.builtCount(id) > 0) this.built.set(id, this.builtCount(id) - 1); }
 
   score(): number {
     return FrCatalog.CONSTRUCTIONS.reduce((sum, c) => sum + c.score * this.builtCount(c.id), 0);
