@@ -174,6 +174,8 @@ class FrGame {
         this.view.applyClock(FrBalance.DAWN_MINUTE + 240);
         const user = await FrIdentity.ready(location.search);
         if (!user && FrIdentity.required(location.search)) {
+            FrDom.el("loading").hidden = true;
+            this.start.show();
             this.start.enter(false, "로그인이 필요해요. 새로 고침해 주세요.");
             return;
         }

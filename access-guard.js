@@ -129,7 +129,9 @@
      file:// 미리보기는 account-login.js 가 알아서 건너뜁니다. */
   var loginRequired = !!klass && !klass.test;
   var loginScript = null;
-  if (loginRequired && script && script.src) {
+  /* 40번(동마의 숲) 배포용 링크는 로그인을 요구하지 않지만 익명 계정이 필요해서 같은 파일을 불러온다(2026-10-30) */
+  var guestLink = !!script && script.getAttribute("data-game") === "dongmaforest" && /[?&]c=test(?:&|$)/.test(location.search);
+  if ((loginRequired || guestLink) && script && script.src) {
     loginScript = document.createElement("script");
     loginScript.charset = "utf-8";
     loginScript.src = script.src.replace("access-guard.js", "account-login.js");

@@ -190,7 +190,12 @@ class FrGame {
     this.backdrop.start();
     this.view.applyClock(FrBalance.DAWN_MINUTE + 240);
     const user = await FrIdentity.ready(location.search);
-    if (!user && FrIdentity.required(location.search)) { this.start.enter(false, "로그인이 필요해요. 새로 고침해 주세요."); return; }
+    if (!user && FrIdentity.required(location.search)) {
+      FrDom.el("loading").hidden = true;
+      this.start.show();
+      this.start.enter(false, "로그인이 필요해요. 새로 고침해 주세요.");
+      return;
+    }
     this.uid = user ? user.uid : "local";
     this.backend = FrBackendChooser.choose();
     if (FrBoardPage.requested(location.search)) {
