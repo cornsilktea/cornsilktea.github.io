@@ -926,7 +926,14 @@ class FrGame {
     this.morningPending = false;
     if (!this.session.sleeping) return;
     if (!FrSleepVote.allAsleep(this.presences())) { void this.fade.dim(0.55, 900); return; }
-    if (await this.clock.skipToMorning()) this.onSkipped();
+    try {
+      if (await this.clock.skipToMorning()) this.onSkipped();
+    } catch (error) {
+      this.session.sleeping = false;
+      void this.fade.lift(700);
+      this.toast.show("아침으로 넘기지 못했어요. 다시 잠자기를 눌러 보세요. (" + error + ")", 5000);
+      await this.publishPresence(true);
+    }
   }
 
   private poseCode(moving: boolean): number {
