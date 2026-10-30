@@ -36,6 +36,7 @@ class FrBalance {
   static readonly TOOL_DURABILITY = 100;
   static readonly WEAPON_DURABILITY = 200;
   static readonly HOTBAR_SLOTS = 8;
+  static readonly GEAR_MATERIAL_COUNT = 3;
 
   static readonly DAY_REAL_SECONDS = 240;
   static readonly GAME_MINUTES_PER_REAL_SECOND = 6;
@@ -96,9 +97,9 @@ class FrBalance {
   static readonly FISH_ODDS: ReadonlyArray<ReadonlyArray<number>> = [[0, 0, 0], [0.80, 0.18, 0.02], [0.60, 0.33, 0.07], [0.45, 0.40, 0.15]];
   static readonly ORE_ODDS: ReadonlyArray<ReadonlyArray<number>> = [
     [0.85, 0.12, 0.03, 0],
-    [0.62, 0.28, 0.097, 0.003],
-    [0.48, 0.30, 0.205, 0.015],
-    [0.36, 0.30, 0.31, 0.03],
+    [0.60, 0.28, 0.108, 0.012],
+    [0.44, 0.30, 0.20, 0.06],
+    [0.31, 0.30, 0.30, 0.09],
   ];
   static readonly FLOOR_ORE_MULTIPLIER: ReadonlyArray<number> = [1, 1, 1.5, 2];
   static readonly STONE_COAL_CHANCE = 0.10;
@@ -178,7 +179,7 @@ class FrCatalog {
     hell: [
       { item: "iron", min: 1, max: 1, chance: 0.35 }, { item: "magic_stone", min: 1, max: 2, chance: 1 },
       { item: "enhance_stone", min: 1, max: 1, chance: 0.10 }, { item: "ring", min: 1, max: 1, chance: 0.03 },
-      { item: "diamond", min: 1, max: 1, chance: 0.03 },
+      { item: "diamond", min: 1, max: 1, chance: 0.06 },
     ],
   };
 

@@ -94,7 +94,7 @@ class FrOreRoll extends FrLegendRoll {
         const multiplier = FrBalance.FLOOR_ORE_MULTIPLIER[context.floor ?? 1];
         const iron = odds[2] * multiplier;
         const diamond = odds[3] * multiplier;
-        const copper = odds[1];
+        const copper = Math.max(0, Math.min(odds[1], 1 - iron - diamond));
         const stone = Math.max(0, 1 - copper - iron - diamond);
         return [
             { item: "stone", weight: stone, legend: false }, { item: "copper", weight: copper, legend: false },
@@ -361,7 +361,7 @@ class FrRecipeRules {
     }
 }
 class FrCraftRules {
-    static gearCost(tier) { return { [FrItems.TIER_MATERIAL[tier]]: 5 }; }
+    static gearCost(tier) { return { [FrItems.TIER_MATERIAL[tier]]: FrBalance.GEAR_MATERIAL_COUNT }; }
     static craftGear(kind, tier, source, bag) {
         if (tier === 0 || FrItems.GEAR_KINDS.indexOf(kind) < 0)
             return false;

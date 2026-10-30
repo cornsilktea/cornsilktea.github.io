@@ -29,7 +29,7 @@ const sourceOf = (bag, pub = new FrPublicStore(), chest = new FrChestStore()) =>
   [1, 2, 3].forEach((t) => check("낚시 확률 합 1 (낚싯대 " + t + ")", near(sum(fish.table({ tier: t })), 1, 1e-9)));
   [0, 1, 2, 3].forEach((t) => [1, 2, 3].forEach((f) => check("광맥 확률 합 1 (곡괭이 " + t + ", " + f + "층)", near(sum(ore.table({ tier: t, floor: f })), 1, 1e-9))));
   const diamondOf = (t, f) => ore.table({ tier: t, floor: f }).find((w) => w.item === "diamond").weight;
-  check("다이아몬드 2층 ×1.5·3층 ×2", near(diamondOf(3, 2), 0.045) && near(diamondOf(3, 3), 0.06), [diamondOf(3, 2), diamondOf(3, 3)]);
+  check("다이아몬드 2층 ×1.5·3층 ×2", near(diamondOf(3, 2), 0.135) && near(diamondOf(3, 3), 0.18), [diamondOf(3, 2), diamondOf(3, 3)]);
   check("기본 0%(맨손) 다이아몬드는 보정해도 안 나옴", (() => { const r = new FrRandom(1); for (let i = 0; i < 3000; i++) if (ore.roll(r, { tier: 0, floor: 1 }, 500).item === "diamond") return false; return true; })());
   check("다이아몬드 바구니: 황금 사과 ×2", near(fruit.table({ basketTier: 3 }).find((w) => w.legend).weight, 0.06));
 }
@@ -86,8 +86,8 @@ const sourceOf = (bag, pub = new FrPublicStore(), chest = new FrChestStore()) =>
 }
 
 {
-  check("나무 도끼는 목재 5", (() => { const b = new FrBag(); b.add("wood", 20); return FrCraftRules.craftGear("axe", 1, sourceOf(b), b) && b.count("wood") === 15 && b.bestTier("axe") === 1; })());
-  check("재료 모자라면 제작 실패", (() => { const b = new FrBag(); b.add("iron", 4); return !FrCraftRules.craftGear("pickaxe", 2, sourceOf(b), b); })());
+  check("나무 도끼는 목재 3", (() => { const b = new FrBag(); b.add("wood", 20); return FrCraftRules.craftGear("axe", 1, sourceOf(b), b) && b.count("wood") === 17 && b.bestTier("axe") === 1; })());
+  check("재료 모자라면 제작 실패", (() => { const b = new FrBag(); b.add("iron", 2); return !FrCraftRules.craftGear("pickaxe", 2, sourceOf(b), b); })());
   check("도구 100번 쓰면 없어짐", (() => { const b = new FrBag(); b.add("gear_pickaxe_1", 1); let broke = null; for (let i = 0; i < 100; i++) broke = b.wear("pickaxe") || broke; return broke === "gear_pickaxe_1" && b.bestTier("pickaxe") === 0; })());
   check("무기 200번", (() => { const b = new FrBag(); b.add("gear_weapon_3", 1); for (let i = 0; i < 199; i++) b.wear("weapon"); const alive = b.bestTier("weapon") === 3; b.wear("weapon"); return alive && b.bestTier("weapon") === 0; })());
   check("높은 등급 도구부터 닳음", (() => { const b = new FrBag(); b.add("gear_axe_1", 1); b.add("gear_axe_3", 1); b.wear("axe"); return b.slots.find((s) => s.id === "gear_axe_3").uses === 99 && b.slots.find((s) => s.id === "gear_axe_1").uses === 100; })());

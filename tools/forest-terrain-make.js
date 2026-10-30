@@ -73,8 +73,29 @@ class Canvas {
       this.pixels[o] = color[0]; this.pixels[o + 1] = color[1]; this.pixels[o + 2] = color[2];
     }
   }
+  setPixel(x, y, color) {
+    if (x < 0 || y < 0 || x >= this.width || y >= this.height) return;
+    const o = (y * this.width + x) * 3;
+    for (let k = 0; k < 3; k++) this.pixels[o + k] = Math.max(0, Math.min(255, Math.round(color[k])));
+  }
+  getPixel(x, y) { const o = (y * this.width + x) * 3; return [this.pixels[o], this.pixels[o + 1], this.pixels[o + 2]]; }
+  disc(cx, cy, radius, color, alpha = 1) {
+    for (let y = Math.floor(cy - radius); y <= Math.ceil(cy + radius); y++) for (let x = Math.floor(cx - radius); x <= Math.ceil(cx + radius); x++) {
+      if (Math.hypot(x - cx, y - cy) > radius || x < 0 || y < 0 || x >= this.width || y >= this.height) continue;
+      const old = this.getPixel(x, y);
+      this.setPixel(x, y, old.map((v, k) => v + (color[k] - v) * alpha));
+    }
+  }
+  ring(cx, cy, radius, thickness, color) {
+    for (let y = Math.floor(cy - radius - 1); y <= Math.ceil(cy + radius + 1); y++) for (let x = Math.floor(cx - radius - 1); x <= Math.ceil(cx + radius + 1); x++) {
+      const d = Math.hypot(x - cx, y - cy);
+      if (d <= radius && d >= radius - thickness) this.setPixel(x, y, color);
+    }
+  }
   save(file) { fs.writeFileSync(file, PngWriter.encode(this.width, this.height, this.pixels)); }
 }
+
+const Renderers = require("./forest-render.js")(Canvas);
 
 class IslandMap {
   static readonly = null;
@@ -608,16 +629,16 @@ class TerrainBuild {
     fs.mkdirSync(path.join(out, "preview"), { recursive: true });
     const island = new IslandMap(20261030).build();
     fs.writeFileSync(path.join(out, "island-terrain.json"), JSON.stringify(island.toJson()));
-    island.drawPreview(path.join(out, "preview", "island.png"));
+    new Renderers.IslandRenderer(island).draw(path.join(out, "preview", "island.png"));
 
     const maker = new CaveMaker(777);
     const mine = [1, 2, 3].map((level) => maker.mineFloor(level));
     fs.writeFileSync(path.join(out, "mine-cave.json"), JSON.stringify({ version: 1, cellMeters: 2, legend: ". 바닥 · # 벽 · ~ 웅덩이 · X 단단한 바위", floors: mine }));
-    CavePreview.draw(mine, path.join(out, "preview", "mine.png"));
+    Renderers.CaveRenderer.draw(mine, path.join(out, "preview", "mine.png"), 14);
 
     const dungeons = ["moss", "crystal", "lava"].map((kind) => new CaveMaker(kind.length * 1009 + 5).dungeon(kind));
     dungeons.forEach((d) => fs.writeFileSync(path.join(out, "dungeon-cave-" + d.kind + ".json"), JSON.stringify({ version: 1, cellMeters: 2, legend: ". 바닥 · # 벽 · ^ 용암", ...d })));
-    CavePreview.draw(dungeons, path.join(out, "preview", "dungeon.png"), 10);
+    Renderers.CaveRenderer.draw(dungeons, path.join(out, "preview", "dungeon.png"), 18);
 
     TerrainBuild.report(island, mine, dungeons);
   }

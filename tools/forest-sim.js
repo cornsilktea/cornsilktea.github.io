@@ -359,7 +359,7 @@ class IslandSim {
   donate(bot) {
     const want = this.nextWantedGear(bot);
     const keep = {};
-    if (want) keep[FrItems.TIER_MATERIAL[want.tier]] = 5;
+    if (want) keep[FrItems.TIER_MATERIAL[want.tier]] = FrBalance.GEAR_MATERIAL_COUNT;
     if (bot.hasRing) { keep.enhance_stone = 12; keep.magic_stone = 12; }
     FrCatalog.MATERIALS.forEach((m) => {
       const have = bot.bag.count(m.id);
