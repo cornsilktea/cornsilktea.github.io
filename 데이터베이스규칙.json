@@ -741,18 +741,33 @@
     },
     "forest": {
       "$island": {
+        ".read": "auth != null && ((auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3') || root.child('users').child(auth.uid).child('forest').child('home').val() === $island)",
         "members": {
+          ".write": "auth != null && ((auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3') || root.child('users').child(auth.uid).child('forest').child('home').val() === $island) && false",
           "$uid": {
-            ".read": "auth != null && ((auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3') || root.child('users').child(auth.uid).child('forest').child('home').val() === $island)",
             ".write": "auth != null && ((auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3') || root.child('users').child(auth.uid).child('forest').child('home').val() === $island) && $uid === auth.uid",
-            ".validate": "newData.hasChildren(['no', 'name'])"
+            ".validate": "newData.hasChildren(['no', 'name']) && newData.child('name').isString() && newData.child('name').val().length <= 12"
+          }
+        },
+        "presence": {
+          "$uid": {
+            ".write": "auth != null && ((auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3') || root.child('users').child(auth.uid).child('forest').child('home').val() === $island) && $uid === auth.uid",
+            ".validate": "newData.hasChildren(['a', 's', 'd', 'at']) && newData.child('a').isString() && newData.child('a').val().length <= 12 && (newData.child('s').val() === 0 || newData.child('s').val() === 1) && newData.child('at').val() === now"
+          }
+        },
+        "pos": {
+          "$uid": {
+            ".write": "auth != null && ((auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3') || root.child('users').child(auth.uid).child('forest').child('home').val() === $island) && $uid === auth.uid",
+            ".validate": "newData.isString() && newData.val().length <= 48"
           }
         },
         "clock": {
-          ".read": "auth != null && ((auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3') || root.child('users').child(auth.uid).child('forest').child('home').val() === $island)",
           ".write": "auth != null && ((auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3') || root.child('users').child(auth.uid).child('forest').child('home').val() === $island)",
           ".validate": "newData.hasChildren(['day', 'dawnAt', 'lastSeen']) && newData.child('day').isNumber() && newData.child('day').val() >= 1",
           "frozen": {
+            ".validate": "newData.isBoolean()"
+          },
+          "slept": {
             ".validate": "newData.isBoolean()"
           },
           "$other": {
@@ -760,14 +775,12 @@
           }
         },
         "jungle": {
-          ".read": "auth != null && ((auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3') || root.child('users').child(auth.uid).child('forest').child('home').val() === $island)",
           ".write": "auth != null && ((auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3') || root.child('users').child(auth.uid).child('forest').child('home').val() === $island)",
           "$cell": {
             ".validate": "$cell.matches(/^[0-9]{1,5}$/) && newData.val() === 1"
           }
         },
         "terrain": {
-          ".read": "auth != null && ((auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3') || root.child('users').child(auth.uid).child('forest').child('home').val() === $island)",
           ".write": "auth != null && ((auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3') || root.child('users').child(auth.uid).child('forest').child('home').val() === $island)",
           "$chunk": {
             "$cell": {
@@ -776,45 +789,45 @@
           }
         },
         "snow": {
-          ".read": "auth != null && ((auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3') || root.child('users').child(auth.uid).child('forest').child('home').val() === $island)",
           ".write": "auth != null && ((auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3') || root.child('users').child(auth.uid).child('forest').child('home').val() === $island)",
           "$cell": {
             ".validate": "newData.isNumber()"
           }
         },
         "build": {
-          ".read": "auth != null && ((auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3') || root.child('users').child(auth.uid).child('forest').child('home').val() === $island)",
           "$id": {
             ".write": "auth != null && ((auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3') || root.child('users').child(auth.uid).child('forest').child('home').val() === $island) && (!data.exists() || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3'))",
             ".validate": "$id.matches(/^[a-z_]{2,24}_[0-9]{1,2}$/) && newData.hasChildren(['at', 'by'])"
           }
         },
         "public": {
-          ".read": "auth != null && ((auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3') || root.child('users').child(auth.uid).child('forest').child('home').val() === $island)",
           ".write": "auth != null && ((auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3') || root.child('users').child(auth.uid).child('forest').child('home').val() === $island)",
           "$id": {
             ".validate": "$id.matches(/^[a-z_0-9]{1,30}$/) && newData.isNumber() && newData.val() >= 0 && newData.val() <= 5400"
           }
         },
         "publicLog": {
-          ".read": "auth != null && ((auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3') || root.child('users').child(auth.uid).child('forest').child('home').val() === $island)",
           ".write": "auth != null && ((auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3') || root.child('users').child(auth.uid).child('forest').child('home').val() === $island)",
           "$key": {
             ".validate": "newData.hasChildren(['at', 'who', 'verb', 'item', 'count']) && newData.child('who').isString() && newData.child('who').val().length <= 12 && newData.child('count').isNumber() && newData.child('count').val() >= 1 && newData.child('count').val() <= 5400"
           }
         },
         "admin": {
-          ".read": "auth != null && ((auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3') || root.child('users').child(auth.uid).child('forest').child('home').val() === $island)",
-          ".write": "auth != null && (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
-        },
-        "adminLog": {
-          ".read": "auth != null && (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')",
-          ".write": "auth != null && (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+          ".write": "auth != null && (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')",
+          "cmd": {
+            "$uid": {
+              ".write": "auth != null && ((auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3') || root.child('users').child(auth.uid).child('forest').child('home').val() === $island) && $uid === auth.uid && !newData.exists()"
+            }
+          }
         },
         "$other": {
           ".validate": false
         }
       }
+    },
+    "forestAdminLog": {
+      ".read": "auth != null && (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')",
+      ".write": "auth != null && (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
     },
     "forestArchive": {
       ".read": "auth != null && (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')",

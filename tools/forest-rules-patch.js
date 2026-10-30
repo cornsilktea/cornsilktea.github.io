@@ -46,24 +46,31 @@ class ForestRulesPatch {
       },
       "forest": {
         "$island": {
-          "members": { "$uid": { ".read": M, ".write": M + " && $uid === auth.uid", ".validate": "newData.hasChildren(['no', 'name'])" } },
+          ".read": M,
+          "members": { ".write": M + " && false", "$uid": { ".write": M + " && $uid === auth.uid", ".validate": "newData.hasChildren(['no', 'name']) && newData.child('name').isString() && newData.child('name').val().length <= 12" } },
+          "presence": { "$uid": { ".write": M + " && $uid === auth.uid", ".validate": "newData.hasChildren(['a', 's', 'd', 'at']) && newData.child('a').isString() && newData.child('a').val().length <= 12 && (newData.child('s').val() === 0 || newData.child('s').val() === 1) && newData.child('at').val() === now" } },
+          "pos": { "$uid": { ".write": M + " && $uid === auth.uid", ".validate": "newData.isString() && newData.val().length <= 48" } },
           "clock": {
-            ".read": M, ".write": M,
+            ".write": M,
             ".validate": "newData.hasChildren(['day', 'dawnAt', 'lastSeen']) && newData.child('day').isNumber() && newData.child('day').val() >= 1",
             "frozen": { ".validate": "newData.isBoolean()" },
+            "slept": { ".validate": "newData.isBoolean()" },
             "$other": { ".validate": "newData.isNumber()" },
           },
-          "jungle": { ".read": M, ".write": M, "$cell": { ".validate": "$cell.matches(/^[0-9]{1,5}$/) && newData.val() === 1" } },
-          "terrain": { ".read": M, ".write": M, "$chunk": { "$cell": { ".validate": "$cell.matches(/^[0-9]{1,5}$/) && newData.hasChildren(['0', '1']) && newData.child('0').isNumber() && newData.child('0').val() >= -2 && newData.child('0').val() <= 14 && newData.child('1').isString() && newData.child('1').val().length === 1" } } },
-          "snow": { ".read": M, ".write": M, "$cell": { ".validate": "newData.isNumber()" } },
-          "build": { ".read": M, "$id": { ".write": M + " && (!data.exists() || " + A + ")", ".validate": "$id.matches(/^[a-z_]{2,24}_[0-9]{1,2}$/) && newData.hasChildren(['at', 'by'])" } },
-          "public": { ".read": M, ".write": M, "$id": { ".validate": "$id.matches(/^[a-z_0-9]{1,30}$/) && newData.isNumber() && newData.val() >= 0 && newData.val() <= 5400" } },
-          "publicLog": { ".read": M, ".write": M, "$key": { ".validate": "newData.hasChildren(['at', 'who', 'verb', 'item', 'count']) && newData.child('who').isString() && newData.child('who').val().length <= 12 && newData.child('count').isNumber() && newData.child('count').val() >= 1 && newData.child('count').val() <= 5400" } },
-          "admin": { ".read": M, ".write": "auth != null && " + A },
-          "adminLog": { ".read": "auth != null && " + A, ".write": "auth != null && " + A },
+          "jungle": { ".write": M, "$cell": { ".validate": "$cell.matches(/^[0-9]{1,5}$/) && newData.val() === 1" } },
+          "terrain": { ".write": M, "$chunk": { "$cell": { ".validate": "$cell.matches(/^[0-9]{1,5}$/) && newData.hasChildren(['0', '1']) && newData.child('0').isNumber() && newData.child('0').val() >= -2 && newData.child('0').val() <= 14 && newData.child('1').isString() && newData.child('1').val().length === 1" } } },
+          "snow": { ".write": M, "$cell": { ".validate": "newData.isNumber()" } },
+          "build": { "$id": { ".write": M + " && (!data.exists() || " + A + ")", ".validate": "$id.matches(/^[a-z_]{2,24}_[0-9]{1,2}$/) && newData.hasChildren(['at', 'by'])" } },
+          "public": { ".write": M, "$id": { ".validate": "$id.matches(/^[a-z_0-9]{1,30}$/) && newData.isNumber() && newData.val() >= 0 && newData.val() <= 5400" } },
+          "publicLog": { ".write": M, "$key": { ".validate": "newData.hasChildren(['at', 'who', 'verb', 'item', 'count']) && newData.child('who').isString() && newData.child('who').val().length <= 12 && newData.child('count').isNumber() && newData.child('count').val() >= 1 && newData.child('count').val() <= 5400" } },
+          "admin": {
+            ".write": "auth != null && " + A,
+            "cmd": { "$uid": { ".write": M + " && $uid === auth.uid && !newData.exists()" } },
+          },
           "$other": { ".validate": false },
         },
       },
+      "forestAdminLog": { ".read": "auth != null && " + A, ".write": "auth != null && " + A },
       "forestArchive": { ".read": "auth != null && " + A, ".write": "auth != null && " + A },
     };
   }
@@ -74,8 +81,17 @@ class ForestRulesPatch {
     return pad + JSON.stringify(name) + ": " + body;
   }
 
+  strip() {
+    const classAnchor = '    "classStats": {';
+    const start = this.text.indexOf('    "forestCodes": {');
+    if (start >= 0) this.text = this.text.slice(0, start) + this.text.slice(this.text.indexOf(classAnchor));
+    const userStart = this.text.indexOf('        "forest": {');
+    const userEnd = this.text.indexOf('        "$other": { ".validate": false }' + String.fromCharCode(10) + '      }' + String.fromCharCode(10) + '    },' + String.fromCharCode(10) + '    "classStats"');
+    if (userStart >= 0 && userEnd > userStart) this.text = this.text.slice(0, userStart) + this.text.slice(userEnd);
+  }
+
   apply() {
-    if (this.text.indexOf('"forestCodes"') >= 0) return false;
+    this.strip();
     const userAnchor = '        "$other": { ".validate": false }\n      }\n    },\n    "classStats": {';
     if (this.text.indexOf(userAnchor) < 0) throw new Error("users 끝 자리를 찾지 못했어요");
     const userBlock = ForestRulesPatch.block("forest", this.userForest(), 8) + ",\n";

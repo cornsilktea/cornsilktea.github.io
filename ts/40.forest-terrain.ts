@@ -199,3 +199,12 @@ class FrTerrainMesher {
     [a, b, c, a, c, d].forEach((p) => { positions.push(p[0], p[1], p[2]); colors.push(color[0], color[1], color[2]); });
   }
 }
+
+class FrBuildSite {
+  constructor(readonly id: string, readonly name: string, readonly x: number, readonly z: number) {}
+}
+
+class FrBuildSites {
+  static readonly STAGE_TWO: ReadonlyArray<FrBuildSite> = [new FrBuildSite("workbench", "작업대", 55, 64)];
+  static find(id: string): FrBuildSite | undefined { return FrBuildSites.STAGE_TWO.find((s) => s.id === id); }
+}

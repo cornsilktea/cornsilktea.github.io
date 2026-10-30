@@ -156,18 +156,6 @@ class FrTreeLayer {
 }
 FrTreeLayer.GHOST_LIMIT = 48;
 FrTreeLayer.GHOST_RADIUS = 3;
-class FrBuildSite {
-    constructor(id, name, x, z) {
-        this.id = id;
-        this.name = name;
-        this.x = x;
-        this.z = z;
-    }
-}
-class FrBuildSites {
-    static find(id) { return FrBuildSites.STAGE_TWO.find((s) => s.id === id); }
-}
-FrBuildSites.STAGE_TWO = [new FrBuildSite("workbench", "작업대", 55, 64)];
 class FrProps {
     constructor(libs, world, group) {
         this.libs = libs;
@@ -400,3 +388,64 @@ class FrWorldView {
 }
 FrWorldView.MAX_PIXEL_RATIO_TOUCH = 1.5;
 FrWorldView.MAX_PIXEL_RATIO_DESKTOP = 2;
+class FrRemoteAvatars {
+    constructor(libs, scene, factory, clips, labels, roster, selfUid) {
+        this.libs = libs;
+        this.scene = scene;
+        this.factory = factory;
+        this.clips = clips;
+        this.labels = labels;
+        this.roster = roster;
+        this.selfUid = selfUid;
+        this.entries = new Map();
+    }
+    update(dt) {
+        const alive = new Set(this.roster.aliveUids().filter((uid) => uid !== this.selfUid && this.roster.poses.has(uid) && this.roster.members.has(uid) && !this.roster.members.get(uid).adm));
+        this.entries.forEach((entry, uid) => { if (!alive.has(uid))
+            this.drop(uid, entry); });
+        alive.forEach((uid) => this.show(uid, dt));
+    }
+    drop(uid, entry) {
+        this.scene.remove(entry.avatar.group);
+        this.factory.disposeModel(entry.avatar.group);
+        this.entries.delete(uid);
+    }
+    show(uid, dt) {
+        const member = this.roster.members.get(uid);
+        const pose = this.roster.poses.get(uid);
+        const lookKey = JSON.stringify(member.look);
+        let entry = this.entries.get(uid);
+        if (entry && entry.look !== lookKey) {
+            this.drop(uid, entry);
+            entry = undefined;
+        }
+        if (!entry) {
+            const model = this.factory.build(CharacterLooks.clean(member.look));
+            const avatar = new FrAvatar(this.libs, model, this.clips);
+            const label = this.labels.create(member.name, "#FFFFFF");
+            label.scale.set(1.4, 0.35, 1);
+            label.position.y = FrRemoteAvatars.LABEL_HEIGHT;
+            avatar.group.add(label);
+            avatar.group.position.set(pose.x, pose.y, pose.z);
+            this.scene.add(avatar.group);
+            entry = { avatar, label, look: lookKey, lastX: pose.x, lastZ: pose.z };
+            this.entries.set(uid, entry);
+        }
+        const group = entry.avatar.group;
+        const k = Math.min(1, dt * 9);
+        const elapsed = Math.min(FrRemoteAvatars.MAX_EXTRAPOLATE, (Date.now() - pose.at) / 1000);
+        group.position.x += (pose.x + pose.vx * elapsed - group.position.x) * k;
+        group.position.z += (pose.z + pose.vz * elapsed - group.position.z) * k;
+        group.position.y += (pose.y - group.position.y) * k;
+        let turn = pose.dir - group.rotation.y;
+        while (turn > Math.PI)
+            turn -= Math.PI * 2;
+        while (turn < -Math.PI)
+            turn += Math.PI * 2;
+        group.rotation.y += turn * k;
+        entry.avatar.play(FrWire.ANIMS[pose.anim] || "idle");
+        entry.avatar.update(dt);
+    }
+}
+FrRemoteAvatars.LABEL_HEIGHT = 2.4;
+FrRemoteAvatars.MAX_EXTRAPOLATE = 3.2;

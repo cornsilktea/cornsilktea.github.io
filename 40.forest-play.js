@@ -7,9 +7,11 @@ class FrClockSync {
         this.state = { day: 1, dawnAt: 0, lastSeen: 0, frozen: false };
         this.offset = 0;
         this.lastHeartbeat = 0;
+        this.onSkipped = () => undefined;
     }
     path() { return "forest/" + this.island + "/clock"; }
-    now() { return Date.now() + this.offset; }
+    now() { return this.state.frozen && this.state.frozenAt ? this.state.frozenAt : Date.now() + this.offset; }
+    serverNow() { return Date.now() + this.offset; }
     minuteOfDay() { return FrClock.minuteOfDay(this.state, this.now()); }
     day() { return FrClock.dayNumber(this.state, this.now()); }
     absoluteMinute() { return FrClock.absoluteMinute(this.state, this.now()); }
@@ -31,6 +33,36 @@ class FrClockSync {
         this.lastHeartbeat = Date.now();
         this.state = { ...this.state, lastSeen: this.now() };
         await this.backend.patch(this.path(), { lastSeen: this.state.lastSeen });
+    }
+    remoteState(next) {
+        const previous = this.state;
+        this.state = next;
+        if (next.dawnAt !== previous.dawnAt && next.slept)
+            this.onSkipped(next);
+    }
+    remoteField(name, value) {
+        const next = { ...this.state };
+        if (value === null)
+            delete next[name];
+        else
+            next[name] = value;
+        this.state = next;
+    }
+    async setMinute(target) {
+        const now = this.now();
+        const back = ((target - FrBalance.DAWN_MINUTE + FrClock.MINUTES_PER_DAY) % FrClock.MINUTES_PER_DAY) / FrBalance.GAME_MINUTES_PER_REAL_SECOND * 1000;
+        await this.backend.transaction(this.path(), (current) => (current ? { ...current, dawnAt: now - back, lastSeen: now, slept: false } : undefined));
+    }
+    async setFrozen(frozen) {
+        const real = this.serverNow();
+        await this.backend.transaction(this.path(), (current) => {
+            if (!current)
+                return undefined;
+            if (frozen)
+                return { ...current, frozen: true, frozenAt: real };
+            const shift = current.frozenAt ? real - current.frozenAt : 0;
+            return { day: current.day, dawnAt: current.dawnAt + shift, lastSeen: real, frozen: false, slept: false };
+        });
     }
     async skipToMorning() {
         const known = this.state.dawnAt;
@@ -55,6 +87,8 @@ class FrPlayerBody {
         this.facing = 0;
         this.moving = false;
         this.swimming = false;
+        this.vx = 0;
+        this.vz = 0;
         this.ground = 0;
     }
     place(cellX, cellZ) {
@@ -103,6 +137,7 @@ class FrPlayerBody {
     step(direction, dt, speedBonus) {
         const length = Math.hypot(direction.x, direction.z);
         this.moving = length > 0.05;
+        const startX = this.x, startZ = this.z;
         const here = this.cell();
         this.swimming = this.world.terrain.isWater(here.x, here.z);
         if (this.moving) {
@@ -114,6 +149,8 @@ class FrPlayerBody {
             if (this.bodyFits(this.x, this.z + dz))
                 this.z += dz;
         }
+        this.vx = dt > 0 ? (this.x - startX) / dt : 0;
+        this.vz = dt > 0 ? (this.z - startZ) / dt : 0;
         this.ground = this.groundUnder(this.x, this.z);
         const cell = this.cell();
         const swim = this.world.terrain.isWater(cell.x, cell.z);

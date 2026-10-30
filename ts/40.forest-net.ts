@@ -7,6 +7,7 @@ interface FrBackend {
   transaction<T>(path: string, update: (current: T | null) => T | null | undefined): Promise<FrTransactionResult<T>>;
   lastChildren<T>(path: string, count: number): Promise<Array<[string, T]>>;
   serverTime(probePath: string): Promise<number>;
+  listen(path: string, sink: FrStreamSink): () => void;
 }
 
 class FrRestBackend implements FrBackend {
@@ -63,6 +64,12 @@ class FrRestBackend implements FrBackend {
     return typeof value === "number" ? value : Date.now();
   }
 
+  listen(path: string, sink: FrStreamSink): () => void {
+    const stream = new FrStream(() => this.url(path), sink);
+    stream.start();
+    return () => stream.stop();
+  }
+
   private async send(method: string, url: string, value: unknown): Promise<void> {
     const response = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(value) });
     if (!response.ok) throw new Error(String(response.status));
@@ -114,6 +121,8 @@ class FrLocalBackend implements FrBackend {
   }
 
   async serverTime(): Promise<number> { return Date.now(); }
+
+  listen(): () => void { return () => undefined; }
 
   private parts(path: string): string[] { return path.split("/").filter((p) => p.length > 0); }
 

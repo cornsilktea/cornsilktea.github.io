@@ -50,6 +50,19 @@ class ForestTestPages {
 `;
   }
 
+  liveScript() {
+    return `<script>
+(function () {
+  var q = new URLSearchParams(location.search);
+  var n = q.get("u") || "1";
+  window.PORTAL_USER = { uid: "u" + n, email: "s" + n + "@dongma.sen.ms.kr", name: (20100 + Number(n)) + " 학생" + n, nick: "학생" + n, getToken: function () { return Promise.resolve("tok"); } };
+  if (q.get("admin")) window.__FOREST_ADMIN__ = true;
+  window.PORTAL_CONFIG = { DB_URL: location.origin + "/db", isReady: function () { return true; } };
+})();
+</script>
+`;
+  }
+
   write(name, html) {
     const dir = path.join(this.root, ".claude");
     fs.mkdirSync(dir, { recursive: true });
@@ -59,6 +72,7 @@ class ForestTestPages {
   build() {
     const fixed = this.withoutGuard().replace("new FrGame(", "window.__game = new FrGame(");
     this.write("forest-test.html", fixed.replace("<head>", '<head><base href="../">'));
+    this.write("forest-live.html", fixed.replace("<head>", '<head><base href="../">' + this.liveScript()));
     this.write("forest-rest.html", fixed.replace("<head>", '<head><base href="../">' + this.restMockScript()));
   }
 }

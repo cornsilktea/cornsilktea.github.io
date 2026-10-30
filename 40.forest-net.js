@@ -52,6 +52,11 @@ class FrRestBackend {
         const value = await this.get(probePath);
         return typeof value === "number" ? value : Date.now();
     }
+    listen(path, sink) {
+        const stream = new FrStream(() => this.url(path), sink);
+        stream.start();
+        return () => stream.stop();
+    }
     async send(method, url, value) {
         const response = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(value) });
         if (!response.ok)
@@ -98,6 +103,7 @@ class FrLocalBackend {
         return Object.keys(data).sort().slice(-count).map((key) => [key, this.clone(data[key])]);
     }
     async serverTime() { return Date.now(); }
+    listen() { return () => undefined; }
     parts(path) { return path.split("/").filter((p) => p.length > 0); }
     read(path) {
         let node = this.tree;

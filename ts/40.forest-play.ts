@@ -3,11 +3,13 @@ class FrClockSync {
   state: FrClockState = { day: 1, dawnAt: 0, lastSeen: 0, frozen: false };
   private offset = 0;
   private lastHeartbeat = 0;
+  onSkipped: (next: FrClockState) => void = () => undefined;
 
   constructor(private readonly backend: FrBackend, private readonly island: string, private readonly uid: string) {}
 
   private path(): string { return "forest/" + this.island + "/clock"; }
-  now(): number { return Date.now() + this.offset; }
+  now(): number { return this.state.frozen && this.state.frozenAt ? this.state.frozenAt : Date.now() + this.offset; }
+  serverNow(): number { return Date.now() + this.offset; }
   minuteOfDay(): number { return FrClock.minuteOfDay(this.state, this.now()); }
   day(): number { return FrClock.dayNumber(this.state, this.now()); }
   absoluteMinute(): number { return FrClock.absoluteMinute(this.state, this.now()); }
@@ -28,6 +30,34 @@ class FrClockSync {
     this.lastHeartbeat = Date.now();
     this.state = { ...this.state, lastSeen: this.now() };
     await this.backend.patch(this.path(), { lastSeen: this.state.lastSeen });
+  }
+
+  remoteState(next: FrClockState): void {
+    const previous = this.state;
+    this.state = next;
+    if (next.dawnAt !== previous.dawnAt && next.slept) this.onSkipped(next);
+  }
+
+  remoteField(name: string, value: unknown): void {
+    const next = { ...this.state } as unknown as Record<string, unknown>;
+    if (value === null) delete next[name]; else next[name] = value;
+    this.state = next as unknown as FrClockState;
+  }
+
+  async setMinute(target: number): Promise<void> {
+    const now = this.now();
+    const back = ((target - FrBalance.DAWN_MINUTE + FrClock.MINUTES_PER_DAY) % FrClock.MINUTES_PER_DAY) / FrBalance.GAME_MINUTES_PER_REAL_SECOND * 1000;
+    await this.backend.transaction<FrClockState>(this.path(), (current) => (current ? { ...current, dawnAt: now - back, lastSeen: now, slept: false } : undefined));
+  }
+
+  async setFrozen(frozen: boolean): Promise<void> {
+    const real = this.serverNow();
+    await this.backend.transaction<FrClockState>(this.path(), (current) => {
+      if (!current) return undefined;
+      if (frozen) return { ...current, frozen: true, frozenAt: real };
+      const shift = current.frozenAt ? real - current.frozenAt : 0;
+      return { day: current.day, dawnAt: current.dawnAt + shift, lastSeen: real, frozen: false, slept: false };
+    });
   }
 
   async skipToMorning(): Promise<boolean> {
@@ -55,6 +85,8 @@ class FrPlayerBody {
   facing = 0;
   moving = false;
   swimming = false;
+  vx = 0;
+  vz = 0;
   private ground = 0;
 
   constructor(private readonly world: FrWorld) {}
@@ -105,6 +137,7 @@ class FrPlayerBody {
   step(direction: FrPoint, dt: number, speedBonus: number): void {
     const length = Math.hypot(direction.x, direction.z);
     this.moving = length > 0.05;
+    const startX = this.x, startZ = this.z;
     const here = this.cell();
     this.swimming = this.world.terrain.isWater(here.x, here.z);
     if (this.moving) {
@@ -114,6 +147,8 @@ class FrPlayerBody {
       if (this.bodyFits(this.x + dx, this.z)) this.x += dx;
       if (this.bodyFits(this.x, this.z + dz)) this.z += dz;
     }
+    this.vx = dt > 0 ? (this.x - startX) / dt : 0;
+    this.vz = dt > 0 ? (this.z - startZ) / dt : 0;
     this.ground = this.groundUnder(this.x, this.z);
     const cell = this.cell();
     const swim = this.world.terrain.isWater(cell.x, cell.z);

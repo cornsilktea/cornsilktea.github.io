@@ -29,12 +29,12 @@ class FrClock {
     }
     static startOfClass(state, now) {
         const idleMs = now - state.lastSeen;
-        if (idleMs <= FrBalance.CLASS_BREAK_REAL_MINUTES * 60000)
+        if (idleMs <= FrBalance.CLASS_BREAK_REAL_MINUTES * 60000 || state.frozen)
             return { ...state, lastSeen: now };
         return { day: FrClock.dayNumber(state, state.lastSeen) + 1, dawnAt: now, lastSeen: now, frozen: false };
     }
     static skipToMorning(state, now) {
-        return { day: FrClock.dayNumber(state, now) + 1, dawnAt: now, lastSeen: now, frozen: state.frozen };
+        return { day: FrClock.dayNumber(state, now) + 1, dawnAt: now, lastSeen: now, frozen: state.frozen, slept: true };
     }
 }
 FrClock.MINUTES_PER_DAY = 1440;

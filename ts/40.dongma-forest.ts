@@ -110,6 +110,17 @@ class FrGame {
   private lastSnowCheck = 0;
   private lastTime = 0;
   private busy = false;
+  private roster = new FrRoster();
+  private hub: FrSyncHub | null = null;
+  private adminNode = new FrAdminNode();
+  private presencePublisher: FrPresencePublisher | null = null;
+  private posePublisher: FrPosePublisher | null = null;
+  private remotes: FrRemoteAvatars | null = null;
+  private labels!: RkLabelFactory;
+  private actedDay = 0;
+  private lastSleepCheck = 0;
+  private island = "";
+  private adminWindow: FrAdminWindow | null = null;
 
   constructor(private readonly libs: ThreeLibs) {
     this.toast = new FrToast(FrDom.el("toast"));
@@ -129,6 +140,7 @@ class FrGame {
     this.assets.clips.forEach((clip, name) => this.clips.set(name, clip));
     tools.clips.forEach((clip, name) => this.clips.set(name, clip));
     this.factory = new CharacterModelFactory(this.libs, this.assets);
+    this.labels = new RkLabelFactory(this.libs);
     this.profile = new PlayerProfile();
     const editor = new ProfileEditor(this.libs, this.factory, this.assets, this.profile);
     editor.mount(FrDom.el("profileHost"));
@@ -142,6 +154,13 @@ class FrGame {
     if (!user && FrIdentity.required(location.search)) { this.start.enter(false, "로그인이 필요해요. 새로 고침해 주세요."); return; }
     this.uid = user ? user.uid : "local";
     this.backend = FrBackendChooser.choose();
+    if (FrBoardPage.requested(location.search)) {
+      this.start.hide();
+      this.backdrop.stop();
+      FrDom.el("view").hidden = true;
+      await new FrBoardPage(this.backend, this.terrainFile, this.uid).start(FrBoardPage.islandsFor(location.search));
+      return;
+    }
     this.join = new FrIslandJoin(this.backend, this.uid, location.search);
     this.start.onCode = (code) => void this.submitCode(code);
     this.start.onEnter = () => this.enterGame();
@@ -153,6 +172,12 @@ class FrGame {
   }
 
   private async resolveHome(): Promise<void> {
+    if (this.isAdmin()) {
+      const chosen = this.islandParam() || (await this.join.existingHome()) || FrIslandLink.TEST_ISLAND;
+      this.start.showCode(false);
+      await this.prepareIsland(chosen);
+      return;
+    }
     let home = await this.join.existingHome();
     if (!home) {
       const automatic = FrIslandLink.autoIsland(location.search);
@@ -201,10 +226,63 @@ class FrGame {
     this.save = save;
     this.finder = new FrTargetFinder(world);
     this.outcome = new FrTaskOutcome(session, world, this.random, clock);
+    this.island = island;
+    this.startSync(world, clock, island);
     this.buildWindows(session);
+    if (this.isAdmin()) this.adminWindow = this.windows.register(new FrAdminWindow(session, this.toast, new FrAdminTools(this.backend, island, clock, world), this.roster, this.adminNode, clock, island));
     session.onChange(() => { save.queue(session.toSave()); this.refreshHud(); });
     document.addEventListener("visibilitychange", () => { if (document.hidden) void save.flush(); });
     this.start.enter(true, "섬: " + island + " · " + FrStatusSummary.line(session));
+  }
+
+  private startSync(world: FrWorld, clock: FrClockSync, island: string): void {
+    if (this.hub) this.hub.close();
+    this.roster = new FrRoster();
+    this.roster.serverNow = () => clock.serverNow();
+    this.adminNode = new FrAdminNode();
+    this.adminNode.selfUid = this.uid;
+    this.adminNode.onNotice = (text) => this.toast.show("공지: " + text, 10000);
+    this.adminNode.onCommand = (uid, type) => { this.runCommand(type); void this.backend.set("forest/" + island + "/admin/cmd/" + uid, null); };
+    const hub = new FrSyncHub();
+    hub.register("jungle", new FrJungleNode(world));
+    hub.register("terrain", new FrTerrainNode(world));
+    hub.register("snow", new FrSnowNode(world));
+    hub.register("build", new FrBuildNode(world));
+    hub.register("public", new FrPublicNode(world));
+    hub.register("publicLog", new FrLogNode(world));
+    hub.register("clock", new FrClockNode(clock));
+    hub.register("members", new FrMembersNode(this.roster));
+    hub.register("presence", new FrPresenceNode(this.roster));
+    hub.register("pos", new FrPoseNode(this.roster));
+    hub.register("admin", this.adminNode);
+    hub.start(this.backend, island);
+    this.hub = hub;
+    clock.onSkipped = () => this.onSkipped();
+    this.presencePublisher = new FrPresencePublisher(this.backend, island, this.uid);
+    this.posePublisher = new FrPosePublisher(this.backend, island, this.uid);
+  }
+
+  private runCommand(type: string): void {
+    if (!this.player || !this.world) return;
+    if (type === "plaza") {
+      const plaza = this.world.terrain.anchors.plaza;
+      this.player.place(plaza.x, plaza.z + 3);
+      this.cancelTask();
+      this.toast.show("선생님이 광장으로 옮겼어요");
+    } else if (type === "wake" && this.session) {
+      this.session.sleeping = false;
+      this.toast.show("선생님이 깨웠어요");
+    }
+  }
+
+  private onSkipped(): void {
+    if (!this.session) return;
+    if (this.session.sleeping) {
+      this.session.sleeping = false;
+      this.session.ap.fill();
+      this.session.changed();
+      this.toast.show("좋은 아침이에요! 행동력이 가득 찼어요");
+    }
   }
 
   private buildWindows(session: FrSession): void {
@@ -229,8 +307,20 @@ class FrGame {
     this.avatar = avatar;
     this.view.attachAvatar(avatar);
     this.hud = new FrStatusHud();
+    this.remotes = new FrRemoteAvatars(this.libs, this.view.scene, this.factory, this.clips, this.labels, this.roster, this.uid);
+    const ownLabel = this.labels.create(this.session.nick, "#FFE2C9");
+    ownLabel.scale.set(1.4, 0.35, 1);
+    ownLabel.position.y = FrRemoteAvatars.LABEL_HEIGHT;
+    avatar.group.add(ownLabel);
+    const account = window.PORTAL_USER;
+    void new FrMemberWriter(this.backend, this.island).write(this.uid, account ? account.name : "", this.session.nick, this.profile.look, this.isAdmin());
+    if (!FrClock.isNight(this.clock.minuteOfDay())) this.actedDay = this.clock.day();
+    window.addEventListener("pagehide", () => { if (this.presencePublisher) void this.presencePublisher.leave(); });
     this.hotbar = new FrHotbar(this.session, (slot) => this.useHotbar(slot));
     FrDom.el("btnBag").addEventListener("click", () => this.toggleBag());
+    const adminButton = FrDom.el<HTMLButtonElement>("btnAdmin");
+    adminButton.hidden = !this.adminWindow;
+    adminButton.addEventListener("click", () => this.key("F2"));
     FrDom.el("btnSleep").addEventListener("click", () => void this.toggleSleep());
     this.view.rig.snap(new this.libs.THREE.Vector3(player.x, player.y, player.z));
     this.lastDay = this.clock.day();
@@ -250,6 +340,7 @@ class FrGame {
     if (!this.playing || !this.session) return;
     if (this.currentTask) { this.currentTask.game.press(); return; }
     if (this.windows.anyOpen() || this.session.sleeping || !this.target) return;
+    if (this.adminNode.state.lock && !this.isAdmin()) { this.toast.show("선생님이 잠시 멈췄어요. 걷기만 할 수 있어요."); return; }
     this.act(this.target);
   }
 
@@ -262,6 +353,7 @@ class FrGame {
     if (code === "Escape") { this.windows.closeAll(); this.cancelTask(); return; }
     if (code === "KeyI") { this.toggleBag(); return; }
     if (code === "KeyZ") { void this.toggleSleep(); return; }
+    if (code === "F2" && this.adminWindow) { if (this.adminWindow.isOpen) this.adminWindow.close(); else this.windows.openOnly(this.adminWindow); return; }
     if (code.indexOf("Digit") === 0) { const n = Number(code.slice(5)); if (n >= 1 && n <= FrBalance.HOTBAR_SLOTS) this.useHotbar(n - 1); }
   }
 
@@ -326,25 +418,50 @@ class FrGame {
     if (message) this.toast.show(message);
   }
 
+  private isAdmin(): boolean {
+    const flagged = (window as unknown as { __FOREST_ADMIN__?: boolean }).__FOREST_ADMIN__ === true;
+    return flagged || (typeof AccountPolicy !== "undefined" && AccountPolicy.ADMIN_UIDS.indexOf(this.uid) >= 0);
+  }
+
+  private islandParam(): string {
+    const match = /[?&]island=([^&]+)/.exec(location.search);
+    return match ? decodeURIComponent(match[1]) : "";
+  }
+
   private presences(): FrPresence[] {
-    if (!this.session) return [];
-    return [{ uid: this.uid, name: this.session.nick, area: this.session.area, sleeping: this.session.sleeping, actedToday: true }];
+    if (!this.session || !this.clock) return [];
+    const self: FrPresence = { uid: this.uid, name: this.session.nick, area: this.session.area, sleeping: this.session.sleeping, actedToday: true };
+    const others = this.roster.asPresences(this.clock.day(), this.uid, self);
+    return this.isAdmin() ? others.filter((p) => p.uid !== this.uid) : others;
   }
 
   private async toggleSleep(): Promise<void> {
     if (!this.session || !this.clock) return;
-    if (this.session.sleeping) { this.session.sleeping = false; this.toast.show("일어났어요"); return; }
+    if (this.session.sleeping) { this.session.sleeping = false; this.toast.show("일어났어요"); await this.publishPresence(true); return; }
     if (!FrSleepVote.canSleep(this.clock.minuteOfDay(), this.session.area)) return;
     this.cancelTask();
     this.windows.closeAll();
     this.session.sleeping = true;
-    if (FrSleepVote.allAsleep(this.presences())) {
-      await this.clock.skipToMorning();
-      this.session.ap.fill();
-      this.session.sleeping = false;
-      this.session.changed();
-      this.toast.show("좋은 아침이에요! 행동력이 가득 찼어요");
-    }
+    await this.publishPresence(true);
+    await this.tryMorning();
+  }
+
+  private async publishPresence(force: boolean): Promise<void> {
+    if (!this.presencePublisher || !this.session) return;
+    await this.presencePublisher.publish(this.session.area, this.session.sleeping, this.actedDay, force);
+  }
+
+  private async tryMorning(): Promise<void> {
+    if (!this.session || !this.clock || !this.session.sleeping) return;
+    if (!FrSleepVote.allAsleep(this.presences())) return;
+    if (await this.clock.skipToMorning()) this.onSkipped();
+  }
+
+  private poseCode(moving: boolean): number {
+    if (!this.session || !this.player) return 0;
+    if (this.session.sleeping) return 6;
+    if (this.currentTask) return FrWire.ANIMS.indexOf(this.currentTask.task.clip);
+    return moving ? (this.player.swimming ? 2 : 1) : 0;
   }
 
   private frame(dt: number, time: number): void {
@@ -362,6 +479,8 @@ class FrGame {
     else this.avatar.play(player.moving ? (player.swimming ? "walk" : "run") : "idle");
     this.view.rig.follow(new this.libs.THREE.Vector3(player.x, player.y, player.z), dt);
     this.view.fadeTreesAround(player.cell());
+    if (this.remotes) this.remotes.update(dt);
+    if (this.posePublisher) this.posePublisher.send(player.x, player.z, player.y, player.facing, this.poseCode(player.moving), player.vx, player.vz);
     this.target = blocked ? null : this.finder.find(player);
     this.view.setMarker(this.target && this.target.cell ? this.target.cell : null);
     this.input.setActionLabel(this.target ? this.target.label : "·");
@@ -372,6 +491,9 @@ class FrGame {
     }
     const minute = clock.minuteOfDay();
     const day = clock.day();
+    if (!FrClock.isNight(minute) && (player.moving || this.currentTask !== null)) this.actedDay = day;
+    void this.publishPresence(false);
+    if (session.sleeping && time - this.lastSleepCheck > 1) { this.lastSleepCheck = time; void this.tryMorning(); }
     this.view.applyClock(minute);
     this.hud.showClock(minute, day);
     this.hud.showArea("마을");

@@ -1,4 +1,4 @@
-interface FrClockState { day: number; dawnAt: number; lastSeen: number; frozen: boolean }
+interface FrClockState { day: number; dawnAt: number; lastSeen: number; frozen: boolean; slept?: boolean; frozenAt?: number }
 interface FrPresence { uid: string; name: string; area: string; sleeping: boolean; actedToday: boolean }
 
 class FrClock {
@@ -39,12 +39,12 @@ class FrClock {
 
   static startOfClass(state: FrClockState, now: number): FrClockState {
     const idleMs = now - state.lastSeen;
-    if (idleMs <= FrBalance.CLASS_BREAK_REAL_MINUTES * 60000) return { ...state, lastSeen: now };
+    if (idleMs <= FrBalance.CLASS_BREAK_REAL_MINUTES * 60000 || state.frozen) return { ...state, lastSeen: now };
     return { day: FrClock.dayNumber(state, state.lastSeen) + 1, dawnAt: now, lastSeen: now, frozen: false };
   }
 
   static skipToMorning(state: FrClockState, now: number): FrClockState {
-    return { day: FrClock.dayNumber(state, now) + 1, dawnAt: now, lastSeen: now, frozen: state.frozen };
+    return { day: FrClock.dayNumber(state, now) + 1, dawnAt: now, lastSeen: now, frozen: state.frozen, slept: true };
   }
 }
 

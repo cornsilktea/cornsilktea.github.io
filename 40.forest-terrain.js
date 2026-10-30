@@ -186,3 +186,15 @@ FrTerrainMesher.WALL_COLORS = {
     W: [0.55, 0.57, 0.62], R: [0.42, 0.38, 0.28], O: [0.22, 0.28, 0.34], P: [0.62, 0.52, 0.36],
 };
 FrTerrainMesher.NEIGHBORS = [[1, 0, 0.78], [-1, 0, 0.78], [0, 1, 0.9], [0, -1, 0.66]];
+class FrBuildSite {
+    constructor(id, name, x, z) {
+        this.id = id;
+        this.name = name;
+        this.x = x;
+        this.z = z;
+    }
+}
+class FrBuildSites {
+    static find(id) { return FrBuildSites.STAGE_TWO.find((s) => s.id === id); }
+}
+FrBuildSites.STAGE_TWO = [new FrBuildSite("workbench", "작업대", 55, 64)];

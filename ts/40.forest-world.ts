@@ -16,6 +16,8 @@ class FrWorld {
   readonly snowDugDay: Map<number, number> = new Map();
   readonly trees: Map<number, FrTreeSpot> = new Map();
   private readonly felled: Set<number> = new Set();
+  private readonly builtKeys: Set<string> = new Set();
+  private readonly logKeys: Set<string> = new Set();
   private readonly listeners: FrWorldListener[] = [];
 
   constructor(readonly island: string, readonly terrain: FrTerrainData, private readonly backend: FrBackend) {
@@ -40,8 +42,9 @@ class FrWorld {
       this.terrain.edit(Number(key) % this.terrain.w, Math.floor(Number(key) / this.terrain.w), { h: cell[0], t: cell[1] });
     }));
     Object.keys(snow || {}).forEach((key) => this.snowDugDay.set(Number(key), (snow as Record<string, number>)[key]));
-    Object.keys(build || {}).forEach((key) => this.village.markBuilt(key.replace(/_\d+$/, "")));
+    Object.keys(build || {}).forEach((key) => { this.builtKeys.add(key); this.village.markBuilt(key.replace(/_\d+$/, "")); });
     this.publicStore.restore(publicAmounts || {}, logs.map(([, line]) => line));
+    logs.forEach(([key]) => this.logKeys.add(key));
   }
 
   isFelled(index: number): boolean { return this.felled.has(index); }
@@ -102,9 +105,9 @@ class FrWorld {
 
   async putPublic(id: string, amount: number, who: string): Promise<boolean> {
     if (!this.publicStore.canPut(id, amount)) return false;
-    await this.backend.transaction<number>(this.path("public/" + id), (current) => (current || 0) + amount);
-    this.publicStore.put(id, amount, who, Date.now());
-    await this.writeLog({ at: Date.now(), who, verb: "put", item: id, count: amount });
+    const result = await this.backend.transaction<number>(this.path("public/" + id), (current) => (current || 0) + amount);
+    this.publicStore.setAmount(id, result.value || 0);
+    await this.logLine({ at: Date.now(), who, verb: "put", item: id, count: amount });
     this.listeners.forEach((l) => l.onPublicChanged());
     return true;
   }
@@ -112,8 +115,8 @@ class FrWorld {
   async takePublic(id: string, amount: number, who: string): Promise<boolean> {
     const result = await this.backend.transaction<number>(this.path("public/" + id), (current) => ((current || 0) >= amount ? ((current || 0) - amount || null) : undefined));
     if (!result.committed) return false;
-    this.publicStore.takeBy(id, Math.min(amount, this.publicStore.count(id)), who, Date.now(), "take");
-    await this.writeLog({ at: Date.now(), who, verb: "take", item: id, count: amount });
+    this.publicStore.setAmount(id, result.value || 0);
+    await this.logLine({ at: Date.now(), who, verb: "take", item: id, count: amount });
     this.listeners.forEach((l) => l.onPublicChanged());
     return true;
   }
@@ -121,16 +124,19 @@ class FrWorld {
   async build(def: FrConstructionDef, who: string): Promise<boolean> {
     if (this.village.builtCount(def.id) >= def.count || this.village.level() < def.minVillageLevel) return false;
     const paid: Array<[string, number]> = [];
+    const left: Record<string, number> = {};
     for (const id of Object.keys(def.cost)) {
       const result = await this.backend.transaction<number>(this.path("public/" + id), (current) => ((current || 0) >= def.cost[id] ? ((current || 0) - def.cost[id] || null) : undefined));
       if (!result.committed) { await this.refund(paid); return false; }
       paid.push([id, def.cost[id]]);
+      left[id] = result.value || 0;
     }
     const number = this.village.builtCount(def.id) + 1;
+    this.builtKeys.add(def.id + "_" + number);
     const slot = await this.backend.transaction<FrBuildRecord>(this.path("build/" + def.id + "_" + number), (current) => (current === null ? { at: Date.now(), by: who } : undefined));
-    if (!slot.committed) { await this.refund(paid); return false; }
-    paid.forEach(([id, n]) => this.publicStore.takeBy(id, Math.min(n, this.publicStore.count(id)), who, Date.now(), "build"));
-    await Promise.all(paid.map(([id, n]) => this.writeLog({ at: Date.now(), who, verb: "build", item: id, count: n })));
+    if (!slot.committed) { this.builtKeys.delete(def.id + "_" + number); await this.refund(paid); return false; }
+    paid.forEach(([id]) => this.publicStore.setAmount(id, left[id]));
+    await Promise.all(paid.map(([id, n]) => this.logLine({ at: Date.now(), who, verb: "build", item: id, count: n })));
     this.village.markBuilt(def.id);
     this.listeners.forEach((l) => { l.onBuilt(def.id, this.village.builtCount(def.id)); l.onPublicChanged(); });
     return true;
@@ -140,7 +146,50 @@ class FrWorld {
     for (const [id, n] of paid) await this.backend.transaction<number>(this.path("public/" + id), (current) => (current || 0) + n);
   }
 
-  private async writeLog(line: FrPublicLogLine): Promise<void> {
-    await this.backend.set(this.path("publicLog/" + String(line.at).padStart(14, "0") + "_" + Math.floor(Math.random() * 1000)), line);
+  private async logLine(line: FrPublicLogLine): Promise<void> {
+    const key = String(line.at).padStart(14, "0") + "_" + Math.floor(Math.random() * 1000);
+    this.logKeys.add(key);
+    this.publicStore.addLine(line);
+    await this.backend.set(this.path("publicLog/" + key), line);
+  }
+
+  remoteFelled(index: number): void {
+    if (this.felled.has(index)) return;
+    this.felled.add(index);
+    const spot = this.trees.get(index);
+    if (spot) this.listeners.forEach((l) => l.onTreeFelled(spot));
+  }
+
+  remoteTerrain(index: number, edit: FrTerrainEdit): void {
+    const x = index % this.terrain.w, z = Math.floor(index / this.terrain.w);
+    const now = this.terrain.editOf(x, z);
+    if (now && now.h === edit.h && now.t === edit.t) return;
+    this.terrain.edit(x, z, edit);
+    this.listeners.forEach((l) => l.onTerrainEdited(x, z));
+  }
+
+  remoteSnow(index: number, day: number | null): void {
+    if (day === null) this.snowDugDay.delete(index); else this.snowDugDay.set(index, day);
+  }
+
+  remoteBuilt(key: string): void {
+    if (this.builtKeys.has(key)) return;
+    this.builtKeys.add(key);
+    const id = key.replace(/_\d+$/, "");
+    this.village.markBuilt(id);
+    this.listeners.forEach((l) => { l.onBuilt(id, this.village.builtCount(id)); l.onPublicChanged(); });
+  }
+
+  remotePublic(id: string, amount: number): void {
+    if (this.publicStore.count(id) === amount) return;
+    this.publicStore.setAmount(id, amount);
+    this.listeners.forEach((l) => l.onPublicChanged());
+  }
+
+  remoteLog(key: string, line: FrPublicLogLine): void {
+    if (this.logKeys.has(key)) return;
+    this.logKeys.add(key);
+    this.publicStore.addLine(line);
+    this.listeners.forEach((l) => l.onPublicChanged());
   }
 }

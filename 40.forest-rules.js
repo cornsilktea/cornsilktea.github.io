@@ -221,6 +221,18 @@ class FrPublicStore {
         this.log.length = 0;
         lines.slice().sort((x, y) => y.at - x.at).slice(0, FrBalance.PUBLIC_LOG_LINES).forEach((line) => this.log.push(line));
     }
+    setAmount(id, amount) {
+        if (amount > 0)
+            this.amounts.set(id, amount);
+        else
+            this.amounts.delete(id);
+    }
+    addLine(line) {
+        this.log.unshift(line);
+        this.log.sort((a, b) => b.at - a.at);
+        if (this.log.length > FrBalance.PUBLIC_LOG_LINES)
+            this.log.length = FrBalance.PUBLIC_LOG_LINES;
+    }
     amountsSnapshot() {
         const copy = {};
         this.amounts.forEach((n, id) => { copy[id] = n; });
