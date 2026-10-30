@@ -110,6 +110,15 @@ class FrGame {
   private currencyWindow: FrCurrencyWindow | null = null;
   private statsWindow: FrStatsWindow | null = null;
   private plantCell: FrPoint | null = null;
+  private dungeonWindow: FrDungeonWindow | null = null;
+  private fight: FrDungeonFight | null = null;
+  private monsterAssets: FrMonsterAssets | null = null;
+  private monsterLayer: FrMonsterLayer | null = null;
+  private dungeonData: Record<string, FrDungeonCaveData> = {};
+  private pendingDifficulty: FrDifficulty = "normal";
+  private attackUntil = 0;
+  private fightClock = 0;
+  private fightEnding = false;
   private buildWindow: FrBuildWindow | null = null;
   private playing = false;
   private currentTask: { target: FrTarget; task: FrTask; game: FrMiniGame } | null = null;
@@ -157,6 +166,7 @@ class FrGame {
   private async boot(): Promise<void> {
     this.terrainFile = (await (await fetch("assets/forest/island-terrain.json?v=1")).json()) as FrTerrainFile;
     this.mineData = (await (await fetch("assets/forest/mine-cave.json?v=1")).json()) as { floors: FrMineFloorData[] };
+    for (const kind of ["moss", "crystal", "lava"]) this.dungeonData[kind] = (await (await fetch("assets/forest/dungeon-cave-" + kind + ".json?v=1")).json()) as FrDungeonCaveData;
     this.assets = new CharacterAssets(this.libs);
     const tools = new FrToolClips(this.libs);
     await Promise.all([this.assets.load(), tools.load()]);
@@ -166,6 +176,7 @@ class FrGame {
     this.labels = new RkLabelFactory(this.libs);
     this.fade = new FrFade(FrDom.el("fade"));
     this.fishing = new FrFishingScreen(this.random);
+    this.monsterAssets = new FrMonsterAssets(this.libs);
     this.profile = new PlayerProfile();
     const editor = new ProfileEditor(this.libs, this.factory, this.assets, this.profile);
     editor.mount(FrDom.el("profileHost"));
@@ -343,6 +354,9 @@ class FrGame {
     this.statsWindow = this.windows.register(new FrStatsWindow(session, this.toast, this.backend, this.island, this.roster));
     this.buildWindow = this.windows.register(new FrBuildWindow(session, this.toast));
     this.pouchWindow = this.windows.register(new FrPouchWindow(session, this.toast));
+    this.dungeonWindow = this.windows.register(new FrDungeonWindow(session, this.toast));
+    this.dungeonWindow.onEnter = (difficulty) => void this.startDungeon(difficulty);
+    this.dungeonWindow.onItem = (id) => { if (this.currencyWindow) this.windows.openOnly(this.currencyWindow, () => (this.currencyWindow as FrCurrencyWindow).showItem(id)); };
   }
 
   private enterGame(): void {
@@ -433,6 +447,7 @@ class FrGame {
   private press(): void {
     if (!this.playing || !this.session) return;
     if (this.fishing.active) { this.fishing.pull(); return; }
+    if (this.fight && !(this.target && this.target.kind === "exit")) { this.attackInput(); return; }
     if (this.currentTask) {
       const game = this.currentTask.game;
       const before = game instanceof FrCenterStop ? Math.round(game.progress() * game.hitsNeeded) : 0;
@@ -452,6 +467,7 @@ class FrGame {
   private key(code: string): void {
     if (!this.playing) return;
     if (code === "Escape") { this.windows.closeAll(); this.cancelTask(); if (this.fishing.active) this.fishing.close(); return; }
+    if (code === "KeyJ") { this.attackInput(); return; }
     if (code === "KeyI") { this.toggleBag(); return; }
     if (code === "KeyK") { this.toggleWindow(this.bookWindow); return; }
     if (code === "KeyC") { this.toggleWindow(this.currencyWindow); return; }
@@ -477,6 +493,11 @@ class FrGame {
   private useHotbar(slot: number): void {
     if (!this.session) return;
     const item = this.session.bag.slots[slot];
+    if (this.fight && item && FrFoodRules.canEat(item.id) && !this.fightEnding) {
+      const gain = FrFoodRules.dungeonGain(Math.max(0, FrFoodRules.starOfIngredient(item.id)));
+      if (this.fight.heal(gain)) { this.session.bag.take(item.id, 1); this.session.changed(); this.toast.show("냠냠! 체력이 찼어요 (잠깐 멈춰요)", 1500); } else this.toast.show("체력이 가득해요", 1200);
+      return;
+    }
     const already = this.session.selected === slot;
     this.session.selected = slot;
     this.levelPick = null;
@@ -574,11 +595,83 @@ class FrGame {
   }
 
   private enterPortal(id: string): void {
-    if (id === "dungeon") { this.toast.show("던전은 아직 문이 닫혀 있어요. 곧 열려요!"); return; }
+    if (id === "dungeon") { if (this.dungeonWindow) this.windows.openOnly(this.dungeonWindow); return; }
     void this.enterArea(id as FrAreaId, 1, "start");
   }
 
+  private async startDungeon(difficulty: FrDifficulty): Promise<void> {
+    if (!this.session || this.travelling) return;
+    if (!this.session.ap.canSpend(FrBalance.DUNGEON_ENTRY_COST)) { this.toast.show("행동력이 모자라요. 음식을 먹거나 밤에 잠을 자요."); return; }
+    this.session.ap.spend(FrBalance.DUNGEON_ENTRY_COST);
+    this.session.stats.add(FrDungeonInfo.STAT_ENTER[difficulty]);
+    this.session.changed();
+    this.pendingDifficulty = difficulty;
+    try { await (this.monsterAssets as FrMonsterAssets).load(); } catch (error) { this.toast.show("몬스터를 불러오지 못했어요"); }
+    await this.enterArea("dungeon", 1, "start");
+  }
+
+  private setupFight(area: FrAreaWorld, scene: FrAreaScene): void {
+    const terrain = area.terrain;
+    this.fight = new FrDungeonFight(this.pendingDifficulty, this.random, area.spawnSpots, (x, z) => terrain.top(terrain.cellOf(x), terrain.cellOf(z)) === "C", this.session ? this.session.pity.dungeon || 0 : 0);
+    this.monsterLayer = new FrMonsterLayer(this.libs, scene.group, this.monsterAssets as FrMonsterAssets, this.clips);
+    this.fightEnding = false;
+    FrDom.el("btnAttack").hidden = false;
+    FrDom.el("btnAttack").onpointerdown = (event) => { event.preventDefault(); this.attackInput(); };
+    this.toast.show(FrDungeonInfo.NAMES[this.pendingDifficulty] + " 던전! " + FrBalance.DUNGEON_SECONDS + "초 동안 해골을 물리쳐요 (J·공격 버튼)", 3200);
+  }
+
+  private clearFight(): void {
+    this.fight = null;
+    if (this.monsterLayer) { this.monsterLayer.clear(); this.monsterLayer = null; }
+    FrDom.el("btnAttack").hidden = true;
+    if (this.hud) this.hud.showHealth(false);
+  }
+
+  private attackInput(): void {
+    if (!this.fight || !this.player || !this.session || this.travelling || this.fightEnding) return;
+    const events = this.fight.attack({ x: this.player.x, z: this.player.z, facing: this.player.facing }, FrDungeonInfo.gearOf(this.session));
+    if (this.fight.stun > 0) return;
+    this.attackUntil = this.fightClock + 0.35;
+    this.handleFight(events);
+  }
+
+  private handleFight(events: FrFightEvent[]): void {
+    if (!this.session || !this.fight) return;
+    events.forEach((e) => {
+      if (e.t === "hit") {
+        const broken = this.session!.wearTool("weapon");
+        this.view.burst.emit(e.monster.x, 3, e.monster.z, [0xffffff, 0xe8e0c8, 0xb8b0a0], 5, 6);
+        if (broken) this.toast.show(FrItemNames.label(broken) + "이(가) 다 닳았어요");
+      } else if (e.t === "kill") {
+        const lost = this.session!.gainAll(e.drops);
+        this.session!.pity.dungeon = this.fight!.legendMissCount;
+        this.session!.stats.add(FrDungeonInfo.STAT_KILL[this.fight!.difficulty]);
+        this.view.burst.emit(e.monster.x, 2.5, e.monster.z, [0xffd43a, 0xffffff, 0xcfd6e0], e.legend ? 18 : 9, 7);
+        const names = Object.keys(e.drops).filter((id) => id !== "bone").map((id) => FrItemNames.label(id) + (e.drops[id] > 1 ? "×" + e.drops[id] : ""));
+        if (names.length > 0 || e.legend) this.toast.show((e.legend ? "전설! " : "") + names.join(", ") + (lost > 0 ? " (가방 가득)" : ""), 1400);
+      } else if (e.t === "hurt") {
+        const hurt = FrDom.el("hurt");
+        hurt.style.opacity = "1";
+        window.setTimeout(() => { hurt.style.opacity = "0"; }, 160);
+      } else if (e.t === "end") {
+        void this.finishDungeon(e.reason);
+      }
+    });
+  }
+
+  private async finishDungeon(reason: "time" | "dead" | "left"): Promise<void> {
+    if (!this.fight || this.fightEnding) return;
+    this.fightEnding = true;
+    if (this.expedition) this.expedition.note = "잡은 몬스터 " + this.fight.kills + "마리";
+    if (reason === "time") this.toast.show("시간이 다 됐어요! 지금까지 얻은 것을 정리해요", 2400);
+    else if (reason === "dead") this.toast.show("쓰러졌어요… 그래도 얻은 것은 가지고 나가요", 2400);
+    await new Promise<void>((resolve) => window.setTimeout(resolve, 1100));
+    this.clearFight();
+    await this.leaveArea();
+  }
+
   private buildArea(id: FrAreaId, floor: number, arrive: "start" | "ladder"): FrAreaWorld {
+    if (id === "dungeon") return FrAreaFactory.dungeon(this.dungeonData[FrDungeonInfo.KIND[this.pendingDifficulty]]);
     if (id === "fruit") return FrAreaFactory.forest(Date.now() & 0xffffff);
     if (id === "beach") { if (!this.beachWorld) this.beachWorld = FrAreaFactory.beach(7); return this.beachWorld; }
     const data = (this.mineData as { floors: FrMineFloorData[] }).floors[floor - 1];
@@ -596,6 +689,7 @@ class FrGame {
     const area = this.buildArea(id, floor, arrive);
     let light: FrCaveLight | null = null;
     if (id === "mine") light = new FrCaveLight((this.mineData as { floors: FrMineFloorData[] }).floors[floor - 1].torches);
+    if (id === "dungeon") { const data = this.dungeonData[FrDungeonInfo.KIND[this.pendingDifficulty]]; light = new FrCaveLight(data.torches, data.kind === "moss" ? [0.8, 1.1, 0.85] : data.kind === "crystal" ? [0.8, 0.95, 1.2] : [1.15, 0.85, 0.8]); }
     const scene = new FrAreaScene(this.libs, area, this.view.groundMaterial(), light);
     scene.syncAvailability(this.clock.absoluteMinute());
     if (this.areaScene) this.view.hideArea();
@@ -611,6 +705,7 @@ class FrGame {
     this.session.floor = floor;
     if (FrAreaInfo.solo(id) && !this.expedition) { this.expedition = new FrExpedition(this.session, id); this.expedition.begin(); }
     this.view.rig.snap(new this.libs.THREE.Vector3(this.player.x, this.player.y, this.player.z));
+    if (id === "dungeon") this.setupFight(area, scene);
     await this.publishPresence(true);
     await this.fade.lift(450);
     this.travelling = false;
@@ -635,6 +730,7 @@ class FrGame {
     this.areaScene = null;
     this.areaFinder = null;
     this.areaOutcome = null;
+    this.clearFight();
     this.player.useWorld(this.world);
     const portal = this.world.terrain.anchors.portals[left];
     const plaza = this.world.terrain.anchors.plaza;
@@ -803,15 +899,22 @@ class FrGame {
     const session = this.session, clock = this.clock, player = this.player, world = this.world;
     if (!this.playing || !session || !clock || !player || !world || !this.hud || !this.avatar || !this.finder) return;
     const direction = this.input.direction();
-    const blocked = this.windows.anyOpen() || session.sleeping || this.currentTask !== null || this.fishing.active || this.travelling;
+    this.fightClock = time;
+    const blocked = this.windows.anyOpen() || session.sleeping || this.currentTask !== null || this.fishing.active || this.travelling || (this.fight !== null && this.fight.stun > 0);
     if (this.fishing.active) this.fishing.update(dt);
     if (this.currentTask && Math.hypot(direction.x, direction.z) > 0.4) this.cancelTask();
     const shoes = FrBalance.SHOES_SPEED[session.bag.bestTier("shoes")];
     player.step(blocked ? { x: 0, z: 0 } : direction, dt, shoes);
+    if (this.fight && this.monsterLayer && !this.fightEnding && !this.travelling) {
+      this.handleFight(this.fight.update(dt, { x: player.x, z: player.z, facing: player.facing }, FrDungeonInfo.gearOf(session)));
+      this.monsterLayer.update(this.fight.monsters, (this.areaWorld as FrAreaWorld).terrain, dt, time);
+      this.hud.showHealth(true, this.fight.health);
+    } else if (this.monsterLayer && this.fight) this.monsterLayer.update(this.fight.monsters, (this.areaWorld as FrAreaWorld).terrain, dt, time);
     this.avatar.group.position.set(player.x, player.y, player.z);
     this.avatar.group.rotation.y = player.facing;
     if (session.sleeping) this.avatar.play("sleep");
     else if (this.currentTask) this.avatar.play(this.currentTask.task.clip);
+    else if (this.fight && time < this.attackUntil) this.avatar.play("attack");
     else if (this.fishing.active) this.avatar.play("fish");
     else this.avatar.play(player.moving ? (player.swimming ? "walk" : "run") : "idle");
     this.view.rig.follow(new this.libs.THREE.Vector3(player.x, player.y, player.z), dt);
@@ -828,7 +931,7 @@ class FrGame {
       else this.view.setPreview(null, 0, true);
       this.view.setMarker(this.target && this.target.cell ? this.target.cell : null);
     }
-    this.input.setActionLabel(this.target ? this.target.label : "·");
+    this.input.setActionLabel(this.target ? this.target.label : this.fight ? "공격" : "·");
     if (this.currentTask) {
       this.currentTask.game.tick(dt);
       this.mini.update();
@@ -841,7 +944,7 @@ class FrGame {
     if (session.sleeping && time - this.lastSleepCheck > 1) { this.lastSleepCheck = time; void this.tryMorning(); }
     this.view.applyClock(minute);
     this.hud.showClock(minute, day);
-    this.hud.showArea(FrAreaInfo.label(session.area) + (session.area === "mine" ? " " + session.floor + "층" : ""));
+    this.hud.showArea(this.fight ? "던전 " + FrDungeonInfo.NAMES[this.fight.difficulty] + " · 남은 " + Math.ceil(this.fight.timeLeft) + "초" : FrAreaInfo.label(session.area) + (session.area === "mine" ? " " + session.floor + "층" : ""));
     this.hud.showSleepButton(FrSleepVote.canSleep(minute, session.area) && !this.currentTask, session.sleeping);
     this.hud.showSleepBand(FrClock.isNight(minute) ? FrSleepVote.banner(this.presences()) : "");
     if (day !== this.lastDay) this.onNewDay(day);

@@ -7,7 +7,7 @@ interface FrWalkWorld {
 }
 
 type FrAreaId = "island" | "fruit" | "beach" | "mine" | "dungeon";
-type FrFeatureKind = "fruitTree" | "jungleTree" | "flower" | "shoreSpot" | "torch" | "ladderDown" | "ladderUp" | "exit";
+type FrFeatureKind = "fruitTree" | "jungleTree" | "flower" | "shoreSpot" | "torch" | "ladderDown" | "ladderUp" | "exit" | "decor";
 
 class FrFeature {
   availableAt = 0;
@@ -28,6 +28,8 @@ class FrAreaWorld implements FrWalkWorld {
   readonly features = new Map<number, FrFeature>();
   readonly lava = new Set<number>();
   readonly list: FrFeature[] = [];
+  spawnSpots: Array<[number, number]> = [];
+  kind = "";
 
   constructor(readonly id: FrAreaId, readonly terrain: FrTerrainData, readonly spawn: FrPoint, readonly dark: boolean, readonly floor = 1) {}
 
@@ -119,6 +121,19 @@ class FrAreaFactory {
     return area;
   }
 
+  static dungeon(data: FrDungeonCaveData): FrAreaWorld {
+    const cell = (x: number, z: number) => (z < 0 || z >= data.rows.length || x < 0 || x >= data.w ? "#" : data.rows[z].charAt(x));
+    const file = FrAreaFactory.file(data.w, data.d, (x, z) => (cell(x, z) === "#" ? 3 : 0), (x, z) => { const c = cell(x, z); return c === "#" ? "T" : c === "^" ? "L" : "C"; });
+    const area = new FrAreaWorld("dungeon", new FrTerrainData(file), { x: data.start[0], z: data.start[1] }, true);
+    area.kind = data.kind;
+    area.spawnSpots = data.spawnSpots;
+    area.add(new FrFeature("exit", data.start[0], data.start[1], 0));
+    data.torches.forEach(([x, z]) => area.add(new FrFeature("torch", x, z, 0)));
+    data.decor.forEach(([x, z], i) => { if (!area.featureAt(x, z)) area.add(new FrFeature("decor", x, z, i)); });
+    for (let z = 0; z < data.d; z++) for (let x = 0; x < data.w; x++) if (cell(x, z) === "^") area.lava.add(z * data.w + x);
+    return area;
+  }
+
   static mine(floorData: FrMineFloorData, floors: number, seed: number): FrAreaWorld {
     const random = new FrRandom(seed + floorData.level * 977);
     const rows = floorData.rows;
@@ -143,16 +158,18 @@ class FrAreaFactory {
   }
 }
 
+interface FrDungeonCaveData { kind: string; w: number; d: number; start: [number, number]; spawnSpots: Array<[number, number]>; torches: Array<[number, number]>; decor: Array<[number, number]>; rows: string[] }
+
 interface FrMineFloorData { level: number; w: number; d: number; start: [number, number]; ladderDown: [number, number] | null; oreSpots: Array<Array<[number, number]>>; torches: Array<[number, number]>; rows: string[] }
 
 class FrCaveLight {
-  constructor(private readonly torches: ReadonlyArray<[number, number]>) {}
+  constructor(private readonly torches: ReadonlyArray<[number, number]>, private readonly tint: [number, number, number] = [1, 1, 1]) {}
 
   at(x: number, z: number): [number, number, number] {
     let glow = 0;
     this.torches.forEach(([tx, tz]) => { const d2 = (x - tx) * (x - tx) + (z - tz) * (z - tz); glow += 1.1 / (1 + d2 * 0.05); });
     const g = Math.min(0.55, glow);
-    return [0.86 + g * 0.55, 0.84 + g * 0.3, 0.82 - g * 0.12];
+    return [(0.86 + g * 0.55) * this.tint[0], (0.84 + g * 0.3) * this.tint[1], (0.82 - g * 0.12) * this.tint[2]];
   }
 }
 
@@ -242,6 +259,8 @@ class FrExpedition {
     });
     return worn;
   }
+
+  note = "";
 
   seconds(): number { return Math.round((Date.now() - this.enteredAt) / 1000); }
 

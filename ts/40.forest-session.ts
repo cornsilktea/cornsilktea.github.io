@@ -99,7 +99,11 @@ class FrSession {
     const slot = this.bag.slots[this.selected];
     return slot && slot.id.indexOf("block_") === 0 ? slot.id : null;
   }
-  changed(): void { this.listeners.forEach((l) => l()); }
+  changed(): void {
+    const ring = FrRingKit.level(this);
+    if (ring !== this.ap.ringLevel) { this.ap.ringLevel = ring; this.ap.current = Math.min(this.ap.current, this.ap.max()); }
+    this.listeners.forEach((l) => l());
+  }
 
   craftSource(): FrPersonalCraftSource { return new FrPersonalCraftSource(this.personal, this.bag, this.world.publicStore); }
 

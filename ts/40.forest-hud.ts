@@ -90,8 +90,27 @@ class FrBagWindow extends FrWindow {
   private selected = -1;
   constructor(session: FrSession, toast: FrToast) { super("가방", session, toast); }
 
+  private equipmentRow(): HTMLDivElement {
+    const row = FrDom.make("div", "fr-row");
+    row.style.justifyContent = "center";
+    [["helmet", "머리"], ["top", "몸"], ["bottom", "다리"], ["shoes", "발"], ["weapon", "무기"]].forEach(([kind, label]) => {
+      const tier = this.session.bag.bestTier(kind);
+      const cell = tier > 0 ? FrItemCell.render(FrItems.gearId(kind, tier as FrTier), 1, 0) : FrDom.make("div", "fr-cell empty");
+      cell.title = label + (tier > 0 ? "" : " (없음)");
+      cell.appendChild(FrDom.make("div", "fr-cell-key", label));
+      row.appendChild(cell);
+    });
+    const ringLevel = FrRingKit.level(this.session);
+    const ring = FrRingKit.best(this.session) ? FrItemCell.render("ring", 1, 0) : FrDom.make("div", "fr-cell empty");
+    ring.appendChild(FrDom.make("div", "fr-cell-key", "반지"));
+    if (ringLevel > 0) ring.appendChild(FrDom.make("div", "fr-cell-count", "+" + ringLevel));
+    row.appendChild(ring);
+    return row;
+  }
+
   render(): void {
     FrDom.clear(this.body);
+    this.body.appendChild(this.equipmentRow());
     const grid = FrDom.make("div", "fr-grid");
     for (let i = 0; i < FrBalance.BAG_SLOTS; i++) {
       const slot = this.session.bag.slots[i];
@@ -192,10 +211,39 @@ class FrChestWindow extends FrWindow {
 }
 
 class FrCraftWindow extends FrWindow {
+  private readonly random = new FrRandom(Date.now() >>> 0);
   constructor(session: FrSession, toast: FrToast, private readonly station: "workbench" | "forge" = "workbench") { super(station === "forge" ? "대장간" : "작업대", session, toast); }
+
+  private ringSection(): HTMLDivElement {
+    const box = FrDom.make("div", "fr-recipe");
+    box.style.marginBottom = "10px";
+    const level = FrRingKit.level(this.session);
+    const has = FrRingKit.best(this.session) !== null;
+    const head = FrDom.make("div", "fr-head");
+    head.append(FrIcons.image("ring", 40), FrDom.make("b", "", has ? "반지 +" + level + " · 행동력 최대 " + this.session.ap.max() : "반지가 없어요 (하드·헬 던전에서 나와요)"));
+    box.appendChild(head);
+    const cost = FrRingKit.enhanceCost(this.session);
+    if (has && cost) {
+      box.appendChild(FrDom.make("div", "fr-note", "+" + (level + 1) + " 도전 · 성공률 " + Math.round(cost.rate * 100) + "% · 실패해도 단계는 안 내려가요. 단계마다 행동력 최대 +10"));
+      const needs = FrDom.make("div", "fr-row");
+      needs.append(this.needLine("enhance_stone", this.session.bag.count("enhance_stone"), cost.enhance), this.needLine("magic_stone", this.session.bag.count("magic_stone"), cost.magic));
+      box.appendChild(needs);
+      box.appendChild(this.button("강화", () => this.enhance(), this.session.bag.count("enhance_stone") >= cost.enhance && this.session.bag.count("magic_stone") >= cost.magic));
+    } else if (has) box.appendChild(FrDom.make("div", "fr-note", "더는 강화할 수 없어요 (+10)"));
+    const spare = FrRingKit.spare(this.session).length;
+    if (spare > 0) box.appendChild(this.button("남는 반지 녹이기 (강화석 +" + FrBalance.RING_MELT_ENHANCE + ") · " + spare + "개", () => { if (FrRingKit.melt(this.session)) this.toast.show("강화석 " + FrBalance.RING_MELT_ENHANCE + "개를 얻었어요"); }));
+    return box;
+  }
+
+  private enhance(): void {
+    const result = FrRingKit.enhance(this.session, this.random);
+    if (result.done && result.success) this.toast.show("강화 성공! 반지 +" + result.level + " (행동력 최대 " + this.session.ap.max() + ")");
+    this.render();
+  }
 
   render(): void {
     FrDom.clear(this.body);
+    if (this.station === "forge") this.body.appendChild(this.ringSection());
     const source = this.session.craftSource();
     this.body.appendChild(FrDom.make("div", "fr-note", "재료는 가방 → 공용 창고 순으로 써요."));
     const list = FrDom.make("div", "fr-list");
@@ -311,7 +359,7 @@ class FrPouchWindow extends FrWindow {
     FrDom.clear(this.body);
     const e = this.expedition;
     if (!e) return;
-    this.body.appendChild(FrDom.make("div", "fr-note", FrAreaInfo.label(e.area) + " · " + e.seconds() + "초 동안 · 행동력 " + e.spentActionPoints() + " 사용"));
+    this.body.appendChild(FrDom.make("div", "fr-note", FrAreaInfo.label(e.area) + " · " + e.seconds() + "초 동안 · 행동력 " + e.spentActionPoints() + " 사용" + (e.note ? " · " + e.note : "")));
     const gains = e.gains();
     const ids = Object.keys(gains);
     const grid = FrDom.make("div", "fr-pouch-grid");
@@ -386,6 +434,8 @@ class FrCurrencyWindow extends FrWindow {
   private static readonly ORDER: FrCategory[] = ["wood", "beach", "fish", "mineral", "crop", "dungeon", "crafted", "block"];
   private static readonly CATEGORY_NAMES: Readonly<Record<string, string>> = { wood: "목재·과일·꽃", beach: "해변", fish: "물고기", mineral: "광물·얼음", crop: "작물·씨앗", dungeon: "던전", crafted: "가공품", block: "블록" };
   constructor(session: FrSession, toast: FrToast) { super("재화 현황 (C)", session, toast); }
+
+  showItem(id: string): void { this.selected = id; this.open(); }
 
   render(): void {
     FrDom.clear(this.body);
@@ -599,6 +649,40 @@ class FrMiniGameView {
   }
 }
 
+class FrDungeonWindow extends FrWindow {
+  onEnter: (difficulty: FrDifficulty) => void = () => undefined;
+  onItem: (id: string) => void = () => undefined;
+  constructor(session: FrSession, toast: FrToast) { super("던전 (서쪽 포탈)", session, toast); }
+
+  render(): void {
+    FrDom.clear(this.body);
+    this.body.appendChild(FrDom.make("div", "fr-note", "행동력 " + FrBalance.DUNGEON_ENTRY_COST + "을 쓰고 " + FrBalance.DUNGEON_SECONDS + "초 동안 사냥해요. 공격은 J 또는 오른쪽 버튼. 몬스터가 팔을 치켜들면 물러나서 피해요. 쓰러지면 그때까지 얻은 것을 가지고 나와요."));
+    const cards = FrDom.make("div", "fr-dcards");
+    (["normal", "hard", "hell"] as FrDifficulty[]).forEach((difficulty) => {
+      const card = FrDom.make("div", "fr-dcard fr-d-" + difficulty);
+      card.appendChild(FrDom.make("h3", "", FrDungeonInfo.NAMES[difficulty] + " — " + FrDungeonInfo.CAVE_NAMES[difficulty]));
+      card.appendChild(FrDom.make("div", "", FrDungeonInfo.SUMMARY[difficulty]));
+      card.appendChild(FrDom.make("div", "fr-note", "권장 장비: " + FrDungeonInfo.RECOMMENDED[difficulty]));
+      card.appendChild(FrDom.make("div", "fr-note", "몬스터: " + FrDungeonInfo.monsterNames(difficulty).join(", ")));
+      const drops = FrDom.make("div", "fr-pouch-grid");
+      FrDungeonInfo.dropIds(difficulty).forEach((id) => {
+        const cell = FrDom.make("div", "fr-pouch-item");
+        cell.style.borderColor = FrItemNames.GRADE_COLORS[FrItemNames.grade(id)];
+        cell.title = FrItemNames.label(id);
+        cell.appendChild(FrIcons.image(id, 30));
+        cell.addEventListener("click", () => this.onItem(id));
+        drops.appendChild(cell);
+      });
+      card.appendChild(drops);
+      const enough = this.session.ap.current >= FrBalance.DUNGEON_ENTRY_COST;
+      card.appendChild(this.button("입장 (행동력 " + FrBalance.DUNGEON_ENTRY_COST + " · " + FrBalance.DUNGEON_SECONDS + "초)", () => { this.close(); this.onEnter(difficulty); }, enough));
+      cards.appendChild(card);
+    });
+    this.body.appendChild(cards);
+    this.body.appendChild(FrDom.make("div", "fr-note", "지금 행동력 " + Math.round(this.session.ap.current) + " / " + this.session.ap.max() + " · 장비 공격력 " + FrDungeonRules.weaponDamage(this.session.bag.bestTier("weapon")) + " · 받는 피해 -" + Math.round(FrDungeonRules.armorReduction(FrDungeonInfo.armorOf(this.session)) * 100) + "%"));
+  }
+}
+
 class FrStatusHud {
   private readonly clock = FrDom.el("hudClock");
   private readonly apText = FrDom.el("hudApText");
@@ -614,7 +698,17 @@ class FrStatusHud {
     this.apFill.style.width = (ap.current / ap.max()) * 100 + "%";
   }
 
+  private readonly hp = FrDom.el("hudHp");
+  private readonly hpFill = FrDom.el("hudHpFill");
+  private readonly hpText = FrDom.el("hudHpText");
+
   showArea(text: string): void { this.area.textContent = text; }
+  showHealth(visible: boolean, health = 0): void {
+    this.hp.hidden = !visible;
+    if (!visible) return;
+    this.hpFill.style.width = health + "%";
+    this.hpText.textContent = "❤ " + Math.round(health) + " / " + FrBalance.PLAYER_HEALTH;
+  }
   showSleepBand(text: string): void { this.sleepBand.textContent = text; this.sleepBand.hidden = text === ""; }
   showSleepButton(visible: boolean, sleeping: boolean): void { this.sleepButton.hidden = !visible; this.sleepButton.textContent = sleeping ? "일어나기 (Z)" : "잠자기 (Z)"; }
 }

@@ -46,7 +46,7 @@ const makeWorld = () => new FrWorld("t", new FrTerrainData(terrainFile), new FrL
 
 {
   check("요리 단계: 모닥불 ★1~2·화덕 ★3~4·섬 부엌 ★5", FrCatalog.RECIPES.every((r) => (r.star <= 2) === (r.station === "campfire") && ((r.star === 3 || r.star === 4) === (r.station === "oven")) && ((r.star === 5) === (r.station === "kitchen"))));
-  check("기록판 분류 10개·모든 칸이 분류 안에 있음", FrStatCatalog.TABS.length === 10 && FrStatCatalog.DEFS.every((d) => FrStatCatalog.TABS.indexOf(d.tab) >= 0) && new Set(FrStatCatalog.DEFS.map((d) => d.key)).size === FrStatCatalog.DEFS.length);
+  check("기록판 분류 11개·모든 칸이 분류 안에 있음", FrStatCatalog.TABS.length === 11 && FrStatCatalog.DEFS.every((d) => FrStatCatalog.TABS.indexOf(d.tab) >= 0) && new Set(FrStatCatalog.DEFS.map((d) => d.key)).size === FrStatCatalog.DEFS.length);
   check("기록 세기: 전체·오늘·종류 수·최댓값", (() => {
     const s = new FrStats(); s.load(null, "20261030");
     s.add("shake"); s.add("shake", 2); s.see("fish", "tuna", "fishKinds"); s.see("fish", "tuna", "fishKinds"); s.see("fish", "sardine", "fishKinds"); s.atLeast("deepFloor", 2); s.atLeast("deepFloor", 1);

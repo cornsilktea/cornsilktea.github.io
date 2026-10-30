@@ -28,6 +28,8 @@ class FrAreaWorld {
         this.features = new Map();
         this.lava = new Set();
         this.list = [];
+        this.spawnSpots = [];
+        this.kind = "";
     }
     add(feature) {
         this.list.push(feature);
@@ -111,6 +113,22 @@ class FrAreaFactory {
         }
         return area;
     }
+    static dungeon(data) {
+        const cell = (x, z) => (z < 0 || z >= data.rows.length || x < 0 || x >= data.w ? "#" : data.rows[z].charAt(x));
+        const file = FrAreaFactory.file(data.w, data.d, (x, z) => (cell(x, z) === "#" ? 3 : 0), (x, z) => { const c = cell(x, z); return c === "#" ? "T" : c === "^" ? "L" : "C"; });
+        const area = new FrAreaWorld("dungeon", new FrTerrainData(file), { x: data.start[0], z: data.start[1] }, true);
+        area.kind = data.kind;
+        area.spawnSpots = data.spawnSpots;
+        area.add(new FrFeature("exit", data.start[0], data.start[1], 0));
+        data.torches.forEach(([x, z]) => area.add(new FrFeature("torch", x, z, 0)));
+        data.decor.forEach(([x, z], i) => { if (!area.featureAt(x, z))
+            area.add(new FrFeature("decor", x, z, i)); });
+        for (let z = 0; z < data.d; z++)
+            for (let x = 0; x < data.w; x++)
+                if (cell(x, z) === "^")
+                    area.lava.add(z * data.w + x);
+        return area;
+    }
     static mine(floorData, floors, seed) {
         const random = new FrRandom(seed + floorData.level * 977);
         const rows = floorData.rows;
@@ -145,14 +163,15 @@ FrAreaFactory.BEACH_W = 64;
 FrAreaFactory.BEACH_D = 46;
 FrAreaFactory.SHORE_ITEMS = ["shell", "salt", "seaweed", "sand"];
 class FrCaveLight {
-    constructor(torches) {
+    constructor(torches, tint = [1, 1, 1]) {
         this.torches = torches;
+        this.tint = tint;
     }
     at(x, z) {
         let glow = 0;
         this.torches.forEach(([tx, tz]) => { const d2 = (x - tx) * (x - tx) + (z - tz) * (z - tz); glow += 1.1 / (1 + d2 * 0.05); });
         const g = Math.min(0.55, glow);
-        return [0.86 + g * 0.55, 0.84 + g * 0.3, 0.82 - g * 0.12];
+        return [(0.86 + g * 0.55) * this.tint[0], (0.84 + g * 0.3) * this.tint[1], (0.82 - g * 0.12) * this.tint[2]];
     }
 }
 class FrGatherRules {
@@ -202,6 +221,7 @@ class FrExpedition {
         this.area = area;
         this.before = null;
         this.enteredAt = 0;
+        this.note = "";
     }
     begin() {
         this.before = this.session.toSave();

@@ -65,6 +65,7 @@ class FrAreaScene {
             ladderDown: () => this.ladder(holder, 0x8a5a2b, -1),
             ladderUp: () => this.ladder(holder, 0x8a5a2b, 1),
             exit: () => this.exit(holder),
+            decor: () => this.decor(holder, feature),
         };
         builders[feature.kind]();
         this.featureLayer.add(holder);
@@ -134,6 +135,35 @@ class FrAreaScene {
         if (direction < 0)
             arrow.rotation.x = Math.PI;
         holder.add(arrow);
+    }
+    decor(holder, feature) {
+        const T = this.libs.THREE;
+        const kind = this.area.kind;
+        if (kind === "moss") {
+            const stem = new T.Mesh(new T.CylinderGeometry(0.12, 0.16, 0.8, 6).translate(0, 0.4, 0), this.mat(0xe6dcc0));
+            const cap = new T.Mesh(new T.SphereGeometry(0.55, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2).translate(0, 0.8, 0), new T.MeshBasicMaterial({ color: feature.variant % 2 ? 0x8fffb0 : 0xa8ff7a }));
+            const halo = new T.Sprite(new T.SpriteMaterial({ map: FrFxTextures.radial(this.libs, "rgba(140,255,160,0.55)", "rgba(140,255,160,0)", 64), blending: T.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.6 }));
+            halo.scale.set(3.4, 3.4, 1);
+            halo.position.y = 0.8;
+            holder.add(stem, cap, halo);
+        }
+        else if (kind === "crystal") {
+            for (let i = 0; i < 3; i++) {
+                const crystal = new T.Mesh(new T.OctahedronGeometry(0.45 + (i % 2) * 0.2, 0).scale(0.7, 1.7, 0.7).translate(0, 0.9, 0), new T.MeshBasicMaterial({ color: [0x6fb8ff, 0x9fd8ff, 0x5a8aff][i] }));
+                crystal.position.set((i - 1) * 0.5, 0, (i % 2) * 0.3);
+                crystal.rotation.z = (i - 1) * 0.25;
+                holder.add(crystal);
+            }
+            const halo = new T.Sprite(new T.SpriteMaterial({ map: FrFxTextures.radial(this.libs, "rgba(120,180,255,0.55)", "rgba(120,180,255,0)", 64), blending: T.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.55 }));
+            halo.scale.set(3.6, 3.6, 1);
+            halo.position.y = 1;
+            holder.add(halo);
+        }
+        else {
+            const spike = new T.Mesh(new T.ConeGeometry(0.5, 1.8, 5).translate(0, 0.9, 0), this.mat(0x2a1a1a));
+            const ember = new T.Mesh(new T.SphereGeometry(0.16, 6, 5).translate(0, 1.7, 0), new T.MeshBasicMaterial({ color: 0xff7a20 }));
+            holder.add(spike, ember);
+        }
     }
     exit(holder) {
         const T = this.libs.THREE;

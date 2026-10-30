@@ -1,4 +1,4 @@
-type FrAvatarClip = "idle" | "run" | "walk" | "chop" | "pickaxe" | "dig" | "work" | "sleep" | "fish";
+type FrAvatarClip = "idle" | "run" | "walk" | "chop" | "pickaxe" | "dig" | "work" | "sleep" | "fish" | "attack";
 
 class FrToolClips {
   static readonly FILE = "assets/kaykit/animations/rig_medium_tools.glb";
@@ -12,7 +12,7 @@ class FrToolClips {
 
 class FrAvatar {
   private static readonly CLIP_NAMES: Readonly<Record<FrAvatarClip, string>> = {
-    idle: "Idle_A", run: "Running_A", walk: "Walking_A", chop: "Chopping", pickaxe: "Pickaxing", dig: "Digging", work: "Working_A", sleep: "Death_A_Pose", fish: "Fishing_Idle",
+    idle: "Idle_A", run: "Running_A", walk: "Walking_A", chop: "Chopping", pickaxe: "Pickaxing", dig: "Digging", work: "Working_A", sleep: "Death_A_Pose", fish: "Fishing_Idle", attack: "Melee_1H_Attack_Chop",
   };
   static readonly SCALE_UP = 2;
   readonly group: Three<"Group">;

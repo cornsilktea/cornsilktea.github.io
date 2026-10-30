@@ -41,7 +41,7 @@ class FrAvatar {
     update(dt) { this.mixer.update(dt); }
 }
 FrAvatar.CLIP_NAMES = {
-    idle: "Idle_A", run: "Running_A", walk: "Walking_A", chop: "Chopping", pickaxe: "Pickaxing", dig: "Digging", work: "Working_A", sleep: "Death_A_Pose", fish: "Fishing_Idle",
+    idle: "Idle_A", run: "Running_A", walk: "Walking_A", chop: "Chopping", pickaxe: "Pickaxing", dig: "Digging", work: "Working_A", sleep: "Death_A_Pose", fish: "Fishing_Idle", attack: "Melee_1H_Attack_Chop",
 };
 FrAvatar.SCALE_UP = 2;
 class FrSky {

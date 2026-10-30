@@ -89,7 +89,14 @@ class FrSession {
         const slot = this.bag.slots[this.selected];
         return slot && slot.id.indexOf("block_") === 0 ? slot.id : null;
     }
-    changed() { this.listeners.forEach((l) => l()); }
+    changed() {
+        const ring = FrRingKit.level(this);
+        if (ring !== this.ap.ringLevel) {
+            this.ap.ringLevel = ring;
+            this.ap.current = Math.min(this.ap.current, this.ap.max());
+        }
+        this.listeners.forEach((l) => l());
+    }
     craftSource() { return new FrPersonalCraftSource(this.personal, this.bag, this.world.publicStore); }
     gain(id, amount) {
         const left = this.bag.add(id, amount);

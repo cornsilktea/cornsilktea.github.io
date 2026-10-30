@@ -115,6 +115,17 @@
   .fr-stats td.zero { color: #6c7b8c; }
   .fr-pouch-grid { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
   .fr-pouch-item { display: flex; align-items: center; gap: 4px; border: 2px solid #B8BEC9; border-radius: 8px; padding: 4px 8px; background: rgba(255,255,255,.06); font-size: 16px; }
+  #hudHp { position: fixed; top: 100px; left: 12px; z-index: 5; width: 190px; font-size: 14px; }
+  #hudHpBar { height: 10px; margin-top: 4px; background: rgba(255,255,255,.2); border-radius: 5px; overflow: hidden; }
+  #hudHpFill { height: 100%; background: linear-gradient(90deg, #E5483F, #FF8A5A); width: 100%; }
+  #btnAttack { position: absolute; right: 150px; bottom: 36px; width: 84px; height: 84px; border-radius: 50%; border: 3px solid rgba(255,255,255,.6); background: rgba(190,60,50,.9); color: #fff; font: inherit; font-size: 18px; font-weight: 800; pointer-events: auto; touch-action: none; }
+  #hurt { position: fixed; inset: 0; z-index: 39; pointer-events: none; opacity: 0; background: radial-gradient(ellipse at center, rgba(229,72,63,0) 40%, rgba(229,72,63,.65) 100%); transition: opacity .35s; }
+  .fr-dcards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 10px; }
+  .fr-dcard { background: rgba(255,255,255,.06); border-radius: 10px; padding: 10px 12px; border-top: 4px solid #9BE08A; }
+  .fr-dcard.fr-d-hard { border-top-color: #7BA8FF; }
+  .fr-dcard.fr-d-hell { border-top-color: #FF7A4A; }
+  .fr-dcard h3 { font-size: 16px; margin-bottom: 4px; }
+  @media (max-width: 720px) { .fr-dcards { grid-template-columns: 1fr; } }
   #fade { position: fixed; inset: 0; z-index: 40; background: #02040a; opacity: 0; pointer-events: none; }
   .fr-ring-holder { position: relative; width: 150px; height: 150px; margin: 0 auto; }
   .fr-ring { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); border-radius: 50%; }
@@ -137,15 +148,18 @@
 <div id="loading">불러오는 중…</div>
 <div id="toast" hidden></div>
 <div id="fade"></div>
+<div id="hurt"></div>
 <div id="hud" hidden>
   <div id="hudClockBox" class="hud-box"><div id="hudClock">06:00 · 1일째</div></div>
   <div id="hudButtons"><button type="button" class="hud-box" id="btnBag">가방 (I)</button><button type="button" class="hud-box" id="btnCurrency">재화 (C)</button><button type="button" class="hud-box" id="btnBook">레시피 (K)</button><button type="button" class="hud-box" id="btnStats">기록판 (L)</button><button type="button" class="hud-box" id="btnSleep" hidden>잠자기 (Z)</button><button type="button" class="hud-box" id="btnAdmin" hidden>운영 (F2)</button></div>
   <div id="hudAp" class="hud-box"><div id="hudApText">⚡ 100 / 100</div><div id="hudApBar"><div id="hudApFill"></div></div></div>
+  <div id="hudHp" class="hud-box" hidden><div id="hudHpText">❤ 100 / 100</div><div id="hudHpBar"><div id="hudHpFill"></div></div></div>
   <div id="hudAreaBox" class="hud-box"><div id="hudArea">마을</div><div id="hudSleep" hidden></div></div>
   <div id="hotbar"></div>
 </div>
 <div id="controls" hidden>
   <div id="joyBase"><div id="joyKnob"></div></div>
+  <button type="button" id="btnAttack" hidden>공격</button>
   <button type="button" id="btnAction">·</button>
 </div>
 <div id="startScreen" data-account-home class="st-screen" hidden>
@@ -188,33 +202,35 @@
 </div>
 <script charset="utf-8" src="character-kit.js?v=20261011"></script>
 <script charset="utf-8" src="fold-card.js"></script>
-<script charset="utf-8" src="40.forest-data.js?v=6"></script>
-<script charset="utf-8" src="40.forest-rules.js?v=6"></script>
-<script charset="utf-8" src="40.forest-clock.js?v=6"></script>
-<script charset="utf-8" src="40.forest-minigame.js?v=6"></script>
-<script charset="utf-8" src="40.forest-terrain.js?v=6"></script>
+<script charset="utf-8" src="40.forest-data.js?v=7"></script>
+<script charset="utf-8" src="40.forest-rules.js?v=7"></script>
+<script charset="utf-8" src="40.forest-clock.js?v=7"></script>
+<script charset="utf-8" src="40.forest-minigame.js?v=7"></script>
+<script charset="utf-8" src="40.forest-terrain.js?v=7"></script>
 <script charset="utf-8" src="room-kit.js?v=11"></script>
-<script charset="utf-8" src="40.forest-stream.js?v=6"></script>
-<script charset="utf-8" src="40.forest-net.js?v=6"></script>
-<script charset="utf-8" src="40.forest-blocks.js?v=6"></script>
-<script charset="utf-8" src="40.forest-farm.js?v=6"></script>
-<script charset="utf-8" src="40.forest-world.js?v=6"></script>
-<script charset="utf-8" src="40.forest-save.js?v=6"></script>
-<script charset="utf-8" src="40.forest-session.js?v=6"></script>
-<script charset="utf-8" src="40.forest-sync.js?v=6"></script>
-<script charset="utf-8" src="40.forest-input.js?v=6"></script>
-<script charset="utf-8" src="40.forest-blocklayer.js?v=6"></script>
-<script charset="utf-8" src="40.forest-views.js?v=6"></script>
-<script charset="utf-8" src="40.forest-icons.js?v=6"></script>
-<script charset="utf-8" src="40.forest-fx.js?v=6"></script>
-<script charset="utf-8" src="40.forest-hud.js?v=6"></script>
-<script charset="utf-8" src="40.forest-admin.js?v=6"></script>
-<script charset="utf-8" src="40.forest-play.js?v=6"></script>
-<script charset="utf-8" src="40.forest-areas.js?v=6"></script>
-<script charset="utf-8" src="40.forest-areaview.js?v=6"></script>
-<script charset="utf-8" src="40.forest-areaplay.js?v=6"></script>
-<script charset="utf-8" src="40.forest-fishing.js?v=6"></script>
-<script charset="utf-8" src="40.dongma-forest.js?v=6"></script>
+<script charset="utf-8" src="40.forest-stream.js?v=7"></script>
+<script charset="utf-8" src="40.forest-net.js?v=7"></script>
+<script charset="utf-8" src="40.forest-blocks.js?v=7"></script>
+<script charset="utf-8" src="40.forest-farm.js?v=7"></script>
+<script charset="utf-8" src="40.forest-world.js?v=7"></script>
+<script charset="utf-8" src="40.forest-save.js?v=7"></script>
+<script charset="utf-8" src="40.forest-session.js?v=7"></script>
+<script charset="utf-8" src="40.forest-sync.js?v=7"></script>
+<script charset="utf-8" src="40.forest-input.js?v=7"></script>
+<script charset="utf-8" src="40.forest-blocklayer.js?v=7"></script>
+<script charset="utf-8" src="40.forest-views.js?v=7"></script>
+<script charset="utf-8" src="40.forest-icons.js?v=7"></script>
+<script charset="utf-8" src="40.forest-fx.js?v=7"></script>
+<script charset="utf-8" src="40.forest-hud.js?v=7"></script>
+<script charset="utf-8" src="40.forest-admin.js?v=7"></script>
+<script charset="utf-8" src="40.forest-play.js?v=7"></script>
+<script charset="utf-8" src="40.forest-areas.js?v=7"></script>
+<script charset="utf-8" src="40.forest-areaview.js?v=7"></script>
+<script charset="utf-8" src="40.forest-areaplay.js?v=7"></script>
+<script charset="utf-8" src="40.forest-fishing.js?v=7"></script>
+<script charset="utf-8" src="40.forest-dungeon.js?v=7"></script>
+<script charset="utf-8" src="40.forest-monsters.js?v=7"></script>
+<script charset="utf-8" src="40.dongma-forest.js?v=7"></script>
 <script type="module">
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";

@@ -62,13 +62,16 @@ FrFarmRules.WATER_REACH = 2;
 FrFarmRules.FIRST_SEEDS = { potato_seed: 3, carrot_seed: 3 };
 class FrStatCatalog {
 }
-FrStatCatalog.TABS = ["채집", "낚시", "광산", "지형", "농사", "요리", "제작", "건설", "공용 창고", "얻은 재화"];
+FrStatCatalog.TABS = ["채집", "낚시", "광산", "던전", "지형", "농사", "요리", "제작", "건설", "공용 창고", "얻은 재화"];
 FrStatCatalog.DEFS = [
     { key: "shake", label: "과일 흔들기", tab: "채집" }, { key: "chop", label: "나무 베기", tab: "채집" }, { key: "clear", label: "정글 개간", tab: "채집" },
     { key: "beach", label: "해변 채집", tab: "채집" }, { key: "flower", label: "꽃 따기", tab: "채집" },
     { key: "fish", label: "낚은 물고기", tab: "낚시" }, { key: "fishLegend", label: "전설 물고기", tab: "낚시" }, { key: "fishKinds", label: "물고기 종류", tab: "낚시" },
     { key: "mineBlocks", label: "캔 블록", tab: "광산" }, { key: "mineVeins", label: "캔 광맥", tab: "광산" }, { key: "ironGot", label: "철", tab: "광산" },
     { key: "diamondGot", label: "다이아몬드", tab: "광산" }, { key: "deepFloor", label: "가장 깊은 층", tab: "광산" },
+    { key: "dungeonNormal", label: "노말 입장", tab: "던전" }, { key: "dungeonHard", label: "하드 입장", tab: "던전" }, { key: "dungeonHell", label: "헬 입장", tab: "던전" },
+    { key: "killNormal", label: "노말 몬스터", tab: "던전" }, { key: "killHard", label: "하드 몬스터", tab: "던전" }, { key: "killHell", label: "헬 몬스터", tab: "던전" },
+    { key: "ringLevel", label: "반지 강화 단계", tab: "제작" },
     { key: "dug", label: "판 칸", tab: "지형" }, { key: "iceGot", label: "캔 얼음", tab: "지형" },
     { key: "planted", label: "심은 작물", tab: "농사" }, { key: "harvested", label: "수확", tab: "농사" }, { key: "canal", label: "수로 판 칸", tab: "농사" },
     { key: "cooked", label: "만든 요리", tab: "요리" }, { key: "recipeKinds", label: "레시피 종류", tab: "요리" },
