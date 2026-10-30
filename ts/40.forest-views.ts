@@ -14,6 +14,7 @@ class FrAvatar {
   private static readonly CLIP_NAMES: Readonly<Record<FrAvatarClip, string>> = {
     idle: "Idle_A", run: "Running_A", walk: "Walking_A", chop: "Chopping", pickaxe: "Pickaxing", dig: "Digging", work: "Working_A", sleep: "Death_A_Pose",
   };
+  static readonly SCALE_UP = 2;
   readonly group: Three<"Group">;
   private readonly mixer: Three<"AnimationMixer">;
   private readonly actions = new Map<FrAvatarClip, Three<"AnimationAction">>();
@@ -22,6 +23,7 @@ class FrAvatar {
   constructor(private readonly libs: ThreeLibs, model: Three<"Object3D">, clips: Map<string, Three<"AnimationClip">>) {
     this.group = new libs.THREE.Group();
     this.group.add(model);
+    this.group.scale.setScalar(FrAvatar.SCALE_UP);
     this.mixer = new libs.THREE.AnimationMixer(model);
     (Object.keys(FrAvatar.CLIP_NAMES) as FrAvatarClip[]).forEach((key) => {
       const clip = clips.get(FrAvatar.CLIP_NAMES[key]);
@@ -253,8 +255,8 @@ class FrProps {
 }
 
 class FrCameraRig {
-  static readonly OFFSET_Y = 30;
-  static readonly OFFSET_Z = 22;
+  static readonly OFFSET_Y = 38;
+  static readonly OFFSET_Z = 28;
   readonly camera: Three<"PerspectiveCamera">;
   private readonly focus: Three<"Vector3">;
 
@@ -267,7 +269,7 @@ class FrCameraRig {
     const k = Math.min(1, dt * 6);
     this.focus.lerp(target, k);
     this.camera.position.set(this.focus.x, this.focus.y + FrCameraRig.OFFSET_Y, this.focus.z + FrCameraRig.OFFSET_Z);
-    this.camera.lookAt(this.focus.x, this.focus.y + 1, this.focus.z);
+    this.camera.lookAt(this.focus.x, this.focus.y + 2.5, this.focus.z);
   }
 
   snap(target: Three<"Vector3">): void { this.focus.copy(target); this.follow(target, 1); }

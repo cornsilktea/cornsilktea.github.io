@@ -43,27 +43,32 @@ class FrClockSync {
 }
 
 class FrPlayerBody {
-  static readonly SPEED = 7.2;
+  static readonly SPEED = 8.4;
   static readonly SWIM_FACTOR = 0.3;
-  static readonly REACH = 2.9;
+  static readonly REACH = 4.2;
+  static readonly RADIUS = 0.9;
+  static readonly FRONT = 2.6;
+  private static readonly SAMPLES: ReadonlyArray<[number, number]> = [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1], [0.7, 0.7], [-0.7, 0.7], [0.7, -0.7], [-0.7, -0.7]];
   x = 0;
   z = 0;
   y = 0;
   facing = 0;
   moving = false;
   swimming = false;
+  private ground = 0;
 
   constructor(private readonly world: FrWorld) {}
 
   place(cellX: number, cellZ: number): void {
     this.x = (cellX + 0.5) * FrTerrainData.BLOCK;
     this.z = (cellZ + 0.5) * FrTerrainData.BLOCK;
+    this.ground = this.world.terrain.height(cellX, cellZ);
     this.y = this.world.terrain.surfaceY(cellX, cellZ);
   }
 
   cell(): FrPoint { return { x: this.world.terrain.cellOf(this.x), z: this.world.terrain.cellOf(this.z) }; }
 
-  frontCell(distance = 1.6): FrPoint {
+  frontCell(distance = FrPlayerBody.FRONT): FrPoint {
     return { x: this.world.terrain.cellOf(this.x + Math.sin(this.facing) * distance), z: this.world.terrain.cellOf(this.z + Math.cos(this.facing) * distance) };
   }
 
@@ -74,9 +79,27 @@ class FrPlayerBody {
     return FrBuildSites.STAGE_TWO.some((s) => s.x === x && s.z === z);
   }
 
-  private canEnter(from: FrPoint, toX: number, toZ: number): boolean {
-    if (toX === from.x && toZ === from.z) return true;
-    return this.world.terrain.canStep(from.x, from.z, toX, toZ) && !this.world.blocked(toX, toZ) && !this.solid(toX, toZ);
+  private bodyFits(px: number, pz: number): boolean {
+    const terrain = this.world.terrain;
+    const r = FrPlayerBody.RADIUS;
+    return FrPlayerBody.SAMPLES.every(([dx, dz]) => {
+      const cx = terrain.cellOf(px + dx * r), cz = terrain.cellOf(pz + dz * r);
+      if (!terrain.inside(cx, cz) || terrain.top(cx, cz) === FrTerrainData.OCEAN) return false;
+      if (this.world.blocked(cx, cz) || this.solid(cx, cz)) return false;
+      if (terrain.isWater(cx, cz)) return true;
+      return terrain.height(cx, cz) - this.ground <= 1;
+    });
+  }
+
+  private groundUnder(px: number, pz: number): number {
+    const terrain = this.world.terrain;
+    const r = FrPlayerBody.RADIUS;
+    let best = -99;
+    FrPlayerBody.SAMPLES.forEach(([dx, dz]) => {
+      const cx = terrain.cellOf(px + dx * r), cz = terrain.cellOf(pz + dz * r);
+      if (!terrain.isWater(cx, cz)) best = Math.max(best, terrain.height(cx, cz));
+    });
+    return best === -99 ? terrain.height(terrain.cellOf(px), terrain.cellOf(pz)) : best;
   }
 
   step(direction: FrPoint, dt: number, speedBonus: number): void {
@@ -88,13 +111,14 @@ class FrPlayerBody {
       this.facing = Math.atan2(direction.x, direction.z);
       const speed = FrPlayerBody.SPEED * (1 + speedBonus) * (this.swimming ? FrPlayerBody.SWIM_FACTOR : 1) * Math.min(1, length);
       const dx = (direction.x / length) * speed * dt, dz = (direction.z / length) * speed * dt;
-      if (this.canEnter(here, this.world.terrain.cellOf(this.x + dx), here.z)) this.x += dx;
-      const after = this.cell();
-      if (this.canEnter(after, after.x, this.world.terrain.cellOf(this.z + dz))) this.z += dz;
+      if (this.bodyFits(this.x + dx, this.z)) this.x += dx;
+      if (this.bodyFits(this.x, this.z + dz)) this.z += dz;
     }
+    this.ground = this.groundUnder(this.x, this.z);
     const cell = this.cell();
-    const target = this.world.terrain.surfaceY(cell.x, cell.z) - (this.world.terrain.isWater(cell.x, cell.z) ? 1.4 : 0);
-    this.y += (target - this.y) * Math.min(1, dt * 14);
+    const swim = this.world.terrain.isWater(cell.x, cell.z);
+    const target = swim ? this.world.terrain.surfaceY(cell.x, cell.z) - 1.4 : this.ground * FrTerrainData.BLOCK;
+    this.y += (target - this.y) * Math.min(1, dt * 16);
   }
 }
 
@@ -115,10 +139,10 @@ class FrTargetFinder {
     const a = this.world.terrain.anchors;
     const B = FrTerrainData.BLOCK;
     const near = (cx: number, cz: number, range: number) => Math.hypot(player.x - cx, player.z - cz) <= range;
-    if (near((a.campfire.x + 0.5) * B, (a.campfire.z + 0.5) * B, 3.6)) return { kind: "cook", label: "요리", cell: null };
-    if (near((a.publicChest.x + a.publicChest.size / 2) * B, (a.publicChest.z + a.publicChest.size / 2) * B, 4.6)) return { kind: "chest", label: "창고", cell: null };
+    if (near((a.campfire.x + 0.5) * B, (a.campfire.z + 0.5) * B, 5.4)) return { kind: "cook", label: "요리", cell: null };
+    if (near((a.publicChest.x + a.publicChest.size / 2) * B, (a.publicChest.z + a.publicChest.size / 2) * B, 6.4)) return { kind: "chest", label: "창고", cell: null };
     for (const site of FrBuildSites.STAGE_TWO) {
-      if (near((site.x + 0.5) * B, (site.z + 0.5) * B, 3.2)) return { kind: "site", label: this.world.village.builtCount(site.id) > 0 ? "열기" : "짓기", cell: null, site };
+      if (near((site.x + 0.5) * B, (site.z + 0.5) * B, 4.8)) return { kind: "site", label: this.world.village.builtCount(site.id) > 0 ? "열기" : "짓기", cell: null, site };
     }
     const tree = this.nearestTree(player);
     if (tree) return { kind: "tree", label: "베기", cell: { x: tree.x, z: tree.z }, tree };
@@ -139,8 +163,8 @@ class FrTargetFinder {
     let best: FrTreeSpot | null = null;
     let bestDistance = FrPlayerBody.REACH;
     const here = player.cell();
-    for (let dz = -2; dz <= 2; dz++) {
-      for (let dx = -2; dx <= 2; dx++) {
+    for (let dz = -3; dz <= 3; dz++) {
+      for (let dx = -3; dx <= 3; dx++) {
         const spot = this.world.standingTree(this.world.terrain.index(here.x + dx, here.z + dz));
         if (!spot) continue;
         const sx = (spot.x + 0.5) * FrTerrainData.BLOCK - player.x, sz = (spot.z + 0.5) * FrTerrainData.BLOCK - player.z;

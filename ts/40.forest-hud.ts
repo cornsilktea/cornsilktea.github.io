@@ -30,7 +30,7 @@ class FrItemCell {
   static render(id: string, count: number, uses: number): HTMLDivElement {
     const cell = FrDom.make("div", "fr-cell");
     cell.style.borderColor = FrItemNames.GRADE_COLORS[FrItemNames.grade(id)];
-    cell.appendChild(FrDom.make("div", "fr-cell-mark", FrItemNames.mark(id)));
+    cell.appendChild(FrIcons.image(id, 38));
     if (count > 1) cell.appendChild(FrDom.make("div", "fr-cell-count", String(count)));
     const total = FrItems.durabilityOf(id);
     if (total > 0) {
@@ -80,7 +80,8 @@ abstract class FrWindow {
 
   protected needLine(id: string, have: number, need: number): HTMLDivElement {
     const line = FrDom.make("div", have >= need ? "fr-need ok" : "fr-need lack");
-    line.textContent = FrItemNames.label(id) + " " + have + " / " + need;
+    line.title = FrItemNames.label(id);
+    line.append(FrIcons.image(id, 22), FrDom.make("span", "", " " + have + " / " + need));
     return line;
   }
 }
@@ -140,7 +141,7 @@ class FrChestWindow extends FrWindow {
     if (totals.size === 0) column.appendChild(FrDom.make("div", "fr-note", "넣을 재료가 없어요"));
     totals.forEach((count, id) => {
       const row = FrDom.make("div", "fr-line");
-      row.appendChild(FrDom.make("span", "", FrItemNames.label(id) + " " + count));
+      row.append(FrIcons.image(id, 28), FrDom.make("span", "", String(count)));
       [1, 10, count].filter((n, i, list) => n <= count && list.indexOf(n) === i).forEach((n) => row.appendChild(this.button(n === count && n > 10 ? "전부" : "+" + n, () => void this.move(id, n, true))));
       column.appendChild(row);
     });
@@ -155,7 +156,7 @@ class FrChestWindow extends FrWindow {
     if (ids.length === 0) column.appendChild(FrDom.make("div", "fr-note", "창고가 비어 있어요"));
     ids.forEach((id) => {
       const row = FrDom.make("div", "fr-line");
-      row.appendChild(FrDom.make("span", "", FrItemNames.label(id) + " " + amounts[id]));
+      row.append(FrIcons.image(id, 28), FrDom.make("span", "", String(amounts[id])));
       [1, 10, amounts[id]].filter((n, i, list) => n <= amounts[id] && list.indexOf(n) === i).forEach((n) => row.appendChild(this.button(n === amounts[id] && n > 10 ? "전부" : "-" + n, () => void this.move(id, n, false))));
       column.appendChild(row);
     });
@@ -198,7 +199,9 @@ class FrCraftWindow extends FrWindow {
     const list = FrDom.make("div", "fr-list");
     FrCraftMenu.options().forEach((option) => {
       const row = FrDom.make("div", "fr-recipe");
-      row.appendChild(FrDom.make("b", "", option.label));
+      const head = FrDom.make("div", "fr-head");
+      head.append(FrIcons.image(option.output, 34), FrDom.make("b", "", option.label));
+      row.appendChild(head);
       Object.keys(option.cost).forEach((id) => row.appendChild(this.needLine(id, source.total(id), option.cost[id])));
       row.appendChild(this.button("만들기", () => this.make(option), source.canPay(option.cost)));
       list.appendChild(row);
@@ -226,12 +229,16 @@ class FrCookWindow extends FrWindow {
         list.appendChild(row);
         return;
       }
-      row.appendChild(FrDom.make("b", "", "★" + recipe.star + " " + recipe.name + (this.session.seen.has(recipe.id) ? "" : "  NEW")));
+      const head = FrDom.make("div", "fr-head");
+      head.append(FrIcons.image(recipe.id, 34), FrDom.make("b", "", "★" + recipe.star + " " + recipe.name + (this.session.seen.has(recipe.id) ? "" : "  NEW")));
+      row.appendChild(head);
       const plan = FrRecipeRules.resolve(recipe, source);
       recipe.ingredients.forEach((ingredient) => {
         const label = ingredient.item ? FrItemNames.label(ingredient.item) : ingredient.group === "fruit" ? "과일" : ingredient.group === "fish_common" ? "일반 물고기" : ingredient.group === "fish_rare" ? "희귀 물고기" : "전설 물고기";
         const have = ingredient.item ? source.total(ingredient.item) : FrCatalog.groupMembers(ingredient.group as FrIngredientGroup).reduce((s, id) => s + source.total(id), 0);
-        const line = FrDom.make("div", have >= ingredient.count ? "fr-need ok" : "fr-need lack", label + " " + have + " / " + ingredient.count);
+        const line = FrDom.make("div", have >= ingredient.count ? "fr-need ok" : "fr-need lack");
+        line.title = label;
+        line.append(ingredient.item ? FrIcons.image(ingredient.item, 22) : FrDom.make("span", "", label), FrDom.make("span", "", " " + have + " / " + ingredient.count));
         row.appendChild(line);
       });
       row.appendChild(FrDom.make("div", "fr-note", "먹으면 행동력 +" + FrFoodRules.islandGain(recipe.star)));
