@@ -112,6 +112,7 @@ interface Window {
   PORTAL_CONFIG?: PortalConfig;
   PORTAL_CLASS?: PortalClass | null;
   PORTAL_USER?: PortalUser | null;
+  PORTAL_GUEST?: PortalUser | null;
   firebase?: {
     initializeApp(config: { apiKey: string; authDomain: string; databaseURL: string }): unknown;
     database(): FirebaseDatabase;

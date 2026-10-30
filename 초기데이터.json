@@ -368,6 +368,15 @@
         "units": [],
         "unitsSet": false,
         "url": "39.water-balloon.html"
+      },
+      "dongmaforest": {
+        "memo": "반을 둘로 나눈 조별 섬(한 섬 13~16명)에 구글 계정으로 함께 접속하는 3D 힐링 샌드박스 / 나무를 베고 땅을 파며 섬을 개척 / 공용 창고에 재료를 모아 작업대·다리·성벽을 함께 짓기 / 하루는 실제 4분(낮 2분·밤 2분), 밤에 잠자기로 아침 넘기기 / 행동력·미니게임 4종 / 섬 코드는 제어판에서 반마다 적기",
+        "open": false,
+        "order": 39,
+        "title": "모여봐요 동마의 숲",
+        "units": [],
+        "unitsSet": false,
+        "url": "40.dongma-forest.html"
       }
     }
   }

@@ -20,6 +20,13 @@ class AccountPolicy {
     static requiresLogin(search) {
         return AccountPolicy.LOGIN_CLASS_PATTERN.test(search);
     }
+    static allowsGuest(search, gameId) {
+        return gameId === AccountPolicy.GUEST_GAME && AccountPolicy.GUEST_LINK_PATTERN.test(search);
+    }
+    static currentGameId() {
+        const script = document.querySelector("script[data-game]");
+        return script ? script.getAttribute("data-game") || "" : "";
+    }
     static accepts(user) {
         if (AccountPolicy.ADMIN_UIDS.indexOf(user.uid) >= 0)
             return true;
@@ -40,6 +47,10 @@ class AccountPolicy {
 AccountPolicy.DOMAIN = "dongma.sen.ms.kr";
 AccountPolicy.ADMIN_UIDS = ["use16pcii5RbEATuPtWhRDArmoj2", "HFcjiyXAl1YWzm3AyrZmzo4uMdG3"];
 AccountPolicy.LOGIN_CLASS_PATTERN = /[?&]c=(?:[1-3]-[1-5]|contest)(?:&|$)/;
+/* 40번(동마의 숲)만 배포용 링크(?c=test)에서 로그인 없이 익명 계정으로 들어온다(2026-10-30 선생님 결정).
+   익명 계정은 학교 이메일이 없어서 데이터베이스규칙.json 의 users·records 등 다른 쓰기가 모두 막히고, forest/test_1 만 쓸 수 있다. */
+AccountPolicy.GUEST_GAME = "dongmaforest";
+AccountPolicy.GUEST_LINK_PATTERN = /[?&]c=test(?:&|$)/;
 class AccountAuthClient {
     constructor() {
         this.sdk = null;
@@ -75,6 +86,9 @@ class AccountAuthClient {
                 throw error;
             await sdk.signInWithRedirect(this.auth, provider);
         }
+    }
+    signInAsGuest() {
+        return this.requireSdk().signInAnonymously(this.auth);
     }
     signOut() {
         return this.requireSdk().signOut(this.auth);
@@ -206,6 +220,10 @@ class AccountGate {
     }
     start() {
         const isWebPage = location.protocol === "http:" || location.protocol === "https:";
+        if (isWebPage && AccountPolicy.allowsGuest(location.search, AccountPolicy.currentGameId())) {
+            this.whenDocumentReady(() => this.beginGuest());
+            return;
+        }
         if (!isWebPage || !AccountPolicy.requiresLogin(location.search))
             return;
         this.hideStyle.textContent = "body{visibility:hidden !important}";
@@ -217,6 +235,27 @@ class AccountGate {
         this.client.prepare()
             .then(() => this.client.watch((user) => this.onUser(user)))
             .catch(() => this.screen.showError("로그인 도구를 불러오지 못했습니다."));
+    }
+    beginGuest() {
+        this.client.prepare()
+            .then(() => this.client.watch((user) => this.onGuestUser(user)))
+            .catch(() => undefined);
+    }
+    onGuestUser(user) {
+        if (!user) {
+            this.client.signInAsGuest().catch(() => undefined);
+            return;
+        }
+        if (user.isAnonymous) {
+            window.PORTAL_GUEST = { uid: user.uid, email: "", name: "", getToken: () => user.getIdToken() };
+            document.dispatchEvent(new CustomEvent(AccountGate.USER_EVENT));
+            return;
+        }
+        if (AccountPolicy.accepts(user)) {
+            this.publish(user);
+            return;
+        }
+        this.client.signOut().then(() => this.client.signInAsGuest()).catch(() => undefined);
     }
     onUser(user) {
         if (!user) {

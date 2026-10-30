@@ -687,8 +687,138 @@
             "$other": { ".validate": false }
           }
         },
+        "forest": {
+          ".write": "auth != null && auth.uid === $uid && ((auth.token.email_verified === true && auth.token.email.endsWith('@dongma.sen.ms.kr')) || auth.token.firebase.sign_in_provider === 'anonymous' || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3'))",
+          "home": {
+            ".validate": "newData.isString() && newData.val().matches(/^([1-3]-[1-5]|test)_[12]$/) && (!data.exists() || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')) && (!(auth.token.firebase.sign_in_provider === 'anonymous') || newData.val() === 'test_1')"
+          },
+          "probe": {
+            ".validate": "newData.isNumber() && newData.val() === now"
+          },
+          "save": {
+            ".validate": "newData.hasChildren(['bag', 'ap', 'ring']) && newData.child('ap').isNumber() && newData.child('ap').val() >= 0 && newData.child('ap').val() <= 200 && newData.child('ring').isNumber() && newData.child('ring').val() >= 0 && newData.child('ring').val() <= 10",
+            "ap": {
+              ".validate": "newData.isNumber()"
+            },
+            "ring": {
+              ".validate": "newData.isNumber()"
+            },
+            "lastAt": {
+              ".validate": "newData.isNumber()"
+            },
+            "bag": {
+              "$i": {
+                ".validate": "$i.matches(/^([0-9]|[1-3][0-9])$/) && newData.hasChildren(['id', 'count', 'uses']) && newData.child('id').isString() && newData.child('id').val().length <= 40 && newData.child('count').isNumber() && newData.child('count').val() >= 1 && newData.child('count').val() <= 30 && newData.child('uses').isNumber() && newData.child('uses').val() >= 0 && newData.child('uses').val() <= 200"
+              }
+            },
+            "pity": {
+              "$k": {
+                ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000"
+              }
+            },
+            "seen": {
+              "$i": {
+                ".validate": "newData.isString() && newData.val().length <= 40"
+              }
+            },
+            "$other": {
+              ".validate": false
+            }
+          },
+          "$other": {
+            ".validate": false
+          }
+        },
         "$other": { ".validate": false }
       }
+    },
+    "forestCodes": {
+      "$code": {
+        ".read": "auth != null",
+        ".write": "auth != null && (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')",
+        ".validate": "newData.hasChildren(['cls', 'island']) && newData.child('cls').isString() && newData.child('cls').val().matches(/^([1-3]-[1-5]|test)$/) && newData.child('island').isNumber() && (newData.child('island').val() === 1 || newData.child('island').val() === 2)"
+      }
+    },
+    "forest": {
+      "$island": {
+        "members": {
+          "$uid": {
+            ".read": "auth != null && ((auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3') || root.child('users').child(auth.uid).child('forest').child('home').val() === $island)",
+            ".write": "auth != null && ((auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3') || root.child('users').child(auth.uid).child('forest').child('home').val() === $island) && $uid === auth.uid",
+            ".validate": "newData.hasChildren(['no', 'name'])"
+          }
+        },
+        "clock": {
+          ".read": "auth != null && ((auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3') || root.child('users').child(auth.uid).child('forest').child('home').val() === $island)",
+          ".write": "auth != null && ((auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3') || root.child('users').child(auth.uid).child('forest').child('home').val() === $island)",
+          ".validate": "newData.hasChildren(['day', 'dawnAt', 'lastSeen']) && newData.child('day').isNumber() && newData.child('day').val() >= 1",
+          "frozen": {
+            ".validate": "newData.isBoolean()"
+          },
+          "$other": {
+            ".validate": "newData.isNumber()"
+          }
+        },
+        "jungle": {
+          ".read": "auth != null && ((auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3') || root.child('users').child(auth.uid).child('forest').child('home').val() === $island)",
+          ".write": "auth != null && ((auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3') || root.child('users').child(auth.uid).child('forest').child('home').val() === $island)",
+          "$cell": {
+            ".validate": "$cell.matches(/^[0-9]{1,5}$/) && newData.val() === 1"
+          }
+        },
+        "terrain": {
+          ".read": "auth != null && ((auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3') || root.child('users').child(auth.uid).child('forest').child('home').val() === $island)",
+          ".write": "auth != null && ((auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3') || root.child('users').child(auth.uid).child('forest').child('home').val() === $island)",
+          "$chunk": {
+            "$cell": {
+              ".validate": "$cell.matches(/^[0-9]{1,5}$/) && newData.hasChildren(['0', '1']) && newData.child('0').isNumber() && newData.child('0').val() >= -2 && newData.child('0').val() <= 14 && newData.child('1').isString() && newData.child('1').val().length === 1"
+            }
+          }
+        },
+        "snow": {
+          ".read": "auth != null && ((auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3') || root.child('users').child(auth.uid).child('forest').child('home').val() === $island)",
+          ".write": "auth != null && ((auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3') || root.child('users').child(auth.uid).child('forest').child('home').val() === $island)",
+          "$cell": {
+            ".validate": "newData.isNumber()"
+          }
+        },
+        "build": {
+          ".read": "auth != null && ((auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3') || root.child('users').child(auth.uid).child('forest').child('home').val() === $island)",
+          "$id": {
+            ".write": "auth != null && ((auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3') || root.child('users').child(auth.uid).child('forest').child('home').val() === $island) && (!data.exists() || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3'))",
+            ".validate": "$id.matches(/^[a-z_]{2,24}_[0-9]{1,2}$/) && newData.hasChildren(['at', 'by'])"
+          }
+        },
+        "public": {
+          ".read": "auth != null && ((auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3') || root.child('users').child(auth.uid).child('forest').child('home').val() === $island)",
+          ".write": "auth != null && ((auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3') || root.child('users').child(auth.uid).child('forest').child('home').val() === $island)",
+          "$id": {
+            ".validate": "$id.matches(/^[a-z_0-9]{1,30}$/) && newData.isNumber() && newData.val() >= 0 && newData.val() <= 5400"
+          }
+        },
+        "publicLog": {
+          ".read": "auth != null && ((auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3') || root.child('users').child(auth.uid).child('forest').child('home').val() === $island)",
+          ".write": "auth != null && ((auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3') || root.child('users').child(auth.uid).child('forest').child('home').val() === $island)",
+          "$key": {
+            ".validate": "newData.hasChildren(['at', 'who', 'verb', 'item', 'count']) && newData.child('who').isString() && newData.child('who').val().length <= 12 && newData.child('count').isNumber() && newData.child('count').val() >= 1 && newData.child('count').val() <= 5400"
+          }
+        },
+        "admin": {
+          ".read": "auth != null && ((auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3') || root.child('users').child(auth.uid).child('forest').child('home').val() === $island)",
+          ".write": "auth != null && (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+        },
+        "adminLog": {
+          ".read": "auth != null && (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')",
+          ".write": "auth != null && (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    },
+    "forestArchive": {
+      ".read": "auth != null && (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')",
+      ".write": "auth != null && (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
     },
     "classStats": {
       ".read": "auth != null && (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')",

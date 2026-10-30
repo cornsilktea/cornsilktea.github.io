@@ -223,6 +223,19 @@ class FrPublicStore implements FrStore {
     return used;
   }
 
+  restore(amounts: Record<string, number>, lines: FrPublicLogLine[]): void {
+    this.amounts.clear();
+    Object.keys(amounts).forEach((id) => { if (amounts[id] > 0) this.amounts.set(id, amounts[id]); });
+    this.log.length = 0;
+    lines.slice().sort((x, y) => y.at - x.at).slice(0, FrBalance.PUBLIC_LOG_LINES).forEach((line) => this.log.push(line));
+  }
+
+  amountsSnapshot(): Record<string, number> {
+    const copy: Record<string, number> = {};
+    this.amounts.forEach((n, id) => { copy[id] = n; });
+    return copy;
+  }
+
   canPut(id: string, amount: number): boolean {
     const now = this.count(id);
     const extra = Math.ceil((now + amount) / FrBalance.STACK_SIZE) - Math.ceil(now / FrBalance.STACK_SIZE);
@@ -411,6 +424,8 @@ class FrVillage {
   private readonly built: Map<string, number> = new Map();
 
   builtCount(id: string): number { return this.built.get(id) || 0; }
+
+  markBuilt(id: string): void { this.built.set(id, this.builtCount(id) + 1); }
 
   score(): number {
     return FrCatalog.CONSTRUCTIONS.reduce((sum, c) => sum + c.score * this.builtCount(c.id), 0);

@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<script charset="utf-8" src="firebase-config.js"></script>
+<script charset="utf-8" src="access-guard.js" data-game="dongmaforest"></script>
+<script charset="utf-8" src="fullscreen-keeper.js" data-watch></script>
+<script charset="utf-8" src="quality-governor.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>모여봐요 동마의 숲</title>
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="정보 수업용 링크 모음">
+<meta property="og:title" content="모여봐요 동마의 숲">
+<meta property="og:description" content="반 친구들과 섬을 개척하는 3D 힐링 샌드박스">
+<meta property="og:url" content="https://cornsilktea.github.io/40.dongma-forest.html">
+<meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
+<meta name="twitter:card" content="summary">
+<link rel="stylesheet" href="theme.css">
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<script async src="https://cdn.jsdelivr.net/npm/es-module-shims@1.10.1/dist/es-module-shims.js"></script>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  [hidden] { display: none !important; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #0F2A1C; font-family: var(--sg-font); color: #fff; -webkit-user-select: none; user-select: none; }
+  #view { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  #loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 800; color: #D6EBC9; }
+  .hud-box { background: rgba(16, 24, 38, .74); border-left: 3px solid #D97B4F; border-radius: 6px; padding: 6px 12px; font-weight: 800; }
+  #hudClockBox { position: fixed; top: 8px; right: 12px; z-index: 5; text-align: center; font-size: 17px; font-variant-numeric: tabular-nums; }
+  #hudButtons { position: fixed; top: 52px; right: 12px; z-index: 5; display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
+  #hudButtons button { font: inherit; font-size: 14px; color: #fff; cursor: pointer; border-top: 0; border-right: 0; border-bottom: 0; }
+  #hudAp { position: fixed; top: 54px; left: 12px; z-index: 5; width: 190px; font-size: 14px; }
+  #hudApBar { height: 10px; margin-top: 4px; background: rgba(255,255,255,.2); border-radius: 5px; overflow: hidden; }
+  #hudApFill { height: 100%; background: linear-gradient(90deg, #F2C14E, #D97B4F); width: 100%; }
+  #hudAreaBox { position: fixed; top: 8px; left: 50%; transform: translateX(-50%); z-index: 5; text-align: center; font-size: 16px; white-space: nowrap; }
+  #hudSleep { font-size: 13px; margin-top: 6px; color: #FFE2C9; }
+  #toast { position: fixed; left: 50%; top: 104px; transform: translateX(-50%); z-index: 12; max-width: 88vw; text-align: center; font-size: 16px; font-weight: 800; background: rgba(16, 24, 38, .88); border-left: 3px solid #D97B4F; border-radius: 6px; padding: 8px 14px; pointer-events: none; }
+  #hotbar { position: fixed; left: 50%; bottom: 10px; transform: translateX(-50%); z-index: 5; display: flex; gap: 4px; padding: 4px; background: rgba(16, 24, 38, .6); border-radius: 8px; }
+  #controls { position: fixed; inset: 0; z-index: 4; pointer-events: none; }
+  #joyBase { position: absolute; left: 24px; bottom: 24px; width: 132px; height: 132px; border-radius: 50%; background: rgba(255,255,255,.14); border: 2px solid rgba(255,255,255,.3); pointer-events: auto; touch-action: none; display: none; }
+  #joyKnob { position: absolute; left: 41px; top: 41px; width: 50px; height: 50px; border-radius: 50%; background: rgba(255,255,255,.55); }
+  #btnAction { position: absolute; right: 26px; bottom: 26px; width: 104px; height: 104px; border-radius: 50%; border: 3px solid rgba(255,255,255,.6); background: rgba(217,123,79,.85); color: #fff; font: inherit; font-size: 20px; font-weight: 800; pointer-events: auto; touch-action: none; }
+  @media (pointer: coarse) { #joyBase { display: block; } #hotbar { bottom: 160px; } }
+  .fr-cell { position: relative; width: 52px; height: 52px; border: 2px solid #B8BEC9; border-radius: 6px; background: rgba(16, 24, 38, .8); display: flex; align-items: center; justify-content: center; cursor: pointer; flex: 0 0 auto; }
+  .fr-cell.empty { border-color: rgba(255,255,255,.18); }
+  .fr-cell.selected { box-shadow: 0 0 0 3px #D97B4F; }
+  .fr-cell.hot { border-width: 3px; }
+  .fr-cell-mark { font-size: 13px; font-weight: 800; text-align: center; line-height: 1.1; }
+  .fr-cell-count { position: absolute; right: 3px; bottom: 1px; font-size: 12px; font-weight: 800; color: #FFD37A; }
+  .fr-cell-key { position: absolute; left: 3px; top: 1px; font-size: 10px; color: #9fb0c4; }
+  .fr-cell-bar { position: absolute; left: 4px; right: 4px; bottom: 3px; height: 4px; background: rgba(255,255,255,.2); border-radius: 2px; overflow: hidden; }
+  .fr-cell-fill { height: 100%; background: #7BD66B; }
+  .fr-cell-fill.low { background: #F2C14E; }
+  .fr-win { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 20; width: min(760px, 94vw); max-height: 80vh; background: rgba(16, 24, 38, .94); border: 1px solid rgba(255,255,255,.2); border-left: 4px solid #D97B4F; border-radius: 10px; display: flex; flex-direction: column; }
+  .fr-win-head { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; font-size: 18px; border-bottom: 1px solid rgba(255,255,255,.14); }
+  .fr-win-close { font: inherit; background: none; border: 0; color: #fff; font-size: 20px; cursor: pointer; padding: 0 6px; }
+  .fr-win-body { padding: 12px 14px; overflow-y: auto; font-size: 15px; -webkit-user-select: text; user-select: text; }
+  .fr-grid { display: grid; grid-template-columns: repeat(8, 52px); gap: 5px; justify-content: center; }
+  .fr-note { font-size: 13px; color: #A9B8C8; margin: 6px 0; }
+  .fr-detail { margin-top: 10px; padding: 10px; background: rgba(255,255,255,.06); border-radius: 8px; }
+  .fr-row { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+  .fr-btn { font: inherit; font-size: 14px; font-weight: 800; padding: 6px 12px; border-radius: 6px; border: 0; background: #D97B4F; color: #fff; cursor: pointer; }
+  .fr-btn:disabled { opacity: .35; cursor: default; }
+  .fr-cols { display: grid; grid-template-columns: 1fr 1fr 1.1fr; gap: 12px; }
+  .fr-col h3 { font-size: 15px; margin-bottom: 6px; color: #FFD7BF; }
+  .fr-col.log { max-height: 46vh; overflow-y: auto; }
+  .fr-line { display: flex; gap: 6px; align-items: center; margin: 4px 0; flex-wrap: wrap; }
+  .fr-line .fr-btn { padding: 2px 8px; font-size: 12px; }
+  .fr-log { font-size: 12px; color: #C9D6E4; margin: 2px 0; }
+  .fr-log.take { color: #FFB27A; }
+  .fr-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
+  .fr-recipe { background: rgba(255,255,255,.06); border-radius: 8px; padding: 8px 10px; }
+  .fr-recipe .fr-btn { margin-top: 6px; }
+  .fr-need { font-size: 13px; }
+  .fr-need.ok { color: #9BE08A; }
+  .fr-need.lack { color: #FF8A7A; }
+  .fr-mini { position: fixed; left: 50%; top: 38%; transform: translate(-50%, -50%); z-index: 15; width: min(420px, 86vw); background: rgba(16, 24, 38, .9); border-left: 4px solid #D97B4F; border-radius: 10px; padding: 12px 16px; pointer-events: none; text-align: center; }
+  .fr-mini-title { font-weight: 800; font-size: 17px; margin-bottom: 10px; }
+  .fr-track { position: relative; height: 26px; background: rgba(255,255,255,.14); border-radius: 13px; overflow: hidden; }
+  .fr-fill { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(90deg, #F2C14E, #D97B4F); width: 0; }
+  .fr-fill.thin { opacity: .85; }
+  .fr-green { position: absolute; top: 0; bottom: 0; background: rgba(120, 220, 110, .65); border-left: 2px solid #9BE08A; border-right: 2px solid #9BE08A; }
+  .fr-needle { position: absolute; top: -2px; bottom: -2px; width: 5px; margin-left: -2px; background: #fff; border-radius: 3px; }
+  .fr-ring-holder { position: relative; width: 150px; height: 150px; margin: 0 auto; }
+  .fr-ring { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); border-radius: 50%; }
+  .fr-ring.target { border: 4px solid #9BE08A; }
+  .fr-ring.moving { border: 4px solid #fff; width: 100%; height: 100%; }
+  #startScreen { position: fixed; inset: 0; z-index: 10; overflow-y: auto; }
+  #startScreen { --st-bg: rgba(10, 30, 18, .72); --st-accent: #8FD06B; --st-title2: #FFD37A; --st-glow: rgba(143, 208, 107, .5); }
+  .st-input { width: 100%; font: inherit; font-size: 18px; padding: 10px 12px; border-radius: 8px; border: 2px solid rgba(255,255,255,.3); background: rgba(0,0,0,.35); color: #fff; margin: 8px 0; text-align: center; }
+  @media (max-width: 720px) { .fr-cols { grid-template-columns: 1fr; } .fr-grid { grid-template-columns: repeat(auto-fill, 52px); } }
+</style>
+</head>
+<body>
+<canvas id="view"></canvas>
+<div id="loading">불러오는 중…</div>
+<div id="toast" hidden></div>
+<div id="hud" hidden>
+  <div id="hudClockBox" class="hud-box"><div id="hudClock">06:00 · 1일째</div></div>
+  <div id="hudButtons"><button type="button" class="hud-box" id="btnBag">가방 (I)</button><button type="button" class="hud-box" id="btnSleep" hidden>잠자기 (Z)</button></div>
+  <div id="hudAp" class="hud-box"><div id="hudApText">⚡ 100 / 100</div><div id="hudApBar"><div id="hudApFill"></div></div></div>
+  <div id="hudAreaBox" class="hud-box"><div id="hudArea">마을</div><div id="hudSleep" hidden></div></div>
+  <div id="hotbar"></div>
+</div>
+<div id="controls" hidden>
+  <div id="joyBase"><div id="joyKnob"></div></div>
+  <button type="button" id="btnAction">·</button>
+</div>
+<div id="startScreen" data-account-home class="st-screen" hidden>
+  <div class="st-wrap">
+    <div class="st-hero"><h1 class="st-title">모여봐요<span>동마의 숲</span></h1></div>
+    <div class="st-card" id="codeCard" hidden>
+      <h2>섬 코드</h2>
+      <input type="text" class="st-input" id="codeInput" maxlength="12" autocomplete="off" placeholder="선생님이 알려 준 섬 코드">
+      <button type="button" class="st-btn primary" id="btnCode">섬으로 들어가기</button>
+      <div class="st-msg" id="codeMsg"></div>
+    </div>
+    <div class="st-card">
+      <h2>우리 섬</h2>
+      <button type="button" class="st-btn primary" id="btnEnter" disabled>섬에 들어가기</button>
+      <div class="st-msg" id="enterMsg"></div>
+    </div>
+    <div class="st-card st-fold">
+      <h2>캐릭터 만들기</h2>
+      <div id="profileHost"></div>
+    </div>
+    <div class="st-card">
+      <h2>조작 방법</h2>
+      <div class="st-keys">
+        <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd></span><span>이동</span>
+        <span><kbd>Space</kbd></span><span>나무 베기 · 땅 파기 · 창고 · 요리 · 건설 (오른쪽 큰 버튼)</span>
+        <span><kbd>I</kbd> <kbd>Z</kbd> <kbd>1</kbd>~<kbd>8</kbd></span><span>가방 · 잠자기(밤) · 핫바 음식 먹기</span>
+        <span><kbd>태블릿</kbd></span><span>왼쪽 조이스틱으로 이동, 오른쪽 큰 버튼으로 행동</span>
+      </div>
+    </div>
+    <div class="st-card">
+      <h2>규칙</h2>
+      <ul class="st-rules">
+        <li>우리 반 친구들과 한 섬에서 <b>나무를 베고 땅을 파며</b> 섬을 개척해요. 친구끼리 싸우는 일은 없어요.</li>
+        <li>하루는 실제 <b>4분</b>(낮 2분 · 밤 2분)이에요. 밤에는 <b>잠자기</b>로 그 자리에서 쉬고, 모두 자면 아침이 와요.</li>
+        <li>일을 하면 <b>행동력</b>이 줄어요. 잠을 자거나 음식을 먹으면 다시 차요.</li>
+        <li>모닥불 옆 <b>공용 창고</b>는 우리 섬 모두의 것이에요. 재료를 모아 작업대·다리·성벽을 지어요.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+<script charset="utf-8" src="character-kit.js?v=20261011"></script>
+<script charset="utf-8" src="fold-card.js"></script>
+<script charset="utf-8" src="40.forest-data.js?v=1"></script>
+<script charset="utf-8" src="40.forest-rules.js?v=1"></script>
+<script charset="utf-8" src="40.forest-clock.js?v=1"></script>
+<script charset="utf-8" src="40.forest-minigame.js?v=1"></script>
+<script charset="utf-8" src="40.forest-terrain.js?v=1"></script>
+<script charset="utf-8" src="40.forest-net.js?v=1"></script>
+<script charset="utf-8" src="40.forest-world.js?v=1"></script>
+<script charset="utf-8" src="40.forest-save.js?v=1"></script>
+<script charset="utf-8" src="40.forest-session.js?v=1"></script>
+<script charset="utf-8" src="40.forest-input.js?v=1"></script>
+<script charset="utf-8" src="40.forest-views.js?v=1"></script>
+<script charset="utf-8" src="40.forest-hud.js?v=1"></script>
+<script charset="utf-8" src="40.forest-play.js?v=1"></script>
+<script charset="utf-8" src="40.dongma-forest.js?v=1"></script>
+<script type="module">
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
+new FrGame({ THREE, GLTFLoader, SkeletonUtils });
+</script>
+</body>
+</html>

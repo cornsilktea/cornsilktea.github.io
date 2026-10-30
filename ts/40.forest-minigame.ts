@@ -34,7 +34,7 @@ abstract class FrMiniGame {
 class FrMashGauge extends FrMiniGame {
   protected readonly timeLimit = 3;
   private gauge = 0;
-  constructor(private readonly pressesNeeded: number, private readonly decayPerSecond = 0.4) { super(); }
+  constructor(readonly pressesNeeded: number, private readonly decayPerSecond = 0.4) { super(); }
   protected onPress(): void {
     if (this.state !== "running") return;
     this.gauge += 1;
@@ -48,7 +48,7 @@ class FrCenterStop extends FrMiniGame {
   protected readonly timeLimit = 8;
   protected readonly firstPressCounts = false;
   private hits = 0;
-  constructor(private readonly greenFraction: number, private readonly hitsNeeded: number, private readonly period = 1.4) { super(); }
+  constructor(readonly greenFraction: number, readonly hitsNeeded: number, readonly period = 1.4) { super(); }
   needle(): number {
     const phase = (this.elapsed / this.period) % 1;
     return phase < 0.5 ? phase * 2 : 2 - phase * 2;
@@ -65,7 +65,7 @@ class FrCenterStop extends FrMiniGame {
 class FrShrinkRing extends FrMiniGame {
   protected readonly timeLimit = 3;
   protected readonly firstPressCounts = false;
-  constructor(private readonly tolerance: number, private readonly shrinkSeconds = 1.2, private readonly targetRadius = 0.35) { super(); }
+  constructor(readonly tolerance: number, readonly shrinkSeconds = 1.2, readonly targetRadius = 0.35) { super(); }
   radius(): number { return 1 - (1 - this.targetRadius) * (this.elapsed / this.shrinkSeconds); }
   protected onPress(): void {
     if (this.state !== "running") return;
@@ -80,7 +80,7 @@ class FrHoldRelease extends FrMiniGame {
   protected readonly timeLimit = 8;
   private holding = false;
   private holdTime = 0;
-  constructor(private readonly greenFraction: number, private readonly riseSeconds = 1, private readonly center = 0.8) { super(); }
+  constructor(readonly greenFraction: number, readonly riseSeconds = 1, readonly center = 0.8) { super(); }
   bar(): number {
     const phase = (this.holdTime / this.riseSeconds) % 2;
     return phase <= 1 ? phase : 2 - phase;

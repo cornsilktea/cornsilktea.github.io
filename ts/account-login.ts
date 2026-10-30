@@ -20,6 +20,7 @@ interface AuthUserSnapshot {
   uid: string;
   email: string | null;
   emailVerified: boolean;
+  isAnonymous?: boolean;
   displayName: string | null;
   getIdToken(): Promise<string>;
 }
@@ -34,6 +35,7 @@ interface AuthSdk {
   GoogleAuthProvider: new () => { setCustomParameters(parameters: Record<string, string>): void };
   signInWithPopup(auth: unknown, provider: unknown): Promise<unknown>;
   signInWithRedirect(auth: unknown, provider: unknown): Promise<void>;
+  signInAnonymously(auth: unknown): Promise<unknown>;
   onAuthStateChanged(auth: unknown, listener: (user: AuthUserSnapshot | null) => void): () => void;
   signOut(auth: unknown): Promise<void>;
 }
@@ -45,6 +47,20 @@ class AccountPolicy {
 
   static requiresLogin(search: string): boolean {
     return AccountPolicy.LOGIN_CLASS_PATTERN.test(search);
+  }
+
+  /* 40번(동마의 숲)만 배포용 링크(?c=test)에서 로그인 없이 익명 계정으로 들어온다(2026-10-30 선생님 결정).
+     익명 계정은 학교 이메일이 없어서 데이터베이스규칙.json 의 users·records 등 다른 쓰기가 모두 막히고, forest/test_1 만 쓸 수 있다. */
+  static readonly GUEST_GAME = "dongmaforest";
+  static readonly GUEST_LINK_PATTERN = /[?&]c=test(?:&|$)/;
+
+  static allowsGuest(search: string, gameId: string): boolean {
+    return gameId === AccountPolicy.GUEST_GAME && AccountPolicy.GUEST_LINK_PATTERN.test(search);
+  }
+
+  static currentGameId(): string {
+    const script = document.querySelector("script[data-game]");
+    return script ? script.getAttribute("data-game") || "" : "";
   }
 
   static accepts(user: AuthUserSnapshot): boolean {
@@ -103,6 +119,10 @@ class AccountAuthClient {
       if (!popupUnavailable) throw error;
       await sdk.signInWithRedirect(this.auth, provider);
     }
+  }
+
+  signInAsGuest(): Promise<unknown> {
+    return this.requireSdk().signInAnonymously(this.auth);
   }
 
   signOut(): Promise<void> {
@@ -249,6 +269,7 @@ class AccountGate {
 
   start(): void {
     const isWebPage = location.protocol === "http:" || location.protocol === "https:";
+    if (isWebPage && AccountPolicy.allowsGuest(location.search, AccountPolicy.currentGameId())) { this.whenDocumentReady(() => this.beginGuest()); return; }
     if (!isWebPage || !AccountPolicy.requiresLogin(location.search)) return;
     this.hideStyle.textContent = "body{visibility:hidden !important}";
     (document.head || document.documentElement).appendChild(this.hideStyle);
@@ -260,6 +281,23 @@ class AccountGate {
     this.client.prepare()
       .then(() => this.client.watch((user) => this.onUser(user)))
       .catch(() => this.screen.showError("로그인 도구를 불러오지 못했습니다."));
+  }
+
+  private beginGuest(): void {
+    this.client.prepare()
+      .then(() => this.client.watch((user) => this.onGuestUser(user)))
+      .catch(() => undefined);
+  }
+
+  private onGuestUser(user: AuthUserSnapshot | null): void {
+    if (!user) { this.client.signInAsGuest().catch(() => undefined); return; }
+    if (user.isAnonymous) {
+      window.PORTAL_GUEST = { uid: user.uid, email: "", name: "", getToken: () => user.getIdToken() };
+      document.dispatchEvent(new CustomEvent(AccountGate.USER_EVENT));
+      return;
+    }
+    if (AccountPolicy.accepts(user)) { this.publish(user); return; }
+    this.client.signOut().then(() => this.client.signInAsGuest()).catch(() => undefined);
   }
 
   private onUser(user: AuthUserSnapshot | null): void {
