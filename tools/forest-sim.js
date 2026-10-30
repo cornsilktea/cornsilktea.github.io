@@ -6,10 +6,10 @@ class SimConfig {
 }
 SimConfig.SESSIONS = Number(process.argv[2] || 10);
 SimConfig.DAYS_PER_SESSION = 11;
-SimConfig.BOTS = 13;
+SimConfig.BOTS = 10;
 SimConfig.DAY_SECONDS = 230;
 SimConfig.SEED = Number(process.argv[3] || 20261030);
-SimConfig.PERSONAS = ["gatherer", "gatherer", "gatherer", "fisher", "fisher", "miner", "miner", "miner", "miner", "fighter", "fighter", "fighter", "builder"];
+SimConfig.PERSONAS = ["gatherer", "gatherer", "fisher", "fisher", "miner", "miner", "miner", "fighter", "fighter", "builder"];
 SimConfig.PERSONA_WEIGHTS = {
   gatherer: { fruit: 5, beach: 2, fish: 1, mine: 1, dungeon: 0, terrain: 0 },
   fisher: { fruit: 1, beach: 3, fish: 5, mine: 1, dungeon: 0, terrain: 0 },
@@ -450,7 +450,7 @@ class IslandSim {
 }
 
 const sessions = SimConfig.SESSIONS;
-const islands = [new IslandSim(SimConfig.SEED, "섬 1"), new IslandSim(SimConfig.SEED + 7919, "섬 2")];
+const islands = [new IslandSim(SimConfig.SEED, "섬 1"), new IslandSim(SimConfig.SEED + 7919, "섬 2"), new IslandSim(SimConfig.SEED + 15838, "섬 3")];
 islands.forEach((island) => island.run(sessions));
 console.log("봇 " + SimConfig.BOTS + "명 × 섬 2개 × 수업 " + sessions + "번 (수업 1번 = 게임 " + SimConfig.DAYS_PER_SESSION + "일, 씨앗 " + SimConfig.SEED + ")");
 islands.forEach((island) => console.log(island.report() + "\n"));

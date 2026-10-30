@@ -121,6 +121,10 @@ class FrGame {
   private lastSleepCheck = 0;
   private island = "";
   private adminWindow: FrAdminWindow | null = null;
+  private fade!: FrFade;
+  private levelPick: number | null = null;
+  private rotation = 0;
+  private morningPending = false;
 
   constructor(private readonly libs: ThreeLibs) {
     this.toast = new FrToast(FrDom.el("toast"));
@@ -141,6 +145,7 @@ class FrGame {
     tools.clips.forEach((clip, name) => this.clips.set(name, clip));
     this.factory = new CharacterModelFactory(this.libs, this.assets);
     this.labels = new RkLabelFactory(this.libs);
+    this.fade = new FrFade(FrDom.el("fade"));
     this.profile = new PlayerProfile();
     const editor = new ProfileEditor(this.libs, this.factory, this.assets, this.profile);
     editor.mount(FrDom.el("profileHost"));
@@ -216,10 +221,13 @@ class FrGame {
     world.syncSnow(clock.day());
     const user = window.PORTAL_USER;
     const nick = user && user.nick ? user.nick : this.profile.nickOrDefault();
-    const session = new FrSession(world, this.uid, nick);
+    const account = window.PORTAL_USER;
+    const session = new FrSession(world, this.uid, nick, FrMemberWriter.numberFor(this.uid, account ? account.name : ""));
+    session.admin = this.isAdmin();
     const save = new FrAccountSave(this.backend, this.uid);
     session.restore(await save.load());
     this.view.useWorld(world);
+    this.view.setLabels(this.labels, this.uid);
     this.world = world;
     this.clock = clock;
     this.session = session;
@@ -229,7 +237,11 @@ class FrGame {
     this.island = island;
     this.startSync(world, clock, island);
     this.buildWindows(session);
-    if (this.isAdmin()) this.adminWindow = this.windows.register(new FrAdminWindow(session, this.toast, new FrAdminTools(this.backend, island, clock, world), this.roster, this.adminNode, clock, island));
+    if (this.isAdmin()) {
+      const panel = this.windows.register(new FrAdminWindow(session, this.toast, new FrAdminTools(this.backend, island, clock, world), this.roster, this.adminNode, clock, island));
+      panel.focus = () => (this.player ? this.player.cell() : null);
+      this.adminWindow = panel;
+    }
     session.onChange(() => { save.queue(session.toSave()); this.refreshHud(); });
     document.addEventListener("visibilitychange", () => { if (document.hidden) void save.flush(); });
     this.start.enter(true, "섬: " + island + " · " + FrStatusSummary.line(session));
@@ -245,6 +257,8 @@ class FrGame {
     this.adminNode.onCommand = (uid, type) => { this.runCommand(type); void this.backend.set("forest/" + island + "/admin/cmd/" + uid, null); };
     const hub = new FrSyncHub();
     hub.register("jungle", new FrJungleNode(world));
+    hub.register("blocks", new FrBlocksNode(world));
+    hub.register("lots", new FrLotsNode(world));
     hub.register("terrain", new FrTerrainNode(world));
     hub.register("snow", new FrSnowNode(world));
     hub.register("build", new FrBuildNode(world));
@@ -271,18 +285,21 @@ class FrGame {
       this.toast.show("선생님이 광장으로 옮겼어요");
     } else if (type === "wake" && this.session) {
       this.session.sleeping = false;
+      void this.fade.lift(900);
       this.toast.show("선생님이 깨웠어요");
     }
   }
 
   private onSkipped(): void {
-    if (!this.session) return;
-    if (this.session.sleeping) {
-      this.session.sleeping = false;
-      this.session.ap.fill();
-      this.session.changed();
-      this.toast.show("좋은 아침이에요! 행동력이 가득 찼어요");
-    }
+    if (!this.session || !this.session.sleeping) return;
+    this.session.sleeping = false;
+    this.session.ap.fill();
+    this.session.changed();
+    this.fade.snapBlack();
+    window.setTimeout(() => {
+      void this.fade.lift(2400);
+      this.toast.show("좋은 아침이에요! 행동력이 가득 찼어요", 3200);
+    }, 700);
   }
 
   private buildWindows(session: FrSession): void {
@@ -295,6 +312,8 @@ class FrGame {
 
   private enterGame(): void {
     if (!this.world || !this.session || !this.clock) return;
+    const others = this.roster.aliveUids().filter((uid) => uid !== this.uid && !(this.roster.members.get(uid) || { adm: false }).adm).length;
+    if (!this.isAdmin() && others >= FrBalance.MAX_ISLAND_PLAYERS) { this.start.enter(false, "이 섬은 " + FrBalance.MAX_ISLAND_PLAYERS + "명이 모두 들어와 있어요. 잠시 뒤 다시 눌러 주세요."); window.setTimeout(() => this.start.enter(true, "다시 들어가 볼까요?"), 4000); return; }
     this.backdrop.stop();
     this.start.hide();
     FrDom.el("hud").hidden = false;
@@ -324,6 +343,7 @@ class FrGame {
     FrDom.el("btnSleep").addEventListener("click", () => void this.toggleSleep());
     this.view.rig.snap(new this.libs.THREE.Vector3(player.x, player.y, player.z));
     this.lastDay = this.clock.day();
+    this.view.canvas.addEventListener("click", (event) => this.clickWorld(event.clientX, event.clientY));
     this.input.enabled = true;
     this.playing = true;
     this.refreshHud();
@@ -336,9 +356,42 @@ class FrGame {
     this.hotbar.render();
   }
 
+  private clickWorld(clientX: number, clientY: number): void {
+    if (!this.playing || !this.session || !this.player || !this.finder || this.currentTask || this.windows.anyOpen() || this.session.sleeping) return;
+    const pick = this.view.pick(clientX, clientY);
+    if (!pick) return;
+    if (pick.kind === "ground" && pick.cell) {
+      const blockTarget = this.finder.blockTarget(pick.cell, this.finderContext());
+      const B = FrTerrainData.BLOCK;
+      if (blockTarget && Math.hypot(this.player.x - (pick.cell.x + 0.5) * B, this.player.z - (pick.cell.z + 0.5) * B) <= 6) { this.act(blockTarget); return; }
+    }
+    const result = this.finder.fromPick(pick, this.player);
+    if (result.far) { this.toast.show("조금 더 가까이 가서 눌러 주세요"); return; }
+    if (!result.target) return;
+    if (this.adminNode.state.lock && !this.isAdmin()) { this.toast.show("선생님이 잠시 멈췄어요. 걷기만 할 수 있어요."); return; }
+    this.act(result.target);
+  }
+
+  private pressFeedback(game: FrMiniGame, hitsBefore: number): void {
+    const hitsNow = game instanceof FrCenterStop ? Math.round(game.progress() * game.hitsNeeded) : hitsBefore;
+    if (game.state === "fail") this.mini.feedback("miss");
+    else if (game instanceof FrCenterStop && hitsNow > hitsBefore) this.mini.feedback("hit");
+    else this.mini.feedback("press");
+    if (!this.player || !this.currentTask) return;
+    const front = this.player.frontCell();
+    const B = FrTerrainData.BLOCK;
+    this.view.burst.emit((front.x + 0.5) * B, this.player.y + 1.4, (front.z + 0.5) * B, FrTaskColors.of(this.currentTask.task.kind), game.state === "fail" ? 2 : 4, 4);
+  }
+
   private press(): void {
     if (!this.playing || !this.session) return;
-    if (this.currentTask) { this.currentTask.game.press(); return; }
+    if (this.currentTask) {
+      const game = this.currentTask.game;
+      const before = game instanceof FrCenterStop ? Math.round(game.progress() * game.hitsNeeded) : 0;
+      game.press();
+      this.pressFeedback(game, before);
+      return;
+    }
     if (this.windows.anyOpen() || this.session.sleeping || !this.target) return;
     if (this.adminNode.state.lock && !this.isAdmin()) { this.toast.show("선생님이 잠시 멈췄어요. 걷기만 할 수 있어요."); return; }
     this.act(this.target);
@@ -352,6 +405,9 @@ class FrGame {
     if (!this.playing) return;
     if (code === "Escape") { this.windows.closeAll(); this.cancelTask(); return; }
     if (code === "KeyI") { this.toggleBag(); return; }
+    if (code === "KeyR") { this.adjustLevel(1); return; }
+    if (code === "KeyF") { this.adjustLevel(-1); return; }
+    if (code === "KeyT") { this.rotation = (this.rotation + 1) % 4; this.toast.show("블록을 돌렸어요"); return; }
     if (code === "KeyZ") { void this.toggleSleep(); return; }
     if (code === "F2" && this.adminWindow) { if (this.adminWindow.isOpen) this.adminWindow.close(); else this.windows.openOnly(this.adminWindow); return; }
     if (code.indexOf("Digit") === 0) { const n = Number(code.slice(5)); if (n >= 1 && n <= FrBalance.HOTBAR_SLOTS) this.useHotbar(n - 1); }
@@ -363,10 +419,77 @@ class FrGame {
   }
 
   private useHotbar(slot: number): void {
-    const item = this.session ? this.session.bag.slots[slot] : undefined;
-    if (!this.session || !item) return;
-    if (FrFoodRules.canEat(item.id)) this.toast.show(this.session.eat(item.id) ? "냠냠! 행동력이 찼어요" : "행동력이 가득해요");
-    else this.toast.show(FrItemNames.label(item.id));
+    if (!this.session) return;
+    const item = this.session.bag.slots[slot];
+    const already = this.session.selected === slot;
+    this.session.selected = slot;
+    this.levelPick = null;
+    this.session.changed();
+    if (!item) return;
+    if (already && FrFoodRules.canEat(item.id)) this.toast.show(this.session.eat(item.id) ? "냠냠! 행동력이 찼어요" : "행동력이 가득해요");
+    else if (item.id.indexOf("block_") === 0) this.toast.show(FrItemNames.label(item.id) + " — 앞 칸에 놓아요 (R/F 높이, T 돌리기)");
+    else this.toast.show(FrItemNames.label(item.id) + (FrFoodRules.canEat(item.id) ? " — 한 번 더 누르면 먹어요" : ""));
+  }
+
+  private finderContext(): FrFinderContext {
+    const session = this.session as FrSession;
+    const bodies: FrPoint[] = [];
+    this.roster.aliveUids().forEach((uid) => {
+      const pose = this.roster.poses.get(uid);
+      if (pose && uid !== this.uid) bodies.push({ x: Math.floor(pose.x / FrTerrainData.BLOCK), z: Math.floor(pose.z / FrTerrainData.BLOCK) });
+    });
+    if (this.player) bodies.push(this.player.cell());
+    return { held: session.heldBlock(), me: session.player(), bodies, levelPick: this.levelPick, rotation: this.rotation };
+  }
+
+  private adjustLevel(direction: number): void {
+    if (!this.player || !this.world || !this.session || !this.session.heldBlock()) return;
+    const front = this.player.frontCell();
+    const current = FrBlockRules.chooseLevel(this.world, front.x, front.z, this.levelPick);
+    this.levelPick = FrBlockRules.stepLevel(this.world, front.x, front.z, current, direction);
+  }
+
+  private async placeHere(target: FrTarget): Promise<void> {
+    if (!this.session || !this.world || !target.plan || !target.check) return;
+    if (!target.check.ok) { this.toast.show(target.check.reason); return; }
+    const plan = target.plan;
+    const ok = await this.world.placeBlock(plan.x, plan.z, plan.y, plan.t, plan.r, this.session.player());
+    if (!ok) { this.toast.show("다른 친구가 먼저 놓았어요"); return; }
+    this.session.bag.take(plan.t, 1);
+    this.levelPick = null;
+    this.session.changed();
+    const B = FrTerrainData.BLOCK;
+    this.view.burst.emit((plan.x + 0.5) * B, this.world.terrain.surfaceY(plan.x, plan.z) + plan.y * B + 1, (plan.z + 0.5) * B, [0xffffff, 0xd9d2c0], 6, 3);
+  }
+
+  private async removeHere(target: FrTarget): Promise<void> {
+    if (!this.session || !this.world || !target.cell || target.removeY === undefined) return;
+    const record = this.world.blocks.get(this.world.terrain.index(target.cell.x, target.cell.z), target.removeY);
+    if (!record) return;
+    const mine = record.n === this.session.no;
+    if (mine && this.session.bag.freeSlots() < 1 && this.session.bag.count(record.t) % FrBalance.STACK_SIZE === 0) { this.toast.show("가방이 가득 찼어요"); return; }
+    const removed = await this.world.removeBlock(target.cell.x, target.cell.z, target.removeY, this.session.player());
+    if (!removed) return;
+    if (mine) this.session.gain(removed.t, 1);
+    const B = FrTerrainData.BLOCK;
+    this.view.burst.emit((target.cell.x + 0.5) * B, this.world.terrain.surfaceY(target.cell.x, target.cell.z) + target.removeY * B + 1, (target.cell.z + 0.5) * B, [0xffffff, 0xb0a890], 6, 3);
+  }
+
+  private async claimLot(index: number): Promise<void> {
+    if (!this.session || !this.world) return;
+    const ok = await this.world.claimLot(index, { uid: this.uid, no: this.session.no, name: this.session.nick });
+    this.toast.show(ok ? "내 집터로 정했어요! 블록으로 마음껏 지어요" : "그 집터는 이미 임자가 있어요");
+  }
+
+  private async buildHouse(index: number): Promise<void> {
+    if (!this.session || !this.world) return;
+    const source = this.session.craftSource();
+    if (!source.canPay(FrHouseKit.COST)) { this.toast.show("재료가 모자라요: 목재 30 · 돌 20 · 노끈 10"); return; }
+    const anchor = this.world.terrain.anchors.lots[index];
+    source.pay(FrHouseKit.COST);
+    await this.world.placeMany(FrHouseKit.blueprint(anchor), this.session.player());
+    this.session.changed();
+    this.toast.show("작은 집이 지어졌어요! 블록을 바꿔 꾸며 보세요", 3500);
   }
 
   private act(target: FrTarget): void {
@@ -374,6 +497,10 @@ class FrGame {
     if (target.kind === "cook" && this.cookWindow) { this.windows.openOnly(this.cookWindow); return; }
     if (target.kind === "chest" && this.chestWindow) { this.windows.openOnly(this.chestWindow); return; }
     if (target.kind === "site" && target.site) { this.openSite(target.site); return; }
+    if (target.kind === "place") { void this.placeHere(target); return; }
+    if (target.kind === "remove") { void this.removeHere(target); return; }
+    if (target.kind === "lot" && target.lot !== undefined) { void this.claimLot(target.lot); return; }
+    if (target.kind === "house" && target.lot !== undefined) { void this.buildHouse(target.lot); return; }
     const task = FrTasks.forTarget(target.kind);
     if (task) this.startTask(target, task);
   }
@@ -412,8 +539,14 @@ class FrGame {
     const current = this.currentTask;
     if (!current || !this.outcome) return;
     this.currentTask = null;
-    this.mini.hide();
-    if (current.game.state !== "success") return;
+    if (current.game.state !== "success") { this.mini.hide(); return; }
+    this.mini.celebrate();
+    window.setTimeout(() => { if (!this.currentTask) this.mini.hide(); }, 950);
+    if (this.player) {
+      const cell = current.target.cell || this.player.frontCell();
+      const B = FrTerrainData.BLOCK;
+      this.view.burst.emit((cell.x + 0.5) * B, this.view.terrainData().surfaceY(cell.x, cell.z) + 2.2, (cell.z + 0.5) * B, FrTaskColors.success(current.task.kind), 22, 7);
+    }
     const message = await this.outcome.finish(current.target, current.task);
     if (message) this.toast.show(message);
   }
@@ -437,11 +570,12 @@ class FrGame {
 
   private async toggleSleep(): Promise<void> {
     if (!this.session || !this.clock) return;
-    if (this.session.sleeping) { this.session.sleeping = false; this.toast.show("일어났어요"); await this.publishPresence(true); return; }
+    if (this.session.sleeping) { this.session.sleeping = false; void this.fade.lift(700); this.toast.show("일어났어요"); await this.publishPresence(true); return; }
     if (!FrSleepVote.canSleep(this.clock.minuteOfDay(), this.session.area)) return;
     this.cancelTask();
     this.windows.closeAll();
     this.session.sleeping = true;
+    void this.fade.dim(0.55, 2600);
     await this.publishPresence(true);
     await this.tryMorning();
   }
@@ -452,8 +586,13 @@ class FrGame {
   }
 
   private async tryMorning(): Promise<void> {
-    if (!this.session || !this.clock || !this.session.sleeping) return;
+    if (!this.session || !this.clock || !this.session.sleeping || this.morningPending) return;
     if (!FrSleepVote.allAsleep(this.presences())) return;
+    this.morningPending = true;
+    await this.fade.blackout(1600);
+    this.morningPending = false;
+    if (!this.session.sleeping) return;
+    if (!FrSleepVote.allAsleep(this.presences())) { void this.fade.dim(0.55, 900); return; }
     if (await this.clock.skipToMorning()) this.onSkipped();
   }
 
@@ -481,7 +620,10 @@ class FrGame {
     this.view.fadeTreesAround(player.cell());
     if (this.remotes) this.remotes.update(dt);
     if (this.posePublisher) this.posePublisher.send(player.x, player.z, player.y, player.facing, this.poseCode(player.moving), player.vx, player.vz);
-    this.target = blocked ? null : this.finder.find(player);
+    this.target = blocked ? null : this.finder.find(player, this.finderContext());
+    const place = this.target && this.target.kind === "place" ? this.target : null;
+    if (place && place.plan) this.view.setPreview(place.cell, place.plan.y, !!place.check && place.check.ok);
+    else this.view.setPreview(null, 0, true);
     this.view.setMarker(this.target && this.target.cell ? this.target.cell : null);
     this.input.setActionLabel(this.target ? this.target.label : "·");
     if (this.currentTask) {
@@ -509,6 +651,7 @@ class FrGame {
       this.session.ap.current = FrSleepVote.morningActionPoints(true, false, this.session.ap.current, this.session.ap.max());
       this.session.sleeping = false;
       this.session.changed();
+      void this.fade.lift(1800);
       this.toast.show("아침이 밝았어요");
     }
   }

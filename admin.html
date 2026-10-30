@@ -545,12 +545,12 @@
         <!-- 40번 동마의 숲 섬 코드(2026-10-30): 학생은 시작 화면에 코드를 넣어 섬에 들어가고(forestCodes/<코드> = {cls, island}),
              한 번 정해진 섬은 학생이 바꾸지 못한다. 배포용(test)은 코드 없이 test_1 섬으로 들어간다. 동작은 스크립트의 ForestCodePanel. -->
         <div id="forestBody" hidden>
-          <p class="hint">반마다 섬 2개의 코드를 적어 학생에게 알려 주세요(짧은 영문·숫자·한글 2~12자). 학생은 처음 한 번만 코드를 넣고, 다음부터는 바로 들어갑니다. 반 링크는 그 반 코드만 받습니다.
+          <p class="hint">반마다 섬 3개(섬마다 최대 10명)의 코드를 적어 학생에게 알려 주세요(짧은 영문·숫자·한글 2~12자). 학생은 처음 한 번만 코드를 넣고, 다음부터는 바로 들어갑니다. 반 링크는 그 반 코드만 받습니다.
             배포용 링크(<code>?c=test</code>)는 코드 없이 <b>test_1</b> 섬 하나로 모두 들어옵니다. 대회서버는 반 칸을 <b>test</b>로 골라 만든 코드로 들어옵니다.</p>
           <div class="actions">
             <input id="forestCode" type="text" maxlength="12" autocomplete="off" placeholder="새 섬 코드">
             <select id="forestCls"></select>
-            <select id="forestIsland"><option value="1">1섬</option><option value="2">2섬</option></select>
+            <select id="forestIsland"><option value="1">1섬</option><option value="2">2섬</option><option value="3">3섬</option></select>
             <button id="forestAdd" type="button">코드 저장</button>
           </div>
           <p class="msg" id="forestMsg"></p>

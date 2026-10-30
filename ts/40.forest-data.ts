@@ -36,6 +36,8 @@ class FrBalance {
   static readonly TOOL_DURABILITY = 100;
   static readonly WEAPON_DURABILITY = 200;
   static readonly HOTBAR_SLOTS = 8;
+  static readonly MAX_ISLAND_PLAYERS = 10;
+  static readonly ISLANDS_PER_CLASS = 3;
   static readonly GEAR_MATERIAL_COUNT = 3;
 
   static readonly DAY_REAL_SECONDS = 240;

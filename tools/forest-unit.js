@@ -1,5 +1,6 @@
 const F = require("./forest-load.js")();
-const { FrBalance, FrCatalog, FrRandom, FrFruitRoll, FrFishRoll, FrOreRoll, FrDungeonDrops, FrBag, FrPublicStore, FrChestStore, FrPersonalCraftSource, FrVillageBuildSource, FrActionPoints, FrRecipeRules, FrCraftRules, FrRingRules, FrCropRules, FrSnowRules, FrVillage, FrDungeonRules, FrClock, FrSleepVote, FrMashGauge, FrCenterStop, FrShrinkRing, FrHoldRelease, FrMiniGameFactory, FrFoodRules } = F;
+const { FrBalance, FrCatalog, FrRandom, FrFruitRoll, FrFishRoll, FrOreRoll, FrDungeonDrops, FrBag, FrPublicStore, FrChestStore, FrPersonalCraftSource, FrVillageBuildSource, FrActionPoints, FrRecipeRules, FrCraftRules, FrRingRules, FrCropRules, FrSnowRules, FrVillage, FrDungeonRules, FrClock, FrSleepVote, FrMashGauge, FrCenterStop, FrShrinkRing, FrHoldRelease, FrMiniGameFactory, FrFoodRules, FrTerrainData, FrWorld, FrLocalBackend, FrBlockStore, FrBlockRules, FrHouseKit, FrBlockKey } = F;
+const terrainFile = JSON.parse(require("fs").readFileSync(require("path").join(__dirname, "..", "assets/forest/island-terrain.json"), "utf8"));
 
 let passed = 0;
 const failures = [];
@@ -187,6 +188,47 @@ const sourceOf = (bag, pub = new FrPublicStore(), chest = new FrChestStore()) =>
   check("꾹 눌러 떼기: 일찍 떼면 실패", (() => { const g = new FrHoldRelease(0.25); g.press(); g.tick(0.2); g.release(); return g.state === "fail"; })());
   check("도끼 등급별 맞출 횟수 4→1", FrMiniGameFactory.create("chop", 0).hitsNeeded === 4 && FrMiniGameFactory.create("chop", 3).hitsNeeded === 1);
   check("삽·곡괭이 없으면 못 하는 작업", FrMiniGameFactory.create("dig", 0) === null && FrMiniGameFactory.create("snow", 0) === null && FrMiniGameFactory.create("hardRock", 1) === null && FrMiniGameFactory.create("hardRock", 2) !== null);
+}
+
+
+{
+  const makeWorld = () => new FrWorld("t", new FrTerrainData(terrainFile), new FrLocalBackend(false));
+  const world = makeWorld();
+  const t = world.terrain;
+  const me = { uid: "u1", no: 20101, admin: false }, other = { uid: "u2", no: 20102, admin: false }, admin = { uid: "a", no: 1, admin: true };
+  let free = null;
+  for (let z = 30; z < 55 && !free; z++) for (let x = 30; x < 55 && !free; x++) {
+    const ok = t.top(x, z) === "G" && !t.isShielded(x, z) && !world.blocked(x, z) && [[1, 0], [-1, 0], [0, 1], [0, -1]].every(([dx, dz]) => t.top(x + dx, z + dz) === "G" && !t.isShielded(x + dx, z + dz) && !world.blocked(x + dx, z + dz)) && FrBlockRules.lotIndexAt(world, x, z) < 0;
+    if (ok) free = [x, z];
+  }
+  const [fx, fz] = free;
+  const idx = t.index(fx, fz);
+  check("블록 저장소: 놓고 높이 세고 치움", (() => { const s = new FrBlockStore(); s.set(5, 0, { t: "block_wood", n: 1, r: 0 }); s.set(5, 1, { t: "block_wood", n: 1, r: 0 }); const top = s.top(5); s.set(5, 1, null); return top === 2 && s.top(5) === 1 && s.total() === 1; })());
+  check("블록 키 읽기", FrBlockKey.parse(FrBlockKey.key(1234, 3)).index === 1234 && FrBlockKey.parse("77_5").y === 5);
+  check("빈터 맨 아래 칸에는 놓을 수 있음", FrBlockRules.check(world, fx, fz, 0, me, []).ok);
+  check("받쳐 주는 블록 없이 높이 1 은 못 놓음", !FrBlockRules.check(world, fx, fz, 1, me, []).ok);
+  world.blocks.set(idx, 0, { t: "block_wood", n: me.no, r: 0 });
+  check("아래에 블록이 있으면 위에 놓을 수 있음", FrBlockRules.check(world, fx, fz, 1, me, []).ok && FrBlockRules.allowedLevels(world, fx, fz).join() === "1");
+  check("옆 블록에 붙은 높이는 놓을 수 있음", (() => { world.blocks.set(t.index(fx + 1, fz), 0, { t: "block_wood", n: me.no, r: 0 }); world.blocks.set(t.index(fx + 1, fz), 1, { t: "block_wood", n: me.no, r: 0 }); return FrBlockRules.allowedLevels(world, fx, fz).indexOf(1) >= 0; })());
+  check("8칸까지만 쌓음", (() => { const w = makeWorld(); for (let y = 0; y < 8; y++) w.blocks.set(idx, y, { t: "block_wood", n: 1, r: 0 }); return !FrBlockRules.check(w, fx, fz, 8, me, []).ok; })());
+  check("물·광장·창고 앞·길에는 못 놓음", (() => { const w = makeWorld(); const wc = (() => { for (let x = 0; x < w.terrain.w; x++) if (w.terrain.top(x, 60) === "R") return x; return -1; })(); const plaza = w.terrain.anchors.plaza; return !FrBlockRules.check(w, wc, 60, 0, me, []).ok && !FrBlockRules.check(w, plaza.x + 2, plaza.z, 0, me, []).ok && !FrBlockRules.check(w, w.terrain.anchors.publicChest.x, w.terrain.anchors.publicChest.z + 3, 0, me, []).ok; })());
+  check("나무 자리·사람 몸 위에는 못 놓음", (() => { const w = makeWorld(); const spot = Array.from(w.trees.values())[0]; return !FrBlockRules.check(w, spot.x, spot.z, 0, me, []).ok && !FrBlockRules.check(w, fx, fz, 1, me, [{ x: fx, z: fz }]).ok; })());
+  check("집터: 주인 없으면 못 놓고, 내 집터는 놓고, 남의 집터는 못 놓음", (() => {
+    const w = makeWorld(); const lot = w.terrain.anchors.lots[0]; const x = lot.x + 1, z = lot.z + 1;
+    const none = !FrBlockRules.check(w, x, z, 0, me, []).ok;
+    w.lots.set(0, { uid: me.uid, no: me.no, name: "나" });
+    const mine = FrBlockRules.check(w, x, z, 0, me, []).ok;
+    const theirs = !FrBlockRules.check(w, x, z, 0, other, []).ok;
+    const adminOk = FrBlockRules.check(w, x, z, 0, admin, []).ok;
+    return none && mine && theirs && adminOk;
+  })());
+  check("한 학생은 집터 하나만(내 집터 찾기)", (() => { const w = makeWorld(); w.lots.set(3, { uid: "u9", no: 1, name: "a" }); return FrBlockRules.ownLot(w, "u9") === 3 && FrBlockRules.ownLot(w, "u1") === -1; })());
+  check("빈터 300개 한도", (() => { const w = makeWorld(); let n = 0; for (let z = 0; z < w.terrain.d && n < 300; z++) for (let x = 0; x < w.terrain.w && n < 300; x++) { if (w.terrain.top(x, z) === "G") { w.blocks.set(w.terrain.index(x, z), 0, { t: "block_wood", n: me.no, r: 0 }); n++; } } return !FrBlockRules.check(w, fx, fz, 0, me, []).ok && FrBlockRules.check(w, fx, fz, 0, admin, []).ok; })());
+  check("치우기 권한: 내 것·운영자만", (() => { const rec = { t: "block_wood", n: me.no, r: 0 }; return FrBlockRules.canRemove(rec, me) && !FrBlockRules.canRemove(rec, other) && FrBlockRules.canRemove(rec, admin); })());
+  check("치울 블록은 가장 위의 내 블록", (() => { const w = makeWorld(); w.blocks.set(idx, 0, { t: "a", n: me.no, r: 0 }); w.blocks.set(idx, 1, { t: "b", n: other.no, r: 0 }); w.blocks.set(idx, 2, { t: "c", n: me.no, r: 0 }); return FrBlockRules.removable(w, fx, fz, me) === 2 && FrBlockRules.removable(w, fx, fz, other) === 1; })());
+  check("집 틀: 집터 안에 73개, 문 1개·창문 3개", (() => { const lot = terrainFile.anchors.lots[0]; const plan = FrHouseKit.blueprint(lot); const inside = plan.every((p) => p.x >= lot.x && p.x < lot.x + lot.size && p.z >= lot.z && p.z < lot.z + lot.size); return inside && plan.length === 73 && plan.filter((p) => p.t === "block_door").length === 1 && plan.filter((p) => p.t === "block_window").length === 3; })());
+  check("집 틀 재료: 목재 30·돌 20·노끈 10", FrHouseKit.COST.wood === 30 && FrHouseKit.COST.stone === 20 && FrHouseKit.COST.rope === 10);
+  check("단계 바꾸기 R/F", (() => { const w = makeWorld(); w.blocks.set(idx, 0, { t: "x", n: 1, r: 0 }); w.blocks.set(t.index(fx + 1, fz), 0, { t: "x", n: 1, r: 0 }); w.blocks.set(t.index(fx + 1, fz), 1, { t: "x", n: 1, r: 0 }); const levels = FrBlockRules.allowedLevels(w, fx, fz); return levels.join() === "1" && FrBlockRules.chooseLevel(w, fx, fz, null) === 1; })());
 }
 
 if (failures.length > 0) {

@@ -52,7 +52,7 @@ class FrRoster {
         return list;
     }
 }
-FrRoster.STALE_MS = 45000;
+FrRoster.STALE_MS = 75000;
 class FrMapNode {
     apply(rest, value) {
         if (rest.length === 0) {
@@ -122,6 +122,36 @@ class FrPublicNode extends FrMapNode {
         this.known.add(rest[0]);
         this.world.remotePublic(rest[0], value === null ? 0 : Number(value));
     }
+}
+class FrBlocksNode extends FrMapNode {
+    constructor(world) {
+        super();
+        this.world = world;
+    }
+    replaceAll(table) { Object.keys(table).forEach((chunk) => this.setOne([chunk], table[chunk])); }
+    setOne(rest, value) {
+        if (rest.length === 1) {
+            const cells = (value || {});
+            Object.keys(cells).forEach((key) => this.setOne([rest[0], key], cells[key]));
+            return;
+        }
+        const parsed = FrBlockKey.parse(rest[1]);
+        const record = value && typeof value === "object" ? value : null;
+        this.world.remoteBlock(parsed.index, parsed.y, record);
+    }
+}
+class FrLotsNode extends FrMapNode {
+    constructor(world) {
+        super();
+        this.world = world;
+    }
+    replaceAll(table) {
+        const keep = new Set(Object.keys(table).map(Number));
+        Array.from(this.world.lots.keys()).forEach((n) => { if (!keep.has(n))
+            this.world.remoteLot(n, null); });
+        Object.keys(table).forEach((n) => this.world.remoteLot(Number(n), table[n]));
+    }
+    setOne(rest, value) { this.world.remoteLot(Number(rest[0]), value && typeof value === "object" ? value : null); }
 }
 class FrLogNode extends FrMapNode {
     constructor(world) {
@@ -295,7 +325,7 @@ class FrPresencePublisher {
     }
     async leave() { await this.backend.set(this.path(), null); await this.backend.set("forest/" + this.island + "/pos/" + this.uid, null); }
 }
-FrPresencePublisher.REFRESH_MS = 15000;
+FrPresencePublisher.REFRESH_MS = 30000;
 class FrPosePublisher {
     constructor(backend, island, uid) {
         this.backend = backend;
@@ -334,7 +364,7 @@ class FrPosePublisher {
         return now - this.last > FrPosePublisher.MAX_SILENCE_MS;
     }
 }
-FrPosePublisher.INTERVAL_MS = 250;
+FrPosePublisher.INTERVAL_MS = 500;
 FrPosePublisher.MAX_ERROR = 0.9;
 FrPosePublisher.VELOCITY_CHANGE = 0.8;
 FrPosePublisher.MAX_SILENCE_MS = 3000;
@@ -347,7 +377,16 @@ class FrMemberWriter {
         const match = /^(\d+)/.exec(name);
         return match ? Number(match[1]) : 0;
     }
+    static numberFor(uid, accountName) {
+        const fromName = FrMemberWriter.studentNumber(accountName);
+        if (fromName > 0)
+            return fromName;
+        let hash = 0;
+        for (let i = 0; i < uid.length; i++)
+            hash = (Math.imul(hash, 31) + uid.charCodeAt(i)) | 0;
+        return 90000 + (Math.abs(hash) % 9000);
+    }
     async write(uid, accountName, nick, look, adm) {
-        await this.backend.set("forest/" + this.island + "/members/" + uid, { no: FrMemberWriter.studentNumber(accountName), name: nick, look, adm: adm ? 1 : 0 });
+        await this.backend.set("forest/" + this.island + "/members/" + uid, { no: FrMemberWriter.numberFor(uid, accountName), name: nick, look, adm: adm ? 1 : 0 });
     }
 }

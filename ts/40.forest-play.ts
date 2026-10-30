@@ -157,7 +157,7 @@ class FrPlayerBody {
   }
 }
 
-type FrTargetKind = "cook" | "chest" | "site" | "tree" | "dig" | "stone" | "snow";
+type FrTargetKind = "cook" | "chest" | "site" | "tree" | "dig" | "stone" | "snow" | "place" | "remove" | "lot" | "house";
 
 interface FrTarget {
   kind: FrTargetKind;
@@ -165,12 +165,24 @@ interface FrTarget {
   cell: FrPoint | null;
   tree?: FrTreeSpot;
   site?: FrBuildSite;
+  plan?: FrBlockPlan;
+  check?: FrPlaceCheck;
+  removeY?: number;
+  lot?: number;
+}
+
+interface FrFinderContext {
+  held: string | null;
+  me: FrBlockPlayer;
+  bodies: FrPoint[];
+  levelPick: number | null;
+  rotation: number;
 }
 
 class FrTargetFinder {
   constructor(private readonly world: FrWorld) {}
 
-  find(player: FrPlayerBody): FrTarget | null {
+  find(player: FrPlayerBody, context?: FrFinderContext): FrTarget | null {
     const a = this.world.terrain.anchors;
     const B = FrTerrainData.BLOCK;
     const near = (cx: number, cz: number, range: number) => Math.hypot(player.x - cx, player.z - cz) <= range;
@@ -179,19 +191,72 @@ class FrTargetFinder {
     for (const site of FrBuildSites.STAGE_TWO) {
       if (near((site.x + 0.5) * B, (site.z + 0.5) * B, 4.8)) return { kind: "site", label: this.world.village.builtCount(site.id) > 0 ? "열기" : "짓기", cell: null, site };
     }
+    if (context) {
+      const front = player.frontCell();
+      const blockTarget = this.blockTarget(front, context);
+      if (blockTarget) return blockTarget;
+      const lotTarget = this.lotTarget(player, context);
+      if (lotTarget) return lotTarget;
+    }
     const tree = this.nearestTree(player);
     if (tree) return { kind: "tree", label: "베기", cell: { x: tree.x, z: tree.z }, tree };
-    const front = player.frontCell();
-    if (this.world.terrain.diggable(front.x, front.z) && !this.world.blocked(front.x, front.z)) {
-      const top = this.world.terrain.top(front.x, front.z);
-      const here = player.cell();
-      if (Math.abs(this.world.terrain.height(front.x, front.z) - this.world.terrain.height(here.x, here.z)) <= 1) {
-        if (top === "W") return { kind: "snow", label: "캐기", cell: front };
-        if (top === "S") return { kind: "stone", label: "캐기", cell: front };
-        return { kind: "dig", label: "파기", cell: front };
-      }
+    return this.cellTarget(player.frontCell(), player);
+  }
+
+  blockTarget(cell: FrPoint, context: FrFinderContext): FrTarget | null {
+    if (context.held) {
+      const level = FrBlockRules.chooseLevel(this.world, cell.x, cell.z, context.levelPick);
+      if (level < 0) return null;
+      const check = FrBlockRules.check(this.world, cell.x, cell.z, level, context.me, context.bodies);
+      return { kind: "place", label: "놓기", cell, plan: { x: cell.x, z: cell.z, y: level, t: context.held, r: context.rotation }, check };
     }
-    return null;
+    const y = FrBlockRules.removable(this.world, cell.x, cell.z, context.me);
+    return y >= 0 ? { kind: "remove", label: "치우기", cell, removeY: y } : null;
+  }
+
+  private lotTarget(player: FrPlayerBody, context: FrFinderContext): FrTarget | null {
+    const here = player.cell();
+    const lotIndex = FrBlockRules.lotIndexAt(this.world, here.x, here.z);
+    if (lotIndex < 0) return null;
+    const lot = this.world.lots.get(lotIndex);
+    if (!lot) return FrBlockRules.ownLot(this.world, context.me.uid) < 0 ? { kind: "lot", label: "집터 정하기", cell: null, lot: lotIndex } : null;
+    if (lot.uid !== context.me.uid) return null;
+    const anchor = this.world.terrain.anchors.lots[lotIndex];
+    const empty = this.world.blocks.countWhere((index) => { const x = index % this.world.terrain.w, z = Math.floor(index / this.world.terrain.w); return x >= anchor.x && x < anchor.x + anchor.size && z >= anchor.z && z < anchor.z + anchor.size; }) === 0;
+    return empty ? { kind: "house", label: "집 짓기", cell: null, lot: lotIndex } : null;
+  }
+
+  private cellTarget(cell: FrPoint, player: FrPlayerBody): FrTarget | null {
+    if (!this.world.terrain.diggable(cell.x, cell.z) || this.world.blocked(cell.x, cell.z) || this.world.blocks.top(this.world.terrain.index(cell.x, cell.z)) > 0) return null;
+    const here = player.cell();
+    if (Math.abs(this.world.terrain.height(cell.x, cell.z) - this.world.terrain.height(here.x, here.z)) > 1) return null;
+    const top = this.world.terrain.top(cell.x, cell.z);
+    if (top === "W") return { kind: "snow", label: "캐기", cell };
+    if (top === "S") return { kind: "stone", label: "캐기", cell };
+    return { kind: "dig", label: "파기", cell };
+  }
+
+  fromPick(pick: FrPick, player: FrPlayerBody): { target: FrTarget | null; far: boolean } {
+    const a = this.world.terrain.anchors;
+    const B = FrTerrainData.BLOCK;
+    const near = (cx: number, cz: number, range: number) => Math.hypot(player.x - cx, player.z - cz) <= range;
+    if (pick.kind === "cook") return near((a.campfire.x + 0.5) * B, (a.campfire.z + 0.5) * B, 7.5) ? { target: { kind: "cook", label: "요리", cell: null }, far: false } : { target: null, far: true };
+    if (pick.kind === "chest") return near((a.publicChest.x + a.publicChest.size / 2) * B, (a.publicChest.z + a.publicChest.size / 2) * B, 8.5) ? { target: { kind: "chest", label: "창고", cell: null }, far: false } : { target: null, far: true };
+    if (pick.kind === "site") {
+      const site = FrBuildSites.find(pick.siteId || "");
+      if (!site) return { target: null, far: false };
+      return near((site.x + 0.5) * B, (site.z + 0.5) * B, 6.8) ? { target: { kind: "site", label: this.world.village.builtCount(site.id) > 0 ? "열기" : "짓기", cell: null, site }, far: false } : { target: null, far: true };
+    }
+    if (pick.kind === "tree" && pick.spot) {
+      const spot = this.world.standingTree(this.world.terrain.index(pick.spot.x, pick.spot.z));
+      if (!spot) return { target: null, far: false };
+      return near((spot.x + 0.5) * B, (spot.z + 0.5) * B, FrPlayerBody.REACH + 2) ? { target: { kind: "tree", label: "베기", cell: { x: spot.x, z: spot.z }, tree: spot }, far: false } : { target: null, far: true };
+    }
+    if (pick.kind === "ground" && pick.cell) {
+      if (!near((pick.cell.x + 0.5) * B, (pick.cell.z + 0.5) * B, 5.4)) return { target: null, far: true };
+      return { target: this.cellTarget(pick.cell, player), far: false };
+    }
+    return { target: null, far: false };
   }
 
   private nearestTree(player: FrPlayerBody): FrTreeSpot | null {

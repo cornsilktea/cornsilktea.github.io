@@ -8,6 +8,8 @@ class FrWorld {
         this.publicStore = new FrPublicStore();
         this.snowDugDay = new Map();
         this.trees = new Map();
+        this.blocks = new FrBlockStore();
+        this.lots = new Map();
         this.felled = new Set();
         this.builtKeys = new Set();
         this.logKeys = new Set();
@@ -17,14 +19,21 @@ class FrWorld {
     listen(listener) { this.listeners.push(listener); }
     path(rest) { return "forest/" + this.island + "/" + rest; }
     async load() {
-        const [jungle, terrain, snow, build, publicAmounts, logs] = await Promise.all([
+        const [jungle, terrain, snow, build, publicAmounts, logs, blocks, lots] = await Promise.all([
             this.backend.get(this.path("jungle")),
             this.backend.get(this.path("terrain")),
             this.backend.get(this.path("snow")),
             this.backend.get(this.path("build")),
             this.backend.get(this.path("public")),
             this.backend.lastChildren(this.path("publicLog"), FrBalance.PUBLIC_LOG_LINES),
+            this.backend.get(this.path("blocks")),
+            this.backend.get(this.path("lots")),
         ]);
+        Object.keys(blocks || {}).forEach((chunk) => Object.keys(blocks[chunk]).forEach((key) => {
+            const parsed = FrBlockKey.parse(key);
+            this.blocks.set(parsed.index, parsed.y, blocks[chunk][key]);
+        }));
+        Object.keys(lots || {}).forEach((n) => this.lots.set(Number(n), lots[n]));
         Object.keys(jungle || {}).forEach((key) => this.felled.add(Number(key)));
         Object.keys(terrain || {}).forEach((chunk) => Object.keys(terrain[chunk]).forEach((key) => {
             const cell = terrain[chunk][key];
@@ -153,6 +162,98 @@ class FrWorld {
         this.logKeys.add(key);
         this.publicStore.addLine(line);
         await this.backend.set(this.path("publicLog/" + key), line);
+    }
+    blockPath(x, z, y) {
+        return this.path("blocks/" + Math.floor(x / FrTerrainMesher.CHUNK) + "_" + Math.floor(z / FrTerrainMesher.CHUNK) + "/" + FrBlockKey.key(this.terrain.index(x, z), y));
+    }
+    async placeBlock(x, z, y, type, rot, me) {
+        const record = { t: type, n: me.no, r: rot };
+        const result = await this.backend.transaction(this.blockPath(x, z, y), (current) => (current === null ? record : undefined));
+        if (!result.committed)
+            return false;
+        this.applyBlock(x, z, y, record);
+        return true;
+    }
+    async removeBlock(x, z, y, me) {
+        const old = this.blocks.get(this.terrain.index(x, z), y);
+        const result = await this.backend.transaction(this.blockPath(x, z, y), (current) => (current !== null && FrBlockRules.canRemove(current, me) ? null : undefined));
+        if (!result.committed)
+            return null;
+        this.applyBlock(x, z, y, null);
+        return old;
+    }
+    async placeMany(plan, me) {
+        const chunks = new Map();
+        plan.forEach((p) => {
+            const chunk = Math.floor(p.x / FrTerrainMesher.CHUNK) + "_" + Math.floor(p.z / FrTerrainMesher.CHUNK);
+            if (!chunks.has(chunk))
+                chunks.set(chunk, {});
+            chunks.get(chunk)[FrBlockKey.key(this.terrain.index(p.x, p.z), p.y)] = { t: p.t, n: me.no, r: p.r };
+        });
+        for (const [chunk, values] of chunks)
+            await this.backend.patch(this.path("blocks/" + chunk), values);
+        plan.forEach((p) => this.applyBlock(p.x, p.z, p.y, { t: p.t, n: me.no, r: p.r }));
+        return plan.length;
+    }
+    async clearBlocks(test) {
+        const doomed = [];
+        this.blocks.forEach((index, y, record) => {
+            const x = index % this.terrain.w, z = Math.floor(index / this.terrain.w);
+            if (test(record, x, z))
+                doomed.push([x, z, y]);
+        });
+        const chunks = new Map();
+        doomed.forEach(([x, z, y]) => {
+            const chunk = Math.floor(x / FrTerrainMesher.CHUNK) + "_" + Math.floor(z / FrTerrainMesher.CHUNK);
+            if (!chunks.has(chunk))
+                chunks.set(chunk, {});
+            chunks.get(chunk)[FrBlockKey.key(this.terrain.index(x, z), y)] = null;
+        });
+        for (const [chunk, values] of chunks)
+            await this.backend.patch(this.path("blocks/" + chunk), values);
+        doomed.forEach(([x, z, y]) => this.applyBlock(x, z, y, null));
+        return doomed.length;
+    }
+    applyBlock(x, z, y, record) {
+        if (!this.blocks.set(this.terrain.index(x, z), y, record))
+            return;
+        this.listeners.forEach((l) => l.onBlockChanged(x, z, y, record));
+    }
+    remoteBlock(index, y, record) {
+        const x = index % this.terrain.w, z = Math.floor(index / this.terrain.w);
+        const now = this.blocks.get(index, y);
+        if (now === null && record === null)
+            return;
+        if (now !== null && record !== null && now.t === record.t && now.r === record.r)
+            return;
+        if (now !== null && record === null) {
+            this.applyBlock(x, z, y, null);
+            return;
+        }
+        if (now !== null)
+            this.blocks.set(index, y, null);
+        this.blocks.set(index, y, record);
+        this.listeners.forEach((l) => l.onBlockChanged(x, z, y, record));
+    }
+    async claimLot(n, lot) {
+        const result = await this.backend.transaction(this.path("lots/" + n), (current) => (current === null ? lot : undefined));
+        if (!result.committed)
+            return false;
+        this.lots.set(n, lot);
+        this.listeners.forEach((l) => l.onLotChanged());
+        return true;
+    }
+    async releaseLot(n) {
+        await this.backend.set(this.path("lots/" + n), null);
+        this.lots.delete(n);
+        this.listeners.forEach((l) => l.onLotChanged());
+    }
+    remoteLot(n, lot) {
+        if (lot === null)
+            this.lots.delete(n);
+        else
+            this.lots.set(n, lot);
+        this.listeners.forEach((l) => l.onLotChanged());
     }
     remoteFelled(index) {
         if (this.felled.has(index))

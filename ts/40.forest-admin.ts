@@ -26,6 +26,19 @@ class FrAdminTools {
     return true;
   }
 
+  async clearAround(x: number, z: number, radius: number): Promise<number> {
+    return this.world.clearBlocks((_record, bx, bz) => Math.hypot(bx - x, bz - z) <= radius);
+  }
+
+  async clearOf(no: number): Promise<number> { return this.world.clearBlocks((record) => record.n === no); }
+
+  async emptyLot(index: number): Promise<number> {
+    const lot = this.world.terrain.anchors.lots[index];
+    const removed = await this.world.clearBlocks((_r, bx, bz) => bx >= lot.x && bx < lot.x + lot.size && bz >= lot.z && bz < lot.z + lot.size);
+    await this.world.releaseLot(index);
+    return removed;
+  }
+
   async wakeEveryone(roster: FrRoster): Promise<void> {
     await this.clock.skipToMorning();
     await Promise.all(roster.aliveUids().map((uid) => this.sendCommand(uid, "wake")));
@@ -66,7 +79,7 @@ class FrAdminWindow extends FrWindow {
 
   render(): void {
     FrDom.clear(this.body);
-    this.body.append(this.islandSection(), this.timeSection(), this.noticeSection(), this.giveSection(), this.backupSection(), this.studentSection());
+    this.body.append(this.islandSection(), this.timeSection(), this.noticeSection(), this.giveSection(), this.blockSection(), this.backupSection(), this.studentSection());
   }
 
   private section(title: string): HTMLDivElement {
@@ -121,6 +134,25 @@ class FrAdminWindow extends FrWindow {
     return box;
   }
 
+  private blockSection(): HTMLDivElement {
+    const box = this.section("블록·집터 (운영자 손은 모든 블록을 바로 부숴요)");
+    const row = FrDom.make("div", "fr-row");
+    row.appendChild(this.button("내 주변 6칸 블록 지우기", () => {
+      const player = this.focus();
+      if (player && window.confirm("내 주변 6칸의 블록을 모두 지울까요?")) void this.tools.clearAround(player.x, player.z, 6).then((n) => this.toast.show(n + "개를 지웠어요"));
+    }));
+    box.appendChild(row);
+    this.session.world.lots.forEach((lot, index) => {
+      const line = FrDom.make("div", "fr-line");
+      line.appendChild(FrDom.make("span", "", (index + 1) + "번 집터: " + lot.name));
+      line.appendChild(this.button("집터 비우기", () => { if (window.confirm((index + 1) + "번 집터의 블록을 지우고 주인을 비울까요?")) void this.tools.emptyLot(index).then(() => this.render()); }));
+      box.appendChild(line);
+    });
+    return box;
+  }
+
+  focus: () => FrPoint | null = () => null;
+
   private backupSection(): HTMLDivElement {
     const box = this.section("섬 백업·되돌리기 (최근 " + FrAdminTools.BACKUP_KEEP + "개)");
     const list = FrDom.make("div", "fr-note");
@@ -148,6 +180,7 @@ class FrAdminWindow extends FrWindow {
       const row = this.roster.presence.get(uid);
       const line = FrDom.make("div", "fr-line");
       line.appendChild(FrDom.make("span", "", member.no + " " + member.name + " · " + (alive ? (row && row.sleeping ? "잠" : FrSleepVote.areaLabel(row ? row.area : "island")) : "접속 안 함")));
+      line.appendChild(this.button("블록 치우기", () => { if (window.confirm(member.name + " 학생의 블록을 모두 치울까요?")) void this.tools.clearOf(member.no).then((n) => this.toast.show(n + "개를 치웠어요")); }));
       if (alive) {
         line.appendChild(this.button("광장으로", () => void this.tools.sendCommand(uid, "plaza")));
         line.appendChild(this.button("깨우기", () => void this.tools.sendCommand(uid, "wake")));
@@ -169,7 +202,7 @@ class FrBoardPage {
 
   static islandsFor(search: string): string[] {
     const link = FrIslandLink.linkClass(search);
-    return FrIslandLink.CLASS_PATTERN.test(link) ? [link + "_1", link + "_2"] : [FrIslandLink.TEST_ISLAND];
+    return FrIslandLink.CLASS_PATTERN.test(link) ? [1, 2, 3].map((n) => link + "_" + n) : [FrIslandLink.TEST_ISLAND];
   }
 
   constructor(private readonly backend: FrBackend, private readonly terrainFile: FrTerrainFile, private readonly uid: string) {}

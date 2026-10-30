@@ -338,7 +338,33 @@ class FrMiniGameView {
     this.root.hidden = false;
   }
 
-  hide(): void { this.game = null; this.root.hidden = true; }
+  hide(): void { this.game = null; this.root.hidden = true; this.root.classList.remove("win"); }
+
+  private restart(name: string): void {
+    this.root.classList.remove("pop-press", "pop-hit", "pop-miss");
+    void this.root.offsetWidth;
+    this.root.classList.add(name);
+  }
+
+  feedback(kind: "press" | "hit" | "miss"): void { this.restart("pop-" + kind); }
+
+  celebrate(): void {
+    this.root.hidden = false;
+    this.root.classList.add("win");
+    this.restart("pop-hit");
+    const burst = FrDom.make("div", "fr-confetti");
+    for (let i = 0; i < 18; i++) {
+      const piece = FrDom.make("span");
+      const angle = (i / 18) * Math.PI * 2 + Math.random() * 0.4, distance = 70 + Math.random() * 90;
+      piece.style.setProperty("--dx", Math.cos(angle) * distance + "px");
+      piece.style.setProperty("--dy", Math.sin(angle) * distance - 30 + "px");
+      piece.style.background = ["#FFD43A", "#9BE08A", "#FF8A5A", "#7BC8FF", "#FFFFFF"][i % 5];
+      burst.appendChild(piece);
+    }
+    const label = FrDom.make("div", "fr-win-text", "성공!");
+    this.root.append(burst, label);
+    window.setTimeout(() => { burst.remove(); label.remove(); }, 1100);
+  }
 
   private bar(): HTMLDivElement { return FrDom.make("div", "fr-track"); }
 
@@ -421,6 +447,7 @@ class FrHotbar {
       const slot = this.session.bag.slots[i];
       const cell = slot ? FrItemCell.render(slot.id, slot.count, slot.uses) : FrDom.make("div", "fr-cell empty");
       cell.appendChild(FrDom.make("div", "fr-cell-key", String(i + 1)));
+      if (i === this.session.selected) cell.classList.add("selected");
       cell.addEventListener("click", () => this.onUse(i));
       this.root.appendChild(cell);
     }

@@ -37,7 +37,7 @@ class FrRoster {
   onChange(listener: () => void): void { this.listeners.push(listener); }
   changed(): void { this.listeners.forEach((l) => l()); }
 
-  static readonly STALE_MS = 45000;
+  static readonly STALE_MS = 75000;
 
   alive(uid: string): boolean {
     const row = this.presence.get(uid);
@@ -116,6 +116,31 @@ class FrPublicNode extends FrMapNode {
     this.known.add(rest[0]);
     this.world.remotePublic(rest[0], value === null ? 0 : Number(value));
   }
+}
+
+class FrBlocksNode extends FrMapNode {
+  constructor(private readonly world: FrWorld) { super(); }
+  protected replaceAll(table: Record<string, unknown>): void { Object.keys(table).forEach((chunk) => this.setOne([chunk], table[chunk])); }
+  protected setOne(rest: string[], value: unknown): void {
+    if (rest.length === 1) {
+      const cells = (value || {}) as Record<string, unknown>;
+      Object.keys(cells).forEach((key) => this.setOne([rest[0], key], cells[key]));
+      return;
+    }
+    const parsed = FrBlockKey.parse(rest[1]);
+    const record = value && typeof value === "object" ? (value as FrBlockRecord) : null;
+    this.world.remoteBlock(parsed.index, parsed.y, record);
+  }
+}
+
+class FrLotsNode extends FrMapNode {
+  constructor(private readonly world: FrWorld) { super(); }
+  protected replaceAll(table: Record<string, unknown>): void {
+    const keep = new Set(Object.keys(table).map(Number));
+    Array.from(this.world.lots.keys()).forEach((n) => { if (!keep.has(n)) this.world.remoteLot(n, null); });
+    Object.keys(table).forEach((n) => this.world.remoteLot(Number(n), table[n] as FrLot));
+  }
+  protected setOne(rest: string[], value: unknown): void { this.world.remoteLot(Number(rest[0]), value && typeof value === "object" ? (value as FrLot) : null); }
 }
 
 class FrLogNode extends FrMapNode {
@@ -229,7 +254,7 @@ class FrSyncHub implements FrStreamSink {
 }
 
 class FrPresencePublisher {
-  static readonly REFRESH_MS = 15000;
+  static readonly REFRESH_MS = 30000;
   private last = 0;
   private lastKey = "";
 
@@ -250,7 +275,7 @@ class FrPresencePublisher {
 }
 
 class FrPosePublisher {
-  static readonly INTERVAL_MS = 250;
+  static readonly INTERVAL_MS = 500;
   static readonly MAX_ERROR = 0.9;
   static readonly VELOCITY_CHANGE = 0.8;
   static readonly MAX_SILENCE_MS = 3000;
@@ -291,7 +316,15 @@ class FrMemberWriter {
     return match ? Number(match[1]) : 0;
   }
 
+  static numberFor(uid: string, accountName: string): number {
+    const fromName = FrMemberWriter.studentNumber(accountName);
+    if (fromName > 0) return fromName;
+    let hash = 0;
+    for (let i = 0; i < uid.length; i++) hash = (Math.imul(hash, 31) + uid.charCodeAt(i)) | 0;
+    return 90000 + (Math.abs(hash) % 9000);
+  }
+
   async write(uid: string, accountName: string, nick: string, look: unknown, adm: boolean): Promise<void> {
-    await this.backend.set("forest/" + this.island + "/members/" + uid, { no: FrMemberWriter.studentNumber(accountName), name: nick, look, adm: adm ? 1 : 0 });
+    await this.backend.set("forest/" + this.island + "/members/" + uid, { no: FrMemberWriter.numberFor(uid, accountName), name: nick, look, adm: adm ? 1 : 0 });
   }
 }

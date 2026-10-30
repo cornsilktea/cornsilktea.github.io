@@ -2,7 +2,7 @@ const fs = require("fs"), vm = require("vm"), path = require("path");
 const { MockDbServer } = require("./forest-mockdb.js");
 
 const root = path.join(__dirname, "..");
-const FILES = ["40.forest-data.js", "40.forest-rules.js", "40.forest-clock.js", "40.forest-minigame.js", "40.forest-terrain.js", "40.forest-stream.js", "40.forest-net.js", "40.forest-world.js", "40.forest-sync.js", "40.forest-play.js"];
+const FILES = ["40.forest-data.js", "40.forest-rules.js", "40.forest-clock.js", "40.forest-minigame.js", "40.forest-terrain.js", "40.forest-stream.js", "40.forest-net.js", "40.forest-blocks.js", "40.forest-world.js", "40.forest-sync.js", "40.forest-play.js"];
 const NAMES = ["FrBalance", "FrCatalog", "FrClock", "FrTerrainData", "FrTreeField", "FrRestBackend", "FrWorld", "FrRoster", "FrSyncHub", "FrJungleNode", "FrTerrainNode", "FrSnowNode", "FrBuildNode", "FrPublicNode", "FrLogNode", "FrClockNode", "FrMembersNode", "FrPresenceNode", "FrPoseNode", "FrAdminNode", "FrPresencePublisher", "FrPosePublisher", "FrMemberWriter", "FrClockSync", "FrPlayerBody", "FrSleepVote", "FrWire"];
 
 class BotEnvironment {

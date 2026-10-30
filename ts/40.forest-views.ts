@@ -73,6 +73,8 @@ class FrSky {
   }
 }
 
+interface FrPick { kind: "cook" | "chest" | "site" | "tree" | "ground"; siteId?: string; spot?: FrTreeSpot; cell?: FrPoint }
+
 class FrTreeLayer {
   private readonly trunks: Three<"InstancedMesh">;
   private readonly crowns: Three<"InstancedMesh">;
@@ -118,6 +120,13 @@ class FrTreeLayer {
     group.add(this.trunks, this.crowns, this.ghosts);
   }
 
+  pick(raycaster: Three<"Raycaster">): { spot: FrTreeSpot; distance: number } | null {
+    const hits = raycaster.intersectObjects([this.trunks, this.crowns], false).filter((h) => h.instanceId !== undefined);
+    if (hits.length === 0) return null;
+    const hit = hits[0];
+    return { spot: this.spots[hit.instanceId as number], distance: hit.distance };
+  }
+
   fadeAround(cellX: number, cellZ: number): void {
     const wanted: number[] = [];
     for (let dz = -1; dz <= FrTreeLayer.GHOST_RADIUS; dz++) {
@@ -158,8 +167,7 @@ class FrTreeLayer {
 }
 
 class FrProps {
-  readonly campfireGlow: Three<"Mesh">;
-  readonly flame: Three<"Mesh">;
+  readonly fire: FrCampfireFx;
   private chest: Three<"Object3D"> | null = null;
   private readonly siteMarkers = new Map<string, Three<"Group">>();
 
@@ -169,22 +177,8 @@ class FrProps {
     const B = FrTerrainData.BLOCK;
     const campfire = new T.Group();
     campfire.position.set((a.campfire.x + 0.5) * B, world.terrain.surfaceY(a.campfire.x, a.campfire.z), (a.campfire.z + 0.5) * B);
-    const logMaterial = new T.MeshLambertMaterial({ color: 0x6b4423 });
-    for (let i = 0; i < 4; i++) {
-      const log = new T.Mesh(new T.CylinderGeometry(0.12, 0.12, 1.3, 6), logMaterial);
-      log.rotation.z = Math.PI / 2;
-      log.rotation.y = (i * Math.PI) / 4;
-      log.position.y = 0.15;
-      campfire.add(log);
-    }
-    this.flame = new T.Mesh(new T.ConeGeometry(0.4, 1.1, 6), new T.MeshBasicMaterial({ color: 0xffa530 }));
-    this.flame.position.y = 0.8;
-    const core = new T.Mesh(new T.ConeGeometry(0.2, 0.7, 6), new T.MeshBasicMaterial({ color: 0xfff0a0 }));
-    core.position.y = 0.65;
-    this.campfireGlow = new T.Mesh(new T.CircleGeometry(4.2, 24), new T.MeshBasicMaterial({ color: 0xffb347, transparent: true, opacity: 0.12, depthWrite: false }));
-    this.campfireGlow.rotation.x = -Math.PI / 2;
-    this.campfireGlow.position.y = 0.06;
-    campfire.add(this.flame, core, this.campfireGlow);
+    campfire.userData = { kind: "cook" };
+    this.fire = new FrCampfireFx(libs, campfire);
     group.add(campfire);
     this.buildChestPlaceholder();
     FrBuildSites.STAGE_TWO.forEach((site) => this.addSiteMarker(site));
@@ -196,6 +190,7 @@ class FrProps {
     const B = FrTerrainData.BLOCK;
     const holder = new T.Group();
     holder.position.set((a.x + 1) * B, this.world.terrain.surfaceY(a.x, a.z), (a.z + 1) * B);
+    holder.userData = { kind: "chest" };
     const box = new T.Mesh(new T.BoxGeometry(3.8, 2.2, 2.6), new T.MeshLambertMaterial({ color: 0x9a6a38 }));
     box.position.y = 1.1;
     const lid = new T.Mesh(new T.BoxGeometry(3.9, 0.5, 2.7), new T.MeshLambertMaterial({ color: 0x7a4f27 }));
@@ -211,6 +206,7 @@ class FrProps {
     const T = this.libs.THREE;
     const marker = new T.Group();
     marker.position.set((site.x + 0.5) * FrTerrainData.BLOCK, this.world.terrain.surfaceY(site.x, site.z), (site.z + 0.5) * FrTerrainData.BLOCK);
+    marker.userData = { kind: "site", id: site.id };
     const post = new T.Mesh(new T.BoxGeometry(0.25, 2.2, 0.25), new T.MeshLambertMaterial({ color: 0x8a5a2b }));
     post.position.y = 1.1;
     const sign = new T.Mesh(new T.BoxGeometry(1.6, 0.9, 0.12), new T.MeshLambertMaterial({ color: 0xe7c98a }));
@@ -238,11 +234,7 @@ class FrProps {
     marker.add(top, saw);
   }
 
-  flicker(time: number, night: number): void {
-    const s = 1 + Math.sin(time * 11) * 0.12 + Math.sin(time * 7.3) * 0.08;
-    this.flame.scale.set(s, 0.9 + (s - 1) * 1.6, s);
-    (this.campfireGlow.material as Three<"MeshBasicMaterial">).opacity = (0.1 + 0.45 * night) * (0.9 + 0.1 * s);
-  }
+  update(dt: number, time: number, night: number): void { this.fire.update(dt, time, night); }
 }
 
 class FrCameraRig {
@@ -281,7 +273,13 @@ class FrWorldView implements FrWorldListener {
   readonly rig: FrCameraRig;
   readonly sky: FrSky;
   readonly marker: Three<"Mesh">;
+  readonly burst: FrBurst;
   props!: FrProps;
+  blocksLayer!: FrBlockLayer;
+  lotMarkers!: FrLotMarkers;
+  readonly preview: Three<"Mesh">;
+  private labels: RkLabelFactory | null = null;
+  private selfUid = "";
   private world!: FrWorld;
   private mesher!: FrTerrainMesher;
   private readonly chunks = new Map<string, Three<"Mesh">>();
@@ -290,6 +288,7 @@ class FrWorldView implements FrWorldListener {
   private readonly terrainMaterial: Three<"MeshLambertMaterial">;
   private readonly treeGroup: Three<"Group">;
   private readonly propGroup: Three<"Group">;
+  private readonly blockGroup: Three<"Group">;
   private readonly water: Three<"Mesh">;
   private governor: QualityGovernorHandle | null = null;
   private pixelRatioCap: number;
@@ -317,10 +316,15 @@ class FrWorldView implements FrWorldListener {
     this.scene.add(this.water);
     this.treeGroup = new T.Group();
     this.propGroup = new T.Group();
-    this.scene.add(this.treeGroup, this.propGroup);
+    this.blockGroup = new T.Group();
+    this.scene.add(this.treeGroup, this.propGroup, this.blockGroup);
+    this.preview = new T.Mesh(new T.BoxGeometry(FrTerrainData.BLOCK, FrTerrainData.BLOCK, FrTerrainData.BLOCK).translate(0, FrTerrainData.BLOCK / 2, 0), new T.MeshBasicMaterial({ color: 0x9be08a, transparent: true, opacity: 0.38, depthWrite: false }));
+    this.preview.visible = false;
+    this.scene.add(this.preview);
     this.marker = new T.Mesh(new T.BoxGeometry(FrTerrainData.BLOCK, 0.18, FrTerrainData.BLOCK), new T.MeshBasicMaterial({ color: 0xffe14a, transparent: true, opacity: 0.55, depthWrite: false }));
     this.marker.visible = false;
     this.scene.add(this.marker);
+    this.burst = new FrBurst(libs, this.scene);
     this.useWorld(world);
     const steps = [() => this.lowerPixelRatio()];
     this.governor = window.QualityGovernor ? window.QualityGovernor({ steps, storageKey: "dongmaforest_quality_v1", isPlaying: () => true, slowSec: 0.022, slowLimit: 90 }) : null;
@@ -342,9 +346,32 @@ class FrWorldView implements FrWorldListener {
     this.water.position.set(size / 2, -0.9, size / 2);
     this.treeGroup.clear();
     this.propGroup.clear();
+    this.blockGroup.clear();
     this.trees = new FrTreeLayer(this.libs, world, this.treeGroup);
     this.props = new FrProps(this.libs, world, this.propGroup);
+    this.blocksLayer = new FrBlockLayer(this.libs, world, this.blockGroup);
+    this.rebuildLotMarkers();
     world.listen(this);
+  }
+
+  setLabels(labels: RkLabelFactory, selfUid: string): void {
+    this.labels = labels;
+    this.selfUid = selfUid;
+    this.rebuildLotMarkers();
+  }
+
+  private rebuildLotMarkers(): void {
+    if (!this.labels) return;
+    if (this.lotMarkers) this.propGroup.remove(this.lotMarkers.groupObject());
+    this.lotMarkers = new FrLotMarkers(this.libs, this.world, this.propGroup, this.labels, this.selfUid);
+  }
+
+  setPreview(cell: FrPoint | null, level: number, valid: boolean, large = true): void {
+    if (!cell) { this.preview.visible = false; return; }
+    this.preview.visible = true;
+    this.preview.position.set((cell.x + 0.5) * FrTerrainData.BLOCK, this.world.terrain.surfaceY(cell.x, cell.z) + level * FrTerrainData.BLOCK, (cell.z + 0.5) * FrTerrainData.BLOCK);
+    (this.preview.material as Three<"MeshBasicMaterial">).color.setHex(valid ? 0x9be08a : 0xff6b5a);
+    this.preview.scale.setScalar(large ? 1.02 : 0.5);
   }
 
   private lowerPixelRatio(): boolean {
@@ -367,6 +394,8 @@ class FrWorldView implements FrWorldListener {
   onTreeFelled(spot: FrTreeSpot): void { this.trees.remove(spot); }
   onBuilt(id: string): void { const site = FrBuildSites.find(id); if (site) this.props.showBuilt(site); }
   onPublicChanged(): void { return; }
+  onBlockChanged(x: number, z: number, y: number, record: FrBlockRecord | null): void { this.blocksLayer.apply(x, z, y, record); }
+  onLotChanged(): void { if (this.lotMarkers) this.lotMarkers.refresh(); }
 
   onTerrainEdited(x: number, z: number): void {
     const cx = Math.floor(x / FrTerrainMesher.CHUNK), cz = Math.floor(z / FrTerrainMesher.CHUNK);
@@ -390,6 +419,30 @@ class FrWorldView implements FrWorldListener {
 
   fadeTreesAround(cell: FrPoint): void { this.trees.fadeAround(cell.x, cell.z); }
 
+  pick(clientX: number, clientY: number): FrPick | null {
+    const T = this.libs.THREE;
+    const rect = this.canvas.getBoundingClientRect();
+    const pointer = new T.Vector2(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
+    const raycaster = new T.Raycaster();
+    raycaster.setFromCamera(pointer, this.rig.camera);
+    const prop = raycaster.intersectObjects(this.propGroup.children, true)[0];
+    const ground = raycaster.intersectObjects(this.terrainGroup.children, false)[0];
+    const treeHit = this.trees.pick(raycaster);
+    const best = (o: { distance: number } | undefined) => (o ? o.distance : Infinity);
+    if (prop && best(prop) <= Math.min(best(ground), treeHit ? treeHit.distance : Infinity)) {
+      let node: Three<"Object3D"> | null = prop.object;
+      while (node) {
+        const kind = (node.userData as { kind?: string }).kind;
+        if (kind) return { kind: kind as FrPick["kind"], siteId: (node.userData as { id?: string }).id };
+        node = node.parent;
+      }
+    }
+    if (treeHit && treeHit.distance <= best(ground) + 6) return { kind: "tree", spot: treeHit.spot };
+    if (!ground) return null;
+    const point = ground.point.clone().addScaledVector(raycaster.ray.direction, 0.05);
+    return { kind: "ground", cell: { x: this.world.terrain.cellOf(point.x), z: this.world.terrain.cellOf(point.z) } };
+  }
+
   applyClock(minuteOfDay: number): void { this.night = this.sky.apply(minuteOfDay); }
 
   resize(): void {
@@ -401,7 +454,8 @@ class FrWorldView implements FrWorldListener {
 
   render(dt: number, time: number): void {
     if (this.avatar) this.avatar.update(dt);
-    this.props.flicker(time, this.night);
+    this.props.update(dt, time, this.night);
+    this.burst.update(dt);
     this.renderer.render(this.scene, this.rig.camera);
     if (this.governor) this.governor.update(dt);
   }

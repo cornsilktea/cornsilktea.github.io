@@ -18,6 +18,20 @@ class FrCraftMenu {
       options.push({ id: "gear_" + kind + "_1", label: "나무 " + FrCraftMenu.KIND_NAMES[kind], cost: FrCraftRules.gearCost(1), output: FrItems.gearId(kind, 1), count: 1, station: "workbench" });
     });
     options.push({ id: "plank", label: "판자", cost: { wood: 2 }, output: "plank", count: 1, station: "workbench" });
+    const block = (id: string, label: string, cost: FrCost, count = 1) => options.push({ id: "make_" + id, label, cost, output: id, count, station: "workbench" });
+    block("block_wood", "나무 블록", { wood: 1 });
+    block("block_plank", "판자 블록", { plank: 1 });
+    block("block_brick", "돌벽돌 블록", { brick: 1 });
+    block("block_stone", "돌 블록", { stone: 1 });
+    block("block_glass", "유리 블록", { glass: 1 });
+    block("block_ice", "얼음 블록", { ice: 1 });
+    ["빨강", "노랑", "파랑", "초록"].forEach((name, i) => block("block_color_" + i, name + " 블록 ×4", { plank: 1, ["dye_" + i]: 1 }, 4));
+    block("block_stairs", "계단 ×3", { block_plank: 2 }, 3);
+    block("block_slab", "반 블록 ×3", { block_plank: 2 }, 3);
+    block("block_fence", "울타리 ×3", { block_plank: 2 }, 3);
+    block("block_door", "문", { plank: 3 });
+    block("block_window", "창문", { glass: 2 });
+    block("block_torch", "횃불 ×4", { wood: 1, coal: 1 }, 4);
     options.push({ id: "rope_seaweed", label: "노끈 (해초 3)", cost: { seaweed: 3 }, output: "rope", count: 1, station: "workbench" });
     options.push({ id: "rope_vine", label: "노끈 (덩굴 2)", cost: { vine: 2 }, output: "rope", count: 1, station: "workbench" });
     options.push({ id: "rope_cloth", label: "노끈 (천 1)", cost: { cloth: 1 }, output: "rope", count: 1, station: "workbench" });
@@ -65,12 +79,21 @@ class FrSession {
   private readonly listeners: Array<() => void> = [];
   sleeping = false;
   area = "island";
+  selected = 0;
+  admin = false;
 
-  constructor(readonly world: FrWorld, readonly uid: string, readonly nick: string, ringLevel = 0) {
+  constructor(readonly world: FrWorld, readonly uid: string, readonly nick: string, readonly no: number, ringLevel = 0) {
     this.ap = new FrActionPoints(ringLevel);
   }
 
   onChange(listener: () => void): void { this.listeners.push(listener); }
+
+  player(): FrBlockPlayer { return { uid: this.uid, no: this.no, admin: this.admin }; }
+
+  heldBlock(): string | null {
+    const slot = this.bag.slots[this.selected];
+    return slot && slot.id.indexOf("block_") === 0 ? slot.id : null;
+  }
   changed(): void { this.listeners.forEach((l) => l()); }
 
   craftSource(): FrPersonalCraftSource { return new FrPersonalCraftSource(this.personal, this.bag, this.world.publicStore); }
