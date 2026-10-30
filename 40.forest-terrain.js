@@ -202,4 +202,7 @@ class FrBuildSite {
 class FrBuildSites {
     static find(id) { return FrBuildSites.STAGE_TWO.find((s) => s.id === id); }
 }
-FrBuildSites.STAGE_TWO = [new FrBuildSite("workbench", "작업대", 55, 64)];
+FrBuildSites.STAGE_TWO = [
+    new FrBuildSite("workbench", "작업대", 55, 64), new FrBuildSite("forge", "대장간", 52, 64), new FrBuildSite("oven", "화덕", 55, 68),
+    new FrBuildSite("kitchen", "섬 부엌", 52, 68), new FrBuildSite("farm_expand", "텃밭 넓히기", 66, 78),
+];

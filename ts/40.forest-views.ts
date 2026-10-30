@@ -224,16 +224,43 @@ class FrProps {
     const marker = this.siteMarkers.get(site.id);
     if (!marker) return;
     marker.clear();
-    const top = new T.Mesh(new T.BoxGeometry(3.2, 0.35, 1.8), new T.MeshLambertMaterial({ color: 0xb98a52 }));
-    top.position.y = 1.7;
-    [[-1.3, -0.7], [1.3, -0.7], [-1.3, 0.7], [1.3, 0.7]].forEach(([dx, dz]) => {
-      const leg = new T.Mesh(new T.BoxGeometry(0.3, 1.6, 0.3), new T.MeshLambertMaterial({ color: 0x8a5a2b }));
-      leg.position.set(dx, 0.8, dz);
-      marker.add(leg);
-    });
-    const saw = new T.Mesh(new T.BoxGeometry(1.2, 0.12, 0.35), new T.MeshLambertMaterial({ color: 0xc9ced6 }));
-    saw.position.set(0.3, 1.95, 0);
-    marker.add(top, saw);
+    const mat = (color: number) => new T.MeshLambertMaterial({ color });
+    const box = (w: number, h: number, d: number, x: number, y: number, z: number, color: number) => { const m = new T.Mesh(new T.BoxGeometry(w, h, d), mat(color)); m.position.set(x, y, z); marker.add(m); return m; };
+    const builders: Record<string, () => void> = {
+      workbench: () => {
+        box(3.2, 0.35, 1.8, 0, 1.7, 0, 0xb98a52);
+        [[-1.3, -0.7], [1.3, -0.7], [-1.3, 0.7], [1.3, 0.7]].forEach(([dx, dz]) => box(0.3, 1.6, 0.3, dx, 0.8, dz, 0x8a5a2b));
+        box(1.2, 0.12, 0.35, 0.3, 1.95, 0, 0xc9ced6);
+      },
+      forge: () => {
+        box(3.4, 1.6, 2.4, 0, 0.8, 0, 0x7a7d86);
+        box(2.4, 0.5, 1.6, 0, 1.85, 0, 0x4a4c54);
+        const coals = new T.Mesh(new T.BoxGeometry(1.6, 0.2, 1), new T.MeshBasicMaterial({ color: 0xff6a20 }));
+        coals.position.set(0, 2.15, 0);
+        marker.add(coals);
+        box(0.8, 1.1, 0.8, 1.1, 2.3, -0.8, 0x6a6c74);
+      },
+      oven: () => {
+        box(3, 0.6, 3, 0, 0.3, 0, 0x8a8d96);
+        const dome = new T.Mesh(new T.SphereGeometry(1.5, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), mat(0xc87f56));
+        dome.position.y = 0.6;
+        marker.add(dome);
+        const mouth = new T.Mesh(new T.CircleGeometry(0.6, 12), new T.MeshBasicMaterial({ color: 0xff9a30 }));
+        mouth.position.set(0, 1.1, 1.45);
+        marker.add(mouth);
+      },
+      kitchen: () => {
+        box(4, 1.5, 1.6, 0, 0.75, 0, 0xd9c9a3);
+        box(4.2, 0.2, 1.8, 0, 1.6, 0, 0x8a5a2b);
+        box(1.2, 0.5, 0.9, -1, 1.95, 0, 0xc8ccd4);
+        box(0.8, 0.9, 0.8, 1.3, 2.15, 0, 0xe05a4a);
+      },
+      farm_expand: () => {
+        [[-1, 0], [1, 0]].forEach(([dx]) => box(0.25, 2.2, 0.25, dx, 1.1, 0, 0x8a5a2b));
+        box(2.6, 0.9, 0.12, 0, 2.1, 0, 0x9be08a);
+      },
+    };
+    (builders[site.id] || builders.workbench)();
   }
 
   private buildPortals(): void {
@@ -259,6 +286,50 @@ class FrProps {
   update(dt: number, time: number, night: number): void {
     this.fire.update(dt, time, night);
     this.portalRings.forEach((p) => { p.ring.rotation.y = time * 0.8 + p.phase; (p.disc.material as Three<"MeshBasicMaterial">).opacity = 0.28 + 0.14 * Math.sin(time * 2.4 + p.phase); });
+  }
+}
+
+class FrCropLayer {
+  private static readonly COLORS: Readonly<Record<string, number>> = {
+    potato: 0xc69a5a, carrot: 0xf0872e, lettuce: 0x7ccb5a, onion: 0xe8d2a0, wheat: 0xe8c45a, rice: 0xf0ebd2,
+    tomato: 0xe5483f, corn: 0xf5d24a, chili: 0xd9372f, pumpkin: 0xf08a2e, strawberry: 0xe5384f, watermelon: 0x4fa55a,
+  };
+  private readonly cells = new Map<number, { stage: number; crop: string; group: Three<"Group"> }>();
+
+  constructor(private readonly libs: ThreeLibs, private readonly world: FrWorld, private readonly parent: Three<"Group">) {}
+
+  sync(nowMinute: number): void {
+    this.cells.forEach((cell, index) => { if (!this.world.farm.has(index)) { this.parent.remove(cell.group); this.cells.delete(index); } });
+    this.world.farm.forEach((record, index) => {
+      const x = index % this.world.terrain.w, z = Math.floor(index / this.world.terrain.w);
+      const stage = FrFarmRules.stage(this.world, x, z, record, nowMinute);
+      const existing = this.cells.get(index);
+      if (existing && existing.stage === stage && existing.crop === record.crop) return;
+      if (existing) this.parent.remove(existing.group);
+      const group = this.build(x, z, stage, record.crop);
+      this.parent.add(group);
+      this.cells.set(index, { stage, crop: record.crop, group });
+    });
+  }
+
+  private build(x: number, z: number, stage: number, crop: string): Three<"Group"> {
+    const T = this.libs.THREE;
+    const group = new T.Group();
+    group.position.set((x + 0.5) * FrTerrainData.BLOCK, this.world.terrain.surfaceY(x, z), (z + 0.5) * FrTerrainData.BLOCK);
+    const green = new T.MeshLambertMaterial({ color: 0x4fae4a });
+    const color = new T.MeshLambertMaterial({ color: FrCropLayer.COLORS[crop] || 0xffffff });
+    const offsets: Array<[number, number]> = [[-0.5, -0.5], [0.5, -0.5], [-0.5, 0.5], [0.5, 0.5]];
+    offsets.forEach(([dx, dz]) => {
+      if (stage === 0) { const m = new T.Mesh(new T.ConeGeometry(0.16, 0.4, 5).translate(0, 0.2, 0), green); m.position.set(dx, 0, dz); group.add(m); }
+      else if (stage === 1) { const m = new T.Mesh(new T.CylinderGeometry(0.06, 0.1, 0.9, 5).translate(0, 0.45, 0), green); m.position.set(dx, 0, dz); group.add(m); const leaf = new T.Mesh(new T.ConeGeometry(0.3, 0.3, 5).translate(0, 0.9, 0), green); leaf.position.set(dx, 0, dz); group.add(leaf); }
+      else {
+        const bush = new T.Mesh(new T.SphereGeometry(0.38, 8, 6).translate(0, 0.55, 0), green);
+        bush.position.set(dx, 0, dz);
+        group.add(bush);
+        if (stage === 3) { const fruit = new T.Mesh(new T.SphereGeometry(0.26, 8, 6).translate(0, 1.0, 0), color); fruit.position.set(dx, 0, dz); group.add(fruit); }
+      }
+    });
+    return group;
   }
 }
 
@@ -301,6 +372,7 @@ class FrWorldView implements FrWorldListener {
   readonly burst: FrBurst;
   props!: FrProps;
   blocksLayer!: FrBlockLayer;
+  crops!: FrCropLayer;
   private areaScene: FrAreaScene | null = null;
   private areaDark = false;
   lotMarkers!: FrLotMarkers;
@@ -379,6 +451,7 @@ class FrWorldView implements FrWorldListener {
     this.trees = new FrTreeLayer(this.libs, world, this.treeGroup);
     this.props = new FrProps(this.libs, world, this.propGroup);
     this.blocksLayer = new FrBlockLayer(this.libs, world, this.blockGroup);
+    this.crops = new FrCropLayer(this.libs, world, this.propGroup);
     this.rebuildLotMarkers();
     world.listen(this);
   }
@@ -479,6 +552,14 @@ class FrWorldView implements FrWorldListener {
   onPublicChanged(): void { return; }
   onBlockChanged(x: number, z: number, y: number, record: FrBlockRecord | null): void { this.blocksLayer.apply(x, z, y, record); }
   onLotChanged(): void { if (this.lotMarkers) this.lotMarkers.refresh(); }
+  onFarmChanged(): void { this.cropsDirty = true; }
+  private cropsDirty = true;
+
+  updateCrops(nowMinute: number, force = false): void {
+    if (!force && !this.cropsDirty) return;
+    this.cropsDirty = false;
+    this.crops.sync(nowMinute);
+  }
 
   onTerrainEdited(x: number, z: number): void {
     const cx = Math.floor(x / FrTerrainMesher.CHUNK), cz = Math.floor(z / FrTerrainMesher.CHUNK);

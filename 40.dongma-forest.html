@@ -107,6 +107,12 @@
   .fr-fishing-exit { position: absolute; left: 14px; top: 54px; }
   .fr-fishing-pull { position: absolute; right: 26px; bottom: 26px; width: 120px; height: 120px; border-radius: 50%; border: 3px solid rgba(255,255,255,.6); background: rgba(217,123,79,.9); color: #fff; font: inherit; font-size: 22px; font-weight: 800; touch-action: none; }
   .fr-fishing-card { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 6px; background: rgba(16,24,38,.95); border: 4px solid #B8BEC9; border-radius: 14px; padding: 16px 28px; font-size: 20px; animation: frHit .5s ease-out; }
+  .fr-cur-count { font-size: 11px; color: #dbe6f2; }
+  .fr-stats { border-collapse: collapse; width: 100%; font-size: 13px; margin-top: 8px; }
+  .fr-stats th, .fr-stats td { padding: 4px 6px; border-bottom: 1px solid rgba(255,255,255,.1); text-align: center; white-space: nowrap; }
+  .fr-stats th:first-child, .fr-stats td:first-child { text-align: left; }
+  .fr-stats tr.me { background: rgba(217,123,79,.22); }
+  .fr-stats td.zero { color: #6c7b8c; }
   .fr-pouch-grid { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
   .fr-pouch-item { display: flex; align-items: center; gap: 4px; border: 2px solid #B8BEC9; border-radius: 8px; padding: 4px 8px; background: rgba(255,255,255,.06); font-size: 16px; }
   #fade { position: fixed; inset: 0; z-index: 40; background: #02040a; opacity: 0; pointer-events: none; }
@@ -133,7 +139,7 @@
 <div id="fade"></div>
 <div id="hud" hidden>
   <div id="hudClockBox" class="hud-box"><div id="hudClock">06:00 · 1일째</div></div>
-  <div id="hudButtons"><button type="button" class="hud-box" id="btnBag">가방 (I)</button><button type="button" class="hud-box" id="btnSleep" hidden>잠자기 (Z)</button><button type="button" class="hud-box" id="btnAdmin" hidden>운영 (F2)</button></div>
+  <div id="hudButtons"><button type="button" class="hud-box" id="btnBag">가방 (I)</button><button type="button" class="hud-box" id="btnCurrency">재화 (C)</button><button type="button" class="hud-box" id="btnBook">레시피 (K)</button><button type="button" class="hud-box" id="btnStats">기록판 (L)</button><button type="button" class="hud-box" id="btnSleep" hidden>잠자기 (Z)</button><button type="button" class="hud-box" id="btnAdmin" hidden>운영 (F2)</button></div>
   <div id="hudAp" class="hud-box"><div id="hudApText">⚡ 100 / 100</div><div id="hudApBar"><div id="hudApFill"></div></div></div>
   <div id="hudAreaBox" class="hud-box"><div id="hudArea">마을</div><div id="hudSleep" hidden></div></div>
   <div id="hotbar"></div>
@@ -182,32 +188,33 @@
 </div>
 <script charset="utf-8" src="character-kit.js?v=20261011"></script>
 <script charset="utf-8" src="fold-card.js"></script>
-<script charset="utf-8" src="40.forest-data.js?v=5"></script>
-<script charset="utf-8" src="40.forest-rules.js?v=5"></script>
-<script charset="utf-8" src="40.forest-clock.js?v=5"></script>
-<script charset="utf-8" src="40.forest-minigame.js?v=5"></script>
-<script charset="utf-8" src="40.forest-terrain.js?v=5"></script>
+<script charset="utf-8" src="40.forest-data.js?v=6"></script>
+<script charset="utf-8" src="40.forest-rules.js?v=6"></script>
+<script charset="utf-8" src="40.forest-clock.js?v=6"></script>
+<script charset="utf-8" src="40.forest-minigame.js?v=6"></script>
+<script charset="utf-8" src="40.forest-terrain.js?v=6"></script>
 <script charset="utf-8" src="room-kit.js?v=11"></script>
-<script charset="utf-8" src="40.forest-stream.js?v=5"></script>
-<script charset="utf-8" src="40.forest-net.js?v=5"></script>
-<script charset="utf-8" src="40.forest-blocks.js?v=5"></script>
-<script charset="utf-8" src="40.forest-world.js?v=5"></script>
-<script charset="utf-8" src="40.forest-save.js?v=5"></script>
-<script charset="utf-8" src="40.forest-session.js?v=5"></script>
-<script charset="utf-8" src="40.forest-sync.js?v=5"></script>
-<script charset="utf-8" src="40.forest-input.js?v=5"></script>
-<script charset="utf-8" src="40.forest-blocklayer.js?v=5"></script>
-<script charset="utf-8" src="40.forest-views.js?v=5"></script>
-<script charset="utf-8" src="40.forest-icons.js?v=5"></script>
-<script charset="utf-8" src="40.forest-fx.js?v=5"></script>
-<script charset="utf-8" src="40.forest-hud.js?v=5"></script>
-<script charset="utf-8" src="40.forest-admin.js?v=5"></script>
-<script charset="utf-8" src="40.forest-play.js?v=5"></script>
-<script charset="utf-8" src="40.forest-areas.js?v=5"></script>
-<script charset="utf-8" src="40.forest-areaview.js?v=5"></script>
-<script charset="utf-8" src="40.forest-areaplay.js?v=5"></script>
-<script charset="utf-8" src="40.forest-fishing.js?v=5"></script>
-<script charset="utf-8" src="40.dongma-forest.js?v=5"></script>
+<script charset="utf-8" src="40.forest-stream.js?v=6"></script>
+<script charset="utf-8" src="40.forest-net.js?v=6"></script>
+<script charset="utf-8" src="40.forest-blocks.js?v=6"></script>
+<script charset="utf-8" src="40.forest-farm.js?v=6"></script>
+<script charset="utf-8" src="40.forest-world.js?v=6"></script>
+<script charset="utf-8" src="40.forest-save.js?v=6"></script>
+<script charset="utf-8" src="40.forest-session.js?v=6"></script>
+<script charset="utf-8" src="40.forest-sync.js?v=6"></script>
+<script charset="utf-8" src="40.forest-input.js?v=6"></script>
+<script charset="utf-8" src="40.forest-blocklayer.js?v=6"></script>
+<script charset="utf-8" src="40.forest-views.js?v=6"></script>
+<script charset="utf-8" src="40.forest-icons.js?v=6"></script>
+<script charset="utf-8" src="40.forest-fx.js?v=6"></script>
+<script charset="utf-8" src="40.forest-hud.js?v=6"></script>
+<script charset="utf-8" src="40.forest-admin.js?v=6"></script>
+<script charset="utf-8" src="40.forest-play.js?v=6"></script>
+<script charset="utf-8" src="40.forest-areas.js?v=6"></script>
+<script charset="utf-8" src="40.forest-areaview.js?v=6"></script>
+<script charset="utf-8" src="40.forest-areaplay.js?v=6"></script>
+<script charset="utf-8" src="40.forest-fishing.js?v=6"></script>
+<script charset="utf-8" src="40.dongma-forest.js?v=6"></script>
 <script type="module">
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";

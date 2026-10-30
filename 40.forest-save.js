@@ -57,6 +57,7 @@ class FrAccountSave {
         this.uid = uid;
         this.pending = null;
         this.timer = 0;
+        this.statsPath = "";
     }
     path(rest) { return "users/" + this.uid + "/forest/" + rest; }
     async load() {
@@ -82,6 +83,8 @@ class FrAccountSave {
         const data = this.pending;
         this.pending = null;
         await this.backend.set(this.path("save"), data);
+        if (this.statsPath && data.stats)
+            await this.backend.set(this.statsPath, { all: data.stats.all, today: data.stats.today });
     }
     async clearHomeForTest() { await this.backend.set(this.path("home"), null); }
 }

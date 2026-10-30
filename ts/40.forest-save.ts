@@ -5,6 +5,7 @@ interface FrSaveData {
   pity: Record<string, number>;
   seen: string[];
   lastAt: number;
+  stats?: FrStatsData;
 }
 
 interface FrIslandCode { cls: string; island: number }
@@ -69,6 +70,7 @@ class FrAccountSave {
 
   private pending: FrSaveData | null = null;
   private timer = 0;
+  statsPath = "";
 
   constructor(private readonly backend: FrBackend, private readonly uid: string) {}
 
@@ -97,6 +99,7 @@ class FrAccountSave {
     const data = this.pending;
     this.pending = null;
     await this.backend.set(this.path("save"), data);
+    if (this.statsPath && data.stats) await this.backend.set(this.statsPath, { all: data.stats.all, today: data.stats.today });
   }
 
   async clearHomeForTest(): Promise<void> { await this.backend.set(this.path("home"), null); }

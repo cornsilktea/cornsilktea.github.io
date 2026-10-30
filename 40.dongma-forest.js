@@ -90,6 +90,14 @@ class FrGame {
         this.chestWindow = null;
         this.craftWindow = null;
         this.cookWindow = null;
+        this.ovenWindow = null;
+        this.kitchenWindow = null;
+        this.forgeWindow = null;
+        this.seedWindow = null;
+        this.bookWindow = null;
+        this.currencyWindow = null;
+        this.statsWindow = null;
+        this.plantCell = null;
         this.buildWindow = null;
         this.playing = false;
         this.currentTask = null;
@@ -226,6 +234,7 @@ class FrGame {
         const session = new FrSession(world, this.uid, nick, FrMemberWriter.numberFor(this.uid, account ? account.name : ""));
         session.admin = this.isAdmin();
         const save = new FrAccountSave(this.backend, this.uid);
+        save.statsPath = "forest/" + island + "/stats/" + this.uid;
         const loaded = await save.load();
         session.restore(loaded);
         const pouch = FrExpedition.recall(this.uid);
@@ -234,6 +243,10 @@ class FrGame {
             save.queue(session.toSave());
         }
         FrExpedition.clear();
+        if (loaded.lastAt === 0) {
+            session.gainAll(FrFarmRules.FIRST_SEEDS);
+            save.queue(session.toSave());
+        }
         this.view.useWorld(world);
         this.view.setLabels(this.labels, this.uid);
         this.world = world;
@@ -317,8 +330,16 @@ class FrGame {
     buildWindows(session) {
         this.bagWindow = this.windows.register(new FrBagWindow(session, this.toast));
         this.chestWindow = this.windows.register(new FrChestWindow(session, this.toast));
-        this.craftWindow = this.windows.register(new FrCraftWindow(session, this.toast));
-        this.cookWindow = this.windows.register(new FrCookWindow(session, this.toast));
+        this.craftWindow = this.windows.register(new FrCraftWindow(session, this.toast, "workbench"));
+        this.forgeWindow = this.windows.register(new FrCraftWindow(session, this.toast, "forge"));
+        this.cookWindow = this.windows.register(new FrCookWindow(session, this.toast, "campfire"));
+        this.ovenWindow = this.windows.register(new FrCookWindow(session, this.toast, "oven"));
+        this.kitchenWindow = this.windows.register(new FrCookWindow(session, this.toast, "kitchen"));
+        this.seedWindow = this.windows.register(new FrSeedWindow(session, this.toast));
+        this.seedWindow.onPlant = (seedId) => void this.plantSeed(seedId);
+        this.bookWindow = this.windows.register(new FrRecipeBookWindow(session, this.toast));
+        this.currencyWindow = this.windows.register(new FrCurrencyWindow(session, this.toast));
+        this.statsWindow = this.windows.register(new FrStatsWindow(session, this.toast, this.backend, this.island, this.roster));
         this.buildWindow = this.windows.register(new FrBuildWindow(session, this.toast));
         this.pouchWindow = this.windows.register(new FrPouchWindow(session, this.toast));
     }
@@ -356,6 +377,10 @@ class FrGame {
             void this.presencePublisher.leave(); });
         this.hotbar = new FrHotbar(this.session, (slot) => this.useHotbar(slot));
         FrDom.el("btnBag").addEventListener("click", () => this.toggleBag());
+        FrDom.el("btnCurrency").addEventListener("click", () => this.toggleWindow(this.currencyWindow));
+        FrDom.el("btnStats").addEventListener("click", () => this.toggleWindow(this.statsWindow));
+        FrDom.el("btnBook").addEventListener("click", () => this.toggleWindow(this.bookWindow));
+        this.view.updateCrops(this.clock.absoluteMinute(), true);
         const adminButton = FrDom.el("btnAdmin");
         adminButton.hidden = !this.adminWindow;
         adminButton.addEventListener("click", () => this.key("F2"));
@@ -468,6 +493,18 @@ class FrGame {
             this.toggleBag();
             return;
         }
+        if (code === "KeyK") {
+            this.toggleWindow(this.bookWindow);
+            return;
+        }
+        if (code === "KeyC") {
+            this.toggleWindow(this.currencyWindow);
+            return;
+        }
+        if (code === "KeyL") {
+            this.toggleWindow(this.statsWindow);
+            return;
+        }
         if (code === "KeyR") {
             this.adjustLevel(1);
             return;
@@ -497,6 +534,14 @@ class FrGame {
             if (n >= 1 && n <= FrBalance.HOTBAR_SLOTS)
                 this.useHotbar(n - 1);
         }
+    }
+    toggleWindow(target) {
+        if (!target)
+            return;
+        if (target.isOpen)
+            target.close();
+        else
+            this.windows.openOnly(target);
     }
     toggleBag() {
         if (!this.bagWindow)
@@ -533,7 +578,7 @@ class FrGame {
         });
         if (this.player)
             bodies.push(this.player.cell());
-        return { held: session.heldBlock(), me: session.player(), bodies, levelPick: this.levelPick, rotation: this.rotation };
+        return { nowMinute: this.clock ? this.clock.absoluteMinute() : 0, held: session.heldBlock(), me: session.player(), bodies, levelPick: this.levelPick, rotation: this.rotation };
     }
     adjustLevel(direction) {
         if (!this.player || !this.world || !this.session || !this.session.heldBlock())
@@ -556,6 +601,7 @@ class FrGame {
             return;
         }
         this.session.bag.take(plan.t, 1);
+        this.session.stats.add("placed");
         this.levelPick = null;
         this.session.changed();
         const B = FrTerrainData.BLOCK;
@@ -605,6 +651,17 @@ class FrGame {
             return;
         if (target.kind === "cook" && this.cookWindow) {
             this.windows.openOnly(this.cookWindow);
+            return;
+        }
+        if (target.kind === "farmPlant" && this.seedWindow && target.cell) {
+            this.plantCell = target.cell;
+            this.windows.openOnly(this.seedWindow);
+            return;
+        }
+        if (target.kind === "farmGrowing" && target.cell && this.world && this.clock) {
+            const record = this.world.farm.get(this.world.terrain.index(target.cell.x, target.cell.z));
+            if (record)
+                this.toast.show(FrItemNames.label(record.crop) + " — 다 자라려면 약 " + Math.ceil(FrFarmRules.minutesLeft(this.world, target.cell.x, target.cell.z, record, this.clock.absoluteMinute()) / 6 / 60 * 10) / 10 + "분 남았어요");
             return;
         }
         if (target.kind === "chest" && this.chestWindow) {
@@ -779,6 +836,10 @@ class FrGame {
                 session.pity.fish = roll.miss;
                 const broken = session.wearTool("rod");
                 session.gain(roll.item, 1);
+                session.stats.add("fish");
+                if (roll.legend)
+                    session.stats.add("fishLegend");
+                session.stats.see("fish", roll.item, "fishKinds");
                 if (broken)
                     this.toast.show(FrItemNames.label(broken) + "이(가) 다 닳았어요");
             },
@@ -789,13 +850,44 @@ class FrGame {
     openSite(site) {
         if (!this.world || !this.craftWindow || !this.buildWindow)
             return;
-        if (this.world.village.builtCount(site.id) > 0) {
-            this.windows.openOnly(this.craftWindow);
+        const def = FrVillage.definition(site.id);
+        const done = this.world.village.builtCount(site.id) >= def.count;
+        const windows = { workbench: this.craftWindow, forge: this.forgeWindow, oven: this.ovenWindow, kitchen: this.kitchenWindow };
+        if (done) {
+            const target = windows[site.id];
+            if (target)
+                this.windows.openOnly(target);
+            else
+                this.toast.show(site.name + "은(는) 이미 모두 넓혔어요");
             return;
         }
-        const def = FrVillage.definition(site.id);
+        if (this.world.village.level() < def.minVillageLevel) {
+            this.toast.show("마을이 더 자라야 지을 수 있어요 (마을 " + def.minVillageLevel + "단계)");
+            return;
+        }
         this.windows.closeAll();
         this.buildWindow.openFor(def);
+    }
+    async plantSeed(seedId) {
+        if (!this.session || !this.world || !this.clock || !this.plantCell)
+            return;
+        const cell = this.plantCell;
+        const check = FrFarmRules.canPlant(this.world, cell.x, cell.z, seedId);
+        if (!check.ok || this.session.bag.count(seedId) < 1) {
+            this.toast.show(check.reason || "씨앗이 없어요");
+            return;
+        }
+        const crop = seedId.replace(/_seed$/, "");
+        const ok = await this.world.plant(this.world.terrain.index(cell.x, cell.z), { uid: this.uid, no: this.session.no, crop, at: this.clock.absoluteMinute() });
+        if (!ok) {
+            this.toast.show("다른 친구가 먼저 심었어요");
+            return;
+        }
+        this.session.bag.take(seedId, 1);
+        this.session.stats.add("planted");
+        this.session.changed();
+        this.view.updateCrops(this.clock.absoluteMinute(), true);
+        this.toast.show(FrItemNames.label(crop) + "을(를) 심었어요! 다 자라면 수확해요");
     }
     startTask(target, task) {
         if (!this.session || !this.player)
@@ -982,6 +1074,7 @@ class FrGame {
         if (time - this.lastSnowCheck > 1) {
             this.lastSnowCheck = time;
             world.syncSnow(day);
+            this.view.updateCrops(clock.absoluteMinute(), true);
             void clock.heartbeat();
         }
     }

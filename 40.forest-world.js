@@ -10,6 +10,7 @@ class FrWorld {
         this.trees = new Map();
         this.blocks = new FrBlockStore();
         this.lots = new Map();
+        this.farm = new Map();
         this.felled = new Set();
         this.builtKeys = new Set();
         this.logKeys = new Set();
@@ -47,7 +48,7 @@ class FrWorld {
     }
     path(rest) { return "forest/" + this.island + "/" + rest; }
     async load() {
-        const [jungle, terrain, snow, build, publicAmounts, logs, blocks, lots] = await Promise.all([
+        const [jungle, terrain, snow, build, publicAmounts, logs, blocks, lots, farm] = await Promise.all([
             this.backend.get(this.path("jungle")),
             this.backend.get(this.path("terrain")),
             this.backend.get(this.path("snow")),
@@ -56,7 +57,9 @@ class FrWorld {
             this.backend.lastChildren(this.path("publicLog"), FrBalance.PUBLIC_LOG_LINES),
             this.backend.get(this.path("blocks")),
             this.backend.get(this.path("lots")),
+            this.backend.get(this.path("farm")),
         ]);
+        Object.keys(farm || {}).forEach((k) => this.farm.set(Number(k), farm[k]));
         Object.keys(blocks || {}).forEach((chunk) => Object.keys(blocks[chunk]).forEach((key) => {
             const parsed = FrBlockKey.parse(key);
             this.blocks.set(parsed.index, parsed.y, blocks[chunk][key]);
@@ -262,6 +265,33 @@ class FrWorld {
             this.blocks.set(index, y, null);
         this.blocks.set(index, y, record);
         this.listeners.forEach((l) => l.onBlockChanged(x, z, y, record));
+    }
+    async plant(index, record) {
+        const result = await this.backend.transaction(this.path("farm/" + index), (current) => (current === null ? record : undefined));
+        if (!result.committed)
+            return false;
+        this.farm.set(index, record);
+        this.listeners.forEach((l) => l.onFarmChanged(index));
+        return true;
+    }
+    async harvest(index, uid) {
+        const had = this.farm.get(index) || null;
+        const result = await this.backend.transaction(this.path("farm/" + index), (current) => (current !== null && current.uid === uid ? null : undefined));
+        if (!result.committed)
+            return null;
+        this.farm.delete(index);
+        this.listeners.forEach((l) => l.onFarmChanged(index));
+        return had;
+    }
+    remoteFarm(index, record) {
+        if (record === null) {
+            if (!this.farm.has(index))
+                return;
+            this.farm.delete(index);
+        }
+        else
+            this.farm.set(index, record);
+        this.listeners.forEach((l) => l.onFarmChanged(index));
     }
     async claimLot(n, lot) {
         const result = await this.backend.transaction(this.path("lots/" + n), (current) => (current === null ? lot : undefined));

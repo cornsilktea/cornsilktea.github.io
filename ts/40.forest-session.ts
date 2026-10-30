@@ -4,7 +4,7 @@ interface FrCraftOption {
   cost: FrCost;
   output: string;
   count: number;
-  station: "workbench";
+  station: "workbench" | "forge";
 }
 
 class FrCraftMenu {
@@ -17,6 +17,9 @@ class FrCraftMenu {
     FrItems.GEAR_KINDS.forEach((kind) => {
       options.push({ id: "gear_" + kind + "_1", label: "나무 " + FrCraftMenu.KIND_NAMES[kind], cost: FrCraftRules.gearCost(1), output: FrItems.gearId(kind, 1), count: 1, station: "workbench" });
     });
+    FrItems.GEAR_KINDS.forEach((kind) => [2, 3].forEach((tier) => {
+      options.push({ id: "gear_" + kind + "_" + tier, label: FrItems.TIER_NAMES[tier] + " " + FrCraftMenu.KIND_NAMES[kind], cost: FrCraftRules.gearCost(tier as FrTier), output: FrItems.gearId(kind, tier as FrTier), count: 1, station: "forge" });
+    }));
     options.push({ id: "plank", label: "판자", cost: { wood: 2 }, output: "plank", count: 1, station: "workbench" });
     const block = (id: string, label: string, cost: FrCost, count = 1) => options.push({ id: "make_" + id, label, cost, output: id, count, station: "workbench" });
     block("block_wood", "나무 블록", { wood: 1 });
@@ -75,6 +78,7 @@ class FrSession {
   readonly ap: FrActionPoints;
   readonly seen: Set<string> = new Set();
   readonly pity: Record<string, number> = {};
+  readonly stats = new FrStats();
   readonly personal = new FrChestStore();
   private readonly listeners: Array<() => void> = [];
   sleeping = false;
@@ -101,7 +105,11 @@ class FrSession {
 
   gain(id: string, amount: number): number {
     const left = this.bag.add(id, amount);
-    if (amount - left > 0) this.seen.add(id);
+    if (amount - left > 0) {
+      this.seen.add(id);
+      this.stats.add("itemsTotal", amount - left);
+      this.stats.see("items", id, "itemKinds");
+    }
     this.changed();
     return left;
   }
@@ -126,12 +134,13 @@ class FrSession {
     if (FrItems.isStackable(option.output) ? this.bag.freeSlots() < 1 && this.bag.count(option.output) % FrBalance.STACK_SIZE === 0 : this.bag.freeSlots() < 1) return false;
     source.pay(option.cost);
     this.gain(option.output, option.count);
+    this.stats.add(option.output.indexOf("gear_") === 0 ? "craftGear" : option.output.indexOf("block_") === 0 ? "craftBlocks" : "craftProcessed", option.count);
     return true;
   }
 
   cook(recipe: FrRecipeDef): FrCookResult {
     const result = FrRecipeRules.cook(recipe, this.craftSource(), this.bag);
-    if (result.ok) { this.seen.add(recipe.id); this.changed(); }
+    if (result.ok) { this.seen.add(recipe.id); this.stats.add("cooked"); this.stats.see("recipes", recipe.id, "recipeKinds"); this.changed(); }
     return result;
   }
 
@@ -149,6 +158,7 @@ class FrSession {
       pity: { ...this.pity },
       seen: Array.from(this.seen),
       lastAt: Date.now(),
+      stats: this.stats.data,
     };
   }
 
@@ -159,5 +169,6 @@ class FrSession {
     this.ap.current = Math.min(data.ap, this.ap.max());
     Object.keys(data.pity).forEach((k) => { this.pity[k] = data.pity[k]; });
     data.seen.forEach((id) => this.seen.add(id));
+    this.stats.load(data.stats || null, FrStats.dayStamp(new Date()));
   }
 }

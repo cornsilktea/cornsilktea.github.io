@@ -113,7 +113,7 @@ class FrAreaOutcome {
             flower: () => this.collect(FrGatherRules.flower(this.random, this.session), feature, 720, "gone"),
             shore: () => this.collect(FrGatherRules.shore(feature, this.random, this.session), feature, 720, "gone"),
             mineStone: () => this.mine(target.cell, FrMineRules.stoneDrop(this.random)),
-            mineVein: () => this.mine(target.cell, FrGatherRules.vein(this.random, this.session, this.area.floor)),
+            mineVein: () => { this.session.stats.add("mineVeins"); return this.mine(target.cell, FrGatherRules.vein(this.random, this.session, this.area.floor)); },
             mineHard: () => this.mine(target.cell, { stone: 2 }),
         };
         const handler = handlers[target.kind];
@@ -121,6 +121,9 @@ class FrAreaOutcome {
     }
     collect(gains, feature, cooldown, after) {
         const lost = this.session.gainAll(gains);
+        const stat = { fruitTree: "shake", jungleTree: "chop", flower: "flower", shoreSpot: "beach" };
+        if (feature && stat[feature.kind])
+            this.session.stats.add(stat[feature.kind]);
         if (feature) {
             feature.availableAt = this.absoluteMinute() + cooldown;
             if (after === "gone")
@@ -134,6 +137,12 @@ class FrAreaOutcome {
         this.area.terrain.edit(cell.x, cell.z, { h: 0, t: "C" });
         this.scene.editCell(cell.x, cell.z);
         const lost = this.session.gainAll(gains);
+        this.session.stats.add("mineBlocks");
+        this.session.stats.atLeast("deepFloor", this.area.floor);
+        if (gains.iron)
+            this.session.stats.add("ironGot", gains.iron);
+        if (gains.diamond)
+            this.session.stats.add("diamondGot", gains.diamond);
         return this.describe(gains) + (lost > 0 ? " · 가방이 가득 차서 " + lost + "개를 놓고 왔어요" : "");
     }
     describe(gains) {

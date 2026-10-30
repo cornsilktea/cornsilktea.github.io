@@ -140,6 +140,31 @@ class FrBlocksNode extends FrMapNode {
         this.world.remoteBlock(parsed.index, parsed.y, record);
     }
 }
+class FrFarmNode extends FrMapNode {
+    constructor(world) {
+        super();
+        this.world = world;
+        this.known = new Set();
+    }
+    replaceAll(table) {
+        const now = new Set(Object.keys(table).map(Number));
+        this.known.forEach((i) => { if (!now.has(i))
+            this.world.remoteFarm(i, null); });
+        this.known = now;
+        Object.keys(table).forEach((k) => this.world.remoteFarm(Number(k), table[k]));
+    }
+    setOne(rest, value) {
+        const index = Number(rest[0]);
+        if (value && typeof value === "object") {
+            this.known.add(index);
+            this.world.remoteFarm(index, value);
+        }
+        else {
+            this.known.delete(index);
+            this.world.remoteFarm(index, null);
+        }
+    }
+}
 class FrLotsNode extends FrMapNode {
     constructor(world) {
         super();

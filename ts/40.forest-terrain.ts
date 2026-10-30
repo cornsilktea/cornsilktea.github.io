@@ -5,7 +5,7 @@ interface FrAnchors {
   publicChest: { x: number; z: number; size: number };
   portals: Record<string, { x: number; z: number; height: number }>;
   lots: Array<{ x: number; z: number; size: number; height: number }>;
-  farm: { x: number; z: number; w: number; d: number };
+  farm: { x: number; z: number; w: number; d: number; expand?: Array<{ x: number; z: number; w: number; d: number }> };
   bridges: Record<string, Array<[number, number]>>;
   jungleZones: Array<[number, number]>;
   paths: Record<string, Array<[number, number]>>;
@@ -211,6 +211,9 @@ class FrBuildSite {
 }
 
 class FrBuildSites {
-  static readonly STAGE_TWO: ReadonlyArray<FrBuildSite> = [new FrBuildSite("workbench", "작업대", 55, 64)];
+  static readonly STAGE_TWO: ReadonlyArray<FrBuildSite> = [
+    new FrBuildSite("workbench", "작업대", 55, 64), new FrBuildSite("forge", "대장간", 52, 64), new FrBuildSite("oven", "화덕", 55, 68),
+    new FrBuildSite("kitchen", "섬 부엌", 52, 68), new FrBuildSite("farm_expand", "텃밭 넓히기", 66, 78),
+  ];
   static find(id: string): FrBuildSite | undefined { return FrBuildSites.STAGE_TWO.find((s) => s.id === id); }
 }

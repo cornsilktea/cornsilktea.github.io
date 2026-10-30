@@ -5,6 +5,9 @@ class FrCraftMenu {
         FrItems.GEAR_KINDS.forEach((kind) => {
             options.push({ id: "gear_" + kind + "_1", label: "나무 " + FrCraftMenu.KIND_NAMES[kind], cost: FrCraftRules.gearCost(1), output: FrItems.gearId(kind, 1), count: 1, station: "workbench" });
         });
+        FrItems.GEAR_KINDS.forEach((kind) => [2, 3].forEach((tier) => {
+            options.push({ id: "gear_" + kind + "_" + tier, label: FrItems.TIER_NAMES[tier] + " " + FrCraftMenu.KIND_NAMES[kind], cost: FrCraftRules.gearCost(tier), output: FrItems.gearId(kind, tier), count: 1, station: "forge" });
+        }));
         options.push({ id: "plank", label: "판자", cost: { wood: 2 }, output: "plank", count: 1, station: "workbench" });
         const block = (id, label, cost, count = 1) => options.push({ id: "make_" + id, label, cost, output: id, count, station: "workbench" });
         block("block_wood", "나무 블록", { wood: 1 });
@@ -70,6 +73,7 @@ class FrSession {
         this.bag = new FrBag();
         this.seen = new Set();
         this.pity = {};
+        this.stats = new FrStats();
         this.personal = new FrChestStore();
         this.listeners = [];
         this.sleeping = false;
@@ -89,8 +93,11 @@ class FrSession {
     craftSource() { return new FrPersonalCraftSource(this.personal, this.bag, this.world.publicStore); }
     gain(id, amount) {
         const left = this.bag.add(id, amount);
-        if (amount - left > 0)
+        if (amount - left > 0) {
             this.seen.add(id);
+            this.stats.add("itemsTotal", amount - left);
+            this.stats.see("items", id, "itemKinds");
+        }
         this.changed();
         return left;
     }
@@ -115,12 +122,15 @@ class FrSession {
             return false;
         source.pay(option.cost);
         this.gain(option.output, option.count);
+        this.stats.add(option.output.indexOf("gear_") === 0 ? "craftGear" : option.output.indexOf("block_") === 0 ? "craftBlocks" : "craftProcessed", option.count);
         return true;
     }
     cook(recipe) {
         const result = FrRecipeRules.cook(recipe, this.craftSource(), this.bag);
         if (result.ok) {
             this.seen.add(recipe.id);
+            this.stats.add("cooked");
+            this.stats.see("recipes", recipe.id, "recipeKinds");
             this.changed();
         }
         return result;
@@ -138,6 +148,7 @@ class FrSession {
             pity: { ...this.pity },
             seen: Array.from(this.seen),
             lastAt: Date.now(),
+            stats: this.stats.data,
         };
     }
     restore(data) {
@@ -147,5 +158,6 @@ class FrSession {
         this.ap.current = Math.min(data.ap, this.ap.max());
         Object.keys(data.pity).forEach((k) => { this.pity[k] = data.pity[k]; });
         data.seen.forEach((id) => this.seen.add(id));
+        this.stats.load(data.stats || null, FrStats.dayStamp(new Date()));
     }
 }

@@ -27,6 +27,7 @@ class ForestRulesPatch {
         "bag": { "$i": { ".validate": "$i.matches(/^([0-9]|[1-3][0-9])$/) && newData.hasChildren(['id', 'count', 'uses']) && newData.child('id').isString() && newData.child('id').val().length <= 40 && newData.child('count').isNumber() && newData.child('count').val() >= 1 && newData.child('count').val() <= 30 && newData.child('uses').isNumber() && newData.child('uses').val() >= 0 && newData.child('uses').val() <= 200" } },
         "pity": { "$k": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000" } },
         "seen": { "$i": { ".validate": "newData.isString() && newData.val().length <= 40" } },
+        "stats": { ".validate": "newData.hasChildren(['all'])" },
         "$other": { ".validate": false },
       },
       "$other": { ".validate": false },
@@ -67,6 +68,11 @@ class ForestRulesPatch {
             ".validate": "$cell.matches(/^[0-9]{1,5}_[0-7]$/) && newData.hasChildren(['t', 'n', 'r']) && newData.child('t').isString() && newData.child('t').val().matches(/^[a-z_0-9]{2,20}$/) && newData.child('n').isNumber() && newData.child('r').isNumber() && newData.child('r').val() >= 0 && newData.child('r').val() <= 3",
           } } },
           "lots": { "$n": { ".write": M + " && (!data.exists() || " + A + ")", ".validate": "$n.matches(/^[0-7]$/) && newData.hasChildren(['uid', 'no', 'name']) && newData.child('uid').val() === auth.uid" } },
+          "farm": { "$cell": {
+            ".write": M + " && (newData.exists() ? newData.child('uid').val() === auth.uid : (data.child('uid').val() === auth.uid || " + A + "))",
+            ".validate": "$cell.matches(/^[0-9]{1,5}$/) && newData.hasChildren(['uid', 'no', 'crop', 'at']) && newData.child('crop').isString() && newData.child('crop').val().matches(/^[a-z]{3,12}$/) && newData.child('at').isNumber()",
+          } },
+          "stats": { "$uid": { ".write": M + " && $uid === auth.uid", ".validate": "newData.hasChildren(['all'])" } },
           "publicLog": { ".write": M, "$key": { ".validate": "newData.hasChildren(['at', 'who', 'verb', 'item', 'count']) && newData.child('who').isString() && newData.child('who').val().length <= 12 && newData.child('count').isNumber() && newData.child('count').val() >= 1 && newData.child('count').val() <= 5400" } },
           "admin": {
             ".write": "auth != null && " + A,

@@ -155,7 +155,7 @@ class FrPlayerBody {
   }
 }
 
-type FrTargetKind = "cook" | "chest" | "site" | "tree" | "dig" | "stone" | "snow" | "place" | "remove" | "lot" | "house" | "portal" | "shake" | "areaChop" | "flower" | "shore" | "fish" | "mineStone" | "mineVein" | "mineHard" | "exit" | "ladderDown" | "ladderUp";
+type FrTargetKind = "farmPlant" | "farmHarvest" | "farmGrowing" | "canal" | "cook" | "chest" | "site" | "tree" | "dig" | "stone" | "snow" | "place" | "remove" | "lot" | "house" | "portal" | "shake" | "areaChop" | "flower" | "shore" | "fish" | "mineStone" | "mineVein" | "mineHard" | "exit" | "ladderDown" | "ladderUp";
 
 interface FrTarget {
   kind: FrTargetKind;
@@ -172,6 +172,7 @@ interface FrTarget {
 }
 
 interface FrFinderContext {
+  nowMinute: number;
   held: string | null;
   me: FrBlockPlayer;
   bodies: FrPoint[];
@@ -193,10 +194,12 @@ class FrTargetFinder {
       if (near((p.x + 0.5) * B, (p.z + 0.5) * B, 6.2)) return { kind: "portal", label: FrAreaInfo.label(id), cell: null, portal: id };
     }
     for (const site of FrBuildSites.STAGE_TWO) {
-      if (near((site.x + 0.5) * B, (site.z + 0.5) * B, 4.8)) return { kind: "site", label: this.world.village.builtCount(site.id) > 0 ? "열기" : "짓기", cell: null, site };
+      if (near((site.x + 0.5) * B, (site.z + 0.5) * B, 4.8)) return { kind: "site", label: this.siteLabel(site), cell: null, site };
     }
     if (context) {
       const front = player.frontCell();
+      const farmTarget = this.farmTarget(front, context);
+      if (farmTarget) return farmTarget;
       const blockTarget = this.blockTarget(front, context);
       if (blockTarget) return blockTarget;
       const lotTarget = this.lotTarget(player, context);
@@ -205,6 +208,22 @@ class FrTargetFinder {
     const tree = this.nearestTree(player);
     if (tree) return { kind: "tree", label: "베기", cell: { x: tree.x, z: tree.z }, tree };
     return this.cellTarget(player.frontCell(), player);
+  }
+
+  siteLabel(site: FrBuildSite): string {
+    const done = this.world.village.builtCount(site.id) >= FrVillage.definition(site.id).count;
+    if (site.id === "farm_expand") return done ? "넓힘" : "넓히기";
+    return done ? "열기" : "짓기";
+  }
+
+  farmTarget(cell: FrPoint, context: FrFinderContext): FrTarget | null {
+    if (!FrFarmRules.isPlot(this.world, cell.x, cell.z)) return null;
+    const index = this.world.terrain.index(cell.x, cell.z);
+    const record = this.world.farm.get(index);
+    if (!record) return { kind: "farmPlant", label: "심기", cell };
+    if (record.uid !== context.me.uid) return null;
+    const stage = FrFarmRules.stage(this.world, cell.x, cell.z, record, context.nowMinute);
+    return stage >= 3 ? { kind: "farmHarvest", label: "수확", cell } : { kind: "farmGrowing", label: "자라는 중", cell };
   }
 
   blockTarget(cell: FrPoint, context: FrFinderContext): FrTarget | null {
@@ -235,6 +254,7 @@ class FrTargetFinder {
     const here = player.cell();
     if (Math.abs(this.world.terrain.height(cell.x, cell.z) - this.world.terrain.height(here.x, here.z)) > 1) return null;
     const top = this.world.terrain.top(cell.x, cell.z);
+    if (FrFarmRules.canalAllowed(this.world, cell.x, cell.z)) return { kind: "canal", label: "수로 파기", cell };
     if (top === "W") return { kind: "snow", label: "캐기", cell };
     if (top === "S") return { kind: "stone", label: "캐기", cell };
     return { kind: "dig", label: "파기", cell };
@@ -254,7 +274,7 @@ class FrTargetFinder {
     if (pick.kind === "site") {
       const site = FrBuildSites.find(pick.siteId || "");
       if (!site) return { target: null, far: false };
-      return near((site.x + 0.5) * B, (site.z + 0.5) * B, 6.8) ? { target: { kind: "site", label: this.world.village.builtCount(site.id) > 0 ? "열기" : "짓기", cell: null, site }, far: false } : { target: null, far: true };
+      return near((site.x + 0.5) * B, (site.z + 0.5) * B, 6.8) ? { target: { kind: "site", label: this.siteLabel(site), cell: null, site }, far: false } : { target: null, far: true };
     }
     if (pick.kind === "tree" && pick.spot) {
       const spot = this.world.standingTree(this.world.terrain.index(pick.spot.x, pick.spot.z));
@@ -296,6 +316,8 @@ class FrTasks {
     dig: new FrTask("dig", "shovel", FrBalance.ACTION_COST.digTile, "dig", "땅 파기", "삽이 있어야 파요. 작업대에서 만들 수 있어요."),
     stone: new FrTask("stone", "pickaxe", FrBalance.ACTION_COST.digTile, "pickaxe", "돌 캐기", ""),
     snow: new FrTask("snow", "pickaxe", FrBalance.ACTION_COST.digTile, "pickaxe", "눈 캐기", "곡괭이가 있어야 눈을 캘 수 있어요."),
+    canal: new FrTask("dig", "shovel", FrBalance.ACTION_COST.canal, "dig", "수로 파기", "삽이 있어야 수로를 팔 수 있어요."),
+    farmHarvest: new FrTask("harvest", "", 1, "work", "수확", ""),
   };
 
   static forTarget(kind: FrTargetKind): FrTask | null { return FrTasks.BY_TARGET[kind] || null; }
@@ -310,6 +332,8 @@ class FrTaskOutcome {
     const note = broken ? FrItemNames.label(broken) + "이(가) 다 닳았어요" : "";
     if (target.kind === "tree" && target.tree) return (await this.chop(target.tree)) + note;
     if (!target.cell) return note;
+    if (target.kind === "canal") return (await this.canal(target.cell)) + note;
+    if (target.kind === "farmHarvest") return (await this.harvest(target.cell)) + note;
     if (target.kind === "snow") return (await this.snow(target.cell)) + note;
     return (await this.dig(target.cell, target.kind === "stone")) + note;
   }
@@ -321,6 +345,8 @@ class FrTaskOutcome {
     this.session.gain("wood", wood);
     this.session.gain("vine", 1);
     const cleared = spot.zone >= 0 && this.world.zoneCleared(spot.zone);
+    this.session.stats.add("chop");
+    if (cleared) this.session.stats.add("clear");
     return "목재 +" + wood + ", 덩굴 +1" + (cleared ? " · 빈터가 생겼어요!" : "");
   }
 
@@ -330,6 +356,7 @@ class FrTaskOutcome {
     const top = before.t;
     const after: FrTerrainEdit = { h: before.h - 1, t: top === "G" ? "D" : top };
     if (!(await this.world.editTerrain(cell.x, cell.z, before, after))) return "다른 친구가 먼저 팠어요";
+    this.session.stats.add("dug");
     if (stone) {
       const drop = FrMineRules.terrainStoneDrop(this.random);
       this.session.gainAll(drop);
@@ -341,9 +368,29 @@ class FrTaskOutcome {
     return FrItemNames.label(block) + " +1";
   }
 
+  private async canal(cell: FrPoint): Promise<string> {
+    const terrain = this.world.terrain;
+    const before: FrTerrainEdit = { h: terrain.height(cell.x, cell.z), t: terrain.top(cell.x, cell.z) };
+    if (!(await this.world.editTerrain(cell.x, cell.z, before, { h: before.h - 1, t: FrTerrainData.RIVER }))) return "다른 친구가 먼저 팠어요";
+    this.session.stats.add("canal");
+    return "수로를 팠어요! 물이 닿는 텃밭은 작물이 더 빨리 자라요";
+  }
+
+  private async harvest(cell: FrPoint): Promise<string> {
+    const index = this.world.terrain.index(cell.x, cell.z);
+    const record = await this.world.harvest(index, this.session.uid);
+    if (!record) return "수확하지 못했어요";
+    const yieldNow = FrCropRules.harvest(this.random);
+    this.session.gain(record.crop, yieldNow.crop);
+    this.session.gain(record.crop + "_seed", yieldNow.seed);
+    this.session.stats.add("harvested");
+    return FrItemNames.label(record.crop) + " +" + yieldNow.crop + ", 씨앗 +" + yieldNow.seed;
+  }
+
   private async snow(cell: FrPoint): Promise<string> {
     await this.world.digSnow(cell.x, cell.z, this.clock.day());
     this.session.gain("ice", 1);
+    this.session.stats.add("iceGot");
     return "얼음 +1 (눈은 3일 뒤 다시 생겨요)";
   }
 }

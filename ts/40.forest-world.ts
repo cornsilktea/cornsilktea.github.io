@@ -4,6 +4,7 @@ interface FrWorldListener {
   onBuilt(id: string, count: number): void;
   onPublicChanged(): void;
   onBlockChanged(x: number, z: number, y: number, record: FrBlockRecord | null): void;
+  onFarmChanged(index: number): void;
   onLotChanged(): void;
 }
 
@@ -19,6 +20,7 @@ class FrWorld {
   readonly trees: Map<number, FrTreeSpot> = new Map();
   readonly blocks = new FrBlockStore();
   readonly lots: Map<number, FrLot> = new Map();
+  readonly farm: Map<number, FrCropRecord> = new Map();
   private readonly felled: Set<number> = new Set();
   private readonly builtKeys: Set<string> = new Set();
   private readonly logKeys: Set<string> = new Set();
@@ -61,7 +63,7 @@ class FrWorld {
   private path(rest: string): string { return "forest/" + this.island + "/" + rest; }
 
   async load(): Promise<void> {
-    const [jungle, terrain, snow, build, publicAmounts, logs, blocks, lots] = await Promise.all([
+    const [jungle, terrain, snow, build, publicAmounts, logs, blocks, lots, farm] = await Promise.all([
       this.backend.get<Record<string, number>>(this.path("jungle")),
       this.backend.get<Record<string, Record<string, [number, string]>>>(this.path("terrain")),
       this.backend.get<Record<string, number>>(this.path("snow")),
@@ -70,7 +72,9 @@ class FrWorld {
       this.backend.lastChildren<FrPublicLogLine>(this.path("publicLog"), FrBalance.PUBLIC_LOG_LINES),
       this.backend.get<Record<string, Record<string, FrBlockRecord>>>(this.path("blocks")),
       this.backend.get<Record<string, FrLot>>(this.path("lots")),
+      this.backend.get<Record<string, FrCropRecord>>(this.path("farm")),
     ]);
+    Object.keys(farm || {}).forEach((k) => this.farm.set(Number(k), (farm as Record<string, FrCropRecord>)[k]));
     Object.keys(blocks || {}).forEach((chunk) => Object.keys((blocks as Record<string, Record<string, FrBlockRecord>>)[chunk]).forEach((key) => {
       const parsed = FrBlockKey.parse(key);
       this.blocks.set(parsed.index, parsed.y, (blocks as Record<string, Record<string, FrBlockRecord>>)[chunk][key]);
@@ -256,6 +260,28 @@ class FrWorld {
     if (now !== null) this.blocks.set(index, y, null);
     this.blocks.set(index, y, record);
     this.listeners.forEach((l) => l.onBlockChanged(x, z, y, record));
+  }
+
+  async plant(index: number, record: FrCropRecord): Promise<boolean> {
+    const result = await this.backend.transaction<FrCropRecord>(this.path("farm/" + index), (current) => (current === null ? record : undefined));
+    if (!result.committed) return false;
+    this.farm.set(index, record);
+    this.listeners.forEach((l) => l.onFarmChanged(index));
+    return true;
+  }
+
+  async harvest(index: number, uid: string): Promise<FrCropRecord | null> {
+    const had = this.farm.get(index) || null;
+    const result = await this.backend.transaction<FrCropRecord>(this.path("farm/" + index), (current) => (current !== null && current.uid === uid ? null : undefined));
+    if (!result.committed) return null;
+    this.farm.delete(index);
+    this.listeners.forEach((l) => l.onFarmChanged(index));
+    return had;
+  }
+
+  remoteFarm(index: number, record: FrCropRecord | null): void {
+    if (record === null) { if (!this.farm.has(index)) return; this.farm.delete(index); } else this.farm.set(index, record);
+    this.listeners.forEach((l) => l.onFarmChanged(index));
   }
 
   async claimLot(n: number, lot: FrLot): Promise<boolean> {

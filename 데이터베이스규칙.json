@@ -721,6 +721,9 @@
                 ".validate": "newData.isString() && newData.val().length <= 40"
               }
             },
+            "stats": {
+              ".validate": "newData.hasChildren(['all'])"
+            },
             "$other": {
               ".validate": false
             }
@@ -818,6 +821,18 @@
           "$n": {
             ".write": "auth != null && ((auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3') || root.child('users').child(auth.uid).child('forest').child('home').val() === $island) && (!data.exists() || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3'))",
             ".validate": "$n.matches(/^[0-7]$/) && newData.hasChildren(['uid', 'no', 'name']) && newData.child('uid').val() === auth.uid"
+          }
+        },
+        "farm": {
+          "$cell": {
+            ".write": "auth != null && ((auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3') || root.child('users').child(auth.uid).child('forest').child('home').val() === $island) && (newData.exists() ? newData.child('uid').val() === auth.uid : (data.child('uid').val() === auth.uid || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')))",
+            ".validate": "$cell.matches(/^[0-9]{1,5}$/) && newData.hasChildren(['uid', 'no', 'crop', 'at']) && newData.child('crop').isString() && newData.child('crop').val().matches(/^[a-z]{3,12}$/) && newData.child('at').isNumber()"
+          }
+        },
+        "stats": {
+          "$uid": {
+            ".write": "auth != null && ((auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3') || root.child('users').child(auth.uid).child('forest').child('home').val() === $island) && $uid === auth.uid",
+            ".validate": "newData.hasChildren(['all'])"
           }
         },
         "publicLog": {

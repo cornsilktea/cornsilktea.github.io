@@ -133,6 +133,21 @@ class FrBlocksNode extends FrMapNode {
   }
 }
 
+class FrFarmNode extends FrMapNode {
+  private known = new Set<number>();
+  constructor(private readonly world: FrWorld) { super(); }
+  protected replaceAll(table: Record<string, unknown>): void {
+    const now = new Set(Object.keys(table).map(Number));
+    this.known.forEach((i) => { if (!now.has(i)) this.world.remoteFarm(i, null); });
+    this.known = now;
+    Object.keys(table).forEach((k) => this.world.remoteFarm(Number(k), table[k] as FrCropRecord));
+  }
+  protected setOne(rest: string[], value: unknown): void {
+    const index = Number(rest[0]);
+    if (value && typeof value === "object") { this.known.add(index); this.world.remoteFarm(index, value as FrCropRecord); } else { this.known.delete(index); this.world.remoteFarm(index, null); }
+  }
+}
+
 class FrLotsNode extends FrMapNode {
   constructor(private readonly world: FrWorld) { super(); }
   protected replaceAll(table: Record<string, unknown>): void {
