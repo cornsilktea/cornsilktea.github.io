@@ -54,7 +54,7 @@ class FrSiteBook {
             const cells = paths[id] || [];
             for (let i = 4; i < cells.length - 1; i++) {
                 const [x, z] = cells[i], [nx, nz] = cells[i + 1];
-                if (Math.hypot(x - 60, z - 60) < 9)
+                if (Math.hypot(x - 60, z - 60) < 9 || terrain.isWater(x, z) || terrain.isWater(nx, nz))
                     continue;
                 if (terrain.height(x, z) !== terrain.height(nx, nz)) {
                     sites.push(new FrBuildSite("stairs", n++, "돌계단", x, z, [{ x, z }], true, Math.atan2(nz - z, nx - x)));
@@ -163,3 +163,11 @@ class FrVillageLevels {
     static nextScore(level) { return level >= 5 ? -1 : FrBalance.VILLAGE_LEVEL_SCORE[level + 1]; }
 }
 FrVillageLevels.NAMES = ["", "작은 야영지", "돌 화로 마을", "분수 마을", "시계탑 마을", "축제 마을"];
+class FrPlazaLayout {
+    static solidAt(plaza, x, z, level) {
+        const hit = [FrPlazaLayout.FOUNTAIN, FrPlazaLayout.TOWER].find((p) => Math.abs(x - plaza.x - p.dx) <= p.reach && Math.abs(z - plaza.z - p.dz) <= p.reach);
+        return !!hit && level() >= hit.level;
+    }
+}
+FrPlazaLayout.FOUNTAIN = { dx: -4, dz: 0, reach: 1, level: 3 };
+FrPlazaLayout.TOWER = { dx: 4, dz: -3, reach: 0, level: 4 };

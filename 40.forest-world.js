@@ -88,6 +88,8 @@ class FrWorld {
             return true;
         if (this.furnitureAt(this.terrain.index(x, z)))
             return true;
+        if (FrPlazaLayout.solidAt(a.plaza, x, z, () => this.village.level()))
+            return true;
         const site = this.siteOfCell.get(this.terrain.index(x, z));
         return !!site && !site.passable && (site.small || this.builtKeys.has(site.id));
     }

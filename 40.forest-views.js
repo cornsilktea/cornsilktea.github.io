@@ -845,6 +845,8 @@ class FrWorldView {
             return;
         }
         this.night = this.sky.apply(minuteOfDay);
+        if (this.plaza)
+            this.plaza.showTime(minuteOfDay, performance.now() / 1000);
     }
     resize() {
         const width = window.innerWidth, height = window.innerHeight;

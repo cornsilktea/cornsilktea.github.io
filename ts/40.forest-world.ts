@@ -102,6 +102,7 @@ class FrWorld {
     if (x === a.campfire.x && z === a.campfire.z) return true;
     if (x >= a.publicChest.x && x < a.publicChest.x + a.publicChest.size && z >= a.publicChest.z && z < a.publicChest.z + a.publicChest.size) return true;
     if (this.furnitureAt(this.terrain.index(x, z))) return true;
+    if (FrPlazaLayout.solidAt(a.plaza, x, z, () => this.village.level())) return true;
     const site = this.siteOfCell.get(this.terrain.index(x, z));
     return !!site && !site.passable && (site.small || this.builtKeys.has(site.id));
   }

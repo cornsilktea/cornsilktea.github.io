@@ -209,13 +209,13 @@ class FrTerrainTiles {
   static readonly SIZE = 16;
   static readonly COLUMNS = 8;
   static readonly ROWS = 2;
-  static readonly NAMES: readonly string[] = ["grassTop", "grassSide", "dirt", "stone", "sand", "snowTop", "snowSide", "riverBed", "plank", "caveFloor", "caveRock", "crystal", "dark", "lava", "seaBed", "stoneDark"];
+  static readonly NAMES: readonly string[] = ["grassTop", "grassSide", "dirt", "stone", "sand", "snowTop", "snowSide", "riverBed", "trail", "caveFloor", "caveRock", "crystal", "dark", "lava", "seaBed", "stoneDark"];
   private static readonly TOP: Readonly<Record<string, string>> = {
-    G: "grassTop", D: "dirt", S: "stone", N: "sand", W: "snowTop", R: "riverBed", O: "riverBed", P: "plank", C: "caveFloor", T: "caveRock", V: "crystal", K: "dark", L: "lava",
+    G: "grassTop", D: "dirt", S: "stone", N: "sand", W: "snowTop", R: "riverBed", O: "riverBed", P: "trail", C: "caveFloor", T: "caveRock", V: "crystal", K: "dark", L: "lava",
   };
   private static readonly SIDE: Readonly<Record<string, [string, string]>> = {
     G: ["grassSide", "dirt"], D: ["dirt", "dirt"], S: ["stone", "stoneDark"], N: ["sand", "sand"], W: ["snowSide", "stone"], R: ["dirt", "dirt"], O: ["dirt", "dirt"],
-    P: ["plank", "plank"], C: ["caveRock", "caveRock"], T: ["caveRock", "caveRock"], V: ["crystal", "caveRock"], K: ["dark", "dark"], L: ["lava", "dark"],
+    P: ["trail", "dirt"], C: ["caveRock", "caveRock"], T: ["caveRock", "caveRock"], V: ["crystal", "caveRock"], K: ["dark", "dark"], L: ["lava", "dark"],
   };
 
   static topOf(type: string): string { return FrTerrainTiles.TOP[type] || "grassTop"; }

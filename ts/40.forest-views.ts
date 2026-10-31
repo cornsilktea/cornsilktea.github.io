@@ -820,6 +820,7 @@ class FrWorldView implements FrWorldListener {
   applyClock(minuteOfDay: number): void {
     if (this.areaDark) { this.night = 0.6; return; }
     this.night = this.sky.apply(minuteOfDay);
+    if (this.plaza) this.plaza.showTime(minuteOfDay, performance.now() / 1000);
   }
 
   resize(): void {

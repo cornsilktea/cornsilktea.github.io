@@ -108,7 +108,7 @@ class FrRegionGrid {
   static keyOf(x: number, z: number, size: number): string { return Math.floor(x / size) + "_" + Math.floor(z / size); }
 }
 
-interface FrTilePaint { base: string; dots: string[]; pattern?: "fringe" | "plank" | "cobble" | "ripple" | "glow"; fringe?: string }
+interface FrTilePaint { base: string; dots: string[]; pattern?: "fringe" | "trail" | "cobble" | "ripple" | "glow"; fringe?: string }
 
 class FrTerrainAtlas {
   private static readonly PAINTS: Readonly<Record<string, FrTilePaint>> = {
@@ -121,7 +121,7 @@ class FrTerrainAtlas {
     snowTop: { base: "#f4f7fb", dots: ["#e4ebf3", "#ffffff", "#dbe4ee"] },
     snowSide: { base: "#9a9da4", dots: ["#8a8d95", "#a9acb3"], pattern: "fringe", fringe: "#f4f7fb" },
     riverBed: { base: "#7d6f52", dots: ["#6e6247", "#8c7d5e"] },
-    plank: { base: "#c99a62", dots: ["#b8884f", "#d4a670"], pattern: "plank" },
+    trail: { base: "#c19463", dots: ["#b88a59", "#c99d6c", "#bd8f5e"], pattern: "trail" },
     caveFloor: { base: "#8f7b62", dots: ["#7f6c55", "#9c886d"], pattern: "cobble" },
     caveRock: { base: "#5c5a63", dots: ["#504e57", "#68666f"], pattern: "cobble" },
     crystal: { base: "#5fb8c8", dots: ["#7fd8e8", "#4a9aaa"], pattern: "glow" },
@@ -164,10 +164,12 @@ class FrTerrainAtlas {
       for (let x = 0; x < S; x++) if (random.next() < 0.6) g.fillRect(ox + x, oy + 3, 1, 1 + Math.floor(random.next() * 3));
       g.fillStyle = "rgba(255,255,255,0.18)";
       g.fillRect(ox, oy, S, 1);
-    } else if (paint.pattern === "plank") {
-      g.fillStyle = "rgba(60,35,15,0.35)";
-      [4, 8, 12].forEach((y) => g.fillRect(ox, oy + y, S, 1));
-      [[3, 0], [11, 4], [6, 8], [13, 12]].forEach(([x, y]) => g.fillRect(ox + x, oy + y, 1, 4));
+    } else if (paint.pattern === "trail") {
+      [["#d7b384", 3], ["#a98055", 3], ["#cfc3ae", 2]].forEach(([color, count]) => {
+        g.fillStyle = String(color);
+        for (let i = 0; i < Number(count); i++) g.fillRect(ox + 1 + Math.floor(random.next() * (S - 3)), oy + 1 + Math.floor(random.next() * (S - 3)), 2, 1);
+      });
+      return;
     } else if (paint.pattern === "cobble") {
       g.fillStyle = "rgba(30,30,40,0.28)";
       [[0, 5], [0, 11]].forEach(([x, y]) => g.fillRect(ox + x, oy + y, S, 1));

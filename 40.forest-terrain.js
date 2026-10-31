@@ -208,13 +208,13 @@ class FrTerrainTiles {
 FrTerrainTiles.SIZE = 16;
 FrTerrainTiles.COLUMNS = 8;
 FrTerrainTiles.ROWS = 2;
-FrTerrainTiles.NAMES = ["grassTop", "grassSide", "dirt", "stone", "sand", "snowTop", "snowSide", "riverBed", "plank", "caveFloor", "caveRock", "crystal", "dark", "lava", "seaBed", "stoneDark"];
+FrTerrainTiles.NAMES = ["grassTop", "grassSide", "dirt", "stone", "sand", "snowTop", "snowSide", "riverBed", "trail", "caveFloor", "caveRock", "crystal", "dark", "lava", "seaBed", "stoneDark"];
 FrTerrainTiles.TOP = {
-    G: "grassTop", D: "dirt", S: "stone", N: "sand", W: "snowTop", R: "riverBed", O: "riverBed", P: "plank", C: "caveFloor", T: "caveRock", V: "crystal", K: "dark", L: "lava",
+    G: "grassTop", D: "dirt", S: "stone", N: "sand", W: "snowTop", R: "riverBed", O: "riverBed", P: "trail", C: "caveFloor", T: "caveRock", V: "crystal", K: "dark", L: "lava",
 };
 FrTerrainTiles.SIDE = {
     G: ["grassSide", "dirt"], D: ["dirt", "dirt"], S: ["stone", "stoneDark"], N: ["sand", "sand"], W: ["snowSide", "stone"], R: ["dirt", "dirt"], O: ["dirt", "dirt"],
-    P: ["plank", "plank"], C: ["caveRock", "caveRock"], T: ["caveRock", "caveRock"], V: ["crystal", "caveRock"], K: ["dark", "dark"], L: ["lava", "dark"],
+    P: ["trail", "dirt"], C: ["caveRock", "caveRock"], T: ["caveRock", "caveRock"], V: ["crystal", "caveRock"], K: ["dark", "dark"], L: ["lava", "dark"],
 };
 class FrTerrainMesher {
     constructor(libs, data, material) {
