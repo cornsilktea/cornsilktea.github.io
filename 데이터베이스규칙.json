@@ -940,6 +940,7 @@
             "dpr": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 8" },
             "sw": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 10000" },
             "sh": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 10000" },
+            "err": { ".validate": "newData.isString() && newData.val().length <= 60" },
             "$other": { ".validate": false }
           }
         }

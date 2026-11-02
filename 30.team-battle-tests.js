@@ -2090,6 +2090,25 @@ class ResultCollector {
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "경기 중 → 로스터 자리, 없으면 관전, 밴픽 중 코드 입장 → 닉네임으로 자리");
   });
 
+  run(DRAFTG, "튕긴 뒤 다시 들어오기: 끊긴 내 선수 정보가 방에 남아 있어도 방 코드로 들어오면 관전이 아니라 내 밴픽·경기 자리를 되찾는가(로그인한 같은 이름만)", function (done) {
+    var SE = api.SEATS, bad = [], user = window.PORTAL_USER;
+    var ghost = { nickname: "가", isAI: false, team: "blue" };
+    var draftInfo = { status: "draft", mode: "cup", players: { old: ghost, other: { nickname: "나", isAI: false, team: "red" } }, roster: null, draft: { seq: { b1: "old", r1: "other" }, names: { old: "가", other: "나" } } };
+    var liveInfo = { status: "playing", mode: "cup", players: { old: ghost }, roster: { old: { team: "blue", c: "mage", s: 1, ai: false, n: "가" } } };
+    try {
+      window.PORTAL_USER = null;
+      if (SE.seatFor("12345", draftInfo, "가")) bad.push("로그인 전인데 남은 자리를 가져감");
+      window.PORTAL_USER = { uid: "u1", name: "가" };
+      if (SE.seatFor("12345", draftInfo, "가") !== "old") bad.push("밴픽 중 남은 내 자리를 못 되찾음");
+      if (SE.seatFor("12345", liveInfo, "가") !== "old") bad.push("경기 중 남은 내 자리를 못 되찾음");
+      if (SE.seatFor("12345", draftInfo, "다")) bad.push("이름이 다른데 남의 자리를 가져감");
+      if (!SE.isOpen(draftInfo, "old", true) || SE.isOpen(draftInfo, "old", false)) bad.push("내 자리 열림 판정이 틀림");
+    } finally {
+      window.PORTAL_USER = user;
+    }
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "로그인한 같은 이름이면 남은 밴픽·경기 자리로, 로그인 전·다른 이름은 그대로 관전");
+  });
+
   var STATS = api.STATS;
   function statsFixture() {
     var roster = {}, players = {};

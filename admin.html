@@ -503,8 +503,12 @@
           <div class="class-grid" id="rankGames"></div>
           <hr class="rank-divider">
           <div class="class-grid" id="rankGrid"></div>
-          <div class="actions"><button id="rankRefresh" type="button" disabled>🔄 새로고침</button></div>
+          <!-- 🩹 통계 정상화(2026-11-02, 팀 배틀(30)을 골랐을 때만 보임): 한 학생 기기만 결과를 못 쓴 판을, 같은 판 다른 학생의 최근 20매치 결과표로 채운다.
+               누르면 users 전체를 한 번 읽어 미리 보기 표를 그리고, 확인 창에서 '확인'을 누를 때만 다시 읽은 뒤 PATCH 한 번. 계산은 teambattle-stats-repair.js -->
+          <div class="actions"><button id="rankRefresh" type="button" disabled>🔄 새로고침</button><button id="rankRepair" type="button" hidden>🩹 통계 정상화</button></div>
           <p class="msg" id="rankMsg"></p>
+          <p class="msg" id="rankRepairMsg"></p>
+          <div id="rankRepairBox" class="stats-box"></div>
           <div id="rankTable" class="stats-box"></div>
         </div>
 
@@ -624,6 +628,7 @@
      통계가 있는 새 게임을 만들면 그 게임의 통계 .js 를 여기 한 줄 더하고 ClassRankPanel.GAMES 에 account 를 넘긴다. -->
 <script charset="utf-8" src="account-match-kit.js?v=20261029c"></script>
 <script charset="utf-8" src="account-stats.js?v=20261029g"></script>
+<script charset="utf-8" src="teambattle-stats-repair.js?v=20261102a"></script>
 <script charset="utf-8" src="patch-notes.js?v=20261029b"></script>
 <script charset="utf-8" src="24.turbo-lap-stats.js?v=20261029c"></script>
 <script charset="utf-8" src="25.fps-survival-stats.js?v=20261028c"></script>
@@ -1222,6 +1227,7 @@ class ClassRankPanel {
     this.fillGrid($("rankGames"), ClassRankPanel.GAMES.map((g) => ({ id: g.key, label: g.title })), (id) => this.pickGame(id), this.game.key);
     this.fillGrid($("rankGrid"), ClassRankPanel.pickable(), (id) => this.pickClass(id), this.cls);
     $("rankRefresh").disabled = !this.cls;
+    $("rankRepair").hidden = this.game.key !== "teambattle";
   }
 
   fillGrid(grid, items, onPick, selected) {
@@ -2454,12 +2460,13 @@ class PatchNotePanel {
     });
   }
 }
-/* 패치노트·새 학년도 칸이 교사 토큰으로 데이터베이스를 읽고 쓰는 통로(상태 없음). keys 는 아이디 목록만 받는 얕은 읽기 */
+/* 패치노트·새 학년도·30번 통계 정상화 칸이 교사 토큰으로 데이터베이스를 읽고 쓰는 통로(상태 없음). keys 는 아이디 목록만 받는 얕은 읽기 */
 class AdminRestIo {
   async read(path) { const r = await fetch(await authedUrl(path), { cache: "no-store" }); if (!r.ok) throw new Error(String(r.status)); return r.json(); }
   async keys(path) { const r = await fetch(await authedUrl(path) + "&shallow=true", { cache: "no-store" }); if (!r.ok) throw new Error(String(r.status)); return Object.keys((await r.json()) || {}); }
   async patch(values) { const r = await fetch(await authedUrl(""), { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(values) }); if (!r.ok) throw new Error(String(r.status)); }
 }
+new TeamBattleRepairPanel(new AdminRestIo(), { run: "rankRepair", msg: "rankRepairMsg", box: "rankRepairBox" }, () => $("rankRefresh").click()).bind();
 new PatchNotePanel(new PatchNoteEditor(new AdminRestIo(), { game: "patchNoteGame", title: "patchNoteTitle", body: "patchNoteText", again: "patchNoteAgain", publish: "patchNotePublish", remove: "patchNoteRemove", msg: "patchNoteMsg", preview: "patchNotePreview" })).bind();
 
 /* 새 학년도 시작(2026-10-29 선생님 요청): 학생 반(profile.cls)은 반 링크로 처음 로그인할 때 한 번만 적히고 규칙상 교사만 바꿀 수 있어서,

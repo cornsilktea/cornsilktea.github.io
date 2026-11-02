@@ -1229,13 +1229,16 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return s && s.code && s.id && Date.now() - s.at < SeatReclaim.SEAT_MS ? s : null;
     }
     isLive(info) { return !!SeatReclaim.SEAT_MODES[info.mode] && (!!SeatReclaim.LIVE[info.status] || (info.status === "draft" && !!info.draft)); }
-    draftSeatOpen(info, id) { var services = this.services;
-      return info.status === "draft" && !!info.draft && !!services.draft.draftSideOf(info.draft, id) && !(info.players || {})[id];
+    draftSeatOpen(info, id, mine) { var services = this.services;
+      return info.status === "draft" && !!info.draft && !!services.draft.draftSideOf(info.draft, id) && (!!mine || !(info.players || {})[id]);
     }
-    isOpen(info, id) {
-      if (info.status === "draft") return this.draftSeatOpen(info, id);
+    isOpen(info, id, mine) {
+      if (info.status === "draft") return this.draftSeatOpen(info, id, mine);
       var r = info.roster && info.roster[id];
-      return !!r && !r.ai && !!r.s && (r.team === "blue" || r.team === "red") && !(info.players || {})[id];
+      return !!r && !r.ai && !!r.s && (r.team === "blue" || r.team === "red") && (!!mine || !(info.players || {})[id]);
+    }
+    leftBehindByMe(info, id, nick) { var p = (info.players || {})[id];
+      return !!window.PORTAL_USER && !!nick && !!p && !p.isAI && p.nickname === nick;
     }
     nickOf(info, id) {
       if (info.status === "draft") return info.draft && info.draft.names ? info.draft.names[id] : null;
@@ -1250,9 +1253,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     seatFor(code, info, nick) { var seats = this;
       if (!seats.isLive(info)) return null;
       var s = seats.saved();
-      if (s && s.code === code && seats.isOpen(info, s.id)) return s.id;
+      if (s && s.code === code && seats.isOpen(info, s.id, true)) return s.id;
       var ids = info.status === "draft" ? Object.keys(info.draft.seq || {}).map(function (k) { return info.draft.seq[k]; }) : Object.keys(info.roster || {});
-      return ids.filter(function (id) { return seats.isOpen(info, id) && !!nick && seats.nickOf(info, id) === nick; })[0] || null;
+      return ids.filter(function (id) { return !!nick && seats.nickOf(info, id) === nick && seats.isOpen(info, id, seats.leftBehindByMe(info, id, nick)); })[0] || null;
     }
     seatRecord(r, nick) { var services = this.services;
       return { nickname: nick || r.n || "", isAI: false, team: r.team, slot: r.s, characterType: r.c, joinedAt: services.clock.now() };
@@ -1286,7 +1289,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var ref = services.backend.db.ref(RoomSession.ROOT + "/" + s.code);
       services.seats.readRoom(ref).then(function (info) {
         if (services.session.room) return;
-        if (!services.seats.isLive(info) || !services.seats.isOpen(info, s.id)) { services.seats.forget(); return; }
+        if (!services.seats.isLive(info) || !services.seats.isOpen(info, s.id, false)) { services.seats.forget(); return; }
         services.lobby.startMsg("이전 경기(" + s.code + ")로 다시 들어가는 중…");
         return services.seats.claim(ref, s.code, s.id, info);
       }).catch(function () { services.lobby.startMsg(""); });
@@ -3752,9 +3755,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var t = services.clock.now();
       if (services.session.room.status === "ended" && services.session.room.endedAt && t - services.session.room.endedAt > 300000) services.session.room.ref.remove();
     }
+    endStep(step, run) { try { run(); } catch (e) { this.services.perf.noteEndError(step, e); } }
     onEnded() { var services = this.services;
-      services.randomMatch.matchEnded();
-      services.accountRecorder.matchEnded();
+      this.endStep("match", function () { services.randomMatch.matchEnded(); });
+      this.endStep("account", function () { services.accountRecorder.matchEnded(); });
       if (!services.match.game) return;
       services.perf.matchEnded();
       services.match.game.forceNet = true;
@@ -9379,7 +9383,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     static PATH = "perfDiag/teambattle/";
     static RTT_KEEP = 50;
     static RECORDS = !Environment.SILENT_RUN;
-    constructor(services) { this.services = services; this.frames = new FrameTally(); this.arrivals = new ArrivalTally(); this.rtts = new SampleTally(); this.snaps = 0; this.startAt = 0; this.sentFor = 0; }
+    static ERR_LEN = 60;
+    constructor(services) { this.services = services; this.frames = new FrameTally(); this.arrivals = new ArrivalTally(); this.rtts = new SampleTally(); this.snaps = 0; this.startAt = 0; this.sentFor = 0; this.endError = ""; }
+    noteEndError(step, e) { if (!this.endError) this.endError = (step + ": " + String((e && e.message) || e)).slice(0, PerfProbe.ERR_LEN); }
     playing() { var room = this.services.session.room; return !!(room && room.status === "playing" && this.services.match.game); }
     followMatch() {
       var room = this.services.session.room;
@@ -9418,13 +9424,14 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         st50: probe.cap(this.arrivals.all.quantile(0.5), 60000), st95: probe.cap(this.arrivals.all.quantile(0.95), 60000),
         stMax: probe.cap(this.arrivals.all.max(), 600000), st95w: probe.cap(this.arrivals.worstQuantile(0.95), 60000),
         snap: probe.cap(this.snaps, 10000), rttN: probe.cap(this.rtts.count(), 1000), rtt50: probe.cap(this.rtts.quantile(0.5), 10000), rttMax: probe.cap(this.rtts.max(), 10000)
-      }, DeviceInfo.summary());
+      }, DeviceInfo.summary(), this.endError ? { err: this.endError } : {});
     }
     matchEnded() {
       this.followMatch();
       if (!PerfProbe.RECORDS || this.sentFor === this.startAt || !this.frames.times.count()) return;
       this.sentFor = this.startAt;
       new PerfRecordSender().send(PerfProbe.PATH + this.dayKey(), this.record());
+      this.endError = "";
     }
   }
   class RemoteSnapshotBuffer {
