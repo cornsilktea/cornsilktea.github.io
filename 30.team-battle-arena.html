@@ -9553,6 +9553,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     static CLEAR_MS = 1200;
     static CHECK_MS = 250;
     static NEEDED_KEYS = 2;
+    static DOT_PX = 9;
     constructor(services) { this.services = services; this.box = null; this.checkedAt = 0; this.badSince = 0; this.lastBadAt = 0; this.visible = false; }
     frame() {
       var now = performance.now();
@@ -9565,13 +9566,22 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       }
       if (bad) this.lastBadAt = now;
       this.setVisible(bad || (this.visible && now - this.lastBadAt < BadConnectionBanner.CLEAR_MS));
+      if (this.visible) this.placeBesideRoomCode();
     }
     makeBox() {
+      var style = document.createElement("style");
+      style.textContent = "@keyframes badConnectionBlink{0%,100%{opacity:1}50%{opacity:.15}}";
+      document.head.appendChild(style);
       var box = document.createElement("div");
-      box.textContent = "인터넷 연결 불량";
-      box.style.cssText = "position:fixed;top:56px;left:50%;transform:translateX(-50%);z-index:2147482000;padding:4px 14px;border-radius:6px;background:rgba(0,0,0,.72);color:#ff3b30;font:800 20px/1.4 'Nanum Gothic','Malgun Gothic',sans-serif;white-space:nowrap;pointer-events:none;display:none";
+      box.style.cssText = "position:fixed;z-index:2147482000;width:" + BadConnectionBanner.DOT_PX + "px;height:" + BadConnectionBanner.DOT_PX + "px;border-radius:50%;background:#ff3b30;pointer-events:none;display:none;animation:badConnectionBlink .8s infinite";
       document.body.appendChild(box);
       return box;
+    }
+    placeBesideRoomCode() {
+      var tag = Dom.$("hudRoomCode"), rect = tag.getBoundingClientRect(), dot = BadConnectionBanner.DOT_PX;
+      var beside = rect.width > 0;
+      this.box.style.left = (beside ? rect.right + 5 : window.innerWidth / 2 - dot / 2) + "px";
+      this.box.style.top = (beside ? rect.top + (rect.height - dot) / 2 : 56) + "px";
     }
     setVisible(on) {
       if (on === this.visible) return;
