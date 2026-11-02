@@ -1,0 +1,270 @@
+"use strict";
+/* =====================================================================
+   30번 팀 구성(2026-11-02 선생님 요청) — 교사 제어판(admin.html) 전용
+
+   한 반의 반 별 통계(classStats/<반>/<uid>)를 한 번 읽어 MVP율 순으로 티어 1·2·3 으로 나누고,
+   8개 조(세로 칸) × 3개 티어(가로 줄) 판 위에서 조를 짠다. 다른 학생의 통계는 교사만 읽을 수 있으므로 제어판에서만 쓴다.
+   순서: 티어 1 은 MVP율 순서대로 1~8조에 자리를 잡고 → 티어 2(가나다순)를 끌어다 놓으면 → 티어 3(가나다순)이 나온다.
+   배치가 끝난 뒤에는 명찰을 끌어다 놓거나 두 명찰을 차례로 눌러 서로 바꿀 수 있다(티어 1 도 다른 칸으로 옮길 수 있다).
+   ===================================================================== */
+class TeamFormationStudent {
+    constructor(id, fullName, games, mvp, tier = 3) {
+        this.id = id;
+        this.fullName = fullName;
+        this.games = games;
+        this.mvp = mvp;
+        this.tier = tier;
+    }
+    get shownName() {
+        const stripped = this.fullName.replace(/^\d+[\s._-]*/, "").trim();
+        return stripped || this.fullName;
+    }
+    get mvpRate() {
+        return this.games > 0 ? this.mvp / this.games : -1;
+    }
+    static byMvpRate(a, b) {
+        return b.mvpRate - a.mvpRate || b.games - a.games || a.shownName.localeCompare(b.shownName, "ko");
+    }
+    static byName(a, b) {
+        return a.shownName.localeCompare(b.shownName, "ko") || a.fullName.localeCompare(b.fullName, "ko");
+    }
+}
+class TeamFormationRoster {
+    constructor(raw) {
+        this.students = Object.keys(raw)
+            .map((uid) => TeamFormationRoster.studentOf(uid, raw[uid] || {}))
+            .sort(TeamFormationStudent.byMvpRate);
+        this.students.forEach((student, index) => {
+            student.tier = Math.min(3, Math.floor(index / TeamFormationRoster.TIER_SIZE) + 1);
+        });
+    }
+    static studentOf(uid, raw) {
+        const name = typeof raw.n === "string" && raw.n ? raw.n : "?";
+        return new TeamFormationStudent(uid, name, Math.max(0, Number(raw.g) || 0), Math.max(0, Number(raw.m) || 0));
+    }
+    tierOf(tier) {
+        return this.students.filter((student) => student.tier === tier);
+    }
+}
+TeamFormationRoster.TIER_SIZE = 8;
+class TeamFormationBoard {
+    constructor(roster) {
+        this.roster = roster;
+        this.cells = Array.from({ length: TeamFormationBoard.ROWS }, () => new Array(TeamFormationBoard.COLS).fill(null));
+        this.unplaced = new Set(roster.students);
+        roster.tierOf(1).slice(0, TeamFormationBoard.COLS).forEach((student, col) => this.put(student, { row: 0, col }));
+    }
+    get isDirty() {
+        return this.roster.students.some((student) => student.tier > 1 && !this.unplaced.has(student));
+    }
+    studentAt(slot) {
+        return this.cells[slot.row][slot.col];
+    }
+    slotOf(student) {
+        for (let row = 0; row < TeamFormationBoard.ROWS; row++) {
+            const col = this.cells[row].indexOf(student);
+            if (col >= 0)
+                return { row, col };
+        }
+        return null;
+    }
+    /* 대기 칸에는 아직 자리가 없는 학생 중 가장 높은 티어만 보인다. 티어 1 은 MVP율 순, 나머지는 가나다순 */
+    trayStudents() {
+        const waiting = Array.from(this.unplaced);
+        if (!waiting.length)
+            return [];
+        const tier = Math.min(...waiting.map((student) => student.tier));
+        const group = waiting.filter((student) => student.tier === tier);
+        return group.sort(tier === 1 ? TeamFormationStudent.byMvpRate : TeamFormationStudent.byName);
+    }
+    trayTier() {
+        const group = this.trayStudents();
+        return group.length ? group[0].tier : 0;
+    }
+    /* 빈 칸이면 옮기고, 학생이 든 칸이면 칸에 있던 학생끼리만 서로 바꾼다. 대기 칸의 학생을 찬 칸에 놓을 수는 없다(false) */
+    moveTo(student, target) {
+        const occupant = this.studentAt(target);
+        if (occupant === student)
+            return true;
+        const from = this.slotOf(student);
+        if (occupant && !from)
+            return false;
+        if (from)
+            this.cells[from.row][from.col] = null;
+        this.unplaced.delete(student);
+        this.cells[target.row][target.col] = student;
+        if (occupant && from)
+            this.cells[from.row][from.col] = occupant;
+        return true;
+    }
+    returnToTray(student) {
+        const from = this.slotOf(student);
+        if (!from)
+            return;
+        this.cells[from.row][from.col] = null;
+        this.unplaced.add(student);
+    }
+    put(student, slot) {
+        this.cells[slot.row][slot.col] = student;
+        this.unplaced.delete(student);
+    }
+}
+TeamFormationBoard.ROWS = 3;
+TeamFormationBoard.COLS = 8;
+class TeamFormationView {
+    constructor(board, boardBox, trayBox, say) {
+        this.board = board;
+        this.boardBox = boardBox;
+        this.trayBox = trayBox;
+        this.say = say;
+        this.selected = null;
+        this.dragged = null;
+        this.makeDropTarget(this.trayBox, (student) => { this.board.returnToTray(student); this.selected = null; this.render(); });
+        this.render();
+    }
+    render() {
+        this.boardBox.textContent = "";
+        this.boardBox.appendChild(this.gridElement());
+        this.renderTray();
+    }
+    gridElement() {
+        const grid = this.make("div", "tf-grid");
+        grid.appendChild(this.make("div", "tf-corner"));
+        for (let col = 0; col < TeamFormationBoard.COLS; col++)
+            grid.appendChild(this.make("div", "tf-head", (col + 1) + "조"));
+        for (let row = 0; row < TeamFormationBoard.ROWS; row++) {
+            grid.appendChild(this.make("div", "tf-tier tf-tier" + (row + 1), "티어 " + (row + 1)));
+            for (let col = 0; col < TeamFormationBoard.COLS; col++)
+                grid.appendChild(this.cellElement({ row, col }));
+        }
+        return grid;
+    }
+    cellElement(slot) {
+        const cell = this.make("div", "tf-cell");
+        this.makeDropTarget(cell, (student) => this.moveTo(student, slot));
+        cell.addEventListener("click", () => { if (this.selected)
+            this.moveTo(this.selected, slot); });
+        const student = this.board.studentAt(slot);
+        if (student)
+            cell.appendChild(this.tokenElement(student));
+        return cell;
+    }
+    renderTray() {
+        const students = this.board.trayStudents();
+        const tier = this.board.trayTier();
+        this.trayBox.textContent = "";
+        const title = tier ? "티어 " + tier + " 학생 " + students.length + "명 — 팀 칸으로 끌어다 놓으세요" : "모든 학생이 조에 들어갔습니다";
+        this.trayBox.appendChild(this.make("div", "tf-tray-title", title));
+        const list = this.make("div", "tf-tray-list");
+        students.forEach((student) => list.appendChild(this.tokenElement(student)));
+        this.trayBox.appendChild(list);
+    }
+    tokenElement(student) {
+        const token = this.make("div", "tf-token tf-token" + student.tier, student.shownName);
+        token.draggable = true;
+        token.title = student.fullName + " · MVP율 " + (student.games ? (student.mvpRate * 100).toFixed(1) + "% (" + student.mvp + "/" + student.games + "판)" : "기록 없음");
+        if (student === this.selected)
+            token.classList.add("selected");
+        token.addEventListener("dragstart", (event) => {
+            this.dragged = student;
+            event.dataTransfer?.setData("text/plain", student.id);
+        });
+        token.addEventListener("dragend", () => { this.dragged = null; });
+        token.addEventListener("click", (event) => { event.stopPropagation(); this.clickToken(student); });
+        return token;
+    }
+    makeDropTarget(target, onDrop) {
+        target.addEventListener("dragover", (event) => { event.preventDefault(); target.classList.add("over"); });
+        target.addEventListener("dragleave", () => target.classList.remove("over"));
+        target.addEventListener("drop", (event) => {
+            event.preventDefault();
+            target.classList.remove("over");
+            if (this.dragged)
+                onDrop(this.dragged);
+            this.dragged = null;
+        });
+    }
+    clickToken(student) {
+        if (this.selected === student) {
+            this.selected = null;
+            this.render();
+            return;
+        }
+        const slot = this.board.slotOf(student);
+        if (this.selected && slot) {
+            this.moveTo(this.selected, slot);
+            return;
+        }
+        this.selected = student;
+        this.say(student.shownName + " 선택 — 옮길 칸이나 바꿀 명찰을 누르세요.");
+        this.render();
+    }
+    moveTo(student, slot) {
+        if (!this.board.moveTo(student, slot)) {
+            this.say("대기 중인 명찰은 빈 칸에만 놓을 수 있습니다. 먼저 그 칸의 학생을 옮겨 주세요.");
+            return;
+        }
+        this.selected = null;
+        this.say("");
+        this.render();
+    }
+    make(tag, className, text) {
+        const node = document.createElement(tag);
+        node.className = className;
+        if (text !== undefined)
+            node.textContent = text;
+        return node;
+    }
+}
+class TeamFormationPanel {
+    constructor(io, ids, classes, currentClass) {
+        this.io = io;
+        this.ids = ids;
+        this.classes = classes;
+        this.currentClass = currentClass;
+        this.busy = false;
+        this.board = null;
+    }
+    /* 펼칠 때마다 부른다: 반 목록을 채우고(처음 한 번), 제어판에서 펼쳐 둔 반이 있으면 그 반을 고른다 */
+    open() {
+        const select = this.el(this.ids.cls);
+        if (!select.options.length) {
+            this.classes.forEach((c) => select.appendChild(new Option(c.label, c.id)));
+        }
+        const current = this.currentClass();
+        if (!this.board && current && this.classes.some((c) => c.id === current))
+            select.value = current;
+    }
+    bind() {
+        this.el(this.ids.load).addEventListener("click", () => { void this.load(); });
+    }
+    el(id) {
+        return document.getElementById(id);
+    }
+    say(text) {
+        this.el(this.ids.msg).textContent = text;
+    }
+    async load() {
+        if (this.busy)
+            return;
+        if (this.board && this.board.isDirty && !confirm("지금 짜 둔 조가 사라집니다. 다시 불러올까요?"))
+            return;
+        const cls = this.el(this.ids.cls).value;
+        const label = this.classes.find((c) => c.id === cls)?.label || cls;
+        this.busy = true;
+        this.say(label + " 통계를 불러오는 중…");
+        try {
+            const data = (await this.io.read("classStats/" + cls));
+            const roster = new TeamFormationRoster(data || {});
+            this.board = new TeamFormationBoard(roster);
+            new TeamFormationView(this.board, this.el(this.ids.board), this.el(this.ids.tray), (text) => this.say(text));
+            this.say(label + " " + roster.students.length + "명 · 티어 1 " + roster.tierOf(1).length + "명 · 티어 2 " + roster.tierOf(2).length + "명 · 티어 3 " + roster.tierOf(3).length + "명" + (roster.students.length > 24 ? " (24명을 넘는 학생은 대기 칸에 남습니다)" : ""));
+        }
+        catch (e) {
+            this.say("불러오지 못했습니다 (" + (e instanceof Error ? e.message : String(e)) + "). 권한은 데이터베이스 규칙(classStats)을 확인하세요.");
+        }
+        finally {
+            this.busy = false;
+        }
+    }
+}
