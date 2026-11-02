@@ -469,6 +469,7 @@ class FrSnowRules {
 class FrVillage {
     constructor() {
         this.built = new Map();
+        this.levelFromQuests = null;
     }
     builtCount(id) { return this.built.get(id) || 0; }
     markBuilt(id) { this.built.set(id, this.builtCount(id) + 1); }
@@ -478,6 +479,8 @@ class FrVillage {
         return FrCatalog.CONSTRUCTIONS.reduce((sum, c) => sum + c.score * this.builtCount(c.id), 0);
     }
     level() {
+        if (this.levelFromQuests)
+            return this.levelFromQuests();
         const wallsDone = this.builtCount("wall") >= 12;
         let level = 1;
         for (let l = 2; l <= 5; l++)

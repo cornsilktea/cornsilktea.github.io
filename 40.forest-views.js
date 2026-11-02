@@ -766,6 +766,9 @@ class FrWorldView {
             else
                 this.props.hideBuilt(site);
         }
+        this.refreshVillageLevel();
+    }
+    refreshVillageLevel() {
         if (!this.plaza)
             return;
         const before = this.plaza.level;

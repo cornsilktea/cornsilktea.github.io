@@ -129,6 +129,15 @@ class FrQuestBoard implements FrQuestSnapshot {
   people(): number { return this.peopleNow(); }
   isDone(id: string): boolean { return this.doneIds.has(id); }
 
+  villageLevel(): number {
+    let level = 1;
+    for (let chapter = 1; chapter < FrQuestCatalog.CHAPTER_NAMES.length - 1; chapter++) {
+      if (!FrQuestCatalog.forChapter(chapter).every((m) => this.doneIds.has(m.id))) break;
+      level = chapter + 1;
+    }
+    return level;
+  }
+
   record(key: string, amount = 1): void {
     this.pending.set(key, (this.pending.get(key) || 0) + amount);
     this.scheduleFlush();

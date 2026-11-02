@@ -473,6 +473,7 @@ class FrSnowRules {
 
 class FrVillage {
   private readonly built: Map<string, number> = new Map();
+  levelFromQuests: (() => number) | null = null;
 
   builtCount(id: string): number { return this.built.get(id) || 0; }
 
@@ -485,6 +486,7 @@ class FrVillage {
   }
 
   level(): number {
+    if (this.levelFromQuests) return this.levelFromQuests();
     const wallsDone = this.builtCount("wall") >= 12;
     let level = 1;
     for (let l = 2; l <= 5; l++) if (this.score() >= FrBalance.VILLAGE_LEVEL_SCORE[l] && (l < 5 || wallsDone)) level = l;

@@ -318,6 +318,7 @@ class FrGame {
   private async prepareQuest(world: FrWorld, session: FrSession, island: string): Promise<void> {
     const board = new FrQuestBoard(this.backend, island, () => world.village, () => this.livePeople());
     await board.load();
+    world.village.levelFromQuests = () => board.villageLevel();
     const panel = new FrQuestPanel(FrDom.el("questPanel"), board, () => world.village.level());
     board.holding = () => !!this.expedition;
     board.onChange = () => panel.render();
@@ -1094,7 +1095,7 @@ class FrGame {
     this.hud.showSleepButton(FrSleepVote.canSleep(minute, session.area) && !this.currentTask, session.sleeping);
     this.hud.showSleepBand(FrClock.isNight(minute) ? FrSleepVote.banner(this.presences()) : "");
     if (day !== this.lastDay) this.onNewDay(day);
-    if (time - this.lastSnowCheck > 1) { this.lastSnowCheck = time; world.syncSnow(day); this.view.updateCrops(clock.absoluteMinute(), true); void clock.heartbeat(); if (this.questPanel) this.questPanel.render(); }
+    if (time - this.lastSnowCheck > 1) { this.lastSnowCheck = time; world.syncSnow(day); this.view.updateCrops(clock.absoluteMinute(), true); void clock.heartbeat(); if (this.questPanel) this.questPanel.render(); this.view.refreshVillageLevel(); }
   }
 
   private onNewDay(day: number): void {

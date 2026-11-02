@@ -126,6 +126,15 @@ class FrQuestBoard {
     built(id) { return this.villageOf().builtCount(id); }
     people() { return this.peopleNow(); }
     isDone(id) { return this.doneIds.has(id); }
+    villageLevel() {
+        let level = 1;
+        for (let chapter = 1; chapter < FrQuestCatalog.CHAPTER_NAMES.length - 1; chapter++) {
+            if (!FrQuestCatalog.forChapter(chapter).every((m) => this.doneIds.has(m.id)))
+                break;
+            level = chapter + 1;
+        }
+        return level;
+    }
     record(key, amount = 1) {
         this.pending.set(key, (this.pending.get(key) || 0) + amount);
         this.scheduleFlush();

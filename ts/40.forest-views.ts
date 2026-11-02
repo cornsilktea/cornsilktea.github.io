@@ -752,6 +752,10 @@ class FrWorldView implements FrWorldListener {
   onBuilt(id: string): void {
     const site = this.world ? this.world.siteOf(id) : undefined;
     if (site) { if (this.world && this.world.isBuilt(id)) this.props.showBuilt(site); else this.props.hideBuilt(site); }
+    this.refreshVillageLevel();
+  }
+
+  refreshVillageLevel(): void {
     if (!this.plaza) return;
     const before = this.plaza.level;
     const level = this.plaza.refresh();

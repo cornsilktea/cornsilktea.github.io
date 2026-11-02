@@ -309,6 +309,7 @@ class FrGame {
     async prepareQuest(world, session, island) {
         const board = new FrQuestBoard(this.backend, island, () => world.village, () => this.livePeople());
         await board.load();
+        world.village.levelFromQuests = () => board.villageLevel();
         const panel = new FrQuestPanel(FrDom.el("questPanel"), board, () => world.village.level());
         board.holding = () => !!this.expedition;
         board.onChange = () => panel.render();
@@ -1419,6 +1420,7 @@ class FrGame {
             void clock.heartbeat();
             if (this.questPanel)
                 this.questPanel.render();
+            this.view.refreshVillageLevel();
         }
     }
     onNewDay(day) {
