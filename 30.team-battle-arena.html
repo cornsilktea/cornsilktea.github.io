@@ -9379,7 +9379,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class PerfProbe {
-    static BUILD = "lag5";
+    static BUILD = "lag6";
     static PATH = "perfDiag/teambattle/";
     static RTT_KEEP = 50;
     static RECORDS = !Environment.SILENT_RUN;
@@ -9437,7 +9437,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   class RemoteSnapshotBuffer {
     static KEEP = 8;
     static MAX_SPAN_MS = 250;
-    constructor() { this.snaps = []; }
+    constructor() { this.snaps = []; this.delay = new RemoteDelay(); }
     push(snap) { this.snaps.push(snap); if (this.snaps.length > RemoteSnapshotBuffer.KEEP) this.snaps.shift(); }
     latest() { return this.snaps[this.snaps.length - 1] || null; }
     restartFrom(snap) { this.snaps = [snap]; }
@@ -9463,6 +9463,33 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return this.still(s[0], s[0].mv);
     }
   }
+  class RemoteDelay {
+    static MIN_MS = 180;
+    static MAX_MS = 320;
+    static MARGIN_MS = 40;
+    static KEEP = 24;
+    static MIN_SAMPLES = 6;
+    static RISE_PER_MS = 0.1;
+    static FALL_PER_MS = 0.03;
+    constructor() { this.gaps = []; this.lastArrival = 0; this.current = RemoteDelay.MIN_MS; this.sampledAt = 0; }
+    note(arrived, wasMoving) {
+      if (this.lastArrival && wasMoving) { this.gaps.push(arrived - this.lastArrival); if (this.gaps.length > RemoteDelay.KEEP) this.gaps.shift(); }
+      this.lastArrival = arrived;
+    }
+    target() {
+      if (this.gaps.length < RemoteDelay.MIN_SAMPLES) return RemoteDelay.MIN_MS;
+      var sorted = this.gaps.slice().sort(function (a, b) { return a - b; });
+      var p90 = sorted[Math.floor((sorted.length - 1) * 0.9)];
+      return Math.max(RemoteDelay.MIN_MS, Math.min(RemoteDelay.MAX_MS, p90 + RemoteDelay.MARGIN_MS));
+    }
+    at(now) {
+      var dt = this.sampledAt ? Math.min(100, Math.max(0, now - this.sampledAt)) : 0, target = this.target();
+      this.sampledAt = now;
+      if (target > this.current) this.current = Math.min(target, this.current + RemoteDelay.RISE_PER_MS * dt);
+      else this.current = Math.max(target, this.current - RemoteDelay.FALL_PER_MS * dt);
+      return this.current;
+    }
+  }
   class RemoteMotion {
     static DELAY_MS = 180;
     static JUMP = 250;
@@ -9476,13 +9503,14 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     push(key, value, arrived) {
       if (typeof value !== "string") return;
       var buffer = this.buffers[key] = this.buffers[key] || new RemoteSnapshotBuffer(), last = buffer.latest();
+      buffer.delay.note(arrived, !!(last && last.mv));
       var f = value.split(",", 4), snap = { at: this.spreadTime(last, arrived), x: +f[0] || 0, y: +f[1] || 0, angle: (+f[2] || 0) * Math.PI / 180, mv: f[3] === "1" };
       if (last && MathKit.hyp(snap.x - last.x, snap.y - last.y) > RemoteMotion.JUMP) { snap.at = arrived; buffer.restartFrom(snap); } else buffer.push(snap);
     }
     drop(key) { delete this.buffers[key]; }
     clear() { this.buffers = {}; }
     restart(key) { var buffer = this.buffers[key], last = buffer && buffer.latest(); if (last) buffer.restartFrom(last); }
-    sample(key, now) { var buffer = this.buffers[key]; return buffer ? buffer.sample(now - RemoteMotion.DELAY_MS) : null; }
+    sample(key, now) { var buffer = this.buffers[key]; return buffer ? buffer.sample(now - buffer.delay.at(now)) : null; }
   }
   class NetJitterSim {
     static MAX_MS = Math.max(0, +((location.search.match(/[?&]jitter=(\d+)/) || [])[1] || 0));
