@@ -211,6 +211,7 @@ class FrChestWindow extends FrWindow {
       if (this.session.bag.count(id) < count) return;
       if (!(await this.session.world.putPublic(id, count, this.session.nick))) { this.toast.show("창고에 더 넣을 수 없어요"); return; }
       this.session.bag.take(id, count);
+      if (id === "iron") this.session.questSink("ironDonated", count);
       this.session.stats.add("chestPut", count);
     } else {
       if (this.session.bag.freeSlots() < 1 && this.session.bag.count(id) % FrBalance.STACK_SIZE === 0) { this.toast.show("가방이 가득 찼어요"); return; }
@@ -414,7 +415,7 @@ class FrBuildWindow extends FrWindow {
       const lacking = def.cost[id] - this.session.world.publicStore.count(id);
       const give = Math.min(lacking, this.session.bag.count(id));
       if (give <= 0) continue;
-      if (await this.session.world.putPublic(id, give, this.session.nick)) this.session.bag.take(id, give);
+      if (await this.session.world.putPublic(id, give, this.session.nick)) { this.session.bag.take(id, give); if (id === "iron") this.session.questSink("ironDonated", give); }
     }
     this.session.changed();
   }

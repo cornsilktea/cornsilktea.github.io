@@ -120,6 +120,9 @@ class FrGame {
         this.target = null;
         this.lastDay = 0;
         this.lastSnowCheck = 0;
+        this.quest = null;
+        this.questPanel = null;
+        this.gainFeed = null;
         this.lastTime = 0;
         this.busy = false;
         this.roster = new FrRoster();
@@ -145,6 +148,7 @@ class FrGame {
         this.rotation = 0;
         this.morningPending = false;
         this.toast = new FrToast(FrDom.el("toast"));
+        this.gainFeed = new FrGainFeed(FrDom.el("gainFeed"));
         this.input = new FrInput(FrDom.el("joyBase"), FrDom.el("joyKnob"), FrDom.el("btnAction"), {
             press: () => this.press(),
             release: () => this.release(),
@@ -283,6 +287,7 @@ class FrGame {
         this.finder = new FrTargetFinder(world);
         this.outcome = new FrTaskOutcome(session, world, this.random, clock);
         this.island = island;
+        await this.prepareQuest(world, session, island);
         this.startSync(world, clock, island);
         this.buildWindows(session);
         if (this.isAdmin()) {
@@ -301,6 +306,25 @@ class FrGame {
             void save.flush(); });
         this.start.enter(true, "섬: " + island + " · " + FrStatusSummary.line(session));
     }
+    async prepareQuest(world, session, island) {
+        const board = new FrQuestBoard(this.backend, island, () => world.village, () => this.livePeople());
+        await board.load();
+        const panel = new FrQuestPanel(FrDom.el("questPanel"), board, () => world.village.level());
+        board.holding = () => !!this.expedition;
+        board.onChange = () => panel.render();
+        board.onMissionDone = (mission) => this.toast.show("퀘스트 완료! " + mission.name, 3200);
+        session.questSink = (key, amount = 1) => board.record(key, amount);
+        session.speciesSink = (group, id) => board.recordSpecies(group, id);
+        session.onGain = (id, amount) => { if (this.gainFeed)
+            this.gainFeed.push(id, amount); };
+        this.quest = board;
+        this.questPanel = panel;
+        panel.render();
+    }
+    livePeople() {
+        const students = this.roster.aliveUids().filter((uid) => { const member = this.roster.members.get(uid); return !(member && member.adm); });
+        return Math.max(1, students.length);
+    }
     startSync(world, clock, island) {
         if (this.hub)
             this.hub.close();
@@ -316,6 +340,8 @@ class FrGame {
         hub.register("lots", new FrLotsNode(world));
         hub.register("terrain", new FrTerrainNode(world));
         hub.register("snow", new FrSnowNode(world));
+        if (this.quest)
+            hub.register("quest", new FrQuestNode(this.quest));
         hub.register("build", new FrBuildNode(world));
         hub.register("public", new FrPublicNode(world));
         hub.register("publicLog", new FrLogNode(world));
@@ -801,6 +827,7 @@ class FrGame {
         const anchor = this.world.terrain.anchors.lots[index];
         source.pay(FrHouseKit.COST);
         await this.world.placeMany(FrHouseKit.blueprint(anchor), this.session.player());
+        this.session.questSink("house");
         this.session.changed();
         this.toast.show("작은 집이 지어졌어요! 블록을 바꿔 꾸며 보세요", 3500);
     }
@@ -945,12 +972,11 @@ class FrGame {
             }
             else if (e.t === "kill") {
                 const lost = this.session.gainAll(e.drops);
+                if (lost > 0)
+                    this.toast.show("가방이 가득 찼어요", 1400);
                 this.session.pity.dungeon = this.fight.legendMissCount;
                 this.session.stats.add(FrDungeonInfo.STAT_KILL[this.fight.difficulty]);
                 this.view.burst.emit(e.monster.x, 2.5, e.monster.z, [0xffd43a, 0xffffff, 0xcfd6e0], e.legend ? 18 : 9, 7);
-                const names = Object.keys(e.drops).filter((id) => id !== "bone").map((id) => FrItemNames.label(id) + (e.drops[id] > 1 ? "×" + e.drops[id] : ""));
-                if (names.length > 0 || e.legend)
-                    this.toast.show((e.legend ? "전설! " : "") + names.join(", ") + (lost > 0 ? " (가방 가득)" : ""), 1400);
             }
             else if (e.t === "hurt") {
                 const hurt = FrDom.el("hurt");
@@ -1069,7 +1095,10 @@ class FrGame {
         this.expedition = null;
         if (finished) {
             FrExpedition.clear();
+            this.session.questSink("trip");
             this.session.changed();
+            if (this.quest)
+                this.quest.release();
         }
         this.view.rig.snap(new this.libs.THREE.Vector3(this.player.x, this.player.y, this.player.z));
         await this.publishPresence(true);
@@ -1102,6 +1131,9 @@ class FrGame {
                 session.pity.fish = roll.miss;
                 const broken = session.wearTool("rod");
                 session.gain(roll.item, 1);
+                session.questSink("fish");
+                if (!roll.legend)
+                    session.speciesSink("fish", roll.item);
                 session.stats.add("fish");
                 if (roll.legend)
                     session.stats.add("fishLegend");
@@ -1274,8 +1306,10 @@ class FrGame {
             return;
         }
         try {
-            if (await this.clock.skipToMorning())
+            if (await this.clock.skipToMorning()) {
+                this.session.questSink("allSleep");
                 this.onSkipped();
+            }
         }
         catch (error) {
             this.session.sleeping = false;
@@ -1383,6 +1417,8 @@ class FrGame {
             world.syncSnow(day);
             this.view.updateCrops(clock.absoluteMinute(), true);
             void clock.heartbeat();
+            if (this.questPanel)
+                this.questPanel.render();
         }
     }
     onNewDay(day) {

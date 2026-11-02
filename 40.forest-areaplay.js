@@ -117,7 +117,7 @@ class FrAreaOutcome {
             mineHard: () => this.mine(target.cell, { stone: 2 }),
         };
         const handler = handlers[target.kind];
-        return handler ? handler() + note : note;
+        return (handler ? handler() + note : note).replace(/^ · /, "");
     }
     collect(gains, feature, cooldown, after) {
         const lost = this.session.gainAll(gains);
@@ -148,6 +148,6 @@ class FrAreaOutcome {
         return this.describe(gains) + (lost > 0 ? " · 가방이 가득 차서 " + lost + "개를 놓고 왔어요" : "");
     }
     describe(gains) {
-        return Object.keys(gains).map((id) => FrItemNames.label(id) + " +" + gains[id]).join(", ");
+        return "";
     }
 }

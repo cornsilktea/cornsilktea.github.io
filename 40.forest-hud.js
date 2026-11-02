@@ -218,6 +218,8 @@ class FrChestWindow extends FrWindow {
                 return;
             }
             this.session.bag.take(id, count);
+            if (id === "iron")
+                this.session.questSink("ironDonated", count);
             this.session.stats.add("chestPut", count);
         }
         else {
@@ -441,8 +443,11 @@ class FrBuildWindow extends FrWindow {
             const give = Math.min(lacking, this.session.bag.count(id));
             if (give <= 0)
                 continue;
-            if (await this.session.world.putPublic(id, give, this.session.nick))
+            if (await this.session.world.putPublic(id, give, this.session.nick)) {
                 this.session.bag.take(id, give);
+                if (id === "iron")
+                    this.session.questSink("ironDonated", give);
+            }
         }
         this.session.changed();
     }

@@ -264,6 +264,7 @@ class FrRingKit {
     const result = FrRingRules.attempt(best.uses, random);
     best.uses = result.level;
     session.stats.atLeast("ringLevel", best.uses);
+    if (result.success) session.questSink("ringUp");
     session.changed();
     return { done: true, success: result.success, level: best.uses };
   }

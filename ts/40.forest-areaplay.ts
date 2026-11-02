@@ -104,7 +104,7 @@ class FrAreaOutcome {
       mineHard: () => this.mine(target.cell as FrPoint, { stone: 2 }),
     };
     const handler = handlers[target.kind];
-    return handler ? handler() + note : note;
+    return (handler ? handler() + note : note).replace(/^ · /, "");
   }
 
   private collect(gains: FrCost, feature: FrFeature | undefined, cooldown: number, after: "fruit" | "gone"): string {
@@ -131,6 +131,6 @@ class FrAreaOutcome {
   }
 
   private describe(gains: FrCost): string {
-    return Object.keys(gains).map((id) => FrItemNames.label(id) + " +" + gains[id]).join(", ");
+    return "";
   }
 }

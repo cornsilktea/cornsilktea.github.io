@@ -92,6 +92,10 @@ class FrSession {
     this.ap = new FrActionPoints(ringLevel);
   }
 
+  onGain: (id: string, amount: number) => void = () => undefined;
+  questSink: (key: string, amount?: number) => void = () => undefined;
+  speciesSink: (group: string, id: string) => void = () => undefined;
+
   onChange(listener: () => void): void { this.listeners.push(listener); }
 
   player(): FrBlockPlayer { return { uid: this.uid, no: this.no, admin: this.admin }; }
@@ -114,6 +118,7 @@ class FrSession {
       this.seen.add(id);
       this.stats.add("itemsTotal", amount - left);
       this.stats.see("items", id, "itemKinds");
+      this.onGain(id, amount - left);
     }
     this.changed();
     return left;
@@ -139,13 +144,15 @@ class FrSession {
     if (FrItems.isStackable(option.output) ? this.bag.freeSlots() < 1 && this.bag.count(option.output) % FrBalance.STACK_SIZE === 0 : this.bag.freeSlots() < 1) return false;
     source.pay(option.cost);
     this.gain(option.output, option.count);
+    const crafted = FrItems.parseGear(option.output);
+    if (crafted && crafted.tier === 1) this.questSink("woodGear", option.count);
     this.stats.add(option.output.indexOf("gear_") === 0 ? "craftGear" : option.output.indexOf("block_") === 0 || FrFurnitureCatalog.isFurniture(option.output) ? "craftBlocks" : "craftProcessed", option.count);
     return true;
   }
 
   cook(recipe: FrRecipeDef): FrCookResult {
     const result = FrRecipeRules.cook(recipe, this.craftSource(), this.bag);
-    if (result.ok) { this.seen.add(recipe.id); this.stats.add("cooked"); this.stats.see("recipes", recipe.id, "recipeKinds"); this.changed(); }
+    if (result.ok) { this.seen.add(recipe.id); this.questSink("cook"); if (recipe.star >= 4) this.questSink("cook4"); this.stats.add("cooked"); this.stats.see("recipes", recipe.id, "recipeKinds"); this.changed(); }
     return result;
   }
 

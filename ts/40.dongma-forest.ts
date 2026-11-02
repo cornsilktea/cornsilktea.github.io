@@ -136,6 +136,9 @@ class FrGame {
   private target: FrTarget | null = null;
   private lastDay = 0;
   private lastSnowCheck = 0;
+  private quest: FrQuestBoard | null = null;
+  private questPanel: FrQuestPanel | null = null;
+  private gainFeed: FrGainFeed | null = null;
   private lastTime = 0;
   private busy = false;
   private roster = new FrRoster();
@@ -166,6 +169,7 @@ class FrGame {
 
   constructor(private readonly libs: ThreeLibs) {
     this.toast = new FrToast(FrDom.el("toast"));
+    this.gainFeed = new FrGainFeed(FrDom.el("gainFeed"));
     this.input = new FrInput(FrDom.el("joyBase"), FrDom.el("joyKnob"), FrDom.el("btnAction"), {
       press: () => this.press(),
       release: () => this.release(),
@@ -296,6 +300,7 @@ class FrGame {
     this.finder = new FrTargetFinder(world);
     this.outcome = new FrTaskOutcome(session, world, this.random, clock);
     this.island = island;
+    await this.prepareQuest(world, session, island);
     this.startSync(world, clock, island);
     this.buildWindows(session);
     if (this.isAdmin()) {
@@ -308,6 +313,26 @@ class FrGame {
     session.onChange(() => { if (this.expedition) this.expedition.remember(); else save.queue(session.toSave()); this.refreshHud(); });
     document.addEventListener("visibilitychange", () => { if (document.hidden) void save.flush(); });
     this.start.enter(true, "섬: " + island + " · " + FrStatusSummary.line(session));
+  }
+
+  private async prepareQuest(world: FrWorld, session: FrSession, island: string): Promise<void> {
+    const board = new FrQuestBoard(this.backend, island, () => world.village, () => this.livePeople());
+    await board.load();
+    const panel = new FrQuestPanel(FrDom.el("questPanel"), board, () => world.village.level());
+    board.holding = () => !!this.expedition;
+    board.onChange = () => panel.render();
+    board.onMissionDone = (mission) => this.toast.show("퀘스트 완료! " + mission.name, 3200);
+    session.questSink = (key, amount = 1) => board.record(key, amount);
+    session.speciesSink = (group, id) => board.recordSpecies(group, id);
+    session.onGain = (id, amount) => { if (this.gainFeed) this.gainFeed.push(id, amount); };
+    this.quest = board;
+    this.questPanel = panel;
+    panel.render();
+  }
+
+  private livePeople(): number {
+    const students = this.roster.aliveUids().filter((uid) => { const member = this.roster.members.get(uid); return !(member && member.adm); });
+    return Math.max(1, students.length);
   }
 
   private startSync(world: FrWorld, clock: FrClockSync, island: string): void {
@@ -324,6 +349,7 @@ class FrGame {
     hub.register("lots", new FrLotsNode(world));
     hub.register("terrain", new FrTerrainNode(world));
     hub.register("snow", new FrSnowNode(world));
+    if (this.quest) hub.register("quest", new FrQuestNode(this.quest));
     hub.register("build", new FrBuildNode(world));
     hub.register("public", new FrPublicNode(world));
     hub.register("publicLog", new FrLogNode(world));
@@ -659,6 +685,7 @@ class FrGame {
     const anchor = this.world.terrain.anchors.lots[index];
     source.pay(FrHouseKit.COST);
     await this.world.placeMany(FrHouseKit.blueprint(anchor), this.session.player());
+    this.session.questSink("house");
     this.session.changed();
     this.toast.show("작은 집이 지어졌어요! 블록을 바꿔 꾸며 보세요", 3500);
   }
@@ -739,11 +766,10 @@ class FrGame {
         if (broken) this.toast.show(FrItemNames.label(broken) + "이(가) 다 닳았어요");
       } else if (e.t === "kill") {
         const lost = this.session!.gainAll(e.drops);
+        if (lost > 0) this.toast.show("가방이 가득 찼어요", 1400);
         this.session!.pity.dungeon = this.fight!.legendMissCount;
         this.session!.stats.add(FrDungeonInfo.STAT_KILL[this.fight!.difficulty]);
         this.view.burst.emit(e.monster.x, 2.5, e.monster.z, [0xffd43a, 0xffffff, 0xcfd6e0], e.legend ? 18 : 9, 7);
-        const names = Object.keys(e.drops).filter((id) => id !== "bone").map((id) => FrItemNames.label(id) + (e.drops[id] > 1 ? "×" + e.drops[id] : ""));
-        if (names.length > 0 || e.legend) this.toast.show((e.legend ? "전설! " : "") + names.join(", ") + (lost > 0 ? " (가방 가득)" : ""), 1400);
       } else if (e.t === "hurt") {
         const hurt = FrDom.el("hurt");
         hurt.style.opacity = "1";
@@ -834,7 +860,7 @@ class FrGame {
     this.session.floor = 1;
     const finished = this.expedition;
     this.expedition = null;
-    if (finished) { FrExpedition.clear(); this.session.changed(); }
+    if (finished) { FrExpedition.clear(); this.session.questSink("trip"); this.session.changed(); if (this.quest) this.quest.release(); }
     this.view.rig.snap(new this.libs.THREE.Vector3(this.player.x, this.player.y, this.player.z));
     await this.publishPresence(true);
     await this.fade.lift(450);
@@ -859,6 +885,8 @@ class FrGame {
         session.pity.fish = roll.miss;
         const broken = session.wearTool("rod");
         session.gain(roll.item, 1);
+        session.questSink("fish");
+        if (!roll.legend) session.speciesSink("fish", roll.item);
         session.stats.add("fish");
         if (roll.legend) session.stats.add("fishLegend");
         session.stats.see("fish", roll.item, "fishKinds");
@@ -994,7 +1022,7 @@ class FrGame {
     if (!this.session.sleeping) return;
     if (!FrSleepVote.allAsleep(this.presences())) { void this.fade.dim(FrGame.SLEEP_DIM, 900); return; }
     try {
-      if (await this.clock.skipToMorning()) this.onSkipped();
+      if (await this.clock.skipToMorning()) { this.session.questSink("allSleep"); this.onSkipped(); }
     } catch (error) {
       this.session.sleeping = false;
       void this.fade.lift(700);
@@ -1066,7 +1094,7 @@ class FrGame {
     this.hud.showSleepButton(FrSleepVote.canSleep(minute, session.area) && !this.currentTask, session.sleeping);
     this.hud.showSleepBand(FrClock.isNight(minute) ? FrSleepVote.banner(this.presences()) : "");
     if (day !== this.lastDay) this.onNewDay(day);
-    if (time - this.lastSnowCheck > 1) { this.lastSnowCheck = time; world.syncSnow(day); this.view.updateCrops(clock.absoluteMinute(), true); void clock.heartbeat(); }
+    if (time - this.lastSnowCheck > 1) { this.lastSnowCheck = time; world.syncSnow(day); this.view.updateCrops(clock.absoluteMinute(), true); void clock.heartbeat(); if (this.questPanel) this.questPanel.render(); }
   }
 
   private onNewDay(day: number): void {

@@ -367,8 +367,8 @@ class FrTaskOutcome {
     this.session.gain("vine", 1);
     const cleared = spot.zone >= 0 && this.world.zoneCleared(spot.zone);
     this.session.stats.add("chop");
-    if (cleared) this.session.stats.add("clear");
-    return "목재 +" + wood + ", 덩굴 +1" + (cleared ? " · 빈터가 생겼어요!" : "");
+    if (cleared) { this.session.stats.add("clear"); this.session.questSink("cleared"); }
+    return cleared ? "빈터가 생겼어요!" : "";
   }
 
   private async dig(cell: FrPoint, stone: boolean): Promise<string> {
@@ -381,7 +381,7 @@ class FrTaskOutcome {
     if (stone) {
       const drop = FrMineRules.terrainStoneDrop(this.random);
       this.session.gainAll(drop);
-      return "돌을 캤어요 +" + Object.keys(drop).map((id) => FrItemNames.label(id)).join(", ");
+      return "";
     }
     const block = top === "G" ? "block_grass" : top === "N" ? "block_sand" : "block_dirt";
     this.session.gain(block, 1);
@@ -406,13 +406,15 @@ class FrTaskOutcome {
     this.session.gain(record.crop, yieldNow.crop);
     this.session.gain(record.crop + "_seed", yieldNow.seed);
     this.session.stats.add("harvested");
-    return FrItemNames.label(record.crop) + " +" + yieldNow.crop + ", 씨앗 +" + yieldNow.seed;
+    this.session.questSink("harvest", yieldNow.crop);
+    this.session.speciesSink("crop", record.crop);
+    return "";
   }
 
   private async snow(cell: FrPoint): Promise<string> {
     await this.world.digSnow(cell.x, cell.z, this.clock.day());
     this.session.gain("ice", 1);
     this.session.stats.add("iceGot");
-    return "얼음 +1 (눈은 3일 뒤 다시 생겨요)";
+    return "눈은 3일 뒤 다시 생겨요";
   }
 }

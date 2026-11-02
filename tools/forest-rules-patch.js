@@ -63,6 +63,11 @@ class ForestRulesPatch {
           "jungle": { ".write": M, "$cell": { ".validate": "$cell.matches(/^[0-9]{1,5}$/) && newData.val() === 1" } },
           "terrain": { ".write": M, "$chunk": { "$cell": { ".validate": "$cell.matches(/^[0-9]{1,5}$/) && newData.hasChildren(['0', '1']) && newData.child('0').isNumber() && newData.child('0').val() >= -2 && newData.child('0').val() <= 14 && newData.child('1').isString() && newData.child('1').val().length === 1" } } },
           "snow": { ".write": M, "$cell": { ".validate": "newData.isNumber()" } },
+          "quest": { ".write": M,
+            "n": { "$k": { ".validate": "$k.matches(/^[a-zA-Z0-9]{2,16}$/) && newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000" } },
+            "sp": { "$k": { ".validate": "$k.matches(/^[a-z_0-9]{3,40}$/) && newData.val() === 1" } },
+            "done": { "$id": { ".validate": "$id.matches(/^[0-9]-[0-9]$/) && newData.val() === 1" } },
+          },
           "build": { "$id": { ".write": M + " && (!data.exists() || " + A + ")", ".validate": "$id.matches(/^[a-z_]{2,24}_[0-9]{1,2}$/) && newData.hasChildren(['at', 'by'])" } },
           "public": { ".write": M, "$id": { ".validate": "$id.matches(/^[a-z_0-9]{1,30}$/) && newData.isNumber() && newData.val() >= 0 && newData.val() <= 5400" } },
           "blocks": { "$chunk": { "$cell": {
