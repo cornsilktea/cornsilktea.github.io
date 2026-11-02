@@ -394,6 +394,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     quality;
     perf;
     netDiag;
+    badConnection;
     remoteMotion;
     netJitter;
     world;
@@ -9328,6 +9329,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       this.lastAt[key] = at; this.wasMoving[key] = moving;
     }
     keyCount() { return Object.keys(this.lastAt).length; }
+    staleMovingCount(now, limitMs) { var tally = this; return Object.keys(this.lastAt).filter(function (k) { return tally.wasMoving[k] && now - tally.lastAt[k] > limitMs; }).length; }
     worstQuantile(q) { var tally = this; return Object.keys(this.byKey).reduce(function (m, k) { return Math.max(m, tally.byKey[k].quantile(q)); }, 0); }
   }
   class DeviceInfo {
@@ -9546,6 +9548,38 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         "\n순간이동 " + probe.snaps + " · 멈춤 " + probe.frames.stall + " · 배율 " + services.cameraRig.pix;
     }
   }
+  class BadConnectionBanner {
+    static STALE_MS = 700;
+    static CLEAR_MS = 1200;
+    static CHECK_MS = 250;
+    static NEEDED_KEYS = 2;
+    constructor(services) { this.services = services; this.box = null; this.checkedAt = 0; this.badSince = 0; this.lastBadAt = 0; this.visible = false; }
+    frame() {
+      var now = performance.now();
+      if (now - this.checkedAt < BadConnectionBanner.CHECK_MS) return;
+      this.checkedAt = now;
+      var probe = this.services.perf, bad = false;
+      if (probe.playing() && !document.hidden) {
+        var needed = Math.min(BadConnectionBanner.NEEDED_KEYS, probe.arrivals.keyCount());
+        bad = needed > 0 && probe.arrivals.staleMovingCount(now, BadConnectionBanner.STALE_MS) >= needed;
+      }
+      if (bad) this.lastBadAt = now;
+      this.setVisible(bad || (this.visible && now - this.lastBadAt < BadConnectionBanner.CLEAR_MS));
+    }
+    makeBox() {
+      var box = document.createElement("div");
+      box.textContent = "인터넷 연결 불량";
+      box.style.cssText = "position:fixed;top:56px;left:50%;transform:translateX(-50%);z-index:2147482000;padding:4px 14px;border-radius:6px;background:rgba(0,0,0,.72);color:#ff3b30;font:800 20px/1.4 'Nanum Gothic','Malgun Gothic',sans-serif;white-space:nowrap;pointer-events:none;display:none";
+      document.body.appendChild(box);
+      return box;
+    }
+    setVisible(on) {
+      if (on === this.visible) return;
+      this.visible = on;
+      if (!this.box) this.box = this.makeBox();
+      this.box.style.display = on ? "block" : "none";
+    }
+  }
   class ArenaQuality {
     static STORAGE_KEY = "teambattle_quality_v1";
     static SLOW_SEC = 1 / 45;
@@ -9732,6 +9766,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var nowMs = Date.now(), frameMs = nowMs - services.loop.lastFrame, dt = Math.min(0.05, frameMs / 1000); services.loop.lastFrame = nowMs;
       services.perf.frame(frameMs);
       services.netDiag.frame(frameMs);
+      services.badConnection.frame();
       services.propThemes.spinMillBlades(dt);
       if (!services.session.room || services.screens.now !== "game") { services.tourView.renderTour(nowMs, dt); return; }
       var st = services.session.room.status;
@@ -10239,6 +10274,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.quality = new ArenaQuality(services);
       services.perf = new PerfProbe(services);
       services.netDiag = new NetDiagOverlay(services);
+      services.badConnection = new BadConnectionBanner(services);
       services.remoteMotion = new RemoteMotion();
       services.netJitter = new NetJitterSim();
       services.loop = new GameLoop(services);
