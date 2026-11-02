@@ -129,17 +129,17 @@ class TeamFormationBoard {
     return group.length ? group[0].tier : 0;
   }
 
-  /* 빈 칸이면 옮기고, 학생이 든 칸이면 칸에 있던 학생끼리만 서로 바꾼다. 대기 칸의 학생을 찬 칸에 놓을 수는 없다(false) */
-  moveTo(student: TeamFormationStudent, target: TeamFormationSlot): boolean {
+  /* 빈 칸이면 옮기고, 학생이 든 칸이면 서로 바꾼다. 대기 칸의 학생과 바꾸면 칸에 있던 학생이 대기 칸으로 간다 */
+  moveTo(student: TeamFormationStudent, target: TeamFormationSlot): void {
     const occupant = this.studentAt(target);
-    if (occupant === student) return true;
+    if (occupant === student) return;
     const from = this.slotOf(student);
-    if (occupant && !from) return false;
     if (from) this.cells[from.row][from.col] = null;
     this.unplaced.delete(student);
     this.cells[target.row][target.col] = student;
-    if (occupant && from) this.cells[from.row][from.col] = occupant;
-    return true;
+    if (!occupant) return;
+    if (from) this.cells[from.row][from.col] = occupant;
+    else this.unplaced.add(occupant);
   }
 
   returnToTray(student: TeamFormationStudent): void {
@@ -235,16 +235,15 @@ class TeamFormationView {
     if (this.selected === student) { this.selected = null; this.render(); return; }
     const slot = this.board.slotOf(student);
     if (this.selected && slot) { this.moveTo(this.selected, slot); return; }
+    const selectedSlot = this.selected && this.board.slotOf(this.selected);
+    if (this.selected && selectedSlot) { this.moveTo(student, selectedSlot); return; }
     this.selected = student;
     this.say(student.shownName + " 선택 — 옮길 칸이나 바꿀 명찰을 누르세요.");
     this.render();
   }
 
   private moveTo(student: TeamFormationStudent, slot: TeamFormationSlot): void {
-    if (!this.board.moveTo(student, slot)) {
-      this.say("대기 중인 명찰은 빈 칸에만 놓을 수 있습니다. 먼저 그 칸의 학생을 옮겨 주세요.");
-      return;
-    }
+    this.board.moveTo(student, slot);
     this.selected = null;
     this.say("");
     this.render();
