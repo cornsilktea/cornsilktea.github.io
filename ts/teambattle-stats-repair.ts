@@ -199,6 +199,7 @@ class TeamBattleRepairPlan {
   readonly matches: TeamBattleRepairMatch[] = [];
   readonly fixes: TeamBattleRepairFix[] = [];
   readonly skips: TeamBattleRepairSkip[] = [];
+  agedOutLines = 0;
 
   get partialMatches(): number {
     const keys = new Set<string>();
@@ -238,7 +239,7 @@ class TeamBattleRepairPlanner {
         if (line.left && !this.includeLeft) return skip("중간에 나감(패배로 넣지 않기로 함)");
         const fix = fixes[uid[0]] = fixes[uid[0]] || new TeamBattleRepairFix(uid[0], users[uid[0]]);
         if (fix.has(match.key)) return;
-        if (!fix.fitsRecent(match.at)) return skip("이 학생의 최근 20매치보다 오래된 판이라 이미 센 판인지 알 수 없음");
+        if (!fix.fitsRecent(match.at)) { plan.agedOutLines++; return; }
         fix.add(match, index, winnerTeam);
       });
     });
@@ -345,7 +346,8 @@ class TeamBattleRepairPanel {
       "채울 학생 " + plan.fixes.length + "명 · 판 " + added.length + "개(누적 통계 " + added.filter((addition) => addition.countsStats).length + " · 최근 매치 " + added.filter((addition) => addition.intoRecent).length + ")" +
       (closed ? " · 그중 " + closed + "개는 판이 끝난 뒤 결과를 쓰기 전에 화면이 닫힌 흔적(미리 적기)이 남아 있음" : "") +
       (left ? " · 다른 기기에서 '나감'으로 보인 판 " + left + "개는 패배로 넣음" : "") +
-      (plan.skips.length ? " · 건너뜀 " + plan.skips.length + "줄" : "");
+      (plan.skips.length ? " · 건너뜀 " + plan.skips.length + "줄" : "") +
+      (plan.agedOutLines ? " · 최근 20매치보다 오래된 " + plan.agedOutLines + "줄은 이미 센 판으로 보고 문제 없음 처리" : "");
     const rows = plan.fixes.map((fix) => {
       const list = fix.additions.map((addition) => RecentBlockList.whenText(addition.at) + " " + (addition.win ? "승" : "패") + (addition.mvp ? "·MVP" : "") + (addition.left ? "(나감)" : "") + (addition.countsStats ? "" : "(AI 판)")).join(", ");
       return "<tr><td>" + AccountHtml.esc(fix.name) + "</td><td>" + fix.additions.length + "</td><td>" + AccountHtml.esc(list) + "</td></tr>";
