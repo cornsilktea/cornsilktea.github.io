@@ -9580,8 +9580,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return box;
     }
     placeBesideRoomCode() {
-      var tag = Dom.$("hudRoomCode"), rect = tag.getBoundingClientRect(), dot = BadConnectionBanner.DOT_PX;
-      var beside = rect.width > 0;
+      var tag = Dom.$("hudRoomCode"), rect = tag.getBoundingClientRect(), beside = rect.width > 0;
+      var dot = beside ? rect.height : BadConnectionBanner.DOT_PX;
+      this.box.style.width = this.box.style.height = dot + "px";
       this.box.style.left = (beside ? rect.right + 5 : window.innerWidth / 2 - dot / 2) + "px";
       this.box.style.top = (beside ? rect.top + (rect.height - dot) / 2 : 56) + "px";
     }
