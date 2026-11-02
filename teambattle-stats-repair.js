@@ -314,6 +314,10 @@ class TeamBattleRepairPanel {
             (left ? " · 다른 기기에서 '나감'으로 보인 판 " + left + "개는 패배로 넣음" : "") +
             (plan.skips.length ? " · 건너뜀 " + plan.skips.length + "줄" : "") +
             (plan.agedOutLines ? " · 최근 20매치보다 오래된 " + plan.agedOutLines + "줄은 이미 센 판으로 보고 문제 없음 처리" : "");
+        if (!plan.fixes.length && !plan.skips.length) {
+            this.el(this.ids.box).innerHTML = "";
+            return;
+        }
         const rows = plan.fixes.map((fix) => {
             const list = fix.additions.map((addition) => RecentBlockList.whenText(addition.at) + " " + (addition.win ? "승" : "패") + (addition.mvp ? "·MVP" : "") + (addition.left ? "(나감)" : "") + (addition.countsStats ? "" : "(AI 판)")).join(", ");
             return "<tr><td>" + AccountHtml.esc(fix.name) + "</td><td>" + fix.additions.length + "</td><td>" + AccountHtml.esc(list) + "</td></tr>";
