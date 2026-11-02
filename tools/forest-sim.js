@@ -28,6 +28,16 @@ SimConfig.DONATED = ["wood", "vine", "seaweed", "stone", "coal", "copper", "iron
 SimConfig.PRIORITY = ["workbench", "forge", "bridge_east", "oven", "bridge_south", "bridge_shortcut", "bridge_shortcut", "stairs", "stairs", "stairs", "farm_expand", "farm_expand", "lamp", "lamp", "lamp", "lamp", "lamp", "lamp", "lamp", "lamp", "kitchen"]
   .concat(Array(12).fill("wall"), Array(4).fill("gate"), Array(4).fill("tower"));
 
+class QuestTally {
+  constructor() { this.total = {}; this.byRole = {}; this.species = new Set(); this.daily = []; }
+  add(key, amount, role) {
+    this.total[key] = (this.total[key] || 0) + amount;
+    this.byRole[key] = this.byRole[key] || {};
+    this.byRole[key][role] = (this.byRole[key][role] || 0) + amount;
+  }
+  closeDay(day) { this.daily[day] = Object.assign({}, this.total, { species: this.species.size }); }
+}
+
 class SkillTable {
   constructor(random) {
     this.random = random;
@@ -113,6 +123,7 @@ class IslandSim {
     this.day = 0;
     this.milestones = {};
     this.stats = { diamonds: 0, rings: 0, dungeonRuns: 0, fish: 0 };
+    this.tally = new QuestTally();
   }
 
   get workbench() { return this.village.builtCount("workbench") > 0; }
@@ -134,6 +145,7 @@ class IslandSim {
     this.convertIntermediates();
     this.tryBuild(session);
     this.markMilestones(session);
+    this.tally.closeDay(this.day);
   }
 
   playBot(bot) {
@@ -218,6 +230,7 @@ class IslandSim {
         if (!this.spend(bot, 3, 10)) break;
         if (!this.random.chance(this.skills.rate("chop", t))) continue;
         bot.give("wood", 2 + FrBalance.AXE_WOOD_BONUS[t]);
+        this.tally.add("chop", 1, bot.persona);
         bot.bag.wear("axe");
       }
     }
@@ -247,6 +260,8 @@ class IslandSim {
       if (!this.random.chance(this.skills.fishBeatRate(t, FrFishingRules.beatsFor(r.item)))) continue;
       bot.give(r.item, 1);
       this.stats.fish++;
+      this.tally.add("fish", 1, bot.persona);
+      if (!r.legend) this.tally.species.add(r.item);
       if (r.legend) bot.counts.legends++;
       bot.bag.wear("rod");
     }
@@ -256,6 +271,7 @@ class IslandSim {
   mineVisit(bot) {
     if (bot.timeLeft < 60 || bot.ap < 3) return false;
     bot.timeLeft -= this.bridgeCount() > 0 && this.village.builtCount("bridge_east") > 0 ? 35 : 55;
+    this.tally.add("trip", 1, bot.persona);
     const t = bot.tier("pickaxe");
     let floor = 1;
     if (t >= 2 && this.random.chance(0.5)) floor = 2;
@@ -299,6 +315,7 @@ class IslandSim {
     const difficulty = w >= 3 ? "hell" : w >= 2 ? "hard" : "normal";
     this.spend(bot, FrBalance.DUNGEON_ENTRY_COST, 100);
     this.stats.dungeonRuns++;
+    this.tally.add("trip", 1, bot.persona);
     bot.counts.dungeons++;
     const kills = Math.max(0, Math.round(FrDungeonRules.estimateKills(difficulty, w) * (0.8 + this.random.next() * 0.4)));
     for (let k = 0; k < kills; k++) {
@@ -342,6 +359,7 @@ class IslandSim {
       const source = new FrPersonalCraftSource(new FrChestStore(), bot.bag, new FrPublicStore());
       if (!FrCraftRules.craftGear(want.kind, want.tier, source, bot.bag)) return;
       bot.counts.gears++;
+      if (want.tier === 1) this.tally.add("woodGear", 1, bot.persona);
       if (want.tier === 3 && !this.milestones.firstDiamondGear) this.milestones.firstDiamondGear = this.day;
     }
   }
@@ -352,7 +370,9 @@ class IslandSim {
       const cost = FrRingRules.cost(bot.ringLevel + 1);
       if (bot.bag.count("enhance_stone") < cost.enhance || bot.bag.count("magic_stone") < cost.magic) return;
       bot.bag.take("enhance_stone", cost.enhance); bot.bag.take("magic_stone", cost.magic);
+      const before = bot.ringLevel;
       bot.ringLevel = FrRingRules.attempt(bot.ringLevel, this.random).level;
+      if (bot.ringLevel > before) this.tally.add("ringUp", 1, bot.persona);
     }
   }
 
@@ -365,7 +385,9 @@ class IslandSim {
       const have = bot.bag.count(m.id);
       const give = have - (keep[m.id] || 0);
       if (give <= 0 || SimConfig.DONATED.indexOf(m.id) < 0) return;
-      if (this.publicStore.put(m.id, give, "bot" + bot.index, this.day)) bot.bag.take(m.id, give);
+      if (!this.publicStore.put(m.id, give, "bot" + bot.index, this.day)) return;
+      bot.bag.take(m.id, give);
+      if (m.id === "iron") this.tally.add("ironDonated", give, bot.persona);
     });
   }
 
@@ -449,8 +471,11 @@ class IslandSim {
   }
 }
 
-const sessions = SimConfig.SESSIONS;
-const islands = [new IslandSim(SimConfig.SEED, "섬 1"), new IslandSim(SimConfig.SEED + 7919, "섬 2"), new IslandSim(SimConfig.SEED + 15838, "섬 3")];
-islands.forEach((island) => island.run(sessions));
-console.log("봇 " + SimConfig.BOTS + "명 × 섬 2개 × 수업 " + sessions + "번 (수업 1번 = 게임 " + SimConfig.DAYS_PER_SESSION + "일, 씨앗 " + SimConfig.SEED + ")");
-islands.forEach((island) => console.log(island.report() + "\n"));
+if (require.main === module) {
+  const sessions = SimConfig.SESSIONS;
+  const islands = [new IslandSim(SimConfig.SEED, "섬 1"), new IslandSim(SimConfig.SEED + 7919, "섬 2"), new IslandSim(SimConfig.SEED + 15838, "섬 3")];
+  islands.forEach((island) => island.run(sessions));
+  console.log("봇 " + SimConfig.BOTS + "명 × 섬 2개 × 수업 " + sessions + "번 (수업 1번 = 게임 " + SimConfig.DAYS_PER_SESSION + "일, 씨앗 " + SimConfig.SEED + ")");
+  islands.forEach((island) => console.log(island.report() + "\n"));
+}
+module.exports = { SimConfig, IslandSim };
