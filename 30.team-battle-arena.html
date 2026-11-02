@@ -9554,13 +9554,15 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     static CHECK_MS = 250;
     static NEEDED_KEYS = 2;
     static DOT_PX = 9;
+    static FORCED = /[?&]badnet(&|$)/.test(location.search) && !Environment.SILENT_RUN;
     constructor(services) { this.services = services; this.box = null; this.checkedAt = 0; this.badSince = 0; this.lastBadAt = 0; this.visible = false; }
     frame() {
       var now = performance.now();
       if (now - this.checkedAt < BadConnectionBanner.CHECK_MS) return;
       this.checkedAt = now;
       var probe = this.services.perf, bad = false;
-      if (probe.playing() && !document.hidden) {
+      if (BadConnectionBanner.FORCED && this.services.screens.now === "game") bad = true;
+      else if (probe.playing() && !document.hidden) {
         var needed = Math.min(BadConnectionBanner.NEEDED_KEYS, probe.arrivals.keyCount());
         bad = needed > 0 && probe.arrivals.staleMovingCount(now, BadConnectionBanner.STALE_MS) >= needed;
       }
