@@ -107,7 +107,7 @@ const sourceOf = (bag, pub = new FrPublicStore(), chest = new FrChestStore()) =>
 
 {
   const rates = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => FrRingRules.successRate(n)).join();
-  check("반지 성공률 표", rates === "0.8,0.8,0.8,0.4,0.4,0.4,0.2,0.2,0.1,0.05", rates);
+  check("반지 성공률 표", rates === "0.9,0.9,0.9,0.7,0.7,0.7,0.5,0.5,0.3,0.2", rates);
   check("반지 +10 까지 오를 수 있고 내려가지 않음", (() => { const r = new FrRandom(11); let level = 0, tries = 0; while (level < 10 && tries < 100000) { const x = FrRingRules.attempt(level, r); if (x.level < level) return false; level = x.level; tries++; } return level === 10; })());
   check("반지 녹이면 강화석 3", FrRingRules.melt().enhance_stone === 3);
   check("+10 이후엔 못 올림", !FrRingRules.attempt(10, new FrRandom(1)).success);
@@ -151,7 +151,7 @@ const sourceOf = (bag, pub = new FrPublicStore(), chest = new FrChestStore()) =>
   check("노말 40초 맨손 약 10마리", kills(0) >= 8 && kills(0) <= 14, kills(0));
   check("노말 40초 다이아몬드 약 25마리", kills(3) >= 20 && kills(3) <= 30, kills(3));
   check("헬에서 반지·다이아몬드가 나옴", (() => { const r = new FrRandom(9); let ring = 0, dia = 0, miss = 0; for (let i = 0; i < 20000; i++) { const d = FrDungeonDrops.roll(r, "hell", miss); miss = d.gotLegend ? 0 : miss + 1; ring += d.items.ring || 0; dia += d.items.diamond || 0; } return ring > 0 && dia > 0; })());
-  check("노말에는 반지 없음", (() => { const r = new FrRandom(2); for (let i = 0; i < 5000; i++) if (FrDungeonDrops.roll(r, "normal", 0).items.ring) return false; return true; })());
+  check("노말에도 반지가 나온다(3%)", (() => { const r = new FrRandom(2); let n = 0; for (let i = 0; i < 5000; i++) if (FrDungeonDrops.roll(r, "normal", 0).items.ring) n++; return n > 80 && n < 240; })());
 }
 
 {

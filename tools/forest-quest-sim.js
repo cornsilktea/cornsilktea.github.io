@@ -37,24 +37,24 @@ class QuestSimConfig {}
 QuestSimConfig.CHAPTERS = [
   { name: "1장 첫 불씨", rules: [
     new BuildRule("1-1", "작업대를 세우자", [{ id: "workbench", count: 1 }]),
-    new CountRule("1-2", "숲에 빈터를(벌목 5번=1칸 가정)", [{ key: "chop", base: 100, scaled: true }]),
-    new CountRule("1-3", "첫 도구 공방", [{ key: "woodGear", base: 12, scaled: true }]),
+    new CountRule("1-2", "숲에 빈터를(20칸, 벌목 5번=1칸 가정)", [{ key: "chop", base: 100, scaled: true }]),
+    new CountRule("1-3", "첫 도구 공방", [{ key: "woodGear", base: 20, scaled: true }]),
   ] },
   { name: "2장 길을 열다", rules: [
     new BuildRule("2-1", "강 위의 다리", [{ id: "bridge_east", count: 1 }, { id: "bridge_south", count: 1 }]),
     new BuildRule("2-2", "계단 마을", [{ id: "stairs", count: 3 }]),
     new BuildRule("2-3", "불을 다루다", [{ id: "forge", count: 1 }, { id: "oven", count: 1 }]),
-    new CountRule("2-4", "광부의 날", [{ key: "ironDonated", base: 30, scaled: true }]),
+    new CountRule("2-4", "광부의 날", [{ key: "ironDonated", base: 70, scaled: true }]),
   ] },
   { name: "3장 먹고사는 마을", rules: [
     new BuildRule("3-1", "텃밭 가꾸기(수로 제외)", [{ id: "farm_expand", count: 2 }]),
-    new CountRule("3-3", "바다의 도감", [{ key: "fish", base: 30, scaled: true }, { key: "species", base: 8, scaled: false }]),
+    new CountRule("3-3", "바다의 도감", [{ key: "fish", base: 90, scaled: true }, { key: "species", base: 8, scaled: false }]),
     new BuildRule("3-4", "밤을 밝히다", [{ id: "lamp", count: 8 }, { id: "kitchen", count: 1 }]),
   ] },
   { name: "4장 지키는 마을", rules: [
     new BuildRule("4-1", "성벽 두르기", [{ id: "wall", count: 12 }]),
     new BuildRule("4-2", "하늘 높이 망루", [{ id: "tower", count: 4 }]),
-    new CountRule("4-3", "용감한 탐험대", [{ key: "trip", base: 40, scaled: true }]),
+    new CountRule("4-3", "용감한 탐험대", [{ key: "trip", base: 150, scaled: true }]),
     new CountRule("4-4", "힘을 모아 반지를", [{ key: "ringUp", base: 8, scaled: true }]),
   ] },
   { name: "5장 동마의 축제", rules: [

@@ -80,7 +80,7 @@ FrBalance.FLOOR_ORE_MULTIPLIER = [1, 1, 1.5, 2];
 FrBalance.STONE_COAL_CHANCE = 0.10;
 FrBalance.TERRAIN_STONE_COAL_CHANCE = 0.05;
 FrBalance.TERRAIN_STONE_ORE_CHANCE = 0.02;
-FrBalance.RING_SUCCESS = [0, 0.8, 0.8, 0.8, 0.4, 0.4, 0.4, 0.2, 0.2, 0.1, 0.05];
+FrBalance.RING_SUCCESS = [0, 0.9, 0.9, 0.9, 0.7, 0.7, 0.7, 0.5, 0.5, 0.3, 0.2];
 FrBalance.RING_COST = [
     { enhance: 0, magic: 0 },
     { enhance: 1, magic: 1 }, { enhance: 1, magic: 1 }, { enhance: 1, magic: 1 },
@@ -196,18 +196,18 @@ class FrCatalog {
         const c = (id, name, cost, score, count = 1, minVillageLevel = 1) => ({ id, name, cost, score, minVillageLevel, count });
         return [
             c("workbench", "작업대", { wood: 10 }, 3),
-            c("forge", "대장간", { brick: 20, copper: 10, wood: 10 }, 3),
-            c("oven", "화덕", { stone: 20, copper: 5 }, 3),
-            c("kitchen", "섬 부엌", { brick: 30, iron: 10, plank: 20 }, 3, 1, 3),
-            c("bridge_east", "동쪽 다리", { wood: 20, iron: 10, rope: 10 }, 3),
-            c("bridge_south", "남쪽 다리", { wood: 20, stone: 15, rope: 10 }, 3),
-            c("bridge_shortcut", "지름길 다리", { plank: 15, rope: 10, copper: 5 }, 3, 2),
-            c("stairs", "돌계단", { brick: 10 }, 1, 3),
-            c("wall", "성벽 구간", { brick: 15, rope: 3 }, 1, 12),
-            c("gate", "성문", { plank: 20, iron: 8, brick: 10 }, 2, 4),
-            c("tower", "망루", { brick: 20, plank: 10 }, 2, 4),
-            c("lamp", "가로등", { wood: 5, copper: 3 }, 1, 8),
-            c("farm_expand", "텃밭 넓히기", { wood: 10, stone: 10 }, 1, 2),
+            c("forge", "대장간", { brick: 6, copper: 4, wood: 5 }, 3),
+            c("oven", "화덕", { stone: 8, copper: 2 }, 3),
+            c("kitchen", "섬 부엌", { brick: 8, iron: 3, plank: 6 }, 3, 1, 3),
+            c("bridge_east", "동쪽 다리", { wood: 8, iron: 3, rope: 3 }, 3),
+            c("bridge_south", "남쪽 다리", { wood: 8, stone: 6, rope: 3 }, 3),
+            c("bridge_shortcut", "지름길 다리", { plank: 6, rope: 3, copper: 2 }, 3, 2),
+            c("stairs", "돌계단", { brick: 3 }, 1, 3),
+            c("wall", "성벽 구간", { brick: 2, rope: 1 }, 1, 12),
+            c("gate", "성문", { plank: 3, iron: 2, brick: 2 }, 2, 4),
+            c("tower", "망루", { brick: 3, plank: 2 }, 2, 4),
+            c("lamp", "가로등", { wood: 2, copper: 1 }, 1, 8),
+            c("farm_expand", "텃밭 넓히기", { wood: 5, stone: 5 }, 1, 2),
         ];
     }
 }
@@ -250,16 +250,17 @@ FrCatalog.MONSTERS = {
 FrCatalog.DROPS = {
     normal: [
         { item: "bone", min: 1, max: 1, chance: 1 }, { item: "cloth", min: 1, max: 1, chance: 0.30 },
-        { item: "copper", min: 1, max: 1, chance: 0.15 }, { item: "iron", min: 1, max: 1, chance: 0.05 },
+        { item: "copper", min: 1, max: 1, chance: 0.15 }, { item: "iron", min: 1, max: 1, chance: 0.05 }, { item: "ring", min: 1, max: 1, chance: 0.03 },
+        { item: "magic_stone", min: 1, max: 1, chance: 0.10 }, { item: "enhance_stone", min: 1, max: 1, chance: 0.05 },
     ],
     hard: [
         { item: "bone", min: 1, max: 2, chance: 1 }, { item: "cloth", min: 1, max: 1, chance: 0.30 },
         { item: "iron", min: 1, max: 1, chance: 0.20 }, { item: "magic_stone", min: 1, max: 1, chance: 0.25 },
-        { item: "enhance_stone", min: 1, max: 1, chance: 0.04 }, { item: "ring", min: 1, max: 1, chance: 0.01 },
+        { item: "enhance_stone", min: 1, max: 1, chance: 0.04 }, { item: "ring", min: 1, max: 1, chance: 0.06 },
     ],
     hell: [
         { item: "iron", min: 1, max: 1, chance: 0.35 }, { item: "magic_stone", min: 1, max: 2, chance: 1 },
-        { item: "enhance_stone", min: 1, max: 1, chance: 0.10 }, { item: "ring", min: 1, max: 1, chance: 0.03 },
+        { item: "enhance_stone", min: 1, max: 1, chance: 0.10 }, { item: "ring", min: 1, max: 1, chance: 0.12 },
         { item: "diamond", min: 1, max: 1, chance: 0.06 },
     ],
 };
