@@ -167,7 +167,7 @@
   #specList .sIcon.origin { background: #C8323C; box-shadow: 0 0 0 2px #FFD27A; }
   #specList .sNm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   #specList .sFloor { flex: 0 0 auto; padding: 2px 8px; border-radius: 999px; background: #E0293D; color: #fff; font-size: 13px; }
-  #floorMap { position: absolute; right: 12px; bottom: calc(env(safe-area-inset-bottom, 0px) + 58px); width: min(340px, 46vw); display: block; border-radius: 6px; background: rgba(6, 9, 18, .62); box-shadow: 0 1px 4px rgba(0, 0, 0, .5); }
+  #floorMap { position: absolute; right: 12px; bottom: calc(env(safe-area-inset-bottom, 0px) + 58px); width: min(460px, 58vw); display: block; border-radius: 6px; background: rgba(6, 9, 18, .62); box-shadow: 0 1px 4px rgba(0, 0, 0, .5); }
   #hud.spec #floorMap { bottom: calc(env(safe-area-inset-bottom, 0px) + 12px); width: min(560px, calc(100vw - 244px)); }
   #touchPad { position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 19; pointer-events: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
   #touchPad[hidden] { display: none; }
@@ -188,7 +188,7 @@
   #tpFlip.on { background: rgba(217, 123, 79, .6); }
   body.touch #keyHint { display: none; }
   body.touch #btnGameLeave { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: auto; }
-  body.touch #hud:not(.spec) #floorMap { left: 12px; right: auto; top: calc(env(safe-area-inset-top, 0px) + 150px); bottom: auto; width: min(240px, 30vw); }
+  body.touch #hud:not(.spec) #floorMap { left: 12px; right: auto; top: calc(env(safe-area-inset-top, 0px) + 150px); bottom: auto; width: min(320px, 38vw); }
   body.touch #dashBox { bottom: calc(env(safe-area-inset-bottom, 0px) + 40px); width: min(260px, 34vw); }
   @media (max-width: 640px) {
     #timer { font-size: 30px; }
@@ -214,6 +214,10 @@
   .zv-cell { min-width: 0; display: flex; animation: zvBob 2s var(--zv-delay, 0s) ease-in-out infinite; }
   .zv-seat { flex: 1; display: flex; flex-direction: column; gap: .6vh; min-width: 0; padding: 1.6vh 1.2vw; border-radius: 10px; border: 3px solid #C8454D; background: rgba(40, 14, 18, .7); }
   .zv-seat.me { box-shadow: inset 0 0 0 3px #D97B4F; }
+  .zv-seat.zombie { border-color: #FF4A55; background: linear-gradient(160deg, #E0202F, #9A0E1A); box-shadow: 0 0 22px 4px rgba(255, 40, 55, .75), inset 0 0 18px rgba(255, 120, 130, .35); animation: zvGlow 1.1s ease-in-out infinite; }
+  .zv-seat.zombie.me { box-shadow: 0 0 22px 4px rgba(255, 40, 55, .75), inset 0 0 0 3px #FFD27A; }
+  .zv-seat.zombie .zv-line, .zv-seat.zombie .zv-line em, .zv-seat.zombie .zv-line small { color: #FFE3E5; }
+  @keyframes zvGlow { 0%, 100% { box-shadow: 0 0 14px 2px rgba(255, 40, 55, .55), inset 0 0 14px rgba(255, 120, 130, .25); } 50% { box-shadow: 0 0 34px 8px rgba(255, 50, 65, .95), inset 0 0 22px rgba(255, 150, 160, .45); } }
   .zv-seat b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: clamp(18px, 2.5vw, 34px); color: #fff; }
   .zv-seat b small { font-size: .6em; color: #FFB08C; }
   .zv-seat.waiting b { animation: zvBlink 1s ease-in-out infinite; }
@@ -241,7 +245,7 @@
     .zv-line { font-size: 12px; white-space: normal; }
     .zv-spark { width: 60px; height: 60px; margin: -30px 0 0 -30px; }
   }
-  @media (prefers-reduced-motion: reduce) { .zv-curtain *, #zvBody.zv-enter * { animation: none !important; } }
+  @media (prefers-reduced-motion: reduce) { .zv-curtain *, #zvBody.zv-enter * { animation: none !important; } .zv-seat.zombie { box-shadow: 0 0 24px 6px rgba(255, 40, 55, .8); } }
 </style>
 </head>
 <body>
@@ -399,10 +403,10 @@
     <div class="zv-hint">곧 게임이 시작돼요. 잠시만 기다려 주세요.</div>
   </div>
 </div>
-<script charset="utf-8" src="match-kit.js?v=20261103b"></script>
+<script charset="utf-8" src="match-kit.js?v=20261103c"></script>
 <script charset="utf-8" src="account-match-kit.js?v=20261103b"></script>
 <script charset="utf-8" src="31.zombie-outbreak-stats.js?v=20261103a"></script>
-<script charset="utf-8" src="31.zombie-versus.js?v=20261103b"></script>
+<script charset="utf-8" src="31.zombie-versus.js?v=20261103c"></script>
 <script>new CharacterMakerDialog(undefined, false);</script>
 <div id="loading">3D 학교를 준비하는 중입니다…</div>
 
@@ -2745,11 +2749,16 @@ class ZombieVersusCurtain {
   static ROOM_SLACK_MS = 3000;
   static MIN_MS = 2000;
   static FADE_MS = 350;
+  static REVEAL_MS = 3200;
   constructor(root) {
     this.root = root; this.view = new ZombieVersusView($("zvBody"));
     this.shownAt = 0; this.hideTimer = 0; this.roomTimer = 0; this.startTimer = 0; this.hostTimer = 0; this.vsAt = 0;
   }
-  watch(ref) { this.vsAt = 0; sub(ref.child("vsAt"), "value", s => { this.vsAt = s.val() || 0; this.follow(); }); }
+  watch(ref) {
+    this.vsAt = 0; this.originPick = null;
+    sub(ref.child("vsAt"), "value", s => { this.vsAt = s.val() || 0; this.follow(); });
+    sub(ref.child("originPick"), "value", s => { this.originPick = s.val(); room.originPick = s.val(); this.refresh(); });
+  }
   matched() { return !!zombieRandom.ticket(); }
   roomLeftMs() { return this.matched() || !this.vsAt ? 0 : this.vsAt + ZombieVersusCurtain.SHOW_MS + ZombieVersusCurtain.ROOM_SLACK_MS - serverNow(); }
   follow() {
@@ -2769,19 +2778,21 @@ class ZombieVersusCurtain {
   refresh() {
     if (this.root.hidden) return;
     const ticket = zombieRandom.ticket();
-    const humans = playerIds().filter(isParticipant).map(id => ({ nick: room.players[id].nickname || "이름 없음", me: id === myId, card: ZombieVersusCards.fromRoom(room.players[id].vs) }));
+    const humans = playerIds().filter(isParticipant).map(id => ({ nick: room.players[id].nickname || "이름 없음", me: id === myId, zombie: !!this.originPick && id === this.originPick, card: ZombieVersusCards.fromRoom(room.players[id].vs) }));
     this.view.render(ZombieVersusLineup.build(humans, MAX_PLAYERS, !!ticket, ticket ? ticket.expect : 0));
   }
   hostStart(start) {
     if (this.matched() || participantCount() < 2) { start(); return; }
     if (this.roomLeftMs() > 0) return;
     const ref = room.ref;
-    ref.child("vsAt").set(serverNow());
+    ref.update({ vsAt: serverNow(), originPick: chooseOrigin() });
     clearTimeout(this.hostTimer);
     this.hostTimer = setTimeout(() => { if (room.ref === ref && isHost() && room.status === "lobby") start(); }, ZombieVersusCurtain.SHOW_MS);
   }
   startAfterShow(start) {
-    const wait = this.root.hidden ? ZombieVersusCurtain.SHOW_MS : this.shownAt + ZombieVersusCurtain.SHOW_MS - performance.now();
+    if (isHost() && room.ref) room.ref.child("originPick").set(chooseOrigin());
+    const shownLeft = this.root.hidden ? ZombieVersusCurtain.SHOW_MS : this.shownAt + ZombieVersusCurtain.SHOW_MS - performance.now();
+    const wait = Math.max(shownLeft, ZombieVersusCurtain.REVEAL_MS);
     clearTimeout(this.startTimer);
     if (wait <= 0) { start(); return; }
     this.startTimer = setTimeout(() => { if (room.ref && room.status === "lobby") start(); }, wait);
@@ -2908,6 +2919,10 @@ function toggleSpectator() {
   if (becomeSpec ? slots.spectators >= MAX_SPECTATORS : slots.players >= MAX_PLAYERS) return;
   room.ref.child("players/" + myId).update({ spec: becomeSpec });
 }
+function chooseOrigin() {
+  const participants = playerIds().filter(isParticipant);
+  return participants.length ? ZombieOriginRotation.pick(participants.map(id => ({ id, gap: ZombieOriginRotation.gapFromRoom(room.players[id].hostGap) })), Math.random) : null;
+}
 function hostStart() {
   if (!isHost() || room.status !== "lobby") return;
   if (participantCount() < playersNeeded()) return;
@@ -2921,7 +2936,8 @@ function beginRound() {
   playerIds().filter(isBot).forEach(id => { u["players/" + id] = null; u["st/" + id] = null; });
   const t0 = serverNow(), botIds = [];
   if (botsWanted()) for (let k = participants.length; k < MAX_PLAYERS; k++) botIds.push("bot" + (botIds.length + 1) + Math.random().toString(36).slice(2, 8));
-  const zombieId = ZombieOriginRotation.pick(participants.map(id => ({ id, gap: ZombieOriginRotation.gapFromRoom(room.players[id].hostGap) })), Math.random);
+  const zombieId = participants.indexOf(room.originPick) >= 0 ? room.originPick : chooseOrigin();
+  u.originPick = null;
   participants.forEach(id => { u["players/" + id + "/hostGap"] = ZombieOriginRotation.nextGap(ZombieOriginRotation.gapFromRoom(room.players[id].hostGap), id === zombieId); });
   const startAt = t0 + COUNTDOWN_MS;
   Object.assign(u, { status: "playing", startAt, endedAt: null, winner: null, quitSide: null, final: null, originZombieId: zombieId, zombieIds: { [zombieId]: startAt } });
@@ -3570,6 +3586,12 @@ $("specList").addEventListener("click", e => {
 const FLOOR_MAP = { x0: -BUILDING_X, x1: GYM.x1, z0: -BUILDING_Z, z1: BUILDING_Z, shear: 0.42, depth: 0.5, gap: 9, pad: 5, labelW: 15, edge: 1.6 };
 const MAP_COLORS = { slab: "#27303C", slabEdge: "#121821", corridor: "#3A4555", room: "#566272", stairs: "#3F5A45", gym: "#3A342C", outline: "#8A96A6",
                      here: "#D97B4F", label: "#C9D3E6", human: "#7CC4FF", zombie: "#E0293D", origin: "#FFD27A" };
+class ZombieHumanPing {
+  static PERIOD_MS = 20000;
+  static SHOW_MS = 3000;
+  static activeAt(elapsedMs) { return elapsedMs >= ZombieHumanPing.PERIOD_MS && elapsedMs % ZombieHumanPing.PERIOD_MS < ZombieHumanPing.SHOW_MS; }
+  static fadeAt(elapsedMs) { return 1 - (elapsedMs % ZombieHumanPing.PERIOD_MS) / ZombieHumanPing.SHOW_MS; }
+}
 const floorMapBase = { cv: document.createElement("canvas"), w: 0, h: 0, dpr: 0 };
 function floorMapUnits() {
   const M = FLOOR_MAP, slabH = (M.z1 - M.z0) * M.depth;
@@ -3646,7 +3668,8 @@ function drawFloorMap(t) {
     c.strokeStyle = MAP_COLORS.here; c.lineWidth = Math.max(1.5, s * 0.7); c.stroke();
   }
   const myZombieSide = round.iAmIn && isZombieNow(myId, t);
-  const shown = roundIds().filter(id => avatars[id] && (!round.iAmIn || id === myId || (myZombieSide && isZombieNow(id, t))));
+  const pingOn = myZombieSide && t >= room.startAt && ZombieHumanPing.activeAt(t - room.startAt);
+  const shown = roundIds().filter(id => avatars[id] && (!round.iAmIn || id === myId || (myZombieSide && (pingOn || isZombieNow(id, t)))));
   shown.sort((a, b) => (a === focusId) - (b === focusId));
   const r = Math.max(3, s * 1.5);
   shown.forEach(id => {
@@ -3657,8 +3680,13 @@ function drawFloorMap(t) {
       c.beginPath(); c.moveTo(p[0] + ux * tip, p[1] + uy * tip); c.lineTo(p[0] - uy * r * 0.9, p[1] + ux * r * 0.9); c.lineTo(p[0] + uy * r * 0.9, p[1] - ux * r * 0.9); c.closePath();
       c.fillStyle = "#FFFFFF"; c.fill();
     }
-    c.beginPath(); c.arc(p[0], p[1], focus ? r * 1.35 : r, 0, Math.PI * 2);
-    c.fillStyle = zombie ? MAP_COLORS.zombie : MAP_COLORS.human; c.fill();
+    const pinged = pingOn && !zombie && id !== myId;
+    if (pinged) {
+      c.beginPath(); c.arc(p[0], p[1], r * (1.8 + 1.6 * (1 - ZombieHumanPing.fadeAt(t - room.startAt))), 0, Math.PI * 2);
+      c.strokeStyle = "rgba(255, 42, 42, " + (0.35 + 0.5 * ZombieHumanPing.fadeAt(t - room.startAt)).toFixed(2) + ")"; c.lineWidth = 2; c.stroke();
+    }
+    c.beginPath(); c.arc(p[0], p[1], focus ? r * 1.35 : pinged ? r * 1.25 : r, 0, Math.PI * 2);
+    c.fillStyle = zombie || pinged ? (pinged ? "#FF2A2A" : MAP_COLORS.zombie) : MAP_COLORS.human; c.fill();
     c.lineWidth = focus ? 2 : 1.2;
     c.strokeStyle = focus ? "#FFFFFF" : zombie && isOriginZombie(id) ? MAP_COLORS.origin : "rgba(0, 0, 0, .65)"; c.stroke();
   });
@@ -4091,7 +4119,7 @@ class ZombieRandomMatch {
     this.quiet = false;
     this.flow = null;
     if (!db) return;
-    const options = { gameRoot: "zombieoutbreak", queue: "zombieoutbreak", partyLimit: ZombieRandomMatch.PARTY_LIMIT, matcher: new MkFreeForAllMatcher(ZombieRandomMatch.PARTY_LIMIT, MAX_PLAYERS, MkMatcher.TIMING, Infinity, 4, 60000), solo: true, stats: new AccountStatsOpener(() => zombieReporter.account.openStats(), new AccountLazyGuard(() => zombieReporter.guard)),
+    const options = { gameRoot: "zombieoutbreak", queue: "zombieoutbreak", partyLimit: ZombieRandomMatch.PARTY_LIMIT, matcher: new MkFreeForAllMatcher(ZombieRandomMatch.PARTY_LIMIT, MAX_PLAYERS, MkMatcher.TIMING, Infinity, 4, 60000, 180000), solo: true, stats: new AccountStatsOpener(() => zombieReporter.account.openStats(), new AccountLazyGuard(() => zombieReporter.guard)),
       intro: "매칭 시작을 누르면 다른 학생들과 최대 " + MAX_PLAYERS + "명이 모여요. 좀비는 시작할 때 무작위로 정해지고, 모자란 자리는 AI가 채워요." };
     this.flow = new MkRandomFlow(db, { now: serverNow }, myId, options, this, new MkPartyPanel($("scrParty"), $("partyMount"), options));
   }

@@ -15,7 +15,7 @@ class ZombieVersusCards {
 }
 class ZombieVersusLineup {
     static build(humans, capacity, matched, expected) {
-        const seats = humans.slice(0, capacity).map((human) => ({ kind: "player", nick: human.nick, me: human.me, card: human.card }));
+        const seats = humans.slice(0, capacity).map((human) => ({ kind: "player", nick: human.nick, me: human.me, zombie: human.zombie, card: human.card }));
         const coming = matched ? Math.max(0, Math.min(capacity, expected) - seats.length) : 0;
         while (seats.length < capacity && seats.length < humans.length + coming)
             seats.push({ kind: "coming" });
@@ -53,7 +53,7 @@ class ZombieVersusView {
             return '<div class="zv-seat waiting"><b>입장하는 중…</b>' + blank + blank + "</div>";
         if (seat.kind === "empty")
             return '<div class="zv-seat empty"><b>빈 자리</b>' + blank + blank + "</div>";
-        return '<div class="zv-seat' + (seat.me ? " me" : "") + '"><b>' + AccountHtml.esc(seat.nick) + (seat.me ? " <small>(나)</small>" : "") + "</b>" + this.cardHtml(seat.card) + "</div>";
+        return '<div class="zv-seat' + (seat.me ? " me" : "") + (seat.zombie ? " zombie" : "") + '"><b>' + (seat.zombie ? "🧟 " : "") + AccountHtml.esc(seat.nick) + (seat.me ? " <small>(나)</small>" : "") + "</b>" + this.cardHtml(seat.card) + "</div>";
     }
     cardHtml(card) {
         if (!card)

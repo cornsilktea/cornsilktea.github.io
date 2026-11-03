@@ -6,11 +6,12 @@ type ZombieVersusSeat =
   | { kind: "ai" }
   | { kind: "coming" }
   | { kind: "empty" }
-  | { kind: "player"; nick: string; me: boolean; card: ZombieVersusCard | null };
+  | { kind: "player"; nick: string; me: boolean; zombie: boolean; card: ZombieVersusCard | null };
 
 interface ZombieVersusHuman {
   nick: string;
   me: boolean;
+  zombie: boolean;
   card: ZombieVersusCard | null;
 }
 
@@ -32,7 +33,7 @@ class ZombieVersusCards {
 
 class ZombieVersusLineup {
   static build(humans: readonly ZombieVersusHuman[], capacity: number, matched: boolean, expected: number): ZombieVersusSeat[] {
-    const seats: ZombieVersusSeat[] = humans.slice(0, capacity).map((human) => ({ kind: "player", nick: human.nick, me: human.me, card: human.card }));
+    const seats: ZombieVersusSeat[] = humans.slice(0, capacity).map((human) => ({ kind: "player", nick: human.nick, me: human.me, zombie: human.zombie, card: human.card }));
     const coming = matched ? Math.max(0, Math.min(capacity, expected) - seats.length) : 0;
     while (seats.length < capacity && seats.length < humans.length + coming) seats.push({ kind: "coming" });
     while (seats.length < capacity) seats.push(matched ? { kind: "ai" } : { kind: "empty" });
@@ -67,7 +68,7 @@ class ZombieVersusView {
     if (seat.kind === "ai") return '<div class="zv-seat ai"><b>🤖 AI</b><span class="zv-line">컴퓨터</span>' + blank + "</div>";
     if (seat.kind === "coming") return '<div class="zv-seat waiting"><b>입장하는 중…</b>' + blank + blank + "</div>";
     if (seat.kind === "empty") return '<div class="zv-seat empty"><b>빈 자리</b>' + blank + blank + "</div>";
-    return '<div class="zv-seat' + (seat.me ? " me" : "") + '"><b>' + AccountHtml.esc(seat.nick) + (seat.me ? " <small>(나)</small>" : "") + "</b>" + this.cardHtml(seat.card) + "</div>";
+    return '<div class="zv-seat' + (seat.me ? " me" : "") + (seat.zombie ? " zombie" : "") + '"><b>' + (seat.zombie ? "🧟 " : "") + AccountHtml.esc(seat.nick) + (seat.me ? " <small>(나)</small>" : "") + "</b>" + this.cardHtml(seat.card) + "</div>";
   }
 
   private cardHtml(card: ZombieVersusCard | null): string {

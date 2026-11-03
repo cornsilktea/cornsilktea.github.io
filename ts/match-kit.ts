@@ -318,6 +318,10 @@ abstract class MkMatcher {
     return 0;
   }
 
+  get avoidWaitMs(): number {
+    return 0;
+  }
+
   protected isCrowded(entries: MkQueueMap | null, now: number): boolean {
     return this.crowd.update(entries, now);
   }
@@ -378,7 +382,7 @@ abstract class MkMatcher {
       const entry = (entries as MkQueueMap)[code];
       if (!entry) return;
       const moments = MkMatcher.isSign(entry) ? [(entry.busyUntil as number) + 1] : [entry.at + this.timing.settleMs, entry.at + this.timing.settleMs + this.spreadWaitMs + 1, entry.at + this.timing.settleMs + this.rematchWaitMs + 1];
-      if (this.holdWaitMs > 0) moments.push(entry.at + this.timing.settleMs + this.holdWaitMs + 1);
+      [this.holdWaitMs, this.avoidWaitMs].forEach((wait) => { if (wait > 0) moments.push(entry.at + this.timing.settleMs + wait + 1); });
       if (entry.claim) moments.push(entry.claim.at + this.timing.claimExpireMs + 1);
       moments.forEach((moment) => {
         if (moment > now && (next === null || moment < next)) next = moment;
@@ -504,9 +508,10 @@ class MkWinBandVersusMatcher extends MkVersusMatcher {
 
 // 여럿이 한 방에 모이는 게임(31·32·38·39): 먼저 온 순서로 정원까지 채우고, 넘치는 항목은 다음 묶음으로.
 // maxEntries: 한 방에 들어갈 수 있는 팀(항목) 수 상한(예: 38번 팀전은 3팀).
+// avoidMs: 바로 전 판에서 만난 사람(entry.avoid)끼리는 맨 앞 항목이 avoidMs 동안만 피해 묶는다(31번: 방금 한 학생을 다시 만나지 않게, 2026-11-03). 그 뒤에는 피하지 않는다.
 // holdFrom/holdMs: holdFrom 명이 모일 때까지 기다리고, 모였어도 정원이 안 차면 마지막 사람이 들어온 뒤 holdMs 까지 더 기다렸다가 시작한다(31번: 4명이 모이면 1분까지 5번째 사람을 기다림, 2026-11-03).
 class MkFreeForAllMatcher extends MkMatcher {
-  constructor(partyLimit: number, readonly capacity: number, timing: MkTiming = MkMatcher.TIMING, readonly maxEntries: number = Infinity, private readonly holdFrom: number = 0, private readonly holdMs: number = 0) {
+  constructor(partyLimit: number, readonly capacity: number, timing: MkTiming = MkMatcher.TIMING, readonly maxEntries: number = Infinity, private readonly holdFrom: number = 0, private readonly holdMs: number = 0, private readonly avoidMs: number = 0) {
     super(partyLimit, timing);
   }
 
@@ -514,10 +519,16 @@ class MkFreeForAllMatcher extends MkMatcher {
     return this.holdMs;
   }
 
+  get avoidWaitMs(): number {
+    return this.avoidMs;
+  }
+
   protected pick(ready: Array<[string, MkQueueEntry]>, context: MkPickContext): Array<[string, MkQueueEntry]> | null {
     const picked: Array<[string, MkQueueEntry]> = [];
     let people = 0;
+    const strict = this.avoidMs > 0 && context.now - (ready[0][1].at + this.timing.settleMs) < this.avoidMs;
     ready.forEach((item) => {
+      if (strict && picked.some((other) => MkMatcher.metRecently(other, item))) return;
       if (picked.length < this.maxEntries && item[1].size <= this.partyLimit && people + item[1].size <= this.capacity) {
         picked.push(item);
         people += item[1].size;
