@@ -399,7 +399,7 @@
     <div class="zv-hint">곧 게임이 시작돼요. 잠시만 기다려 주세요.</div>
   </div>
 </div>
-<script charset="utf-8" src="match-kit.js?v=20261103a"></script>
+<script charset="utf-8" src="match-kit.js?v=20261103b"></script>
 <script charset="utf-8" src="account-match-kit.js?v=20261103b"></script>
 <script charset="utf-8" src="31.zombie-outbreak-stats.js?v=20261103a"></script>
 <script charset="utf-8" src="31.zombie-versus.js?v=20261103a"></script>
@@ -1017,7 +1017,7 @@ class CoplanarFaceCuller {
     const kept = new Map(), hidden = new Set();
     for (const i of order) {
       const here = placed[i], cells = CoplanarFaceCuller.cellsOf(here);
-      const covered = !allFaces[i].uv && cells.some(cell => (kept.get(here.plane + "|" + cell) || []).some(other => CoplanarFaceCuller.contains(other, here)));
+      const covered = !allFaces[i].uv && CoplanarFaceCuller.samplesOf(here).every(point => cells.some(cell => (kept.get(here.plane + "|" + cell) || []).some(other => CoplanarFaceCuller.holds(other, point))));
       if (covered) { hidden.add(i); continue; }
       for (const cell of cells) {
         const key = here.plane + "|" + cell;
@@ -1043,9 +1043,15 @@ class CoplanarFaceCuller {
     return cells;
   }
 
-  static contains(outer, inner) {
+  static samplesOf(rect) {
+    const points = [];
+    for (const a of [0.01, 0.5, 0.99]) for (const b of [0.01, 0.5, 0.99]) points.push([rect.u0 + (rect.u1 - rect.u0) * a, rect.w0 + (rect.w1 - rect.w0) * b]);
+    return points;
+  }
+
+  static holds(rect, point) {
     const eps = CoplanarFaceCuller.EPS;
-    return outer.u0 <= inner.u0 + eps && outer.u1 >= inner.u1 - eps && outer.w0 <= inner.w0 + eps && outer.w1 >= inner.w1 - eps;
+    return point[0] >= rect.u0 - eps && point[0] <= rect.u1 + eps && point[1] >= rect.w0 - eps && point[1] <= rect.w1 + eps;
   }
 }
 
@@ -4085,7 +4091,7 @@ class ZombieRandomMatch {
     this.quiet = false;
     this.flow = null;
     if (!db) return;
-    const options = { gameRoot: "zombieoutbreak", queue: "zombieoutbreak", partyLimit: ZombieRandomMatch.PARTY_LIMIT, matcher: new MkFreeForAllMatcher(ZombieRandomMatch.PARTY_LIMIT, MAX_PLAYERS), solo: true, stats: new AccountStatsOpener(() => zombieReporter.account.openStats(), new AccountLazyGuard(() => zombieReporter.guard)),
+    const options = { gameRoot: "zombieoutbreak", queue: "zombieoutbreak", partyLimit: ZombieRandomMatch.PARTY_LIMIT, matcher: new MkFreeForAllMatcher(ZombieRandomMatch.PARTY_LIMIT, MAX_PLAYERS, MkMatcher.TIMING, Infinity, 4, 60000), solo: true, stats: new AccountStatsOpener(() => zombieReporter.account.openStats(), new AccountLazyGuard(() => zombieReporter.guard)),
       intro: "매칭 시작을 누르면 다른 학생들과 최대 " + MAX_PLAYERS + "명이 모여요. 좀비는 시작할 때 무작위로 정해지고, 모자란 자리는 AI가 채워요." };
     this.flow = new MkRandomFlow(db, { now: serverNow }, myId, options, this, new MkPartyPanel($("scrParty"), $("partyMount"), options));
   }

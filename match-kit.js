@@ -132,6 +132,10 @@ class MkMatcher {
     get spreadWaitMs() {
         return this.timing.spreadWaitMs ?? MkCrowdGuard.SPREAD_WAIT_MS;
     }
+    // 정원이 안 찬 묶음을 이만큼(ms) 더 기다려 준다. 0 이면 기다리지 않는다(자식이 덮어씀).
+    get holdWaitMs() {
+        return 0;
+    }
     isCrowded(entries, now) {
         return this.crowd.update(entries, now);
     }
@@ -188,6 +192,8 @@ class MkMatcher {
             if (!entry)
                 return;
             const moments = MkMatcher.isSign(entry) ? [entry.busyUntil + 1] : [entry.at + this.timing.settleMs, entry.at + this.timing.settleMs + this.spreadWaitMs + 1, entry.at + this.timing.settleMs + this.rematchWaitMs + 1];
+            if (this.holdWaitMs > 0)
+                moments.push(entry.at + this.timing.settleMs + this.holdWaitMs + 1);
             if (entry.claim)
                 moments.push(entry.claim.at + this.timing.claimExpireMs + 1);
             moments.forEach((moment) => {
@@ -315,13 +321,19 @@ class MkWinBandVersusMatcher extends MkVersusMatcher {
 }
 // 여럿이 한 방에 모이는 게임(31·32·38·39): 먼저 온 순서로 정원까지 채우고, 넘치는 항목은 다음 묶음으로.
 // maxEntries: 한 방에 들어갈 수 있는 팀(항목) 수 상한(예: 38번 팀전은 3팀).
+// holdFrom/holdMs: holdFrom 명이 모일 때까지 기다리고, 모였어도 정원이 안 차면 마지막 사람이 들어온 뒤 holdMs 까지 더 기다렸다가 시작한다(31번: 4명이 모이면 1분까지 5번째 사람을 기다림, 2026-11-03).
 class MkFreeForAllMatcher extends MkMatcher {
-    constructor(partyLimit, capacity, timing = MkMatcher.TIMING, maxEntries = Infinity) {
+    constructor(partyLimit, capacity, timing = MkMatcher.TIMING, maxEntries = Infinity, holdFrom = 0, holdMs = 0) {
         super(partyLimit, timing);
         this.capacity = capacity;
         this.maxEntries = maxEntries;
+        this.holdFrom = holdFrom;
+        this.holdMs = holdMs;
     }
-    pick(ready, _context) {
+    get holdWaitMs() {
+        return this.holdMs;
+    }
+    pick(ready, context) {
         const picked = [];
         let people = 0;
         ready.forEach((item) => {
@@ -330,7 +342,17 @@ class MkFreeForAllMatcher extends MkMatcher {
                 people += item[1].size;
             }
         });
-        return picked.length >= 2 && picked[0] === ready[0] ? picked : null;
+        if (picked.length < 2 || picked[0] !== ready[0])
+            return null;
+        if (this.holdMs > 0) {
+            const total = picked.reduce((sum, item) => sum + item[1].size, 0);
+            const gatheredAt = Math.max(...picked.map((item) => item[1].at)) + this.timing.settleMs;
+            if (total < this.holdFrom)
+                return null;
+            if (total < this.capacity && context.now - gatheredAt < this.holdMs)
+                return null;
+        }
+        return picked;
     }
     sides(count) {
         const sides = [];
