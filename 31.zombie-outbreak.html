@@ -2386,6 +2386,42 @@ function applyGravity(p, dt) {
     if (p.y <= g) { p.y = g; p.vy = 0; }
   } else { p.y = g; p.vy = 0; }
   if (p.y < -5) { p.x = SPAWN.x; p.z = SPAWN.z; p.y = 0; p.vy = 0; }
+  BodyUnstuck.pushOutOfColliders(p);
+}
+
+class BodyUnstuck {
+  static PASSES = 4;
+
+  static pushOutOfColliders(p) {
+    for (let pass = 0; pass < BodyUnstuck.PASSES && blockedAt(p.x, p.z, p.y); pass++) BodyUnstuck.pushOutOnce(p);
+  }
+
+  static pushOutOnce(p) {
+    const r = PLAYER_RADIUS, bodyLow = p.y + STEP_UP, bodyHigh = p.y + BODY_H;
+    for (const c of collidersNear(p.x - r, p.x + r, p.z - r, p.z + r, colliderScratch)) {
+      if (c.y1 <= bodyLow || c.y0 >= bodyHigh) continue;
+      const dx = Math.max(c.x0 - p.x, 0, p.x - c.x1), dz = Math.max(c.z0 - p.z, 0, p.z - c.z1);
+      const dist = Math.hypot(dx, dz);
+      if (dist >= r) continue;
+      if (dist > 0) {
+        const push = r - dist + 0.01;
+        p.x += (p.x < c.x0 ? -dx : p.x > c.x1 ? dx : 0) / dist * push;
+        p.z += (p.z < c.z0 ? -dz : p.z > c.z1 ? dz : 0) / dist * push;
+        continue;
+      }
+      BodyUnstuck.exitFromInside(p, c, r);
+    }
+  }
+
+  static exitFromInside(p, c, r) {
+    const exits = [
+      { gap: p.x - c.x0, apply: () => { p.x = c.x0 - r - 0.01; } },
+      { gap: c.x1 - p.x, apply: () => { p.x = c.x1 + r + 0.01; } },
+      { gap: p.z - c.z0, apply: () => { p.z = c.z0 - r - 0.01; } },
+      { gap: c.z1 - p.z, apply: () => { p.z = c.z1 + r + 0.01; } }
+    ];
+    exits.sort((a, b) => a.gap - b.gap)[0].apply();
+  }
 }
 
 function rayBoxHit(ox, oy, oz, dx, dy, dz, c) {
