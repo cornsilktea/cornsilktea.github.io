@@ -249,6 +249,9 @@ class AccountMatchStore {
     keyOf(report) {
         return AccountMatchKey.of(this.profile.matchIdOf(report));
     }
+    get outboxScope() {
+        return this.user.uid + "|" + this.profile.gameKey;
+    }
     async record(report, context) {
         const key = this.keyOf(report);
         const pending = await this.settleOtherThan(key);
@@ -352,32 +355,116 @@ class AccountMatchStore {
         return finish(plan.countsStats ? "stats" : "recent");
     }
 }
+class AccountOutbox {
+    static readAll() {
+        try {
+            const raw = window.localStorage.getItem(AccountOutbox.STORAGE_KEY);
+            const parsed = raw ? JSON.parse(raw) : null;
+            return parsed && typeof parsed === "object" ? parsed : {};
+        }
+        catch (error) {
+            return {};
+        }
+    }
+    static writeAll(all) {
+        try {
+            window.localStorage.setItem(AccountOutbox.STORAGE_KEY, JSON.stringify(all));
+        }
+        catch (error) {
+            /* 저장 공간이 없거나 막힌 기기: 이번 접속 안에서의 다시 보내기만 가능하다 */
+        }
+    }
+    static list(scope, now = Date.now()) {
+        const items = AccountOutbox.readAll()[scope];
+        return Array.isArray(items) ? items.filter((item) => item && typeof item.key === "string" && now - item.at < AccountOutbox.MAX_AGE_MS && item.tries < AccountOutbox.MAX_TRIES) : [];
+    }
+    static put(scope, item) {
+        const all = AccountOutbox.readAll();
+        const items = AccountOutbox.list(scope).filter((other) => other.key !== item.key);
+        items.push(item);
+        all[scope] = items.slice(-AccountOutbox.MAX_ITEMS);
+        AccountOutbox.writeAll(all);
+    }
+    static remove(scope, key) {
+        const all = AccountOutbox.readAll();
+        if (!all[scope])
+            return;
+        all[scope] = all[scope].filter((item) => item.key !== key);
+        if (!all[scope].length)
+            delete all[scope];
+        AccountOutbox.writeAll(all);
+    }
+    static failed(scope, key) {
+        const all = AccountOutbox.readAll();
+        (all[scope] || []).forEach((item) => { if (item.key === key)
+            item.tries++; });
+        AccountOutbox.writeAll(all);
+    }
+}
+AccountOutbox.STORAGE_KEY = "portal_acct_outbox_v1";
+AccountOutbox.MAX_AGE_MS = 3 * 24 * 60 * 60 * 1000;
+AccountOutbox.MAX_TRIES = 8;
+AccountOutbox.MAX_ITEMS = 12;
 /* 한 게임 화면이 쓰는 계정 기록 창구. 미리 적기·지우기·진짜 기록을 차례대로 보내(앞 요청이 끝난 뒤 다음 요청)
    "진짜 결과를 쓴 뒤에 늦게 도착한 미리 적기"가 남아 거짓 패배가 되는 일을 막고, 같은 판을 두 번 보내지 않는다 */
 class AccountMatchSender {
     constructor(storeOf) {
         this.storeOf = storeOf;
-        this.sentKey = "";
+        this.inFlight = new Set();
+        this.delivered = new Set();
         this.armedKey = "";
         this.queue = Promise.resolve();
     }
+    /* 결과를 먼저 이 기기 상자에 적고, 서버에 쓰기에 성공해야 지운다. 실패하면 몇 번 더 보내고, 그래도 안 되면 상자에 남겨 다음에 이어서 보낸다 */
     record(report, context) {
         const store = this.storeOf();
         if (!store)
             return;
         const key = store.keyOf(report);
-        if (key === this.sentKey)
+        if (this.inFlight.has(key) || this.delivered.has(key))
             return;
-        this.sentKey = key;
         this.armedKey = "";
-        this.enqueue(() => store.record(report, context));
+        AccountOutbox.put(store.outboxScope, { key, report, context, at: Date.now(), tries: 0 });
+        this.deliver(store, key, report, context);
+    }
+    /* 이 기기 상자에 남은 결과를 다시 보낸다(페이지를 열 때·통계 창을 열 때·다음 판을 기록할 때) */
+    flush() {
+        const store = this.storeOf();
+        if (!store)
+            return;
+        AccountOutbox.list(store.outboxScope).forEach((item) => {
+            if (this.inFlight.has(item.key) || this.delivered.has(item.key))
+                return;
+            this.deliver(store, item.key, item.report, item.context);
+        });
+    }
+    deliver(store, key, report, context) {
+        this.inFlight.add(key);
+        this.enqueue(async () => {
+            const delays = AccountMatchSender.RETRY_DELAYS_MS;
+            for (let attempt = 0; attempt <= delays.length; attempt++) {
+                try {
+                    await store.record(report, context);
+                    AccountOutbox.remove(store.outboxScope, key);
+                    this.delivered.add(key);
+                    this.inFlight.delete(key);
+                    return;
+                }
+                catch (error) {
+                    AccountOutbox.failed(store.outboxScope, key);
+                    if (attempt < delays.length)
+                        await new Promise((resolve) => window.setTimeout(resolve, delays[attempt]));
+                }
+            }
+            this.inFlight.delete(key);
+        });
     }
     arm(report) {
         const store = this.storeOf();
         if (!store)
             return;
         const key = store.keyOf(report);
-        if (key === this.sentKey || key === this.armedKey)
+        if (this.inFlight.has(key) || this.delivered.has(key) || key === this.armedKey)
             return;
         this.armedKey = key;
         this.enqueue(() => store.arm(report));
@@ -388,7 +475,7 @@ class AccountMatchSender {
         if (!store)
             return;
         const key = store.keyOf(report);
-        if (key === this.sentKey)
+        if (this.inFlight.has(key) || this.delivered.has(key))
             return;
         this.armedKey = "";
         this.enqueue(() => store.stash(report));
@@ -405,11 +492,13 @@ class AccountMatchSender {
         const store = this.storeOf();
         if (store)
             this.enqueue(() => store.settlePending());
+        this.flush();
     }
     enqueue(task) {
         this.queue = this.queue.then(task).catch(() => undefined);
     }
 }
+AccountMatchSender.RETRY_DELAYS_MS = [1500, 5000, 15000];
 /* 랜덤 매칭 판의 패배 보고를 만들 줄 아는 게임 쪽 연결. buildForfeit 가 null 이면 아직 경기 전이라 다음 기회에 다시 시도한다 */
 class AccountPendingGuard {
     constructor(sender, buildForfeit) {
@@ -796,8 +885,10 @@ class RandomMatchAccount {
         this.sender = new AccountMatchSender(() => AccountMatchStore.forProfile(this.profile));
         this.guard = new AccountPendingGuard(this.sender, (ticket) => RandomMatchCodec.fromOutcome(ticket, { result: "lose" }));
         this.dialog.bindButtons();
+        window.setTimeout(() => this.sender.flush(), AccountGameAccount.FLUSH_DELAY_MS);
     }
     open() {
+        this.sender.flush();
         this.dialog.open("stats");
     }
     recordOutcome(ticket, outcome) {
@@ -824,8 +915,10 @@ class AccountGameAccount {
     }
     bind() {
         this.dialog.bindButtons();
+        window.setTimeout(() => this.sender.flush(), AccountGameAccount.FLUSH_DELAY_MS);
     }
     openStats() {
+        this.sender.flush();
         this.dialog.open("stats");
     }
     /* 화면에 승률을 보여 주거나 매칭에 쓰려고 내 누적 통계를 한 번 읽는다(로그인 전이면 null) */
@@ -849,6 +942,7 @@ class AccountGameAccount {
         return new AccountPendingGuard(this.sender, buildForfeit);
     }
 }
+AccountGameAccount.FLUSH_DELAY_MS = 3000;
 /* 랜덤 매칭 설정을 만들 때 아직 기록 쪽 객체가 없는 게임(31번 등)이 나중에 guard 를 넘기게 한다 */
 class AccountLazyGuard {
     constructor(make) {

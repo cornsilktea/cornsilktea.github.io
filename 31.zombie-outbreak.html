@@ -439,7 +439,7 @@
   </div>
 </div>
 <script charset="utf-8" src="match-kit.js?v=20261103d"></script>
-<script charset="utf-8" src="account-match-kit.js?v=20261103d"></script>
+<script charset="utf-8" src="account-match-kit.js?v=20261103e"></script>
 <script charset="utf-8" src="31.zombie-outbreak-stats.js?v=20261103c"></script>
 <script charset="utf-8" src="31.zombie-versus.js?v=20261103c"></script>
 <script charset="utf-8" src="40.forest-minigame.js?v=13"></script>
@@ -2747,8 +2747,8 @@ function enterRoom(code) {
   sub(ref.child("originZombieId"), "value", s => { room.originZombieId = s.val(); });
   zombieVersus.watch(ref);
   zombieMissions.watch(ref);
-  sub(ref.child("final"), "value", s => { room.final = s.val(); if (screenNow === "result") renderResult(); });
-  sub(ref.child("winner"), "value", s => { room.winner = s.val(); if (screenNow === "result") renderResult(); });
+  sub(ref.child("final"), "value", s => { room.final = s.val(); if (screenNow === "result") renderResult(); else zombieReporter.endedWhenKnown(); });
+  sub(ref.child("winner"), "value", s => { room.winner = s.val(); if (screenNow === "result") renderResult(); else zombieReporter.endedWhenKnown(); });
   sub(ref.child("missionCleared"), "value", s => { room.missionCleared = s.val() || 0; });
   sub(ref.child("quitSide"), "value", s => { room.quitSide = s.val(); if (screenNow === "result") renderResult(); });
   sub(ref.child("status"), "value", s => onStatus(s.val()));
@@ -3014,6 +3014,7 @@ function onStatus(st) {
     else if (screenNow === "lobby") renderLobby();
   } else if (st === "ended") {
     if (screenNow === "game" || screenNow === "lobby") showScreen("result");
+    zombieReporter.endedWhenKnown();
   }
   zombieRandom.armMatch();
 }
@@ -4440,6 +4441,7 @@ class ZombieMatchReporter {
       winner: -1, progress: AccountForfeit.progressOnLeave(!!zombieRandom.ticket(), zombieRandom.progress()), iLeft: true, random: !!zombieRandom.ticket() };
   }
   ended() { if (room.ref && room.final && room.final[myId] && room.winner) { this.account.record(this.finishedReport()); zombieHistory.reloadSoon(); } }
+  endedWhenKnown() { if (room.status === "ended") this.ended(); }
   forfeitApplies() { return !!room.ref && room.status === "playing" && roundIds().indexOf(myId) >= 0 && (!!zombieRandom.ticket() || zombieRandom.progress() >= AccountForfeit.AT); }
   leaving() { if (this.forfeitApplies()) this.account.record(this.roundReport()); }
   forfeitReport() { return this.forfeitApplies() && zombieRandom.ticket() ? this.roundReport() : null; }

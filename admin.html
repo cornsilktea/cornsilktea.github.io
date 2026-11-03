@@ -527,9 +527,8 @@
           <div class="class-grid" id="rankGames"></div>
           <hr class="rank-divider">
           <div class="class-grid" id="rankGrid"></div>
-          <!-- 🩹 통계 정상화(2026-11-02, 팀 배틀(30)을 골랐을 때만 보임): 한 학생 기기만 결과를 못 쓴 판을, 같은 판 다른 학생의 최근 20매치 결과표로 채운다.
-               누르면 users 전체를 한 번 읽어 미리 보기 표를 그리고, 확인 창에서 '확인'을 누를 때만 다시 읽은 뒤 PATCH 한 번. 계산은 teambattle-stats-repair.js -->
-          <div class="actions rank-bar"><button id="rankRefresh" type="button" disabled>🔄 새로고침</button><button id="rankRepair" type="button" hidden>🩹 통계 정상화</button><p class="msg" id="rankMsg"></p><p class="msg" id="rankRepairMsg"></p></div>
+          <!-- 🔄 새로고침 = 통계 정상화 + 다시 읽기(2026-11-03): 누를 때마다 그 게임에서 한 학생 기기만 결과를 못 쓴 판을, 같은 판 다른 학생의 최근 20매치 결과표로 바로 채운 뒤 표를 읽는다. 계산은 account-stats-repair.js -->
+          <div class="actions rank-bar"><button id="rankRefresh" type="button" disabled>🔄 새로고침</button><p class="msg" id="rankMsg"></p><p class="msg" id="rankRepairMsg"></p></div>
           <div id="rankRepairBox" class="stats-box"></div>
           <div id="rankTable" class="stats-box"></div>
         </div>
@@ -665,9 +664,9 @@
 <!-- 반 별 통계에서 학생 이름을 누르면 여는 개인 통계 창이 게임과 같은 계산·되살리기·표 클래스를 쓰려고 불러온다.
      30번은 StudentStatsWindow(account-stats.js), 나머지는 각 게임 통계 모듈의 Profile·View + AccountStatsDialog(StudentAccountWindow).
      통계가 있는 새 게임을 만들면 그 게임의 통계 .js 를 여기 한 줄 더하고 ClassRankPanel.GAMES 에 account 를 넘긴다. -->
-<script charset="utf-8" src="account-match-kit.js?v=20261103d"></script>
+<script charset="utf-8" src="account-match-kit.js?v=20261103e"></script>
 <script charset="utf-8" src="account-stats.js?v=20261029g"></script>
-<script charset="utf-8" src="teambattle-stats-repair.js?v=20261102c"></script>
+<script charset="utf-8" src="teambattle-stats-repair.js?v=20261103a"></script>
 <script charset="utf-8" src="patch-notes.js?v=20261029b"></script>
 <script charset="utf-8" src="30.team-formation.js?v=20261102b"></script>
 <script charset="utf-8" src="24.turbo-lap-stats.js?v=20261029c"></script>
@@ -675,6 +674,7 @@
 <script charset="utf-8" src="31.zombie-outbreak-stats.js?v=20261103c"></script>
 <script charset="utf-8" src="38.snow-account.js?v=20261028c"></script>
 <script charset="utf-8" src="39.balloon-account.js?v=20261028c"></script>
+<script charset="utf-8" src="account-stats-repair.js?v=20261103a"></script>
 <script>
 /* 밝기 전환 버튼: <html data-theme> 를 바꾸고 localStorage('portal_theme')에 남긴다(index.html 과 같은 키).
    주소창 색(theme-color)도 배경색에 맞춘다. */
@@ -1260,14 +1260,37 @@ class ClassRankPanel {
       $("rankToggle").setAttribute("aria-expanded", open ? "true" : "false");
       if (open) this.renderPickers();
     });
-    $("rankRefresh").addEventListener("click", () => { if (this.cls) this.load(this.cls); });
+    $("rankRefresh").addEventListener("click", () => { if (this.cls) void this.refresh(); });
+  }
+
+  normalizerOf() {
+    if (!this.normalizer) this.normalizer = new AccountStatsNormalizer(new AdminRestIo());
+    return this.normalizer;
+  }
+
+  /* 새로고침 = 통계 정상화 + 다시 읽기(2026-11-03 선생님 요청): 누를 때마다 그 게임에서 빠진 판을 찾아 바로 채우고, 그 뒤에 표를 새로 읽는다 */
+  async refresh() {
+    const button = $("rankRefresh"), game = this.game;
+    button.disabled = true;
+    $("rankRepairBox").innerHTML = "";
+    let result = null, failure = "";
+    const normalizer = this.normalizerOf();
+    if (normalizer.supports(game.key)) {
+      say("rankRepairMsg", "통계 정상화 중…");
+      try { result = await normalizer.normalize(game.key); } catch (e) {
+        failure = "통계 정상화를 하지 못했습니다(" + (e && e.message ? e.message : e) + "). 데이터베이스규칙.json 을 Firebase 콘솔에 다시 게시했는지 확인해 주세요.";
+      }
+    }
+    await this.load(this.cls);
+    say("rankRepairMsg", failure || AccountRepairReport.line(result));
+    $("rankRepairBox").innerHTML = AccountRepairReport.html(result);
+    button.disabled = !this.cls;
   }
 
   renderPickers() {
     this.fillGrid($("rankGames"), ClassRankPanel.GAMES.map((g) => ({ id: g.key, label: g.title })), (id) => this.pickGame(id), this.game.key);
     this.fillGrid($("rankGrid"), ClassRankPanel.pickable(), (id) => this.pickClass(id), this.cls);
     $("rankRefresh").disabled = !this.cls;
-    $("rankRepair").hidden = this.game.key !== "teambattle";
   }
 
   fillGrid(grid, items, onPick, selected) {
@@ -2507,7 +2530,6 @@ class AdminRestIo {
   async keys(path) { const r = await fetch(await authedUrl(path) + "&shallow=true", { cache: "no-store" }); if (!r.ok) throw new Error(String(r.status)); return Object.keys((await r.json()) || {}); }
   async patch(values) { const r = await fetch(await authedUrl(""), { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(values) }); if (!r.ok) throw new Error(String(r.status)); }
 }
-new TeamBattleRepairPanel(new AdminRestIo(), { run: "rankRepair", msg: "rankRepairMsg", box: "rankRepairBox" }, () => $("rankRefresh").click()).bind();
 const teamFormPanel = new TeamFormationPanel(new AdminRestIo(), { cls: "teamFormClass", load: "teamFormLoad", msg: "teamFormMsg", board: "teamFormBoard", tray: "teamFormTray" },
   D.ALL_CLASSES.filter((c) => /^[1-3]-[1-5]$/.test(c.id)), () => current);
 teamFormPanel.bind();

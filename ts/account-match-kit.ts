@@ -329,6 +329,10 @@ class AccountMatchStore<R, P extends AccountMatchPlanBase, N, E extends AccountR
     return AccountMatchKey.of(this.profile.matchIdOf(report));
   }
 
+  get outboxScope(): string {
+    return this.user.uid + "|" + this.profile.gameKey;
+  }
+
   async record(report: R, context: C): Promise<string> {
     const key = this.keyOf(report);
     const pending = await this.settleOtherThan(key);
@@ -430,30 +434,126 @@ class AccountMatchStore<R, P extends AccountMatchPlanBase, N, E extends AccountR
   }
 }
 
+/* 보내지 못한 결과를 이 기기에 보관해 두는 상자(2026-11-03 선생님 요청: 기록이 빠지는 일이 없게).
+   예전에는 판이 끝나 보낸 요청이 한 번 실패하면(인터넷 끊김·토큰 갱신 중·잠깐의 서버 오류) 그 판이 영영 사라졌다.
+   이제 보내기 전에 여기에 적고, 성공해야 지운다. 실패하면 이 상자에서 다시 꺼내 몇 번 더 보내고, 페이지를 새로 열 때도 이어서 보낸다. */
+interface AccountOutboxItem {
+  key: string;
+  report: unknown;
+  context: unknown;
+  at: number;
+  tries: number;
+}
+
+class AccountOutbox {
+  static readonly STORAGE_KEY = "portal_acct_outbox_v1";
+  static readonly MAX_AGE_MS = 3 * 24 * 60 * 60 * 1000;
+  static readonly MAX_TRIES = 8;
+  static readonly MAX_ITEMS = 12;
+
+  private static readAll(): Record<string, AccountOutboxItem[]> {
+    try {
+      const raw = window.localStorage.getItem(AccountOutbox.STORAGE_KEY);
+      const parsed = raw ? JSON.parse(raw) : null;
+      return parsed && typeof parsed === "object" ? parsed as Record<string, AccountOutboxItem[]> : {};
+    } catch (error) {
+      return {};
+    }
+  }
+
+  private static writeAll(all: Record<string, AccountOutboxItem[]>): void {
+    try {
+      window.localStorage.setItem(AccountOutbox.STORAGE_KEY, JSON.stringify(all));
+    } catch (error) {
+      /* 저장 공간이 없거나 막힌 기기: 이번 접속 안에서의 다시 보내기만 가능하다 */
+    }
+  }
+
+  static list(scope: string, now: number = Date.now()): AccountOutboxItem[] {
+    const items = AccountOutbox.readAll()[scope];
+    return Array.isArray(items) ? items.filter((item) => item && typeof item.key === "string" && now - item.at < AccountOutbox.MAX_AGE_MS && item.tries < AccountOutbox.MAX_TRIES) : [];
+  }
+
+  static put(scope: string, item: AccountOutboxItem): void {
+    const all = AccountOutbox.readAll();
+    const items = AccountOutbox.list(scope).filter((other) => other.key !== item.key);
+    items.push(item);
+    all[scope] = items.slice(-AccountOutbox.MAX_ITEMS);
+    AccountOutbox.writeAll(all);
+  }
+
+  static remove(scope: string, key: string): void {
+    const all = AccountOutbox.readAll();
+    if (!all[scope]) return;
+    all[scope] = all[scope].filter((item) => item.key !== key);
+    if (!all[scope].length) delete all[scope];
+    AccountOutbox.writeAll(all);
+  }
+
+  static failed(scope: string, key: string): void {
+    const all = AccountOutbox.readAll();
+    (all[scope] || []).forEach((item) => { if (item.key === key) item.tries++; });
+    AccountOutbox.writeAll(all);
+  }
+}
+
 /* 한 게임 화면이 쓰는 계정 기록 창구. 미리 적기·지우기·진짜 기록을 차례대로 보내(앞 요청이 끝난 뒤 다음 요청)
    "진짜 결과를 쓴 뒤에 늦게 도착한 미리 적기"가 남아 거짓 패배가 되는 일을 막고, 같은 판을 두 번 보내지 않는다 */
 class AccountMatchSender<R, P extends AccountMatchPlanBase, N, E extends AccountRecentHeadEntry, C> {
-  private sentKey = "";
+  static readonly RETRY_DELAYS_MS = [1500, 5000, 15000];
+  private readonly inFlight = new Set<string>();
+  private readonly delivered = new Set<string>();
   private armedKey = "";
   private queue: Promise<unknown> = Promise.resolve();
 
   constructor(private readonly storeOf: () => AccountMatchStore<R, P, N, E, C> | null) {}
 
+  /* 결과를 먼저 이 기기 상자에 적고, 서버에 쓰기에 성공해야 지운다. 실패하면 몇 번 더 보내고, 그래도 안 되면 상자에 남겨 다음에 이어서 보낸다 */
   record(report: R, context: C): void {
     const store = this.storeOf();
     if (!store) return;
     const key = store.keyOf(report);
-    if (key === this.sentKey) return;
-    this.sentKey = key;
+    if (this.inFlight.has(key) || this.delivered.has(key)) return;
     this.armedKey = "";
-    this.enqueue(() => store.record(report, context));
+    AccountOutbox.put(store.outboxScope, { key, report, context, at: Date.now(), tries: 0 });
+    this.deliver(store, key, report, context);
+  }
+
+  /* 이 기기 상자에 남은 결과를 다시 보낸다(페이지를 열 때·통계 창을 열 때·다음 판을 기록할 때) */
+  flush(): void {
+    const store = this.storeOf();
+    if (!store) return;
+    AccountOutbox.list(store.outboxScope).forEach((item) => {
+      if (this.inFlight.has(item.key) || this.delivered.has(item.key)) return;
+      this.deliver(store, item.key, item.report as R, item.context as C);
+    });
+  }
+
+  private deliver(store: AccountMatchStore<R, P, N, E, C>, key: string, report: R, context: C): void {
+    this.inFlight.add(key);
+    this.enqueue(async () => {
+      const delays = AccountMatchSender.RETRY_DELAYS_MS;
+      for (let attempt = 0; attempt <= delays.length; attempt++) {
+        try {
+          await store.record(report, context);
+          AccountOutbox.remove(store.outboxScope, key);
+          this.delivered.add(key);
+          this.inFlight.delete(key);
+          return;
+        } catch (error) {
+          AccountOutbox.failed(store.outboxScope, key);
+          if (attempt < delays.length) await new Promise((resolve) => window.setTimeout(resolve, delays[attempt]));
+        }
+      }
+      this.inFlight.delete(key);
+    });
   }
 
   arm(report: R): void {
     const store = this.storeOf();
     if (!store) return;
     const key = store.keyOf(report);
-    if (key === this.sentKey || key === this.armedKey) return;
+    if (this.inFlight.has(key) || this.delivered.has(key) || key === this.armedKey) return;
     this.armedKey = key;
     this.enqueue(() => store.arm(report));
   }
@@ -463,7 +563,7 @@ class AccountMatchSender<R, P extends AccountMatchPlanBase, N, E extends Account
     const store = this.storeOf();
     if (!store) return;
     const key = store.keyOf(report);
-    if (key === this.sentKey) return;
+    if (this.inFlight.has(key) || this.delivered.has(key)) return;
     this.armedKey = "";
     this.enqueue(() => store.stash(report));
   }
@@ -479,6 +579,7 @@ class AccountMatchSender<R, P extends AccountMatchPlanBase, N, E extends Account
   settle(): void {
     const store = this.storeOf();
     if (store) this.enqueue(() => store.settlePending());
+    this.flush();
   }
 
   private enqueue(task: () => Promise<unknown>): void {
@@ -921,9 +1022,11 @@ class RandomMatchAccount implements MkStatsLink {
     this.sender = new AccountMatchSender(() => AccountMatchStore.forProfile(this.profile));
     this.guard = new AccountPendingGuard(this.sender, (ticket) => RandomMatchCodec.fromOutcome(ticket, { result: "lose" }));
     this.dialog.bindButtons();
+    window.setTimeout(() => this.sender.flush(), AccountGameAccount.FLUSH_DELAY_MS);
   }
 
   open(): void {
+    this.sender.flush();
     this.dialog.open("stats");
   }
 
@@ -944,6 +1047,7 @@ class AccountStatsOpener implements MkStatsLink {
 /* 게임별 통계 창이 있는 게임(24·25·31·38·39)의 계정 쪽 묶음: 통계 창 + 기록 창구 + 미리 적는 패배 연결.
    자식은 자기 profile·view 만 넘긴다. 30번은 맥락(MVP 판정)이 있어 AccountMatchSender 를 직접 쓴다 */
 class AccountGameAccount<R, P extends AccountMatchPlanBase, N, E extends AccountRecentHeadEntry> {
+  static readonly FLUSH_DELAY_MS = 3000;
   private readonly dialog: AccountStatsDialog<N, E>;
   private readonly sender: AccountMatchSender<R, P, N, E, null>;
 
@@ -954,9 +1058,11 @@ class AccountGameAccount<R, P extends AccountMatchPlanBase, N, E extends Account
 
   bind(): void {
     this.dialog.bindButtons();
+    window.setTimeout(() => this.sender.flush(), AccountGameAccount.FLUSH_DELAY_MS);
   }
 
   openStats(): void {
+    this.sender.flush();
     this.dialog.open("stats");
   }
 

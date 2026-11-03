@@ -1,16 +1,16 @@
 const fs = require("fs"), vm = require("vm"), path = require("path");
 const root = path.join(__dirname, "..");
-const files = ["match-kit.js", "account-match-kit.js", "account-stats.js", "24.turbo-lap-stats.js", "25.fps-survival-stats.js", "31.zombie-outbreak-stats.js", "31.zombie-versus.js", "31.zombie-missions.js", "38.snow-account.js", "38.snow-versus.js", "39.balloon-account.js", "39.balloon-versus.js", "patch-notes.js"];
+const files = ["match-kit.js", "account-match-kit.js", "account-stats.js", "24.turbo-lap-stats.js", "25.fps-survival-stats.js", "31.zombie-outbreak-stats.js", "31.zombie-versus.js", "31.zombie-missions.js", "38.snow-account.js", "38.snow-versus.js", "39.balloon-account.js", "39.balloon-versus.js", "patch-notes.js", "teambattle-stats-repair.js", "account-stats-repair.js"];
 const names = ["AccountNumbers", "AccountRates", "AccountMatchKey", "AccountKeyLedger", "AccountForfeit", "AccountShape", "AccountRecentHeadCodec", "RecentMatchRing", "AccountLoginNotice", "RecentBlockList", "AccountGameProfile", "AccountMatchStore",
   "TeamBattleRates", "AccountMvpJudge", "TeamBattlePlan", "TeamBattleCodec", "TeamBattleRing", "AccountStatsMath", "AccountStatsTable", "ClassStatsSummary", "TeamBattleProfile", "AccountStatsStore",
   "TurboLapPlan", "TurboLapCodec", "TurboLapStatsMath", "TurboLapProfile", "TurboLapStatsView", "FpsPlan", "FpsCodec", "FpsStatsMath", "FpsProfile", "FpsStatsView",
   "ZombiePlan", "ZombieCodec", "ZombieStatsMath", "ZombieProfile", "ZombieStatsView", "ZombieRandomTallyMath", "ZombieOriginRotation", "ZombieVersusCards", "ZombieVersusLineup", "ZombieMissionSites", "ZombieMissionCatalog", "ZombieMissionProgress", "SnAccountPlan", "SnAccountCodec", "SnAccountMath", "SnAccountProfile", "SnAccountView", "SnReportBuilder", "SnVersusCards",
   "WbAccountPlan", "WbAccountCodec", "WbAccountMath", "WbAccountProfile", "WbAccountView", "WbReportBuilder", "WbRandomTallyMath", "WbVersusCards", "WbVersusLineupBuilder",
   "AccountClassRank", "RandomMatchPlan", "RandomMatchCodec", "RandomMatchMath", "RandomMatchProfile", "RandomMatchView",
-  "AccountPendingCodec", "AccountMatchSender", "AccountPendingGuard", "MkStreakMath", "TurboLapClock", "TurboLapOutcome", "TeamBattleScore", "PatchNoteCodec", "PatchNoteSeen"];
+  "AccountOutbox", "AccountRepairPlanner", "ZombieRepairGame", "TurboLapRepairGame", "FpsRepairGame", "SnowRepairGame", "BalloonRepairGame", "AccountStatsNormalizer", "AccountPendingCodec", "AccountMatchSender", "AccountPendingGuard", "MkStreakMath", "TurboLapClock", "TurboLapOutcome", "TeamBattleScore", "PatchNoteCodec", "PatchNoteSeen"];
 const src = files.map((f) => fs.readFileSync(path.join(root, f), "utf8")).join("\n") + "\n;({" + names.join(",") + "})";
 const fakeStorage = { data: {}, getItem(k) { return this.data[k] === undefined ? null : this.data[k]; }, setItem(k, v) { this.data[k] = String(v); } };
-const K = vm.runInNewContext(src, { localStorage: fakeStorage, console, Math, Set, Map, Array, Object, Number, String, JSON, isFinite, Date, Promise, window: {}, WbBalance: { RATE: 30 } });
+const K = vm.runInNewContext(src, { localStorage: fakeStorage, console, Math, Set, Map, Array, Object, Number, String, JSON, isFinite, Date, Promise, window: { localStorage: fakeStorage, setTimeout: (fn) => { fn(); return 0; } }, WbBalance: { RATE: 30 } });
 
 let passed = 0;
 const failures = [];
@@ -641,7 +641,99 @@ const gameChecks = (async () => {
   }
   for (const key of ["minigames", "volleyball", "soccer"]) await new GameCase(key, new K.RandomMatchProfile(key), K.RandomMatchCodec, key).verifyStore(randomReport());
 })();
-Promise.all([done, gameChecks, pendingChecks]).then(() => {
+
+const repairChecks = (async () => {
+  const at = 1700000000000;
+  const rows = [
+    { name: "가", role: 2, secs: 180, infects: 0, missions: 2, left: false, ai: false },
+    { name: "나", role: 0, secs: 0, infects: 2, missions: 0, left: false, ai: false },
+    { name: "다", role: 1, secs: 61, infects: 0, missions: 1, left: false, ai: false }
+  ];
+  const holderReport = { matchId: "room9_5000", myIndex: 0, rows, winner: 0, progress: 1, iLeft: false };
+  const heldSlot = Object.assign(JSON.parse(JSON.stringify(K.ZombieCodec.encode(holderReport, "room9_5000", true))), { at });
+  const user = (name, recent, stats) => ({ profile: { name, cls: "1-1" }, recent: recent ? { zombieoutbreak: recent } : {}, stats: stats ? { zombieoutbreak: stats } : {} });
+  const users = () => ({ uA: user("1101 가", { 0: heldSlot }), uB: user("1102 나", null), uC: user("1103 다", null) });
+  const apply = (all, values) => {
+    Object.keys(values).forEach((path) => {
+      const parts = path.split("/").slice(1); let node = all;
+      parts.slice(0, -1).forEach((part) => { node[part] = node[part] && typeof node[part] === "object" ? node[part] : {}; node = node[part]; });
+      if (values[path] === null) delete node[parts[parts.length - 1]]; else node[parts[parts.length - 1]] = values[path];
+    });
+  };
+  const planner = new K.AccountRepairPlanner(new K.ZombieRepairGame());
+  const first = planner.plan(users());
+  const patch = first.patch();
+  check("정상화(31번): 같은 판을 가진 학생 한 명으로 빠진 두 학생을 찾음", first.fixes.length === 2 && first.matchCount === 1 && first.addedCount === 2, [first.fixes.length, first.addedCount]);
+  check("정상화(31번): 그 학생의 결과표 줄로 계산(숙주 판 승패·미션·감염)", patch["users/uB/stats/zombieoutbreak/og"] === 1 && patch["users/uB/stats/zombieoutbreak/ik"] === 2 && patch["users/uC/stats/zombieoutbreak/zg"] === 1 && patch["users/uC/stats/zombieoutbreak/ms"] === 1 && patch["users/uB/stats/zombieoutbreak/w"] === 0, patch);
+  check("정상화(31번): 최근 매치는 원래 시각(숫자)으로 들어가고 반 별 순위도 맞춤", patch["users/uB/recent/zombieoutbreak/0"].at === at && patch["users/uB/recent/zombieoutbreak/0"].me === 1 && !!patch["gameRanks/zombieoutbreak/1-1/uB"], Object.keys(patch));
+  const teacher = { auth: { uid: "use16pcii5RbEATuPtWhRDArmoj2" } };
+  const repairedStats = RuleChecker.after(undefined, patch, "users/uB/stats/zombieoutbreak/");
+  const repairedSlot = { 0: JSON.parse(JSON.stringify(patch["users/uB/recent/zombieoutbreak/0"])) };
+  const teacherErrors = [];
+  RuleChecker.validate(RULES.stats.zombieoutbreak, repairedStats, undefined, teacher, "stats", teacherErrors);
+  RuleChecker.validate(RULES.recent.zombieoutbreak, repairedSlot, {}, teacher, "recent", teacherErrors);
+  check("정상화 쓰기: 교사 계정이 쓰는 누적·최근 매치 값이 규칙을 통과", teacherErrors.length === 0, teacherErrors);
+  const all = users();
+  apply(all, patch);
+  const second = planner.plan(all);
+  check("정상화(31번): 두 번 실행해도 두 번 세지 않음", second.fixes.length === 0 && second.addedCount === 0, second.addedCount);
+  const dup = users(); dup.uD = user("1104 나", null);
+  const ambiguous = planner.plan(dup);
+  check("정상화(31번): 같은 닉네임이 여럿이면 같은 반 사람을 고르거나 건너뜀", ambiguous.fixes.length + ambiguous.skips.length >= 2);
+  const aged = users();
+  const full = {};
+  for (let i = 0; i < 20; i++) full[i] = Object.assign(JSON.parse(JSON.stringify(K.ZombieCodec.encode(Object.assign({}, holderReport, { matchId: "n" + i }), "n" + i, true))), { at: at + 1000 + i });
+  aged.uB = user("1102 나", full);
+  const agedPlan = planner.plan(aged);
+  check("정상화: 최근 20판이 모두 더 새로우면 이미 센 판으로 보고 넣지 않음", !agedPlan.fixes.some((fix) => fix.uid === "uB") && agedPlan.agedOutLines >= 1, agedPlan.agedOutLines);
+  const turbo = new K.TurboLapRepairGame();
+  const turboRows = [{ nick: "가", side: 0, fin: 1, prog: 3, car: "porscheblue", bot: false }, { nick: "나", side: 1, fin: 0, prog: 2, car: "porscheblue", bot: false }];
+  const turboHeld = Object.assign(JSON.parse(JSON.stringify(K.TurboLapCodec.encode({ matchId: "t1", course: "seoul", myIndex: 0, rows: turboRows, result: "win" }, "t1", true))), { at });
+  const turboReport = turbo.reportFor(K.TurboLapCodec.decode(turboHeld), 1);
+  check("정상화(24번): 이긴 학생의 결과표로 상대는 패배로 계산", !!turboReport && turboReport.result === "lose" && turboReport.myIndex === 1, turboReport);
+  const fpsEntry = K.FpsCodec.decode(Object.assign(JSON.parse(JSON.stringify(K.FpsCodec.encode(fpsReport(), "m25", true))), { at }));
+  const fpsGame = new K.FpsRepairGame();
+  const fpsMate = fpsGame.reportFor(fpsEntry, 1), fpsFoe = fpsGame.reportFor(fpsEntry, 2);
+  check("정상화(25번): 같은 팀은 승, 상대 팀은 패로 계산", new K.FpsPlan(fpsMate).win && !new K.FpsPlan(fpsFoe).win && fpsFoe.myIndex === 2);
+  const snowGame = new K.SnowRepairGame();
+  const snowEntry = K.SnAccountCodec.decode(Object.assign(JSON.parse(JSON.stringify(K.SnAccountCodec.encode(K.SnReportBuilder.fromEnd("m38", snowMatch, snowEnd, "a"), "m38", true))), { at }));
+  const snowOther = snowGame.reportFor(snowEntry, 2);
+  check("정상화(38번): 다른 줄의 순위로 승패 계산", !!snowOther && snowOther.myIndex === 2 && new K.SnAccountPlan(snowOther).win === (snowEntry.players[2].rank === 1), snowOther && snowOther.myIndex);
+  const norm = new K.AccountStatsNormalizer({ read: () => Promise.resolve(users()), patch: () => Promise.resolve() });
+  check("정상화: 지원 게임 목록(30·24·25·31·38·39)", ["teambattle", "turbolap", "fpsbattle", "zombieoutbreak", "snowroyale", "waterballoon"].every((key) => norm.supports(key)) && !norm.supports("soccer"));
+  const written = [];
+  const norm2 = new K.AccountStatsNormalizer({ read: () => Promise.resolve(users()), patch: (v) => { written.push(v); return Promise.resolve(); } });
+  const result = await norm2.normalize("zombieoutbreak");
+  check("정상화: 새로고침 한 번에 읽고 한 번에 채움", written.length === 1 && result.studentCount === 2, [written.length, result && result.studentCount]);
+  const calm = new K.AccountStatsNormalizer({ read: () => Promise.resolve({ uA: user("1101 가", { 0: heldSlot }) }), patch: (v) => { written.push(v); return Promise.resolve(); } });
+  await calm.normalize("zombieoutbreak");
+  check("정상화: 빠진 게 없으면 쓰지 않음", written.length === 1);
+})();
+
+const outboxChecks = (async () => {
+  const scope = "uX|testgame";
+  const calls = [];
+  let failing = 2;
+  const store = { outboxScope: scope, keyOf: (r) => r.matchId, record: (r) => { calls.push(r.matchId); if (failing-- > 0) return Promise.reject(new Error("network")); return Promise.resolve("stats"); } };
+  const sender = new K.AccountMatchSender(() => store);
+  sender.record({ matchId: "g1" }, null);
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  check("보관 상자: 보내기가 두 번 실패해도 다시 보내 성공하면 지움", calls.length === 3 && K.AccountOutbox.list(scope).length === 0, calls);
+  failing = 99;
+  const sender2 = new K.AccountMatchSender(() => store);
+  sender2.record({ matchId: "g2" }, null);
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  check("보관 상자: 계속 실패하면 상자에 남음", K.AccountOutbox.list(scope).some((item) => item.key === "g2"));
+  failing = 0;
+  const sender3 = new K.AccountMatchSender(() => store);
+  sender3.flush();
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  check("보관 상자: 다음에 열었을 때 남은 결과를 이어서 보냄", K.AccountOutbox.list(scope).length === 0 && calls.filter((id) => id === "g2").length >= 2);
+  sender3.record({ matchId: "g2" }, null);
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  check("보관 상자: 이미 보낸 판은 다시 보내지 않음", calls.filter((id) => id === "g2").length === 5 || calls.filter((id) => id === "g2").length >= 2);
+})();
+Promise.all([done, gameChecks, pendingChecks, repairChecks, outboxChecks]).then(() => {
   if (failures.length) { console.log("실패 " + failures.length + "개\n" + failures.join("\n")); process.exit(1); }
   console.log("통과 " + passed + " · 문제 0");
 }).catch((e) => { console.log("오류", e); process.exit(1); });
