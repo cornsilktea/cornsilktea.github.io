@@ -752,6 +752,7 @@ function collidersNear(x0, x1, z0, z1, out) {
 const FLOORS = 2, ROOF_Y = FLOOR_H * FLOORS;
 const BUILDING_X = 54, BUILDING_Z = 18, CORRIDOR_Z = 3, BAY_W = 12, GROUND_Y = -0.3;
 const GYM = { x0: 54, x1: 84, z0: -15, z1: 15, h: 8 };
+const RAMP_GUARD_EXTRA_H = 0.8;
 const MOON_DIR = new THREE.Vector3(0.35, -0.55, 0.76).normalize();
 const WORLD_BRIGHTNESS = 1.0, INDOOR_LEVEL = 0.74;
 
@@ -1865,6 +1866,7 @@ function buildGym() {
     ramps.push({ axis: "x", x0: 75.6, x1: stageX0, z0: sz - 1, z1: sz + 1, a0: 75.6, h0: 0, a1: stageX0, h1: stageH });
     for (let i = 0; i < 6; i++) box(75.6 + i * 0.4, 75.6 + (i + 1) * 0.4, 0, (i + 1) * 0.2, sz - 1, sz + 1, C.stair, "wood", false);
     for (const side of [-1, 1]) {
+      box(75.6, stageX0, 0, stageH + RAMP_GUARD_EXTRA_H, sz + side * 1.0, sz + side * 1.1, null);
       obox(76.8, 1.5, sz + side * 1.02, 2.7, 0.05, 0.05, 0, 0, Math.atan2(stageH, 2.4), C.rail, "metal", false);
       for (const px of [75.8, 77.8]) box(px - 0.025, px + 0.025, 0, 0.9 + (px - 75.6) / 2.4 * stageH, sz + side * 1.02 - 0.025, sz + side * 1.02 + 0.025, C.rail, "metal", false);
     }
