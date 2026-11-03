@@ -221,6 +221,7 @@ class ZombieProfile extends AccountGameProfile<ZombieReport, ZombiePlan, ZombieS
 
 class ZombieStatsView implements AccountDialogView<ZombieStatsNode, ZombieRecentEntry> {
   readonly title = "좀비 아웃브레이크";
+  static readonly PILL_CLASSES = ["origin", "infected", "survived"];
   readonly emptyRecent = "아직 기록된 온라인 경기가 없어요.";
 
   statsHtml(node: ZombieStatsNode | null): string {
@@ -252,12 +253,13 @@ class ZombieStatsView implements AccountDialogView<ZombieStatsNode, ZombieRecent
 
   resultHtml(entry: ZombieRecentEntry): string {
     const order = entry.rows.map((row, index) => ({ row, index })).sort((a, b) => (b.row.secs - a.row.secs) || (a.index - b.index));
-    const rows = order.map((item) => {
-      const row = item.row;
-      const cells = [(row.ai ? "🤖 " : "") + AccountHtml.esc(row.name) + (item.index === entry.myIndex ? " (나)" : ""), ZombieRoles.LABELS[row.role], row.role === ZombieRoles.ORIGIN ? "-" : row.secs + "초", String(row.infects), String(row.missions)];
-      return item.index === entry.myIndex ? cells.map((cell) => '<b class="asd-result-mine">' + cell + "</b>") : cells;
-    });
-    return AccountHtml.table(["닉네임", "결과", "생존 시간", "감염", "미션"], rows);
+    const body = order.map((item) => {
+      const row = item.row, mine = item.index === entry.myIndex;
+      const pill = '<span class="asd-pill ' + ZombieStatsView.PILL_CLASSES[row.role] + '">' + ZombieRoles.LABELS[row.role] + "</span>";
+      const cells = [(row.ai ? "🤖 " : "") + AccountHtml.esc(row.name) + (mine ? " (나)" : ""), pill, row.role === ZombieRoles.ORIGIN ? "-" : row.secs + "초", String(row.missions), String(row.infects)];
+      return '<tr class="' + (mine ? "asd-me" : "") + '">' + cells.map((cell) => "<td>" + cell + "</td>").join("") + "</tr>";
+    }).join("");
+    return '<table class="asd-table"><thead><tr>' + ["닉네임", "결과", "생존 시간", "미션", "감염"].map((head) => "<th>" + head + "</th>").join("") + "</tr></thead><tbody>" + body + "</tbody></table>";
   }
 }
 
