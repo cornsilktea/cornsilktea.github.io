@@ -306,13 +306,19 @@ const fpsReport = (extra) => Object.assign({ matchId: "m25", myIndex: 0, winnerT
 
 const zombie = new GameCase("31번", new K.ZombieProfile(), K.ZombieCodec, "zombieoutbreak");
 const zombieRows = () => [{ name: "숙주", role: 0, secs: 0, infects: 3, left: false, ai: false }, { name: "나", role: 2, secs: 180, infects: 0, left: false, ai: false },
-  { name: "감염", role: 1, secs: 61, infects: 1, left: false, ai: false }, { name: "봇", role: 1, secs: 20, infects: 0, left: false, ai: true }];
+  { name: "감염", role: 1, secs: 61, infects: 1, left: false, ai: false }, { name: "봇", role: 1, secs: 20, infects: 0, left: false, ai: true }, { name: "봇2", role: 1, secs: 10, infects: 0, left: false, ai: true }];
 const zombieReport = (extra) => Object.assign({ matchId: "m31", myIndex: 1, rows: zombieRows(), winner: 0, progress: 1, iLeft: false }, extra || {});
 {
   check("31번 판정: 인간 승리 때 끝까지 생존한 사람이 승", new K.ZombiePlan(zombieReport()).win && !new K.ZombiePlan(zombieReport({ myIndex: 2 })).win && new K.ZombiePlan(zombieReport({ winner: 1, myIndex: 2 })).win && new K.ZombiePlan(zombieReport({ winner: 1, myIndex: 0 })).win);
-  check("31번 판정: 봇이 있으면 최근 매치만, 절반 전 나가기는 기록 없음", (() => { const p = new K.ZombiePlan(zombieReport()); return p.recordsRecent && !p.countsStats; })() && !new K.ZombiePlan(zombieReport({ iLeft: true, progress: 0.2, winner: -1 })).recordsRecent);
+  check("31번 판정: 봇이 2명 이상이면 최근 매치만, 절반 전 나가기는 기록 없음", (() => { const p = new K.ZombiePlan(zombieReport()); return p.recordsRecent && !p.countsStats; })() && !new K.ZombiePlan(zombieReport({ iLeft: true, progress: 0.2, winner: -1 })).recordsRecent);
   const r = zombie.roundTrip(zombieReport(), true);
-  check("31번 값 배열: 왕복(역할·생존 초·감염 수)", r.back.rows.length === 4 && r.back.rows[0].role === 0 && r.back.rows[0].infects === 3 && r.back.rows[1].secs === 180 && r.back.winner === 0 && r.back.rows[3].ai && r.size < 500, r.size);
+  check("31번 값 배열: 왕복(역할·생존 초·감염 수)", r.back.rows.length === 5 && r.back.rows[0].role === 0 && r.back.rows[0].infects === 3 && r.back.rows[1].secs === 180 && r.back.winner === 0 && r.back.rows[3].ai && r.size < 500, r.size);
+  const oneBot = zombieReport({ rows: zombieRows().slice(0, 4), matchId: "m1bot" });
+  const oneBotPlan = new K.ZombiePlan(oneBot);
+  const oneBotNode = K.ZombieStatsMath.apply(null, oneBot, true, "kb", 1).node;
+  check("31번 판정: AI 1명(사람 3명+AI 1명 이상)이 섞인 판도 누적에 셈", oneBotPlan.countsMain && oneBotPlan.countsStats && oneBotNode.g === 1 && oneBotNode.w === 1, oneBotNode);
+  const twoBots = K.ZombieStatsMath.apply(null, zombieReport({ matchId: "m2bot" }), true, "kc", 1).node;
+  check("31번 판정: AI 2명 이상이면 누적에 안 셈", twoBots.g === 0);
   const clean = zombieReport({ rows: zombieRows().slice(0, 3) });
   const human = K.ZombieStatsMath.apply(null, clean, true, "k1", 1).node;
   check("31번 누적: 끝까지 생존한 인간 판", human.g === 1 && human.w === 1 && human.hg === 1 && human.hw === 1 && human.zg === 0 && human.sv === 1 && human.hs === 180 && human.ls === 180, human);
@@ -686,6 +692,14 @@ const repairChecks = (async () => {
   aged.uB = user("1102 나", full);
   const agedPlan = planner.plan(aged);
   check("정상화: 최근 20판이 모두 더 새로우면 이미 센 판으로 보고 넣지 않음", !agedPlan.fixes.some((fix) => fix.uid === "uB") && agedPlan.agedOutLines >= 1, agedPlan.agedOutLines);
+  const aiRows = rows.concat([{ name: "봇", role: 1, secs: 20, infects: 0, missions: 0, left: false, ai: true }]);
+  const aiSlot = Object.assign(JSON.parse(JSON.stringify(K.ZombieCodec.encode(Object.assign({}, holderReport, { matchId: "room9_6000", rows: aiRows }), "room9_6000", true))), { at });
+  const aiUsers = () => ({ uA: user("1101 가", { 0: aiSlot }), uB: user("1102 나", { 0: Object.assign({}, aiSlot, { me: 1, r: 0 }) }) });
+  const aiPlan = planner.plan(aiUsers());
+  const aiPatch = aiPlan.patch();
+  check("정상화(31번): 최근 매치에만 있던 AI 1명 판을 누적에 채움(최근 칸은 그대로)", aiPlan.fixes.length === 2 && aiPatch["users/uA/stats/zombieoutbreak/g"] === 1 && aiPatch["users/uA/stats/zombieoutbreak/w"] === 1 && aiPatch["users/uB/stats/zombieoutbreak/og"] === 1 && !Object.keys(aiPatch).some((k) => k.indexOf("/recent/") >= 0), aiPatch);
+  const aiAll = aiUsers(); apply(aiAll, aiPatch);
+  check("정상화(31번): AI 판 누적 채우기도 두 번 세지 않음", planner.plan(aiAll).fixes.length === 0);
   const turbo = new K.TurboLapRepairGame();
   const turboRows = [{ nick: "가", side: 0, fin: 1, prog: 3, car: "porscheblue", bot: false }, { nick: "나", side: 1, fin: 0, prog: 2, car: "porscheblue", bot: false }];
   const turboHeld = Object.assign(JSON.parse(JSON.stringify(K.TurboLapCodec.encode({ matchId: "t1", course: "seoul", myIndex: 0, rows: turboRows, result: "win" }, "t1", true))), { at });

@@ -89,6 +89,11 @@ abstract class AccountRepairGame<R, P extends AccountMatchPlanBase, N, E extends
   /* source 는 그 판을 가진 학생 중 한 명의 최근 매치. 승패를 정할 수 없으면 null */
   abstract reportFor(source: E, index: number): R | null;
 
+  /* 예전 규칙으로는 누적에 안 셌지만 지금 규칙으로는 세는 판(예: 31번 AI 1명 판)인가. 그런 판은 최근 매치에만 있고 누적에 빠져 있으므로 누적에만 채운다 */
+  backfillable(entry: E): boolean {
+    return false;
+  }
+
   /* 나가지 않은 사람의 기록을 먼저 믿는다(나간 사람의 결과표는 승패를 모를 수 있다) */
   isReliable(entry: E): boolean {
     const line = this.linesOf(entry)[this.ownIndex(entry)];
@@ -101,6 +106,10 @@ class ZombieRepairGame extends AccountRepairGame<ZombieReport, ZombiePlan, Zombi
 
   linesOf(entry: ZombieRecentEntry): AccountRepairLine[] { return entry.rows.map((row) => ({ name: row.name, ai: row.ai, left: row.left })); }
   ownIndex(entry: ZombieRecentEntry): number { return entry.myIndex; }
+
+  backfillable(entry: ZombieRecentEntry): boolean {
+    return entry.rows.some((row) => row.ai) && ZombieRoles.countsInTotals(entry.rows);
+  }
 
   reportFor(source: ZombieRecentEntry, index: number): ZombieReport | null {
     return { matchId: source.id, myIndex: index, rows: source.rows, winner: source.winner, progress: 1, iLeft: !!source.rows[index] && source.rows[index].left };
@@ -193,6 +202,26 @@ class AccountRepairFix<R, P extends AccountMatchPlanBase, N, E extends AccountRe
     const ids = (this.nodeRaw && typeof this.nodeRaw === "object" ? (this.nodeRaw as { ids?: unknown }).ids : null) as Record<string, unknown> | null;
     if (ids && ids[key] != null) return true;
     return Object.keys(this.slots).some((slot) => (this.slots[slot] as AccountRecentHead | null)?.id === key);
+  }
+
+  hasInTotals(key: string): boolean {
+    const ids = (this.nodeRaw && typeof this.nodeRaw === "object" ? (this.nodeRaw as { ids?: unknown }).ids : null) as Record<string, unknown> | null;
+    return !!ids && ids[key] != null;
+  }
+
+  /* 이미 최근 매치에 있는 판을 누적 통계에만 더한다(최근 20칸은 누적 열쇠 20개보다 새로우므로, 칸에 있는데 열쇠가 없으면 센 적이 없는 판이다) */
+  addTotalsOnly(key: string, at: number, report: R): boolean {
+    const profile = this.game.profile;
+    const plan = profile.planOf(report, null as never);
+    if (!plan.countsStats) return false;
+    const change = profile.applyStats(this.nodeRaw, report, plan, key, at);
+    if (!change) return false;
+    this.nodeRaw = change.node;
+    const root = "users/" + this.uid + "/";
+    Object.keys(change.patch).forEach((path) => { this.values[root + profile.statsPath + "/" + path] = change.patch[path]; });
+    Object.assign(this.values, profile.extraPatch({ uid: this.uid, name: this.name } as PortalUser, this.user.profile?.cls, change.node));
+    this.additions.push({ key, at, win: plan.win, countsStats: true, intoRecent: false, pendingSame: false });
+    return true;
   }
 
   /* 최근 20칸이 다 찼는데 이 판이 그보다 오래됐으면 예전에 이미 세고 밀려난 판일 수 있어 넣지 않는다(두 번 세지 않게) */
@@ -289,6 +318,13 @@ class AccountRepairPlanner<R, P extends AccountMatchPlanBase, N, E extends Accou
     plan.matchCount = matches.length;
     matches.forEach((match) => {
       const source = match.holders.filter((holder) => game.isReliable(holder.entry))[0] || match.holders[0];
+      match.holders.forEach((holder) => {
+        if (!game.backfillable(holder.entry)) return;
+        const own = game.reportFor(holder.entry, game.ownIndex(holder.entry));
+        if (!own) return;
+        const fix = fixes[holder.uid] = fixes[holder.uid] || new AccountRepairFix<R, P, N, E>(holder.uid, users[holder.uid], game);
+        if (!fix.hasInTotals(match.key)) fix.addTotalsOnly(match.key, holder.entry.at || match.at, own);
+      });
       const heldIndexes = match.holders.map((holder) => game.ownIndex(holder.entry));
       game.linesOf(source.entry).forEach((line, index) => {
         if (line.ai || heldIndexes.indexOf(index) >= 0) return;

@@ -671,10 +671,10 @@
 <script charset="utf-8" src="30.team-formation.js?v=20261102b"></script>
 <script charset="utf-8" src="24.turbo-lap-stats.js?v=20261029c"></script>
 <script charset="utf-8" src="25.fps-survival-stats.js?v=20261028c"></script>
-<script charset="utf-8" src="31.zombie-outbreak-stats.js?v=20261103c"></script>
+<script charset="utf-8" src="31.zombie-outbreak-stats.js?v=20261103d"></script>
 <script charset="utf-8" src="38.snow-account.js?v=20261028c"></script>
 <script charset="utf-8" src="39.balloon-account.js?v=20261028c"></script>
-<script charset="utf-8" src="account-stats-repair.js?v=20261103a"></script>
+<script charset="utf-8" src="account-stats-repair.js?v=20261103b"></script>
 <script>
 /* 밝기 전환 버튼: <html data-theme> 를 바꾸고 localStorage('portal_theme')에 남긴다(index.html 과 같은 키).
    주소창 색(theme-color)도 배경색에 맞춘다. */
@@ -1213,7 +1213,7 @@ class ClassRankPanel {
     new RankGame("fpsbattle", "서바이벌(25)", { label: "처치 합계" }, "팀 대전(방 만들기·코드 입장·랜덤 매칭) 중 AI 없는 판만 셉니다.",
       () => ({ profile: new FpsProfile(), view: new FpsStatsView() })),
     new TeamBattleRankGame("teambattle", "팀 배틀(30)", { label: "MVP 수", rate: "MVP율" }, "AI 없이 치른 대회모드 경기(랜덤 매칭 포함)만 셉니다."),
-    new RankGame("zombieoutbreak", "좀비(31)", { label: "감염시킨 수", yLabel: "완료한 미션" }, "온라인 방(랜덤 매칭 포함) 중 AI 없는 판만 셉니다. 승 = 내 편이 이긴 판.",
+    new RankGame("zombieoutbreak", "좀비(31)", { label: "감염시킨 수", yLabel: "완료한 미션" }, "온라인 방(랜덤 매칭 포함) 중 AI 가 1명 이하인 판만 셉니다(사람 4명 + AI 1명도 포함). 승 = 내 편이 이긴 판.",
       () => ({ profile: new ZombieProfile(), view: new ZombieStatsView() })),
     new RankGame("minigames", "미니게임(32)", { label: "3위 안" }, "랜덤 매칭에서 사람과 함께한 판만 셉니다. 승 = 우리 팀이 최종 1등.",
       () => ({ profile: new RandomMatchProfile("minigames"), view: new RandomMatchView("미니게임 랜덤 매칭 통계", true) })),

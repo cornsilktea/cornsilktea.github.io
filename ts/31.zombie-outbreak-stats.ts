@@ -7,8 +7,8 @@
      - 인간 승률 = 인간으로 시작한 판(감염되기 전 포함) 중 인간 편이 이긴 판 ÷ 그런 판.
        좀비 승률 = 좀비 편으로 끝난 판(숙주·감염 포함) 중 좀비가 이긴 판 ÷ 그런 판.  (감염된 판은 두 쪽에 모두 셈)
      - 인간 평균 생존 시간 = 인간으로 시작한 판의 생존 초 합계 ÷ 그런 판 수(감염되면 감염된 때까지, 끝까지면 라운드 길이).
-     - 완료 미션 수: 내가 끝낸 미션(한 판 최대 3). 감염 수와 같은 기준(누적은 AI 없는 판만).
-     - 감염 수: 내가 감염시킨 사람 수(room.players[].infectedBy). 누적 통계는 AI 가 없던 판만, 최근 매치는 AI 가 섞여도 기록.
+     - 완료 미션 수: 내가 끝낸 미션(한 판 최대 3). 감염 수와 같은 기준(누적은 AI 가 1명 이하인 판만).
+     - 감염 수: 내가 감염시킨 사람 수(room.players[].infectedBy). 누적 통계는 AI 가 1명 이하인 판만(2026-11-03 선생님 결정: 사람 4명+AI 1명 판도 승패를 센다), 최근 매치는 AI 가 몇 명 섞여도 기록.
      - 경기 절반 뒤에 나가면 패배, 절반 전에 나가면 기록 없음. 승패가 안 가려진 판은 없다(인간·좀비 중 한쪽이 항상 이김).
 
    저장:
@@ -61,6 +61,11 @@ class ZombieRoles {
   static readonly LABELS = ["숙주 좀비", "감염", "생존"];
   static readonly SECONDS_MAX = 180;
   static readonly MISSIONS_MAX = 3;
+  static readonly AI_COUNTED_MAX = 1;
+
+  static countsInTotals(rows: readonly { ai: boolean }[]): boolean {
+    return rows.filter((row) => row.ai).length <= ZombieRoles.AI_COUNTED_MAX;
+  }
   static readonly NUMBER_KEYS = ["g", "w", "l", "hg", "hw", "zg", "zw", "og", "sv", "ik", "ms", "mi", "hs", "ls"] as const;
 
   static fromResult(result: string): number {
@@ -84,7 +89,7 @@ class ZombiePlan implements AccountMatchPlanBase {
     const me = report.rows[report.myIndex];
     this.withAi = report.rows.some((row) => row.ai);
     this.recordsRecent = !!me && !AccountForfeit.leftEarly(report.iLeft, report.progress) && (report.winner === 0 || report.winner === 1 || report.iLeft);
-    this.countsMain = this.recordsRecent && !this.withAi;
+    this.countsMain = this.recordsRecent && ZombieRoles.countsInTotals(report.rows);
     this.countsRandom = this.recordsRecent && !!report.random;
     this.countsStats = this.countsMain || this.countsRandom;
     this.win = !!me && !report.iLeft && ZombieRoles.wonBy(me.role, report.winner);
@@ -177,7 +182,7 @@ class ZombieStatsMath {
     const infects = Math.min(9, AccountNumbers.count(me.infects));
     const missions = Math.min(ZombieRoles.MISSIONS_MAX, AccountNumbers.count(me.missions));
     const rm = report.random ? ZombieRandomTallyMath.add(before.rm, report, win) : before.rm;
-    const node: ZombieStatsNode = report.rows.some((row) => row.ai) ? Object.assign({}, before, { ids: Object.assign({}, before.ids), rm }) : {
+    const node: ZombieStatsNode = !ZombieRoles.countsInTotals(report.rows) ? Object.assign({}, before, { ids: Object.assign({}, before.ids), rm }) : {
       g: before.g + 1, w: before.w + (win ? 1 : 0), l: before.l + (win ? 0 : 1),
       hg: before.hg + (startedHuman ? 1 : 0), hw: before.hw + (startedHuman && report.winner === 0 ? 1 : 0),
       zg: before.zg + (endedZombie ? 1 : 0), zw: before.zw + (endedZombie && report.winner === 1 ? 1 : 0),
@@ -238,7 +243,7 @@ class ZombieStatsView implements AccountDialogView<ZombieStatsNode, ZombieRecent
         ["숙주 좀비", s.og + "번"],
         ["끝까지 생존", s.sv + "번 (" + AccountHtml.percent(s.sv, s.g) + ")"]
       ])
-      + '<div class="asd-sec">AI 없이 사람끼리 한 판만 세요. 감염되면 좀비 편으로 계산해요.</div>';
+      + '<div class="asd-sec">AI 가 1명 이하인 판만 세요(사람 4명 + AI 1명 판은 셉니다). 감염되면 좀비 편으로 계산해요.</div>';
   }
 
   blockBodyHtml(entry: ZombieRecentEntry): string {
