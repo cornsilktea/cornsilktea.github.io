@@ -511,7 +511,7 @@ class MkWinBandVersusMatcher extends MkVersusMatcher {
 // avoidMs: 바로 전 판에서 만난 사람(entry.avoid)끼리는 맨 앞 항목이 avoidMs 동안만 피해 묶는다(31번: 방금 한 학생을 다시 만나지 않게, 2026-11-03). 그 뒤에는 피하지 않는다.
 // holdFrom/holdMs: holdFrom 명이 모일 때까지 기다리고, 모였어도 정원이 안 차면 마지막 사람이 들어온 뒤 holdMs 까지 더 기다렸다가 시작한다(31번: 4명이 모이면 1분까지 5번째 사람을 기다림, 2026-11-03).
 class MkFreeForAllMatcher extends MkMatcher {
-  constructor(partyLimit: number, readonly capacity: number, timing: MkTiming = MkMatcher.TIMING, readonly maxEntries: number = Infinity, private readonly holdFrom: number = 0, private readonly holdMs: number = 0, private readonly avoidMs: number = 0) {
+  constructor(partyLimit: number, readonly capacity: number, timing: MkTiming = MkMatcher.TIMING, readonly maxEntries: number = Infinity, private readonly holdFrom: number = 0, private readonly holdMs: number = 0, private readonly avoidMs: number = 0, private readonly maxRepeat: number = 0) {
     super(partyLimit, timing);
   }
 
@@ -527,13 +527,17 @@ class MkFreeForAllMatcher extends MkMatcher {
     const picked: Array<[string, MkQueueEntry]> = [];
     let people = 0;
     const strict = this.avoidMs > 0 && context.now - (ready[0][1].at + this.timing.settleMs) < this.avoidMs;
-    ready.forEach((item) => {
-      if (strict && picked.some((other) => MkMatcher.metRecently(other, item))) return;
+    const tryAdd = (item: [string, MkQueueEntry]): void => {
+      if (picked.indexOf(item) >= 0) return;
+      if (strict && this.tooManyRepeats(picked, item)) return;
       if (picked.length < this.maxEntries && item[1].size <= this.partyLimit && people + item[1].size <= this.capacity) {
         picked.push(item);
         people += item[1].size;
       }
-    });
+    };
+    // 방금 상대와 겹치지 않는 사람을 먼저 채우고, 모자라면 겹침이 허용되는 사람으로 채운다(대기열이 막히지 않게).
+    if (strict) ready.forEach((item) => { if (picked.length === 0 || !picked.some((other) => MkMatcher.metRecently(other, item))) tryAdd(item); });
+    ready.forEach(tryAdd);
     if (picked.length < 2 || picked[0] !== ready[0]) return null;
     if (this.holdMs > 0) {
       const total = picked.reduce((sum, item) => sum + item[1].size, 0);
@@ -542,6 +546,12 @@ class MkFreeForAllMatcher extends MkMatcher {
       if (total < this.capacity && context.now - gatheredAt < this.holdMs) return null;
     }
     return picked;
+  }
+
+  // 새로 넣으면 바로 전 판 상대를 maxRepeat 명보다 많이 만나는 사람이 생기는지(31번: 같은 방에 최대 2명 = maxRepeat 1).
+  private tooManyRepeats(picked: Array<[string, MkQueueEntry]>, item: [string, MkQueueEntry]): boolean {
+    const group = picked.concat([item]);
+    return group.some((member) => group.filter((other) => other !== member && MkMatcher.metRecently(member, other)).length > this.maxRepeat);
   }
 
   protected sides(count: number): number[] {

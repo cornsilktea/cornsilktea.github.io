@@ -55,11 +55,10 @@ class Report {
     return [
       ["① 지금 방식(2명 이상이면 바로, 피하기 없음)", () => new K.MkFreeForAllMatcher(1, 5)],
       ["② 4명 모일 때까지 + 5번째 1분 대기(현재 적용)", () => new K.MkFreeForAllMatcher(1, 5, T, Infinity, 4, 60000)],
-      ["③ ② + 방금 상대 피하기 30초", () => new K.MkFreeForAllMatcher(1, 5, T, Infinity, 4, 60000, 30000)],
-      ["④ ② + 방금 상대 피하기 60초", () => new K.MkFreeForAllMatcher(1, 5, T, Infinity, 4, 60000, 60000)],
-      ["⑤ ② + 방금 상대 피하기 120초", () => new K.MkFreeForAllMatcher(1, 5, T, Infinity, 4, 60000, 120000)],
-      ["⑥ ② + 방금 상대 피하기 180초 한도", () => new K.MkFreeForAllMatcher(1, 5, T, Infinity, 4, 60000, 180000)],
-      ["⑦ ② + 끝까지 피하기(시간 제한 없음)", () => new K.MkFreeForAllMatcher(1, 5, T, Infinity, 4, 60000, 1e9)]
+      ["③ ② + 방금 상대 전부 피하기 180초", () => new K.MkFreeForAllMatcher(1, 5, T, Infinity, 4, 60000, 180000, 0)],
+      ["④ ② + 같은 방 최대 2명 허용 180초", () => new K.MkFreeForAllMatcher(1, 5, T, Infinity, 4, 60000, 180000, 1)],
+      ["⑤ ② + 같은 방 최대 2명 허용 90초", () => new K.MkFreeForAllMatcher(1, 5, T, Infinity, 4, 60000, 90000, 1)],
+      ["⑥ ② + 같은 방 최대 3명 허용 180초", () => new K.MkFreeForAllMatcher(1, 5, T, Infinity, 4, 60000, 180000, 2)]
     ];
   }
 
