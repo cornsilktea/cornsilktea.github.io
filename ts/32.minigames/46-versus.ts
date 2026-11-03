@@ -184,7 +184,6 @@ class CollectionVersusScreen {
     this.fadeTicket++;
     this.view.reset();
     this.page.setText(this.head, matched ? "⚔️ 상대를 찾았어요!" : "⚔️ 곧 대결이 시작돼요!");
-    this.page.setText(this.hint, "종목 " + CollectionRules.GAMES_PER_COLLECTION + "개를 무작위로 뽑아 겨뤄요 · 곧 첫 종목이 시작돼요.");
     this.root.classList.remove("out");
     this.page.show(this.root, true);
   }

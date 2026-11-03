@@ -42,7 +42,6 @@ class ZombieVersusLineup {
 
 class ZombieVersusView {
   static readonly ENTER_MS = 1200;
-  private static readonly VS_HTML = '<div class="zv-vs"><span class="zv-spark"></span><b>VS</b></div>';
   private shownKey = "";
 
   constructor(private readonly root: HTMLElement) {}
@@ -59,9 +58,7 @@ class ZombieVersusView {
     this.shownKey = key;
     this.root.classList.toggle("zv-enter", animate);
     const cells = seats.map((seat, index) => '<div class="zv-cell" style="--zv-delay:' + (index * 0.08) + 's">' + this.seatHtml(seat) + "</div>");
-    this.root.innerHTML = '<div class="zv-mode">' + seats.length + "명 · 좀비는 시작할 때 무작위</div>"
-      + '<div class="zv-arena' + (seats.length > 4 ? " wide" : "") + '">' + cells.join("") + "</div>"
-      + '<div class="zv-last">' + ZombieVersusView.VS_HTML + "<span>3분 동안 살아남을 수 있을까?</span></div>";
+    this.root.innerHTML = '<div class="zv-arena' + (seats.length > 4 ? " wide" : "") + '">' + cells.join("") + "</div>";
     if (animate) window.setTimeout(() => this.root.classList.remove("zv-enter"), ZombieVersusView.ENTER_MS);
   }
 

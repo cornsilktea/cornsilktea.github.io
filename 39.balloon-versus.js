@@ -68,8 +68,7 @@ class WbVersusView {
         if (animate)
             this.root.classList.add("wbv-enter");
         const team = lineup.mode === "team";
-        const sub = team ? "팀전 · 2명씩 " + lineup.units.length + "팀 · 마지막까지 남은 팀이 우승" : "개인전 · " + lineup.units.length + "명 · 최후의 1명이 우승";
-        this.root.innerHTML = '<div class="wbv-head">💧 ' + AccountHtml.esc(title) + '</div><div class="wbv-sub">' + sub + "</div>"
+        this.root.innerHTML = '<div class="wbv-head">💧 ' + AccountHtml.esc(title) + '</div>'
             + (team ? this.teamsHtml(lineup.units) : this.soloHtml(lineup.units));
         if (animate)
             window.setTimeout(() => this.root.classList.remove("wbv-enter"), WbVersusView.ENTER_MS);

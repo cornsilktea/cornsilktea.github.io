@@ -53,14 +53,11 @@ class SnVersusView {
     duosHtml(teams) {
         const columns = teams.map((team, index) => '<div class="snv-team" style="--snv-team:' + team.color + ";--snv-delay:" + (index * 0.12) + 's"><div class="snv-team-name">' + AccountHtml.esc(team.name) + "</div>"
             + team.seats.map((seat) => this.seatHtml(seat, team.color)).join("") + "</div>");
-        return '<div class="snv-mode">팀전 · ' + teams.length + "팀</div>"
-            + '<div class="snv-arena duos">' + columns.join(SnVersusView.VS_HTML) + "</div>";
+        return '<div class="snv-arena duos">' + columns.join(SnVersusView.VS_HTML) + "</div>";
     }
     soloHtml(teams) {
         const cells = teams.map((team, index) => '<div class="snv-cell" style="--snv-delay:' + (index * 0.08) + 's">' + this.seatHtml(team.seats[0] || { kind: "ai" }, team.color) + "</div>");
-        return '<div class="snv-mode">개인전 · ' + teams.length + "명</div>"
-            + '<div class="snv-arena solo' + (teams.length > 4 ? " wide" : "") + '">' + cells.join("") + "</div>"
-            + '<div class="snv-last">' + SnVersusView.VS_HTML + "<span>최후의 1명은 누구?</span></div>";
+        return '<div class="snv-arena solo' + (teams.length > 4 ? " wide" : "") + '">' + cells.join("") + "</div>";
     }
     seatHtml(seat, color) {
         const style = ' style="--snv-team:' + color + '"';
