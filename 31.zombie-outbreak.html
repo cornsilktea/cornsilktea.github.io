@@ -201,6 +201,47 @@
   #lobbyMatchNote, #resStreak:empty { display: none; }
   #scrLobby.matched #lobbyMatchNote { display: block; }
   #scrLobby.matched #btnStart, #scrLobby.matched #btnBots, #scrLobby.matched #btnSpecToggle, #scrResult.matched #btnAgain { display: none !important; }
+  .zv-curtain { position: fixed; inset: 0; z-index: 30; display: flex; align-items: center; justify-content: center; overflow-y: auto; padding: calc(env(safe-area-inset-top, 0px) + 54px) 3vw 3vh;
+    background: radial-gradient(ellipse at center, rgba(52, 14, 20, .94), rgba(12, 6, 10, .97)); color: #F4E8E8; font-family: var(--sg-font); transition: opacity .35s ease; }
+  .zv-curtain[hidden] { display: none; }
+  .zv-curtain.out { opacity: 0; }
+  .zv-in { width: min(1400px, 100%); margin: auto 0; }
+  .zv-head { text-align: center; font-size: clamp(22px, 3.4vw, 44px); font-weight: 900; text-shadow: 0 0 18px rgba(255, 70, 80, .65); }
+  .zv-hint { margin-top: 2.4vh; text-align: center; font-size: clamp(14px, 1.7vw, 20px); color: #D6B8BA; }
+  .zv-mode { margin: 1.4vh 0 2.4vh; text-align: center; font-size: clamp(15px, 1.9vw, 24px); font-weight: 800; color: #FF8A8F; }
+  .zv-arena { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.6vh 1.4vw; max-width: 1000px; margin: 0 auto; }
+  .zv-arena.wide { grid-template-columns: repeat(3, minmax(0, 1fr)); max-width: none; }
+  .zv-cell { min-width: 0; display: flex; animation: zvBob 2s var(--zv-delay, 0s) ease-in-out infinite; }
+  .zv-seat { flex: 1; display: flex; flex-direction: column; gap: .6vh; min-width: 0; padding: 1.6vh 1.2vw; border-radius: 10px; border: 3px solid #C8454D; background: rgba(40, 14, 18, .7); }
+  .zv-seat.me { box-shadow: inset 0 0 0 3px #D97B4F; }
+  .zv-seat b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: clamp(18px, 2.5vw, 34px); color: #fff; }
+  .zv-seat b small { font-size: .6em; color: #FFB08C; }
+  .zv-seat.waiting b { animation: zvBlink 1s ease-in-out infinite; }
+  .zv-seat.ai, .zv-seat.empty { border-color: #6B4A4E; }
+  .zv-seat.ai b, .zv-seat.ai .zv-line, .zv-seat.empty b { color: #BFA3A6; }
+  .zv-line { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: clamp(13px, 1.55vw, 21px); color: #EBD9DA; }
+  .zv-line em { font-style: normal; font-weight: 900; color: #FFB3B7; }
+  .zv-line small { font-weight: 700; color: #B89A9D; }
+  .zv-vs { position: relative; display: flex; align-items: center; justify-content: center; width: clamp(44px, 6vw, 96px); }
+  .zv-vs b { position: relative; font-size: clamp(28px, 4.4vw, 64px); font-style: italic; font-weight: 900; color: #fff; text-shadow: 0 0 14px #D97B4F, 0 3px 0 rgba(0, 0, 0, .5); animation: zvPulse 1s ease-in-out infinite; }
+  .zv-spark { position: absolute; left: 50%; top: 50%; width: 9vw; height: 9vw; margin: -4.5vw 0 0 -4.5vw; border-radius: 50%; background: radial-gradient(circle, rgba(255, 120, 126, .8), rgba(255, 70, 80, 0) 70%); animation: zvSpark 1s ease-out infinite; }
+  .zv-last { display: flex; align-items: center; justify-content: center; gap: 1vw; margin-top: 2vh; font-size: clamp(16px, 2vw, 26px); font-weight: 900; color: #FFB08C; }
+  #zvBody.zv-enter .zv-cell { animation: zvDrop .6s var(--zv-delay, 0s) cubic-bezier(.2, .9, .3, 1.25) both, zvBob 2s calc(var(--zv-delay, 0s) + .6s) ease-in-out infinite; }
+  #zvBody.zv-enter .zv-vs b { animation: zvSlam .45s .45s both, zvPulse 1s .9s ease-in-out infinite; }
+  @keyframes zvDrop { from { transform: translateY(-60px) scale(.9); opacity: 0; } to { transform: none; opacity: 1; } }
+  @keyframes zvSlam { from { transform: scale(3); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  @keyframes zvPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.14); } }
+  @keyframes zvSpark { from { transform: scale(.4); opacity: .9; } to { transform: scale(1.5); opacity: 0; } }
+  @keyframes zvBob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+  @keyframes zvBlink { 0%, 100% { opacity: .45; } 50% { opacity: .9; } }
+  @media (max-width: 760px) {
+    .zv-arena, .zv-arena.wide { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    .zv-seat { padding: 8px; gap: 2px; }
+    .zv-seat b { font-size: 17px; }
+    .zv-line { font-size: 12px; white-space: normal; }
+    .zv-spark { width: 60px; height: 60px; margin: -30px 0 0 -30px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .zv-curtain *, #zvBody.zv-enter * { animation: none !important; } }
 </style>
 </head>
 <body>
@@ -351,9 +392,17 @@
 
 <script charset="utf-8" src="character-kit.js?v=20261011"></script>
 <script charset="utf-8" src="character-maker.js?v=20261026a"></script>
+<div id="versusCurtain" class="zv-curtain" hidden>
+  <div class="zv-in">
+    <div class="zv-head">🧟 곧 시작해요!</div>
+    <div id="zvBody"></div>
+    <div class="zv-hint">곧 게임이 시작돼요. 잠시만 기다려 주세요.</div>
+  </div>
+</div>
 <script charset="utf-8" src="match-kit.js?v=20261103a"></script>
-<script charset="utf-8" src="account-match-kit.js?v=20261103a"></script>
-<script charset="utf-8" src="31.zombie-outbreak-stats.js?v=20261027b"></script>
+<script charset="utf-8" src="account-match-kit.js?v=20261103b"></script>
+<script charset="utf-8" src="31.zombie-outbreak-stats.js?v=20261103a"></script>
+<script charset="utf-8" src="31.zombie-versus.js?v=20261103a"></script>
 <script>new CharacterMakerDialog(undefined, false);</script>
 <div id="loading">3D 학교를 준비하는 중입니다…</div>
 
@@ -614,7 +663,7 @@ const NIGHT_COLOR = 0x04060c;
 scene.background = new THREE.Color(NIGHT_COLOR);
 scene.fog = new THREE.Fog(NIGHT_COLOR, 3, 17);
 const GAME_VIEW = { near: 2.5, far: 17, cameraFar: 40 };
-const camera = new THREE.PerspectiveCamera(BASE_FOV, 1, 0.08, GAME_VIEW.cameraFar);
+const camera = new THREE.PerspectiveCamera(BASE_FOV, 1, 0.2, GAME_VIEW.cameraFar);
 function setViewDistance(near, far, cameraFar) {
   scene.fog.near = near; scene.fog.far = far;
   if (camera.far !== cameraFar) { camera.far = cameraFar; camera.updateProjectionMatrix(); }
@@ -958,10 +1007,52 @@ function splitsAlong(len, cell, yA, yB) {
   }
   return ts;
 }
+class CoplanarFaceCuller {
+  static EPS = 0.001;
+  static CELL = 8;
+
+  static cull(allFaces) {
+    const placed = allFaces.map(face => CoplanarFaceCuller.placement(face));
+    const order = placed.map((_, i) => i).filter(i => placed[i]).sort((a, b) => placed[b].area - placed[a].area || a - b);
+    const kept = new Map(), hidden = new Set();
+    for (const i of order) {
+      const here = placed[i], cells = CoplanarFaceCuller.cellsOf(here);
+      const covered = !allFaces[i].uv && cells.some(cell => (kept.get(here.plane + "|" + cell) || []).some(other => CoplanarFaceCuller.contains(other, here)));
+      if (covered) { hidden.add(i); continue; }
+      for (const cell of cells) {
+        const key = here.plane + "|" + cell;
+        if (!kept.has(key)) kept.set(key, []);
+        kept.get(key).push(here);
+      }
+    }
+    return allFaces.filter((_, i) => !hidden.has(i));
+  }
+
+  static placement(face) {
+    const n = faceNormal(face.p), axis = [0, 1, 2].find(k => Math.abs(n[k]) > 0.9999);
+    if (axis === undefined) return null;
+    const u = (axis + 1) % 3, w = (axis + 2) % 3, eps = CoplanarFaceCuller.EPS;
+    const us = face.p.map(p => p[u]), ws = face.p.map(p => p[w]);
+    const rect = { u0: Math.min(...us), u1: Math.max(...us), w0: Math.min(...ws), w1: Math.max(...ws) };
+    return { plane: axis + (n[axis] > 0 ? "+" : "-") + Math.round(face.p[0][axis] / eps), ...rect, area: (rect.u1 - rect.u0) * (rect.w1 - rect.w0) };
+  }
+
+  static cellsOf(rect) {
+    const size = CoplanarFaceCuller.CELL, cells = [];
+    for (let i = Math.floor(rect.u0 / size); i <= Math.floor(rect.u1 / size); i++) for (let j = Math.floor(rect.w0 / size); j <= Math.floor(rect.w1 / size); j++) cells.push(i + "," + j);
+    return cells;
+  }
+
+  static contains(outer, inner) {
+    const eps = CoplanarFaceCuller.EPS;
+    return outer.u0 <= inner.u0 + eps && outer.u1 >= inner.u1 - eps && outer.w0 <= inner.w0 + eps && outer.w1 >= inner.w1 - eps;
+  }
+}
+
 function buildWorldMeshes() {
   const buckets = new Map(), lightA = [0, 0, 0];
   const lerp3 = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
-  for (const f of faces) {
+  for (const f of CoplanarFaceCuller.cull(faces)) {
     const [a, b, c, d] = f.p;
     const cx = (a[0] + b[0] + c[0] + d[0]) / 4, cy = (a[1] + b[1] + c[1] + d[1]) / 4, cz = (a[2] + b[2] + c[2] + d[2]) / 4;
     const key = f.m + "|" + chunkOf(cx, cy, cz);
@@ -1220,10 +1311,10 @@ function buildStairwell(laneA, laneB) {
   for (let i = 0; i < STAIR_STEPS; i++) {
     const za = STAIR_Z0 + i * run, top1 = (i + 1) * rise;
     box(laneA[0] + 0.02, laneA[1] - 0.02, 0, top1, za, za + run, C.stair, "plaster", false);
-    box(laneA[0] + 0.25, laneA[1] - 0.25, top1, top1 + 0.012, za + run - 0.09, za + run - 0.01, C.nosing, "plain", false);
+    box(laneA[0] + 0.25, laneA[1] - 0.25, top1, top1 + 0.03, za + run - 0.09, za + run - 0.01, C.nosing, "plain", false);
     const zb = STAIR_Z1 - (i + 1) * run, top2 = half + (i + 1) * rise;
     box(laneB[0] + 0.02, laneB[1] - 0.02, half - 0.35, top2, zb, zb + run, C.stair, "plaster", false);
-    box(laneB[0] + 0.25, laneB[1] - 0.25, top2, top2 + 0.012, zb + 0.01, zb + 0.09, C.nosing, "plain", false);
+    box(laneB[0] + 0.25, laneB[1] - 0.25, top2, top2 + 0.03, zb + 0.01, zb + 0.09, C.nosing, "plain", false);
   }
   box(laneB[0], laneB[1], 0, half - 0.35, STAIR_Z0, STAIR_Z1, C.wall, "plaster", false);
   addCollider(laneB[0], laneB[1], 0, half - 0.05, STAIR_Z0, STAIR_Z1);
@@ -1368,7 +1459,7 @@ function ceilingFixture(cx, cy, cz, alongX, broken) {
 function roomCeilingLights(x0, x1, zIn, zOut, y) {
   for (const fx of [0.3, 0.7]) for (const fz of [0.22, 0.5, 0.78]) ceilingFixture(x0 + (x1 - x0) * fx, y + FLOOR_H - 0.2, zIn + (zOut - zIn) * fz, false, chance(0.12));
 }
-function roomFloor(x0, x1, zIn, zOut, y, hex, m) { box(x0 + 0.2, x1 - 0.2, y, y + 0.012, zIn, zOut, hex, m, false); }
+function roomFloor(x0, x1, zIn, zOut, y, hex, m) { box(x0 + 0.2, x1 - 0.2, y, y + 0.03, zIn, zOut, hex, m, false); }
 function trashBin(cx, y, cz, tipped) {
   if (tipped) { obox(cx, y + 0.19, cz, 0.36, 0.36, 0.5, Math.PI / 2, randIn(0, 6.28), 0, 0x3f6c8a, "plain", false); scatterPapers(cx - 0.7, cx + 0.7, cz - 0.7, cz + 0.7, y, 4); }
   else cyl(cx, y, cz, 0.18, 0.2, 0.5, 8, 0x3f6c8a, "plain", true);
@@ -1624,8 +1715,8 @@ function shoeLocker(xa, xb, z) {
 }
 function furnishLobby() {
   const y = 0;
-  box(-17.9, 17.9, y, y + 0.012, -17.8, -3, 0xc4c2b6, "tile", false);
-  box(-4.2, 4.2, y + 0.012, y + 0.02, -17.8, -15.4, 0x2a2e30, "plain", false);
+  box(-17.9, 17.9, y, y + 0.03, -17.8, -3, 0xc4c2b6, "tile", false);
+  box(-4.2, 4.2, y + 0.03, y + 0.05, -17.8, -15.4, 0x2a2e30, "plain", false);
   for (const s of [-1, 1]) {
     for (const rowZ of [-15, -11.5]) {
       if (s > 0 && rowZ === -11.5) {
@@ -1713,11 +1804,11 @@ function buildGym() {
   for (let zb = z0; zb < z1 - 0.01; zb += 6) facadeBay("z", 1, zb, zb + 6, 0, { halfExtent: x1, height: H, sill: 4.6, head: 6.9, pier: 0.5, noBand: true });
   wallWithGaps("z", x0 + 0.1, z0, z1, 0, H, [[-2.5, 2.5, 3]], 0.2);
   box(x1 + 0.15, x1 + 0.35, H + 0.25, H + 1.0, z0 - 0.35, z1 + 0.35, C.band, "plaster", false);
-  for (let lx = 57; lx <= 81; lx += 12) box(lx - 0.04, lx + 0.04, 0, 0.006, -13, 13, C.gymLine, "plain", false);
-  box(57, 75, 0, 0.006, -13.04, -12.96, C.gymLine, "plain", false);
-  box(57, 75, 0, 0.006, 12.96, 13.04, C.gymLine, "plain", false);
-  box(68.96, 69.04, 0, 0.006, -13, 13, C.gymLine, "plain", false);
-  for (let i = 0; i < 24; i++) { const a = i / 24 * Math.PI * 2; obox(69 + Math.cos(a) * 3, 0.004, Math.sin(a) * 3, 0.06, 0.004, 0.8, 0, -a, 0, C.gymLine, "plain", false); }
+  for (let lx = 57; lx <= 81; lx += 12) box(lx - 0.04, lx + 0.04, 0, 0.03, -13, 13, C.gymLine, "plain", false);
+  box(57, 75, 0, 0.03, -13.04, -12.96, C.gymLine, "plain", false);
+  box(57, 75, 0, 0.03, 12.96, 13.04, C.gymLine, "plain", false);
+  box(68.96, 69.04, 0, 0.03, -13, 13, C.gymLine, "plain", false);
+  for (let i = 0; i < 24; i++) { const a = i / 24 * Math.PI * 2; obox(69 + Math.cos(a) * 3, 0.02, Math.sin(a) * 3, 0.06, 0.02, 0.8, 0, -a, 0, C.gymLine, "plain", false); }
   const stageH = 1.2, stageX0 = 78, stageX1 = 84, stageZ = 11;
   box(stageX0, stageX1, 0, stageH, -stageZ, stageZ, C.podium, "wood");
   box(stageX0 - 0.04, stageX0, 0, stageH - 0.08, -stageZ, stageZ, 0x5a3f28, "wood", false);
@@ -1832,7 +1923,7 @@ function buildInterior() {
 const CAMPUS = { x0: -95, x1: 100, z0: -106, z1: 36 };
 const TRACK = { zc: -66, half: 26, radii: [24, 25.2, 26.4] };
 function groundStrip(x0, z0, x1, z1, width, hex, lift) {
-  const dx = x1 - x0, dz = z1 - z0, len = Math.hypot(dx, dz) || 1, nx = -dz / len * width / 2, nz = dx / len * width / 2, y = GROUND_Y + (lift || 0.03);
+  const dx = x1 - x0, dz = z1 - z0, len = Math.hypot(dx, dz) || 1, nx = -dz / len * width / 2, nz = dx / len * width / 2, y = GROUND_Y + (lift || 0.08);
   quad("plain", [x0 - nx, y, z0 - nz], [x1 - nx, y, z1 - nz], [x1 + nx, y, z1 + nz], [x0 + nx, y, z0 + nz], hex, { sub: false });
   quad("plain", [x0 + nx, y, z0 + nz], [x1 + nx, y, z1 + nz], [x1 - nx, y, z1 - nz], [x0 - nx, y, z0 - nz], hex, { sub: false });
 }
@@ -1861,7 +1952,7 @@ function streetLight(x, z, yaw) {
   quad("sign", [hx - 0.2, GROUND_Y + 5.74, hz - 0.1], [hx + 0.2, GROUND_Y + 5.74, hz - 0.1], [hx + 0.2, GROUND_Y + 5.74, hz + 0.1], [hx - 0.2, GROUND_Y + 5.74, hz + 0.1], 0xffe2a8,
     { uv: [[WHITE_CELL.u0, WHITE_CELL.v0], [WHITE_CELL.u1, WHITE_CELL.v0], [WHITE_CELL.u1, WHITE_CELL.v1], [WHITE_CELL.u0, WHITE_CELL.v1]], bake: false, sub: false });
   addEmitter(hx, GROUND_Y + 5, hz, 0xffc890, 2.4, 14);
-  glowDecal(hx, GROUND_Y + 0.04, hz, 12, 12, 0, 0xffb870, 0.22);
+  glowDecal(hx, GROUND_Y + 0.12, hz, 12, 12, 0, 0xffb870, 0.22);
   return { x: hx, y: GROUND_Y + 5.74, z: hz };
 }
 const fenceTexture = canvasTexture(128, (ctx, w, h) => {
@@ -1964,11 +2055,11 @@ function updateClock() {
 }
 function buildExterior() {
   box(-400, 400, GROUND_Y - 0.1, GROUND_Y, -400, 400, C.grass, "ground", false, { sub: false });
-  box(-60, 60, GROUND_Y, GROUND_Y + 0.012, -28, -18.2, 0x55595c, "ground", false);
-  box(-66, 66, GROUND_Y, GROUND_Y + 0.01, -104, -30, C.dirt, "ground", false);
-  box(-90, -68, GROUND_Y, GROUND_Y + 0.012, -54, -30, C.asphalt, "ground", false);
-  box(-60, 60, GROUND_Y, GROUND_Y + 0.008, 18.2, 30, 0x4a4e50, "ground", false);
-  box(84.2, 99, GROUND_Y, GROUND_Y + 0.01, -104, 30, C.asphalt, "ground", false);
+  box(-60, 60, GROUND_Y, GROUND_Y + 0.04, -28, -18.2, 0x55595c, "ground", false);
+  box(-66, 66, GROUND_Y, GROUND_Y + 0.04, -104, -30, C.dirt, "ground", false);
+  box(-90, -68, GROUND_Y, GROUND_Y + 0.04, -54, -30, C.asphalt, "ground", false);
+  box(-60, 60, GROUND_Y, GROUND_Y + 0.04, 18.2, 30, 0x4a4e50, "ground", false);
+  box(84.2, 99, GROUND_Y, GROUND_Y + 0.04, -104, 30, C.asphalt, "ground", false);
   for (const r of TRACK.radii) polyline(trackLoop(r), 0.1, C.white);
   groundStrip(0, TRACK.zc - 23, 0, TRACK.zc + 23, 0.1, C.white);
   const circle = []; for (let i = 0; i <= 28; i++) { const a = i / 28 * Math.PI * 2; circle.push([Math.cos(a) * 6, TRACK.zc + Math.sin(a) * 6]); }
@@ -1984,7 +2075,7 @@ function buildExterior() {
   }
   for (let s = 0; s < 4; s++) box(6, 50, GROUND_Y, GROUND_Y + 0.45 * (s + 1), -29.6 + (3 - s) * 0.9 - 0.9, -29.6 + (3 - s) * 0.9, C.concrete, "ground", false);
   box(-34, -24, GROUND_Y, GROUND_Y + 1.2, -32, -27.5, C.concrete, "ground", true);
-  for (let s = 0; s < 3; s++) box(-31.5, -26.5, GROUND_Y, GROUND_Y + 0.4 * (s + 1), -33.2 + s * 0.4, -32.8 + s * 0.4 + 0.4, C.concrete, "ground", false);
+  for (let s = 0; s < 3; s++) box(-31.5, -26.5, GROUND_Y, GROUND_Y + 0.4 * (s + 1), -33.2 + s * 0.4, -32.8 + s * 0.4, C.concrete, "ground", false);
   box(-34, -24, GROUND_Y + 1.2, GROUND_Y + 2.2, -27.7, -27.5, C.concrete, "ground", false);
   const podiumName = atlasCell("podium", drawPlate("구 령 대", "#E8E4D8", "#2B4A38"));
   panel(podiumName, -29, GROUND_Y + 0.8, -32.02, 3, 0.55, Math.PI, 0xffffff);
@@ -2014,8 +2105,8 @@ function buildExterior() {
   for (let k = 0; k < 14; k++) box(60 + k * 0.45 - 0.03, 60 + k * 0.45 + 0.03, GROUND_Y + 0.1, GROUND_Y + 1.8, CAMPUS.z0 - 0.9, CAMPUS.z0 - 0.84, 0x6a7078, "metal", false);
   box(60, 66.3, GROUND_Y + 1.75, GROUND_Y + 1.85, CAMPUS.z0 - 0.92, CAMPUS.z0 - 0.82, 0x6a7078, "metal", false);
   box(60, 66.3, GROUND_Y + 0.1, GROUND_Y + 0.2, CAMPUS.z0 - 0.92, CAMPUS.z0 - 0.82, 0x6a7078, "metal", false);
-  box(-400, 400, GROUND_Y, GROUND_Y + 0.015, -122, -110, C.asphalt, "ground", false);
-  for (let x = -120; x < 200; x += 8) groundStrip(x, -116, x + 4, -116, 0.15, 0xd8c890, 0.02);
+  box(-400, 400, GROUND_Y, GROUND_Y + 0.04, -122, -110, C.asphalt, "ground", false);
+  for (let x = -120; x < 200; x += 8) groundStrip(x, -116, x + 4, -116, 0.15, 0xd8c890, 0.08);
   const lights = [streetLight(-52, -24, Math.PI), streetLight(52, -24, Math.PI), streetLight(-72, -60, Math.PI / 2), streetLight(75, -60, -Math.PI / 2), streetLight(58, -103, Math.PI), streetLight(-40, 28, 0)];
   flickerSpots.push({ kind: "street", pos: lights[3], hex: 0xffe2a8 });
   for (let x = CAMPUS.x0 + 4; x < CAMPUS.x1 - 4; x += 7.5) {
@@ -2071,7 +2162,7 @@ function buildFlickerLights() {
     if (spot.kind === "tube") { mesh = new THREE.Mesh(tubeGeo, mat); mesh.position.set(spot.pos.x, spot.pos.y, spot.pos.z); scene.add(mesh); }
     const glowMat = new THREE.MeshBasicMaterial({ map: glowTexture, color: spot.hex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.5 });
     const glow = new THREE.Mesh(new THREE.PlaneGeometry(spot.kind === "tube" ? 6 : 12, spot.kind === "tube" ? 5 : 12), glowMat);
-    glow.rotation.x = -Math.PI / 2; glow.position.set(spot.pos.x, spot.floorY !== undefined ? spot.floorY + 0.035 : GROUND_Y + 0.05, spot.pos.z); glow.renderOrder = 3;
+    glow.rotation.x = -Math.PI / 2; glow.position.set(spot.pos.x, spot.floorY !== undefined ? spot.floorY + 0.035 : GROUND_Y + 0.12, spot.pos.z); glow.renderOrder = 3;
     scene.add(glow);
     flickerMeshes.push({ mat, glowMat, glow, pos: spot.pos, lit: true, phase: Math.random() * 100, speed: randIn(0.7, 1.4), base: spot.kind === "tube" ? 0.28 : 0.35 });
   }
@@ -2509,7 +2600,7 @@ function countSlots(ps) {
   const spectators = ids.filter(id => ps[id].spec).length;
   return { players: ids.length - spectators, spectators };
 }
-function newPlayer(t, spec) { return { nickname: PlayerProfile.storedNick(), joinedAt: t, role: "human", infected: false, inRound: false, spec: !!spec }; }
+function newPlayer(t, spec) { return Object.assign({ nickname: PlayerProfile.storedNick(), joinedAt: t, role: "human", infected: false, inRound: false, spec: !!spec }, zombieHistory.seatFields()); }
 function startMsg(t) { setText($("startMsg"), t || ""); }
 
 function roomCodes() {
@@ -2593,6 +2684,7 @@ function enterRoom(code) {
   sub(ref.child("startAt"), "value", s => { room.startAt = s.val() || 0; });
   sub(ref.child("fillBots"), "value", s => { room.fillBots = s.val() !== false; playersChanged(); });
   sub(ref.child("originZombieId"), "value", s => { room.originZombieId = s.val(); });
+  zombieVersus.watch(ref);
   sub(ref.child("final"), "value", s => { room.final = s.val(); if (screenNow === "result") renderResult(); });
   sub(ref.child("winner"), "value", s => { room.winner = s.val(); if (screenNow === "result") renderResult(); });
   sub(ref.child("quitSide"), "value", s => { room.quitSide = s.val(); if (screenNow === "result") renderResult(); });
@@ -2642,6 +2734,84 @@ window.addEventListener("pagehide", () => {
   if (room.ref) { try { room.ref.child("players/" + myId).remove(); room.ref.child("st/" + myId).remove(); } catch (e) {} }
 });
 
+class ZombieVersusCurtain {
+  static SHOW_MS = 4500;
+  static ROOM_SLACK_MS = 3000;
+  static MIN_MS = 2000;
+  static FADE_MS = 350;
+  constructor(root) {
+    this.root = root; this.view = new ZombieVersusView($("zvBody"));
+    this.shownAt = 0; this.hideTimer = 0; this.roomTimer = 0; this.startTimer = 0; this.hostTimer = 0; this.vsAt = 0;
+  }
+  watch(ref) { this.vsAt = 0; sub(ref.child("vsAt"), "value", s => { this.vsAt = s.val() || 0; this.follow(); }); }
+  matched() { return !!zombieRandom.ticket(); }
+  roomLeftMs() { return this.matched() || !this.vsAt ? 0 : this.vsAt + ZombieVersusCurtain.SHOW_MS + ZombieVersusCurtain.ROOM_SLACK_MS - serverNow(); }
+  follow() {
+    clearTimeout(this.hideTimer); clearTimeout(this.roomTimer);
+    const lobby = screenNow === "lobby" && !!room.ref && room.status === "lobby";
+    const roomLeft = lobby ? this.roomLeftMs() : 0;
+    if (lobby && (this.matched() || roomLeft > 0)) {
+      if (roomLeft > 0) this.roomTimer = setTimeout(() => this.follow(), roomLeft);
+      this.show();
+      return;
+    }
+    if (this.root.hidden) return;
+    if (screenNow !== "game") { this.hide(); return; }
+    const left = this.shownAt + ZombieVersusCurtain.MIN_MS - performance.now();
+    if (left > 0) this.hideTimer = setTimeout(() => this.hide(), left); else this.hide();
+  }
+  refresh() {
+    if (this.root.hidden) return;
+    const ticket = zombieRandom.ticket();
+    const humans = playerIds().filter(isParticipant).map(id => ({ nick: room.players[id].nickname || "이름 없음", me: id === myId, card: ZombieVersusCards.fromRoom(room.players[id].vs) }));
+    this.view.render(ZombieVersusLineup.build(humans, MAX_PLAYERS, !!ticket, ticket ? ticket.expect : 0));
+  }
+  hostStart(start) {
+    if (this.matched() || participantCount() < 2) { start(); return; }
+    if (this.roomLeftMs() > 0) return;
+    const ref = room.ref;
+    ref.child("vsAt").set(serverNow());
+    clearTimeout(this.hostTimer);
+    this.hostTimer = setTimeout(() => { if (room.ref === ref && isHost() && room.status === "lobby") start(); }, ZombieVersusCurtain.SHOW_MS);
+  }
+  startAfterShow(start) {
+    const wait = this.root.hidden ? ZombieVersusCurtain.SHOW_MS : this.shownAt + ZombieVersusCurtain.SHOW_MS - performance.now();
+    clearTimeout(this.startTimer);
+    if (wait <= 0) { start(); return; }
+    this.startTimer = setTimeout(() => { if (room.ref && room.status === "lobby") start(); }, wait);
+  }
+  show() {
+    if (this.root.hidden || this.root.classList.contains("out")) {
+      this.shownAt = performance.now(); this.view.reset();
+      setText(this.root.querySelector(".zv-head"), this.matched() ? "🧟 같이 할 사람들을 찾았어요!" : "🧟 곧 시작해요!");
+    }
+    this.root.classList.remove("out"); this.root.hidden = false;
+    this.refresh();
+  }
+  hide() {
+    this.root.classList.add("out");
+    this.hideTimer = setTimeout(() => { this.root.hidden = true; this.root.classList.remove("out"); }, ZombieVersusCurtain.FADE_MS);
+  }
+}
+const zombieVersus = new ZombieVersusCurtain($("versusCurtain"));
+
+class ZombieMyHistory {
+  static RELOAD_MS = 6000;
+  constructor() { this.gap = ZombieOriginRotation.UNKNOWN_GAP; this.card = null; this.loading = false; }
+  load() {
+    if (this.loading) return;
+    this.loading = true;
+    const account = zombieReporter.account;
+    Promise.all([account.loadStats().catch(() => null), account.loadHostGap()])
+      .then(([node, gap]) => { this.card = ZombieVersusCards.fromStats(node); this.gap = gap; this.publish(); })
+      .catch(() => {}).then(() => { this.loading = false; });
+  }
+  reloadSoon() { setTimeout(() => this.load(), ZombieMyHistory.RELOAD_MS); }
+  seatFields() { return this.card ? { hostGap: this.gap, vs: ZombieVersusCards.toRoom(this.card) } : { hostGap: this.gap }; }
+  publish() { if (room.ref && room.players[myId]) room.ref.child("players/" + myId).update(this.seatFields()); }
+}
+const zombieHistory = new ZombieMyHistory();
+
 let screenNow = "start";
 function showScreen(name) {
   screenNow = name;
@@ -2654,6 +2824,7 @@ function showScreen(name) {
   if (name !== "game") { $("vignette").className = ""; $("speedLines").style.opacity = "0"; }
   if (name === "lobby") renderLobby();
   if (name === "result") renderResult();
+  zombieVersus.follow();
 }
 
 function onStatus(st) {
@@ -2680,6 +2851,7 @@ function playersChanged() {
     lobbyQueued = false;
     if (room.status === "playing" && screenNow === "lobby" && watchesRound()) { showScreen("game"); return; }
     if (screenNow === "lobby") renderLobby();
+    zombieVersus.refresh();
     zombieRandom.roomChanged();
   }, 0);
 }
@@ -2732,13 +2904,19 @@ function toggleSpectator() {
 }
 function hostStart() {
   if (!isHost() || room.status !== "lobby") return;
+  if (participantCount() < playersNeeded()) return;
+  zombieVersus.hostStart(beginRound);
+}
+function beginRound() {
+  if (!isHost() || room.status !== "lobby") return;
   const participants = playerIds().filter(isParticipant);
   if (participants.length < playersNeeded()) return;
   const u = {};
   playerIds().filter(isBot).forEach(id => { u["players/" + id] = null; u["st/" + id] = null; });
   const t0 = serverNow(), botIds = [];
   if (botsWanted()) for (let k = participants.length; k < MAX_PLAYERS; k++) botIds.push("bot" + (botIds.length + 1) + Math.random().toString(36).slice(2, 8));
-  const zombieId = participants[Math.floor(Math.random() * participants.length)];
+  const zombieId = ZombieOriginRotation.pick(participants.map(id => ({ id, gap: ZombieOriginRotation.gapFromRoom(room.players[id].hostGap) })), Math.random);
+  participants.forEach(id => { u["players/" + id + "/hostGap"] = ZombieOriginRotation.nextGap(ZombieOriginRotation.gapFromRoom(room.players[id].hostGap), id === zombieId); });
   const startAt = t0 + COUNTDOWN_MS;
   Object.assign(u, { status: "playing", startAt, endedAt: null, winner: null, quitSide: null, final: null, originZombieId: zombieId, zombieIds: { [zombieId]: startAt } });
   botIds.forEach((id, k) => {
@@ -3963,7 +4141,7 @@ class ZombieRandomMatch {
     if (this.inParty()) { this.flow.backToParty(msg); return; }
     showScreen("start"); startMsg(msg);
   }
-  startMatch() { hostStart(); }
+  startMatch() { zombieVersus.startAfterShow(beginRound); }
   showParty() { showScreen("party"); refreshNick(); }
   showStart(message) { showScreen("start"); startMsg(message); }
   presentIds() { return room.ref ? humanIdsOf(room.players) : []; }
@@ -3995,21 +4173,22 @@ class ZombieMatchReporter {
   finishedReport() {
     const final = room.final, ids = okeys(final).sort((a, b) => (final[b].s - final[a].s) || (final[a].j - final[b].j));
     return { matchId: this.matchId(), myIndex: ids.indexOf(myId), rows: ids.map(id => this.rowOf(id, final[id].n, final[id].r, final[id].s)),
-      winner: room.winner === "human" ? 0 : room.winner === "zombie" ? 1 : -1, progress: 1, iLeft: false };
+      winner: room.winner === "human" ? 0 : room.winner === "zombie" ? 1 : -1, progress: 1, iLeft: false, random: !!zombieRandom.ticket() };
   }
   roundReport() {
     const t = serverNow(), ids = roundIds();
     const state = id => { const p = room.players[id]; return id === room.originZombieId ? "origin" : (p.infected || p.role === "zombie") ? "infected" : "survived"; };
     const secsOf = id => { const p = room.players[id], at = state(id) === "infected" ? (p.infectedAt || t) : t; return clamp(Math.floor((at - room.startAt) / 1000), 0, ROUND_MS / 1000); };
     return { matchId: this.matchId(), myIndex: ids.indexOf(myId), rows: ids.map(id => this.rowOf(id, room.players[id].nickname || "이름 없음", state(id), state(id) === "origin" ? 0 : secsOf(id))),
-      winner: -1, progress: AccountForfeit.progressOnLeave(!!zombieRandom.ticket(), zombieRandom.progress()), iLeft: true };
+      winner: -1, progress: AccountForfeit.progressOnLeave(!!zombieRandom.ticket(), zombieRandom.progress()), iLeft: true, random: !!zombieRandom.ticket() };
   }
-  ended() { if (room.ref && room.final && room.final[myId] && room.winner) this.account.record(this.finishedReport()); }
+  ended() { if (room.ref && room.final && room.final[myId] && room.winner) { this.account.record(this.finishedReport()); zombieHistory.reloadSoon(); } }
   forfeitApplies() { return !!room.ref && room.status === "playing" && roundIds().indexOf(myId) >= 0 && (!!zombieRandom.ticket() || zombieRandom.progress() >= AccountForfeit.AT); }
   leaving() { if (this.forfeitApplies()) this.account.record(this.roundReport()); }
   forfeitReport() { return this.forfeitApplies() && zombieRandom.ticket() ? this.roundReport() : null; }
 }
 const zombieReporter = new ZombieMatchReporter();
+zombieHistory.load();
 
 function blurAfter(fn) { return e => { e.currentTarget.blur(); fn(); }; }
 $("btnRandom").onclick = blurAfter(() => zombieRandom.open());

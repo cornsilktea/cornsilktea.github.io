@@ -31,12 +31,18 @@ interface ZombieReport {
   winner: number;
   progress: number;
   iLeft: boolean;
+  random?: boolean;
+}
+
+interface ZombieRandomTally {
+  g: number; w: number; hg: number; hw: number; zg: number; zw: number;
 }
 
 interface ZombieStatsNode {
   g: number; w: number; l: number; hg: number; hw: number; zg: number; zw: number;
   og: number; sv: number; ik: number; mi: number; hs: number; ls: number;
   ids: Record<string, number>;
+  rm: ZombieRandomTally;
 }
 
 interface ZombieRecentEntry extends AccountRecentHeadEntry {
@@ -68,12 +74,16 @@ class ZombiePlan implements AccountMatchPlanBase {
   readonly countsStats: boolean;
   readonly win: boolean;
   readonly withAi: boolean;
+  readonly countsMain: boolean;
+  readonly countsRandom: boolean;
 
   constructor(report: ZombieReport) {
     const me = report.rows[report.myIndex];
     this.withAi = report.rows.some((row) => row.ai);
     this.recordsRecent = !!me && !AccountForfeit.leftEarly(report.iLeft, report.progress) && (report.winner === 0 || report.winner === 1 || report.iLeft);
-    this.countsStats = this.recordsRecent && !this.withAi;
+    this.countsMain = this.recordsRecent && !this.withAi;
+    this.countsRandom = this.recordsRecent && !!report.random;
+    this.countsStats = this.countsMain || this.countsRandom;
     this.win = !!me && !report.iLeft && ZombieRoles.wonBy(me.role, report.winner);
   }
 }
@@ -110,9 +120,36 @@ class ZombieCodec {
   }
 }
 
+class ZombieRandomTallyMath {
+  static readonly NUMBERS = ["g", "w", "hg", "hw", "zg", "zw"] as const;
+
+  static empty(): ZombieRandomTally {
+    return { g: 0, w: 0, hg: 0, hw: 0, zg: 0, zw: 0 };
+  }
+
+  static normalize(raw: unknown): ZombieRandomTally {
+    const tally = ZombieRandomTallyMath.empty();
+    if (!raw || typeof raw !== "object") return tally;
+    const source = raw as Record<string, unknown>;
+    ZombieRandomTallyMath.NUMBERS.forEach((key) => { tally[key] = AccountNumbers.count(source[key]); });
+    return tally;
+  }
+
+  static add(before: ZombieRandomTally, report: ZombieReport, win: boolean): ZombieRandomTally {
+    const me = report.rows[report.myIndex];
+    const startedHuman = me.role !== ZombieRoles.ORIGIN;
+    const endedZombie = me.role !== ZombieRoles.SURVIVED;
+    return {
+      g: before.g + 1, w: before.w + (win ? 1 : 0),
+      hg: before.hg + (startedHuman ? 1 : 0), hw: before.hw + (startedHuman && report.winner === 0 ? 1 : 0),
+      zg: before.zg + (endedZombie ? 1 : 0), zw: before.zw + (endedZombie && report.winner === 1 ? 1 : 0)
+    };
+  }
+}
+
 class ZombieStatsMath {
   static empty(): ZombieStatsNode {
-    return { g: 0, w: 0, l: 0, hg: 0, hw: 0, zg: 0, zw: 0, og: 0, sv: 0, ik: 0, mi: 0, hs: 0, ls: 0, ids: {} };
+    return { g: 0, w: 0, l: 0, hg: 0, hw: 0, zg: 0, zw: 0, og: 0, sv: 0, ik: 0, mi: 0, hs: 0, ls: 0, ids: {}, rm: ZombieRandomTallyMath.empty() };
   }
 
   static normalize(raw: unknown): ZombieStatsNode {
@@ -122,6 +159,7 @@ class ZombieStatsMath {
     ZombieRoles.NUMBER_KEYS.forEach((key) => { node[key] = AccountNumbers.count(source[key]); });
     const ids = AccountShape.slots(source.ids);
     Object.keys(ids).forEach((key) => { node.ids[key] = Number(ids[key]) || 0; });
+    node.rm = ZombieRandomTallyMath.normalize(source.rm);
     return node;
   }
 
@@ -133,14 +171,15 @@ class ZombieStatsMath {
     const endedZombie = me.role !== ZombieRoles.SURVIVED;
     const secs = Math.min(ZombieRoles.SECONDS_MAX, AccountNumbers.count(me.secs));
     const infects = Math.min(9, AccountNumbers.count(me.infects));
-    const node: ZombieStatsNode = {
+    const rm = report.random ? ZombieRandomTallyMath.add(before.rm, report, win) : before.rm;
+    const node: ZombieStatsNode = report.rows.some((row) => row.ai) ? Object.assign({}, before, { ids: Object.assign({}, before.ids), rm }) : {
       g: before.g + 1, w: before.w + (win ? 1 : 0), l: before.l + (win ? 0 : 1),
       hg: before.hg + (startedHuman ? 1 : 0), hw: before.hw + (startedHuman && report.winner === 0 ? 1 : 0),
       zg: before.zg + (endedZombie ? 1 : 0), zw: before.zw + (endedZombie && report.winner === 1 ? 1 : 0),
       og: before.og + (me.role === ZombieRoles.ORIGIN ? 1 : 0), sv: before.sv + (me.role === ZombieRoles.SURVIVED ? 1 : 0),
       ik: before.ik + infects, mi: Math.max(before.mi, infects),
       hs: before.hs + (startedHuman ? secs : 0), ls: Math.max(before.ls, startedHuman ? secs : 0),
-      ids: Object.assign({}, before.ids)
+      ids: Object.assign({}, before.ids), rm
     };
     node.ids[key] = at;
     const evicted = AccountKeyLedger.overflowKeys(node.ids);
@@ -151,9 +190,11 @@ class ZombieStatsMath {
 
 class ZombieProfile extends AccountGameProfile<ZombieReport, ZombiePlan, ZombieStatsNode, ZombieRecentEntry, null> {
   readonly gameKey = "zombieoutbreak";
+  private mainChanged = true;
 
   matchIdOf(report: ZombieReport): string { return report.matchId; }
   rankFields(node: ZombieStatsNode): AccountRankFields { return { g: node.g, w: node.w, x: node.ik }; }
+  extraPatch(user: PortalUser, extraRaw: unknown, node: ZombieStatsNode): Record<string, unknown> { return this.mainChanged ? super.extraPatch(user, extraRaw, node) : {}; }
   planOf(report: ZombieReport): ZombiePlan { return new ZombiePlan(report); }
   encodeRecent(report: ZombieReport, key: string, win: boolean): object { return ZombieCodec.encode(report, key, win); }
   decodeRecent(raw: unknown): ZombieRecentEntry | null { return ZombieCodec.decode(raw); }
@@ -162,9 +203,11 @@ class ZombieProfile extends AccountGameProfile<ZombieReport, ZombiePlan, ZombieS
   applyStats(raw: unknown, report: ZombieReport, plan: ZombiePlan, key: string, at: number): AccountStatsChangeBase<ZombieStatsNode> | null {
     const change = ZombieStatsMath.apply(raw, report, plan.win, key, at);
     if (!change) return null;
+    this.mainChanged = plan.countsMain;
     const node = change.node;
     const patch: Record<string, unknown> = {};
-    ZombieRoles.NUMBER_KEYS.forEach((name) => { patch[name] = node[name]; });
+    if (plan.countsMain) ZombieRoles.NUMBER_KEYS.forEach((name) => { patch[name] = node[name]; });
+    if (plan.countsRandom) patch.rm = Object.assign({}, node.rm);
     patch["ids/" + key] = node.ids[key];
     change.evicted.forEach((id) => { patch["ids/" + id] = null; });
     return { node, patch };
@@ -212,8 +255,61 @@ class ZombieStatsView implements AccountDialogView<ZombieStatsNode, ZombieRecent
   }
 }
 
+interface ZombieOriginCandidate {
+  id: string;
+  gap: number;
+}
+
+class ZombieOriginRotation {
+  static readonly COOLDOWN = 3;
+  static readonly GAP_CAP = 12;
+  static readonly UNKNOWN_GAP = ZombieOriginRotation.COOLDOWN;
+
+  static gapOf(recent: readonly ZombieRecentEntry[]): number {
+    if (!recent.length) return ZombieOriginRotation.UNKNOWN_GAP;
+    const newestFirst = recent.slice().sort((a, b) => b.at - a.at);
+    let gap = 0;
+    for (const entry of newestFirst) {
+      if (entry.rows[entry.myIndex].role === ZombieRoles.ORIGIN) break;
+      gap++;
+    }
+    return Math.min(ZombieOriginRotation.GAP_CAP, gap);
+  }
+
+  static gapFromRoom(raw: unknown): number {
+    const gap = Number(raw);
+    return Number.isFinite(gap) && gap >= 0 ? Math.min(ZombieOriginRotation.GAP_CAP, Math.floor(gap)) : ZombieOriginRotation.UNKNOWN_GAP;
+  }
+
+  static nextGap(gap: number, wasOrigin: boolean): number {
+    return wasOrigin ? 0 : Math.min(ZombieOriginRotation.GAP_CAP, gap + 1);
+  }
+
+  static pick(candidates: readonly ZombieOriginCandidate[], random: () => number): string {
+    const eligible = candidates.filter((item) => item.gap >= ZombieOriginRotation.COOLDOWN);
+    if (eligible.length) return ZombieOriginRotation.weighted(eligible, random);
+    const longest = Math.max(...candidates.map((item) => item.gap));
+    const tied = candidates.filter((item) => item.gap === longest);
+    return tied[Math.floor(random() * tied.length)].id;
+  }
+
+  private static weighted(eligible: readonly ZombieOriginCandidate[], random: () => number): string {
+    const weights = eligible.map((item) => Math.min(item.gap, ZombieOriginRotation.GAP_CAP) - ZombieOriginRotation.COOLDOWN + 1);
+    let roll = random() * weights.reduce((sum, weight) => sum + weight, 0);
+    for (let index = 0; index < eligible.length; index++) {
+      roll -= weights[index];
+      if (roll < 0) return eligible[index].id;
+    }
+    return eligible[eligible.length - 1].id;
+  }
+}
+
 class ZombieAccount extends AccountGameAccount<ZombieReport, ZombiePlan, ZombieStatsNode, ZombieRecentEntry> {
   constructor() {
     super(new ZombieProfile(), new ZombieStatsView());
+  }
+
+  loadHostGap(): Promise<number> {
+    return this.loadRecent().then(ZombieOriginRotation.gapOf, () => ZombieOriginRotation.UNKNOWN_GAP);
   }
 }

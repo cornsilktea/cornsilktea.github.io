@@ -959,6 +959,12 @@ class AccountGameAccount<R, P extends AccountMatchPlanBase, N, E extends Account
     return store ? store.loadStats() : Promise.resolve(null);
   }
 
+  /* 내 최근 매치(최대 20판, 최신 먼저)를 한 번 읽는다. 로그인 전이면 빈 목록 */
+  loadRecent(): Promise<E[]> {
+    const store = AccountMatchStore.forProfile(this.profile);
+    return store ? store.loadRecent() : Promise.resolve([]);
+  }
+
   record(report: R): void {
     this.sender.record(report, null);
   }

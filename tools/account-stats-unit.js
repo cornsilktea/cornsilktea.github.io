@@ -1,10 +1,10 @@
 const fs = require("fs"), vm = require("vm"), path = require("path");
 const root = path.join(__dirname, "..");
-const files = ["match-kit.js", "account-match-kit.js", "account-stats.js", "24.turbo-lap-stats.js", "25.fps-survival-stats.js", "31.zombie-outbreak-stats.js", "38.snow-account.js", "38.snow-versus.js", "39.balloon-account.js", "39.balloon-versus.js", "patch-notes.js"];
+const files = ["match-kit.js", "account-match-kit.js", "account-stats.js", "24.turbo-lap-stats.js", "25.fps-survival-stats.js", "31.zombie-outbreak-stats.js", "31.zombie-versus.js", "38.snow-account.js", "38.snow-versus.js", "39.balloon-account.js", "39.balloon-versus.js", "patch-notes.js"];
 const names = ["AccountNumbers", "AccountRates", "AccountMatchKey", "AccountKeyLedger", "AccountForfeit", "AccountShape", "AccountRecentHeadCodec", "RecentMatchRing", "AccountLoginNotice", "RecentBlockList", "AccountGameProfile", "AccountMatchStore",
   "TeamBattleRates", "AccountMvpJudge", "TeamBattlePlan", "TeamBattleCodec", "TeamBattleRing", "AccountStatsMath", "AccountStatsTable", "ClassStatsSummary", "TeamBattleProfile", "AccountStatsStore",
   "TurboLapPlan", "TurboLapCodec", "TurboLapStatsMath", "TurboLapProfile", "TurboLapStatsView", "FpsPlan", "FpsCodec", "FpsStatsMath", "FpsProfile", "FpsStatsView",
-  "ZombiePlan", "ZombieCodec", "ZombieStatsMath", "ZombieProfile", "ZombieStatsView", "SnAccountPlan", "SnAccountCodec", "SnAccountMath", "SnAccountProfile", "SnAccountView", "SnReportBuilder", "SnVersusCards",
+  "ZombiePlan", "ZombieCodec", "ZombieStatsMath", "ZombieProfile", "ZombieStatsView", "ZombieRandomTallyMath", "ZombieOriginRotation", "ZombieVersusCards", "ZombieVersusLineup", "SnAccountPlan", "SnAccountCodec", "SnAccountMath", "SnAccountProfile", "SnAccountView", "SnReportBuilder", "SnVersusCards",
   "WbAccountPlan", "WbAccountCodec", "WbAccountMath", "WbAccountProfile", "WbAccountView", "WbReportBuilder", "WbRandomTallyMath", "WbVersusCards", "WbVersusLineupBuilder",
   "AccountClassRank", "RandomMatchPlan", "RandomMatchCodec", "RandomMatchMath", "RandomMatchProfile", "RandomMatchView",
   "AccountPendingCodec", "AccountMatchSender", "AccountPendingGuard", "MkStreakMath", "TurboLapClock", "TurboLapOutcome", "TeamBattleScore", "PatchNoteCodec", "PatchNoteSeen"];
@@ -322,6 +322,27 @@ const zombieReport = (extra) => Object.assign({ matchId: "m31", myIndex: 1, rows
   check("31번 누적: 감염된 판은 인간·좀비 양쪽 판 수에 들고 생존 시간은 감염 때까지", infected.hg === 2 && infected.zg === 2 && infected.hw === 2 && infected.zw === 1 && infected.hs === 241 && infected.l === 1, infected);
 }
 
+{
+  const rot = K.ZombieOriginRotation, pickWith = (list, r) => rot.pick(list, () => r);
+  check("31번 숙주 순번: 숙주가 된 뒤 3판은 후보에서 빠짐", pickWith([{ id: "a", gap: 0 }, { id: "b", gap: 2 }, { id: "c", gap: 3 }], 0.5) === "c" && pickWith([{ id: "a", gap: 1 }, { id: "b", gap: 5 }], 0) === "b");
+  check("31번 숙주 순번: 오래 기다린 사람일수록 뽑힐 확률이 큼(가중치 1·2·3)", pickWith([{ id: "a", gap: 3 }, { id: "b", gap: 4 }, { id: "c", gap: 5 }], 0) === "a" && pickWith([{ id: "a", gap: 3 }, { id: "b", gap: 4 }, { id: "c", gap: 5 }], 0.2) === "b" && pickWith([{ id: "a", gap: 3 }, { id: "b", gap: 4 }, { id: "c", gap: 5 }], 0.9) === "c");
+  check("31번 숙주 순번: 모두 쿨다운이면 가장 오래 기다린 사람, 같으면 무작위", pickWith([{ id: "a", gap: 0 }, { id: "b", gap: 2 }, { id: "c", gap: 1 }], 0.1) === "b" && pickWith([{ id: "a", gap: 2 }, { id: "b", gap: 2 }], 0.9) === "b");
+  const entry = (role, at) => ({ id: "x" + at, at, win: true, withAi: false, myIndex: 0, winner: 0, rows: [{ name: "나", role, secs: 0, infects: 0, left: false, ai: false }] });
+  check("31번 숙주 순번: 최근 매치에서 마지막 숙주 뒤 인간으로 한 판 수를 센다", rot.gapOf([entry(2, 5), entry(1, 4), entry(0, 3), entry(2, 2)]) === 2 && rot.gapOf([entry(0, 5), entry(2, 4)]) === 0 && rot.gapOf([entry(2, 1), entry(2, 2)]) === 2 && rot.gapOf([]) === rot.UNKNOWN_GAP);
+  check("31번 숙주 순번: 방 자리 값은 숫자만 받고 숙주 뒤 0, 아니면 +1(최대 12)", rot.gapFromRoom("x") === rot.UNKNOWN_GAP && rot.gapFromRoom(-1) === rot.UNKNOWN_GAP && rot.gapFromRoom(4) === 4 && rot.nextGap(5, true) === 0 && rot.nextGap(5, false) === 6 && rot.nextGap(12, false) === 12);
+  const rounds = (() => { const gaps = { a: 3, b: 3, c: 3, d: 3, e: 3 }, hosts = []; let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    for (let i = 0; i < 400; i++) { const id = rot.pick(Object.keys(gaps).map((k) => ({ id: k, gap: gaps[k] })), rnd); hosts.push([id, Math.min(...Object.keys(gaps).map((k) => gaps[k]))]); Object.keys(gaps).forEach((k) => { gaps[k] = rot.nextGap(gaps[k], k === id); }); }
+    return hosts; })();
+  check("31번 숙주 순번: 5명이 400판을 돌면 아무도 연달아 숙주가 되지 않고 4판 안에 한 번씩은 돌아옴", rounds.every((h, i) => i === 0 || h[0] !== rounds[i - 1][0]) && rounds.length === 400);
+  const cardNode = K.ZombieStatsMath.normalize({ g: 9, w: 5, rm: { g: 4, w: 3, hg: 3, hw: 2, zg: 2, zw: 1 } });
+  const card = K.ZombieVersusCards.fromStats(cardNode);
+  check("31번 대결 화면 카드: rm 만 읽고 자리 값으로 왕복", card.g === 4 && card.w === 3 && card.hw === 2 && same(K.ZombieVersusCards.fromRoom(JSON.parse(JSON.stringify(K.ZombieVersusCards.toRoom(card)))), card) && K.ZombieVersusCards.fromStats(null) === null && K.ZombieVersusCards.fromRoom(null) === null && K.ZombieVersusCards.fromStats(K.ZombieStatsMath.normalize({ g: 4, w: 2 })) === null);
+  const people = [{ nick: "가", me: true, card }, { nick: "나", me: false, card: null }];
+  const matchedSeats = K.ZombieVersusLineup.build(people, 5, true, 3).map((seat) => seat.kind).join(",");
+  const roomSeats = K.ZombieVersusLineup.build(people, 5, false, 0).map((seat) => seat.kind).join(",");
+  check("31번 대결 화면 자리: 랜덤 매칭은 사람 → 입장하는 중 → AI, 일반 방은 사람 → 빈 자리", matchedSeats === "player,player,coming,ai,ai" && roomSeats === "player,player,empty,empty,empty", [matchedSeats, roomSeats]);
+}
+
 const snow = new GameCase("38번", new K.SnAccountProfile(), K.SnAccountCodec, "snowroyale");
 const snowMatch = { id: 1, seed: 2, mode: "duos", startAt: 0, teams: [{ members: [{ id: "a", nick: "A", bot: false }, { id: "b", nick: "B", bot: false }] }, { members: [{ id: "c", nick: "C", bot: false }, { id: "d", nick: "D", bot: true }] }] };
 const snowEnd = { match: 1, ranks: [1, 2], at: 1, stats: [[3, 120.6, 5, 200.46, 2, 1], [1, 40, 2, 150, 0, 2], [2, 90, 3, 80, 1, 0], [0, 10, 0, 60, 0, 0]] };
@@ -569,6 +590,32 @@ const gameChecks = (async () => {
     check("39번 랜덤 매칭 칸: rm 만 올리며 누적 처치를 바꾸면 거부", RuleChecker.check("waterballoon", cheat, ruled2.stats, ruled2.slots).errors.length > 0);
     const cheat2 = JSON.parse(JSON.stringify(w3)); cheat2["users/u1/stats/waterballoon/rm"] = Object.assign({}, cheat2["users/u1/stats/waterballoon/rm"], { g: ruled2.stats.rm.g + 2 });
     check("39번 랜덤 매칭 칸: rm 판 수를 한 번에 2 올리면 거부", RuleChecker.check("waterballoon", cheat2, ruled2.stats, ruled2.slots).errors.length > 0);
+  }
+  {
+    const withBot = zombieReport({ random: true });
+    const clean31 = zombieReport({ random: true, rows: zombieRows().slice(0, 3) });
+    const first = zombie.store({});
+    check("31번 랜덤 매칭 칸: 봇 섞인 첫 판 저장", (await first.store.record(withBot, null)) === "stats" && first.writes.length === 1);
+    const w1 = first.writes[0] || {};
+    check("31번 랜덤 매칭 칸: 누적 칸·반별 순위는 쓰지 않음", !("users/u1/stats/zombieoutbreak/g" in w1) && !!w1["users/u1/stats/zombieoutbreak/rm"] && !Object.keys(w1).some((k) => k.indexOf("gameRanks/") === 0), Object.keys(w1));
+    const ruled1 = RuleChecker.check("zombieoutbreak", w1, undefined, undefined);
+    check("31번 랜덤 매칭 칸: 누적 칸 없이 rm 만 쓰는 첫 판이 규칙 통과", ruled1.errors.length === 0 && ruled1.stats.rm.g === 1 && ruled1.stats.rm.hw === 1, ruled1.errors);
+    const second = zombie.store({ "stats/zombieoutbreak": ruled1.stats, "recent/zombieoutbreak": ruled1.slots });
+    await second.store.record(Object.assign({}, clean31, { matchId: "m31b" }), null);
+    const ruled2 = RuleChecker.check("zombieoutbreak", second.writes[0] || {}, ruled1.stats, ruled1.slots);
+    check("31번 랜덤 매칭 칸: 사람끼리 판은 누적 첫 판 + rm 둘째 판", ruled2.errors.length === 0 && ruled2.stats.g === 1 && ruled2.stats.rm.g === 2, [ruled2.errors, ruled2.stats]);
+    const third = zombie.store({ "stats/zombieoutbreak": ruled2.stats, "recent/zombieoutbreak": ruled2.slots });
+    await third.store.record(Object.assign({}, withBot, { matchId: "m31c" }), null);
+    const w3 = third.writes[0] || {};
+    const ruled3 = RuleChecker.check("zombieoutbreak", w3, ruled2.stats, ruled2.slots);
+    check("31번 랜덤 매칭 칸: 누적 칸이 있을 때 봇 섞인 판(rm 만)도 통과", ruled3.errors.length === 0 && ruled3.stats.g === 1 && ruled3.stats.rm.g === 3, ruled3.errors);
+    const cheat = JSON.parse(JSON.stringify(w3)); cheat["users/u1/stats/zombieoutbreak/ik"] = ruled2.stats.ik + 5;
+    check("31번 랜덤 매칭 칸: rm 만 올리며 누적 감염을 바꾸면 거부", RuleChecker.check("zombieoutbreak", cheat, ruled2.stats, ruled2.slots).errors.length > 0);
+    const cheat2 = JSON.parse(JSON.stringify(w3)); cheat2["users/u1/stats/zombieoutbreak/rm"] = Object.assign({}, cheat2["users/u1/stats/zombieoutbreak/rm"], { g: ruled2.stats.rm.g + 2 });
+    check("31번 랜덤 매칭 칸: rm 판 수를 한 번에 2 올리면 거부", RuleChecker.check("zombieoutbreak", cheat2, ruled2.stats, ruled2.slots).errors.length > 0);
+    const normal = zombie.store({});
+    await normal.store.record(zombieReport({ rows: zombieRows().slice(0, 3) }), null);
+    check("31번 일반 방 판은 rm 을 쓰지 않음", !("users/u1/stats/zombieoutbreak/rm" in (normal.writes[0] || {})));
   }
   for (const key of ["minigames", "volleyball", "soccer"]) await new GameCase(key, new K.RandomMatchProfile(key), K.RandomMatchCodec, key).verifyStore(randomReport());
 })();
