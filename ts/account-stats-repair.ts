@@ -108,7 +108,7 @@ class ZombieRepairGame extends AccountRepairGame<ZombieReport, ZombiePlan, Zombi
   ownIndex(entry: ZombieRecentEntry): number { return entry.myIndex; }
 
   backfillable(entry: ZombieRecentEntry): boolean {
-    return entry.rows.some((row) => row.ai) && ZombieRoles.countsInTotals(entry.rows);
+    return entry.rows.some((row) => row.ai) && ZombieRoles.countsInTotals(entry.rows) && entry.at < ZombieRoles.AI_RULE_FROM_MS;
   }
 
   reportFor(source: ZombieRecentEntry, index: number): ZombieReport | null {
@@ -204,9 +204,11 @@ class AccountRepairFix<R, P extends AccountMatchPlanBase, N, E extends AccountRe
     return Object.keys(this.slots).some((slot) => (this.slots[slot] as AccountRecentHead | null)?.id === key);
   }
 
-  hasInTotals(key: string): boolean {
+  /* 열쇠(ids)가 있어도 센 판이 아닐 수 있다: 예전 규칙에서는 AI 판도 열쇠만 적었다. 채운 판은 열쇠 값을 시각+0.5(소수)로 적어 구분한다 */
+  needsTotals(key: string): boolean {
     const ids = (this.nodeRaw && typeof this.nodeRaw === "object" ? (this.nodeRaw as { ids?: unknown }).ids : null) as Record<string, unknown> | null;
-    return !!ids && ids[key] != null;
+    const value = ids ? ids[key] : null;
+    return value == null || (typeof value === "number" && Number.isInteger(value));
   }
 
   /* 이미 최근 매치에 있는 판을 누적 통계에만 더한다(최근 20칸은 누적 열쇠 20개보다 새로우므로, 칸에 있는데 열쇠가 없으면 센 적이 없는 판이다) */
@@ -214,7 +216,9 @@ class AccountRepairFix<R, P extends AccountMatchPlanBase, N, E extends AccountRe
     const profile = this.game.profile;
     const plan = profile.planOf(report, null as never);
     if (!plan.countsStats) return false;
-    const change = profile.applyStats(this.nodeRaw, report, plan, key, at);
+    const base = JSON.parse(JSON.stringify(this.nodeRaw || {})) as { ids?: Record<string, unknown> };
+    if (base.ids) delete base.ids[key];
+    const change = profile.applyStats(base, report, plan, key, at + 0.5);
     if (!change) return false;
     this.nodeRaw = change.node;
     const root = "users/" + this.uid + "/";
@@ -323,7 +327,7 @@ class AccountRepairPlanner<R, P extends AccountMatchPlanBase, N, E extends Accou
         const own = game.reportFor(holder.entry, game.ownIndex(holder.entry));
         if (!own) return;
         const fix = fixes[holder.uid] = fixes[holder.uid] || new AccountRepairFix<R, P, N, E>(holder.uid, users[holder.uid], game);
-        if (!fix.hasInTotals(match.key)) fix.addTotalsOnly(match.key, holder.entry.at || match.at, own);
+        if (fix.needsTotals(match.key)) fix.addTotalsOnly(match.key, holder.entry.at || match.at, own);
       });
       const heldIndexes = match.holders.map((holder) => game.ownIndex(holder.entry));
       game.linesOf(source.entry).forEach((line, index) => {

@@ -34,6 +34,8 @@ ZombieRoles.LABELS = ["숙주 좀비", "감염", "생존"];
 ZombieRoles.SECONDS_MAX = 180;
 ZombieRoles.MISSIONS_MAX = 3;
 ZombieRoles.AI_COUNTED_MAX = 1;
+/* 이 시각(2026-11-03 efdc201 반영) 전에 기록된 AI 1명 판은 누적에 승패가 더해지지 않았다. 열쇠(ids)만 적혀 있어 정상화가 이 시각으로 가려낸다 */
+ZombieRoles.AI_RULE_FROM_MS = 1793684492000;
 ZombieRoles.NUMBER_KEYS = ["g", "w", "l", "hg", "hw", "zg", "zw", "og", "sv", "ik", "ms", "mi", "hs", "ls"];
 class ZombiePlan {
     constructor(report) {

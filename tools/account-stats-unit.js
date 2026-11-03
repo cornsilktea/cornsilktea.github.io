@@ -700,6 +700,13 @@ const repairChecks = (async () => {
   check("정상화(31번): 최근 매치에만 있던 AI 1명 판을 누적에 채움(최근 칸은 그대로)", aiPlan.fixes.length === 2 && aiPatch["users/uA/stats/zombieoutbreak/g"] === 1 && aiPatch["users/uA/stats/zombieoutbreak/w"] === 1 && aiPatch["users/uB/stats/zombieoutbreak/og"] === 1 && !Object.keys(aiPatch).some((k) => k.indexOf("/recent/") >= 0), aiPatch);
   const aiAll = aiUsers(); apply(aiAll, aiPatch);
   check("정상화(31번): AI 판 누적 채우기도 두 번 세지 않음", planner.plan(aiAll).fixes.length === 0);
+  const countedLookingUsers = () => ({ uA: user("1101 가", { 0: aiSlot }, { g: 4, w: 2, l: 2, hg: 4, hw: 2, zg: 0, zw: 0, og: 0, sv: 2, ik: 3, ms: 0, mi: 1, hs: 400, ls: 180, ids: { room9_6000: at + 7 }, rm: { g: 0, w: 0, hg: 0, hw: 0, zg: 0, zw: 0 } }) });
+  const keyed = countedLookingUsers();
+  const keyedPlan = planner.plan(keyed);
+  const keyedPatch = keyedPlan.patch();
+  check("정상화(31번): 열쇠만 적히고 승패는 더해지지 않은 AI 1명 판을 찾아 더함(판 수 4→5, 승 2→3)", keyedPlan.fixes.length === 1 && keyedPatch["users/uA/stats/zombieoutbreak/g"] === 5 && keyedPatch["users/uA/stats/zombieoutbreak/w"] === 3 && keyedPatch["users/uA/stats/zombieoutbreak/ids/room9_6000"] === at + 0.5, keyedPatch);
+  apply(keyed, keyedPatch);
+  check("정상화(31번): 더한 판은 열쇠가 소수라 다시 더하지 않음", planner.plan(keyed).fixes.length === 0);
   const turbo = new K.TurboLapRepairGame();
   const turboRows = [{ nick: "가", side: 0, fin: 1, prog: 3, car: "porscheblue", bot: false }, { nick: "나", side: 1, fin: 0, prog: 2, car: "porscheblue", bot: false }];
   const turboHeld = Object.assign(JSON.parse(JSON.stringify(K.TurboLapCodec.encode({ matchId: "t1", course: "seoul", myIndex: 0, rows: turboRows, result: "win" }, "t1", true))), { at });
