@@ -165,7 +165,10 @@ class AccountClassRank {
             return values;
         const classKey = AccountClassRank.classKey(cls);
         const root = AccountClassRank.ROOT + "/" + gameKey + "/";
-        values[root + classKey + "/" + user.uid] = { n: String(user.name || "학생").slice(0, AccountClassRank.NAME_MAX) || "학생", g: fields.g, w: fields.w, x: AccountNumbers.count(fields.x) };
+        const row = { n: String(user.name || "학생").slice(0, AccountClassRank.NAME_MAX) || "학생", g: fields.g, w: fields.w, x: AccountNumbers.count(fields.x) };
+        if (fields.y !== undefined)
+            row.y = AccountNumbers.count(fields.y);
+        values[root + classKey + "/" + user.uid] = row;
         if (classKey !== AccountClassRank.NONE)
             values[root + AccountClassRank.NONE + "/" + user.uid] = null;
         return values;

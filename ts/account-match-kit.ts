@@ -203,6 +203,7 @@ interface AccountRankFields {
   g: number;
   w: number;
   x: number;
+  y?: number;
 }
 
 /* 교사 화면 반별 순위 요약(gameRanks). 반은 학생이 반 링크로 처음 로그인할 때 profile/cls 에 적힌다(없으면 none = 미분류).
@@ -224,7 +225,9 @@ class AccountClassRank {
     if (admins.indexOf(user.uid) >= 0) return values;
     const classKey = AccountClassRank.classKey(cls);
     const root = AccountClassRank.ROOT + "/" + gameKey + "/";
-    values[root + classKey + "/" + user.uid] = { n: String(user.name || "학생").slice(0, AccountClassRank.NAME_MAX) || "학생", g: fields.g, w: fields.w, x: AccountNumbers.count(fields.x) };
+    const row: Record<string, unknown> = { n: String(user.name || "학생").slice(0, AccountClassRank.NAME_MAX) || "학생", g: fields.g, w: fields.w, x: AccountNumbers.count(fields.x) };
+    if (fields.y !== undefined) row.y = AccountNumbers.count(fields.y);
+    values[root + classKey + "/" + user.uid] = row;
     if (classKey !== AccountClassRank.NONE) values[root + AccountClassRank.NONE + "/" + user.uid] = null;
     return values;
   }

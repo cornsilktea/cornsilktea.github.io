@@ -367,6 +367,7 @@
             "sv": { ".validate": "newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 1" },
             "ik": { ".validate": "newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 9" },
             "hs": { ".validate": "newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 180" },
+            "ms": { ".validate": "newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 3" },
             "mi": { ".validate": "newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= 9" },
             "ls": { ".validate": "newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= 180" },
             "rm": {
@@ -924,6 +925,7 @@
             "g": { ".validate": "newData.isNumber() && newData.val() >= 0" },
             "w": { ".validate": "newData.isNumber() && newData.val() >= 0" },
             "x": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+            "y": { ".validate": "newData.isNumber() && newData.val() >= 0" },
             "$other": { ".validate": false }
           }
         }

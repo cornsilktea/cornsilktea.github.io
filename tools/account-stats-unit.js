@@ -319,6 +319,11 @@ const zombieReport = (extra) => Object.assign({ matchId: "m31", myIndex: 1, rows
   const origin = K.ZombieStatsMath.apply(JSON.parse(JSON.stringify(human)), zombieReport({ rows: zombieRows().slice(0, 3), myIndex: 0, winner: 1, matchId: "m2" }), true, "k2", 2).node;
   check("31번 누적: 숙주 좀비 판(좀비 편 승리, 감염 수·최다)", origin.og === 1 && origin.zg === 1 && origin.zw === 1 && origin.hg === 1 && origin.ik === 3 && origin.mi === 3 && origin.w === 2, origin);
   const infected = K.ZombieStatsMath.apply(JSON.parse(JSON.stringify(origin)), zombieReport({ rows: zombieRows().slice(0, 3), myIndex: 2, winner: 0, matchId: "m3" }), false, "k3", 3).node;
+  const missionRows = zombieRows().slice(0, 3); missionRows[1] = Object.assign({}, missionRows[1], { missions: 2 });
+  const mission = K.ZombieStatsMath.apply(null, zombieReport({ rows: missionRows, matchId: "m4" }), true, "k4", 4).node;
+  check("31번 누적: 완료한 미션 합계(ms)와 순위 요약 y", mission.ms === 2 && new K.ZombieProfile().rankFields(mission).y === 2 && human.ms === 0, mission);
+  const missionBack = zombie.roundTrip(zombieReport({ rows: missionRows }), true).back;
+  check("31번 값 배열: 완료 미션 수 왕복, 옛 기록(칸 6개)은 0", missionBack.rows[1].missions === 2 && K.ZombieCodec.decode({ v: 1, id: "o", at: 1, r: 1, ai: 0, me: 0, w: 0, p: [["옛", 2, 10, 0, 0, 0]] }).rows[0].missions === 0, missionBack.rows[1]);
   check("31번 누적: 감염된 판은 인간·좀비 양쪽 판 수에 들고 생존 시간은 감염 때까지", infected.hg === 2 && infected.zg === 2 && infected.hw === 2 && infected.zw === 1 && infected.hs === 241 && infected.l === 1, infected);
 }
 

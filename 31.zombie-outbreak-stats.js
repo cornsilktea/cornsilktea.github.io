@@ -8,12 +8,13 @@
      - 인간 승률 = 인간으로 시작한 판(감염되기 전 포함) 중 인간 편이 이긴 판 ÷ 그런 판.
        좀비 승률 = 좀비 편으로 끝난 판(숙주·감염 포함) 중 좀비가 이긴 판 ÷ 그런 판.  (감염된 판은 두 쪽에 모두 셈)
      - 인간 평균 생존 시간 = 인간으로 시작한 판의 생존 초 합계 ÷ 그런 판 수(감염되면 감염된 때까지, 끝까지면 라운드 길이).
+     - 완료 미션 수: 내가 끝낸 미션(한 판 최대 3). 감염 수와 같은 기준(누적은 AI 없는 판만).
      - 감염 수: 내가 감염시킨 사람 수(room.players[].infectedBy). 누적 통계는 AI 가 없던 판만, 최근 매치는 AI 가 섞여도 기록.
      - 경기 절반 뒤에 나가면 패배, 절반 전에 나가면 기록 없음. 승패가 안 가려진 판은 없다(인간·좀비 중 한쪽이 항상 이김).
 
    저장:
-     users/<uid>/stats/zombieoutbreak  { g, w, l, hg, hw, zg, zw, og 숙주 횟수, sv 끝까지 생존 횟수, ik 감염 합, mi 한 판 최다 감염, hs 인간 생존 초 합, ls 최장 생존 초, ids }
-     users/<uid>/recent/zombieoutbreak/<0~19>  { v, id, at, r, ai, me, w 0인간/1좀비, p [[닉네임, 0숙주/1감염/2생존, 생존 초, 감염 수, 나감 0/1, AI 0/1]] }
+     users/<uid>/stats/zombieoutbreak  { g, w, l, hg, hw, zg, zw, og 숙주 횟수, sv 끝까지 생존 횟수, ik 감염 합, ms 완료 미션 합, mi 한 판 최다 감염, hs 인간 생존 초 합, ls 최장 생존 초, ids }
+     users/<uid>/recent/zombieoutbreak/<0~19>  { v, id, at, r, ai, me, w 0인간/1좀비, p [[닉네임, 0숙주/1감염/2생존, 생존 초, 감염 수, 나감 0/1, AI 0/1, 완료 미션 수]] }
    ===================================================================== */
 class ZombieRoles {
     static fromResult(result) {
@@ -28,7 +29,8 @@ ZombieRoles.INFECTED = 1;
 ZombieRoles.SURVIVED = 2;
 ZombieRoles.LABELS = ["숙주 좀비", "감염", "생존"];
 ZombieRoles.SECONDS_MAX = 180;
-ZombieRoles.NUMBER_KEYS = ["g", "w", "l", "hg", "hw", "zg", "zw", "og", "sv", "ik", "mi", "hs", "ls"];
+ZombieRoles.MISSIONS_MAX = 3;
+ZombieRoles.NUMBER_KEYS = ["g", "w", "l", "hg", "hw", "zg", "zw", "og", "sv", "ik", "ms", "mi", "hs", "ls"];
 class ZombiePlan {
     constructor(report) {
         const me = report.rows[report.myIndex];
@@ -48,7 +50,8 @@ class ZombieCodec {
             w: report.winner === 1 ? 1 : 0,
             p: report.rows.map((row) => [
                 String(row.name || "").slice(0, ZombieCodec.NAME_MAX), Math.min(2, AccountNumbers.count(row.role)),
-                Math.min(ZombieRoles.SECONDS_MAX, AccountNumbers.count(row.secs)), Math.min(9, AccountNumbers.count(row.infects)), row.left ? 1 : 0, row.ai ? 1 : 0
+                Math.min(ZombieRoles.SECONDS_MAX, AccountNumbers.count(row.secs)), Math.min(9, AccountNumbers.count(row.infects)), row.left ? 1 : 0, row.ai ? 1 : 0,
+                Math.min(ZombieRoles.MISSIONS_MAX, AccountNumbers.count(row.missions))
             ])
         });
     }
@@ -62,7 +65,7 @@ class ZombieCodec {
             const cells = AccountShape.list(item);
             if (cells.length < 6 || typeof cells[0] !== "string")
                 return null;
-            rows.push({ name: String(cells[0]), role: Math.min(2, AccountNumbers.count(cells[1])), secs: AccountNumbers.count(cells[2]), infects: AccountNumbers.count(cells[3]), left: Number(cells[4]) === 1, ai: Number(cells[5]) === 1 });
+            rows.push({ name: String(cells[0]), role: Math.min(2, AccountNumbers.count(cells[1])), secs: AccountNumbers.count(cells[2]), infects: AccountNumbers.count(cells[3]), missions: Math.min(ZombieRoles.MISSIONS_MAX, AccountNumbers.count(cells[6])), left: Number(cells[4]) === 1, ai: Number(cells[5]) === 1 });
         }
         const myIndex = AccountNumbers.count(stored.me);
         if (!rows.length || myIndex >= rows.length)
@@ -98,7 +101,7 @@ class ZombieRandomTallyMath {
 ZombieRandomTallyMath.NUMBERS = ["g", "w", "hg", "hw", "zg", "zw"];
 class ZombieStatsMath {
     static empty() {
-        return { g: 0, w: 0, l: 0, hg: 0, hw: 0, zg: 0, zw: 0, og: 0, sv: 0, ik: 0, mi: 0, hs: 0, ls: 0, ids: {}, rm: ZombieRandomTallyMath.empty() };
+        return { g: 0, w: 0, l: 0, hg: 0, hw: 0, zg: 0, zw: 0, og: 0, sv: 0, ik: 0, ms: 0, mi: 0, hs: 0, ls: 0, ids: {}, rm: ZombieRandomTallyMath.empty() };
     }
     static normalize(raw) {
         const node = ZombieStatsMath.empty();
@@ -120,13 +123,14 @@ class ZombieStatsMath {
         const endedZombie = me.role !== ZombieRoles.SURVIVED;
         const secs = Math.min(ZombieRoles.SECONDS_MAX, AccountNumbers.count(me.secs));
         const infects = Math.min(9, AccountNumbers.count(me.infects));
+        const missions = Math.min(ZombieRoles.MISSIONS_MAX, AccountNumbers.count(me.missions));
         const rm = report.random ? ZombieRandomTallyMath.add(before.rm, report, win) : before.rm;
         const node = report.rows.some((row) => row.ai) ? Object.assign({}, before, { ids: Object.assign({}, before.ids), rm }) : {
             g: before.g + 1, w: before.w + (win ? 1 : 0), l: before.l + (win ? 0 : 1),
             hg: before.hg + (startedHuman ? 1 : 0), hw: before.hw + (startedHuman && report.winner === 0 ? 1 : 0),
             zg: before.zg + (endedZombie ? 1 : 0), zw: before.zw + (endedZombie && report.winner === 1 ? 1 : 0),
             og: before.og + (me.role === ZombieRoles.ORIGIN ? 1 : 0), sv: before.sv + (me.role === ZombieRoles.SURVIVED ? 1 : 0),
-            ik: before.ik + infects, mi: Math.max(before.mi, infects),
+            ik: before.ik + infects, ms: before.ms + missions, mi: Math.max(before.mi, infects),
             hs: before.hs + (startedHuman ? secs : 0), ls: Math.max(before.ls, startedHuman ? secs : 0),
             ids: Object.assign({}, before.ids), rm
         };
@@ -143,7 +147,7 @@ class ZombieProfile extends AccountGameProfile {
         this.mainChanged = true;
     }
     matchIdOf(report) { return report.matchId; }
-    rankFields(node) { return { g: node.g, w: node.w, x: node.ik }; }
+    rankFields(node) { return { g: node.g, w: node.w, x: node.ik, y: node.ms }; }
     extraPatch(user, extraRaw, node) { return this.mainChanged ? super.extraPatch(user, extraRaw, node) : {}; }
     planOf(report) { return new ZombiePlan(report); }
     encodeRecent(report, key, win) { return ZombieCodec.encode(report, key, win); }
@@ -180,6 +184,7 @@ class ZombieStatsView {
                 ["최장 생존", s.ls ? s.ls + "초" : "—"],
                 ["감염시킨 수 합계", String(s.ik)],
                 ["한 판 최다 감염", String(s.mi)],
+                ["완료한 미션 합계", String(s.ms)],
                 ["숙주 좀비", s.og + "번"],
                 ["끝까지 생존", s.sv + "번 (" + AccountHtml.percent(s.sv, s.g) + ")"]
             ])
@@ -188,7 +193,7 @@ class ZombieStatsView {
     blockBodyHtml(entry) {
         const me = entry.rows[entry.myIndex];
         const secs = me.role === ZombieRoles.ORIGIN ? "" : " · 생존 " + me.secs + "초";
-        return ZombieRoles.LABELS[me.role] + secs + (me.infects ? " · 감염시킴 " + me.infects : "") + " · " + (entry.winner === 0 ? "인간 승리" : "좀비 승리");
+        return ZombieRoles.LABELS[me.role] + secs + (me.infects ? " · 감염시킴 " + me.infects : "") + (me.missions ? " · 미션 " + me.missions : "") + " · " + (entry.winner === 0 ? "인간 승리" : "좀비 승리");
     }
     resultTitle(entry) {
         return entry.winner === 0 ? "인간 승리!" : "좀비 승리!";
@@ -197,10 +202,10 @@ class ZombieStatsView {
         const order = entry.rows.map((row, index) => ({ row, index })).sort((a, b) => (b.row.secs - a.row.secs) || (a.index - b.index));
         const rows = order.map((item) => {
             const row = item.row;
-            const cells = [(row.ai ? "🤖 " : "") + AccountHtml.esc(row.name) + (item.index === entry.myIndex ? " (나)" : ""), ZombieRoles.LABELS[row.role], row.role === ZombieRoles.ORIGIN ? "-" : row.secs + "초", String(row.infects)];
+            const cells = [(row.ai ? "🤖 " : "") + AccountHtml.esc(row.name) + (item.index === entry.myIndex ? " (나)" : ""), ZombieRoles.LABELS[row.role], row.role === ZombieRoles.ORIGIN ? "-" : row.secs + "초", String(row.infects), String(row.missions)];
             return item.index === entry.myIndex ? cells.map((cell) => '<b class="asd-result-mine">' + cell + "</b>") : cells;
         });
-        return AccountHtml.table(["닉네임", "결과", "생존 시간", "감염"], rows);
+        return AccountHtml.table(["닉네임", "결과", "생존 시간", "감염", "미션"], rows);
     }
 }
 class ZombieOriginRotation {
