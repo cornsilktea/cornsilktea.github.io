@@ -1,7 +1,7 @@
 const fs = require("fs"), vm = require("vm"), path = require("path");
 
 class MatchKitLoader {
-  static NAMES = ["MkPaths", "MkMatcher", "MkVersusMatcher", "MkWinBandVersusMatcher", "MkWinBand", "MkRecentMaps", "MkFreeForAllMatcher", "MkRecordBook", "MkPartyDirectory", "MkParty", "MkQueue", "MkBusySign", "MkStreakMath", "MkPersonalStreak"];
+  static NAMES = ["MkPaths", "MkMatcher", "MkRecentRivals", "MkVersusMatcher", "MkWinBandVersusMatcher", "MkWinBand", "MkRecentMaps", "MkFreeForAllMatcher", "MkRecordBook", "MkPartyDirectory", "MkParty", "MkQueue", "MkBusySign", "MkStreakMath", "MkPersonalStreak"];
   static load() {
     const src = fs.readFileSync(path.join(__dirname, "..", "match-kit.js"), "utf8") + "\n;({" + MatchKitLoader.NAMES.join(",") + "})";
     return vm.runInNewContext(src, { console, Math, Date, JSON, Object, Array, String, Number, Set, Map, Promise, setTimeout, clearTimeout });
@@ -602,6 +602,29 @@ class Scenarios {
     Report.check("AI 차례 돌리기: 막 들어온 AI 판 팀도 곧 올 팀으로 셈", v.plan({ a: e(0), b: e(1), c: e(90, { owed: true }) }, 100, () => 0.5) === null);
   }
 
+  static unitCrowdSpread() {
+    const timing = { settleMs: 40, claimExpireMs: 300, rematchWaitMs: 400, busyMs: 2000, returnGraceMs: 300, spreadWaitMs: 200 };
+    const e = (at, extra) => Object.assign({ leader: "x", people: {}, bots: 0, size: 1, at, claim: null }, extra || {});
+    const sign = (until) => ({ leader: "y", people: {}, bots: 0, size: 0, at: 0, claim: null, busyUntil: until });
+    const codes = (plan) => plan ? plan.groups.map((g) => g.code).sort().join() : null;
+    const metB = { avoid: ["b"], recent: [["b"], ["c"]] };
+    const seven = new Mk.MkVersusMatcher(1, timing);
+    const crowd = { a: e(0, metB), b: e(1), c: e(2), d: e(3), e: e(4), f: e(5), g: e(6) };
+    Report.check("최근 2판 피하기: 7팀이면 2판 전 상대(c)도 건너뛰고 d 와 묶음", codes(seven.plan(crowd, 100, () => 0.5)) === "a,d", codes(seven.plan(crowd, 100, () => 0.5)));
+    const six = new Mk.MkVersusMatcher(1, timing);
+    const few = { a: e(0, metB), b: e(1), c: e(2), d: e(3), e: e(4), f: e(5) };
+    Report.check("최근 2판 피하기: 6팀 이하면 바로 전 상대만 피함(c 와 묶임)", codes(six.plan(few, 100, () => 0.5)) === "a,c", codes(six.plan(few, 100, () => 0.5)));
+    const blocked = new Mk.MkVersusMatcher(1, timing);
+    const stuck = { a: e(0, metB), b: e(1, { recent: [["a"]], avoid: ["a"] }), c: e(2, { recent: [["a"]] }), s1: sign(5000), s2: sign(5000), s3: sign(5000), s4: sign(5000) };
+    Report.check("최근 2판 피하기: 맞는 상대가 없는 팀은 건너뛰고 다른 두 팀이 먼저 묶임", codes(blocked.plan(stuck, 100, () => 0.5)) === "b,c", codes(blocked.plan(stuck, 100, () => 0.5)));
+    Report.check("최근 2판 피하기: 45초(여기선 200ms) 뒤에는 바로 전 상대만 피하는 규칙으로 돌아감", codes(blocked.plan(stuck, 40 + 200 + 1, () => 0.5)) === "a,c", codes(blocked.plan(stuck, 40 + 200 + 1, () => 0.5)));
+    Report.check("다음 확인 시각: 최근 2판 단계가 끝나는 시각", new Mk.MkVersusMatcher(1, timing).nextCheck({ a: e(0) }, 100) === 40 + 200 + 1);
+    const kept = Mk.MkRecentRivals.push([["x"], ["y"]], ["z"]);
+    Report.check("최근 상대 기록: 새 판이 앞에 오고 2판까지만 남음", JSON.stringify(kept) === JSON.stringify([["z"], ["x"]]), kept);
+    Report.check("최근 상대 기록: AI 판(상대 없음)은 칸을 쓰지 않음", JSON.stringify(Mk.MkRecentRivals.push([["x"]], [])) === JSON.stringify([["x"]]));
+    Report.check("최근 상대 기록: 번호 키 객체로 돌아와도 읽음", Mk.MkRecentRivals.codes({ 0: { 0: "p" }, 1: { 0: "q", 1: "p" } }).join() === "p,q");
+  }
+
   // 1인 팀 3개가 여러 판 계속 매칭할 때: 바로 전 상대와 연달아 붙지 않고, AI 와 하는 판이 한 팀에 연달아 몰리지 않는가.
   // 게임 흐름(MkRandomFlow)을 줄여 흉내 낸다: 표를 받으면 경기 중 표지판 → 경기 → 결과 → 돌아옴 표지판 → 다시 매칭.
   static async scenarioRotation(teamCount, rounds) {
@@ -654,6 +677,7 @@ class SimRunner {
   static async run() {
     Scenarios.unitMatcher();
     Scenarios.unitRotation();
+    Scenarios.unitCrowdSpread();
     Scenarios.unitWinBand();
     Scenarios.unitRecentMaps();
     await Scenarios.scenarioWinBand();

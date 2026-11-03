@@ -96,6 +96,7 @@ interface MkHistoryLine {
 interface MkLastMatch {
   rivals?: string[];
   ai?: boolean;
+  recent?: string[][];
 }
 
 interface MkPartyRecord {
@@ -126,6 +127,7 @@ interface MkQueueEntry {
   at: number;
   claim?: MkClaim | null;
   avoid?: string[];
+  recent?: string[][];
   owed?: boolean;
   busyUntil?: number;
 }
@@ -200,12 +202,14 @@ interface MkTiming {
   rematchWaitMs?: number;
   busyMs?: number;
   returnGraceMs?: number;
+  spreadWaitMs?: number;
 }
 
 interface MkPickContext {
   now: number;
   othersComing: boolean;
   owedComing: boolean;
+  crowded: boolean;
 }
 
 class MkPaths {
@@ -224,6 +228,51 @@ class MkPaths {
   }
 }
 
+// 사람과 한 최근 판들의 상대 팀 코드(최신 순, KEEP 판까지). AI 판은 칸을 쓰지 않는다.
+class MkRecentRivals {
+  static readonly KEEP = 2;
+
+  static push(previous: string[][] | undefined, rivals: string[]): string[][] {
+    const kept = MkRecentRivals.lists(previous);
+    return rivals.length ? [rivals.slice()].concat(kept).slice(0, MkRecentRivals.KEEP) : kept;
+  }
+
+  static codes(recent: string[][] | undefined): string[] {
+    const codes: string[] = [];
+    MkRecentRivals.lists(recent).forEach((list) => list.forEach((code) => { if (codes.indexOf(code) < 0) codes.push(code); }));
+    return codes;
+  }
+
+  // Firebase 는 배열을 번호 키 객체로 돌려줄 수 있어 둘 다 받는다.
+  private static lists(value: unknown): string[][] {
+    if (!value || typeof value !== "object") return [];
+    const source = value as Record<string, unknown>;
+    return Object.keys(source).map((key) => {
+      const inner = source[key];
+      return inner && typeof inner === "object" ? Object.keys(inner as object).map((k) => (inner as Record<string, string>)[k]) : [];
+    });
+  }
+}
+
+// 대기열(기다리는 팀 + 경기 중 표지판)이 ON 팀 이상이면 붙는 팀이 충분히 많다고 보고 "최근 2판 상대 피하기"를 켠다.
+// OFF 팀 이하로 줄면 끈다(경계에서 깜빡이지 않게 두 값을 다르게 둠). 2026-11-03 선생님 요청.
+class MkCrowdGuard {
+  static readonly ON = 7;
+  static readonly OFF = 5;
+  static readonly SPREAD_WAIT_MS = 45000;
+  private crowded = false;
+
+  update(entries: MkQueueMap | null, now: number): boolean {
+    const count = Object.keys(entries || {}).filter((code) => {
+      const entry = (entries as MkQueueMap)[code];
+      return !!entry && (entry.size > 0 || (MkMatcher.isSign(entry) && (entry.busyUntil as number) > now));
+    }).length;
+    if (count >= MkCrowdGuard.ON) this.crowded = true;
+    else if (count <= MkCrowdGuard.OFF) this.crowded = false;
+    return this.crowded;
+  }
+}
+
 // 묶기 규칙의 공통 부분: 누가 준비됐는지, 누가 묶을 차례인지, 다음에 언제 다시 볼지.
 // 어떤 항목을 몇 개 고르고 어느 편에 넣는지는 자식 클래스가 정한다.
 // 시간 값의 이유:
@@ -233,6 +282,8 @@ class MkPaths {
 //  - returnGraceMs(25초): 판이 끝나 팀 대기실로 돌아온 팀이 "매칭 시작"을 다시 누를 때까지 기다려 주는 시간.
 abstract class MkMatcher {
   static readonly TIMING: MkTiming = { settleMs: 3000, claimExpireMs: 10000, rematchWaitMs: 40000, busyMs: 240000, returnGraceMs: 25000 };
+
+  private readonly crowd = new MkCrowdGuard();
 
   constructor(readonly partyLimit: number, protected readonly timing: MkTiming = MkMatcher.TIMING) {}
 
@@ -257,8 +308,21 @@ abstract class MkMatcher {
     return this.timing.returnGraceMs ?? (MkMatcher.TIMING.returnGraceMs as number);
   }
 
+  // 팀이 많을 때 붙는 단계 구분: 처음 spreadWaitMs 동안은 최근 2판 상대까지 피하고, 그 뒤에는 바로 전 상대만 피한다.
+  get spreadWaitMs(): number {
+    return this.timing.spreadWaitMs ?? MkCrowdGuard.SPREAD_WAIT_MS;
+  }
+
+  protected isCrowded(entries: MkQueueMap | null, now: number): boolean {
+    return this.crowd.update(entries, now);
+  }
+
   static metRecently(a: [string, MkQueueEntry], b: [string, MkQueueEntry]): boolean {
     return (a[1].avoid || []).indexOf(b[0]) >= 0 || (b[1].avoid || []).indexOf(a[0]) >= 0;
+  }
+
+  static metRecentTwo(a: [string, MkQueueEntry], b: [string, MkQueueEntry]): boolean {
+    return MkMatcher.metRecently(a, b) || MkRecentRivals.codes(a[1].recent).indexOf(b[0]) >= 0 || MkRecentRivals.codes(b[1].recent).indexOf(a[0]) >= 0;
   }
 
   static isSign(entry: MkQueueEntry): boolean {
@@ -288,7 +352,7 @@ abstract class MkMatcher {
   plan(entries: MkQueueMap | null, now: number, random: () => number): MkMatchPlan | null {
     const ready = this.ready(entries, now);
     if (!ready.length) return null;
-    const picked = this.pick(ready, { now, othersComing: this.othersComing(entries, now, false), owedComing: this.othersComing(entries, now, true) });
+    const picked = this.pick(ready, { now, othersComing: this.othersComing(entries, now, false), owedComing: this.othersComing(entries, now, true), crowded: this.isCrowded(entries, now) });
     if (!picked || picked[0][0] !== ready[0][0]) return null;
     const sides = this.sides(picked.length, random);
     return {
@@ -308,7 +372,7 @@ abstract class MkMatcher {
     Object.keys(entries || {}).forEach((code) => {
       const entry = (entries as MkQueueMap)[code];
       if (!entry) return;
-      const moments = MkMatcher.isSign(entry) ? [(entry.busyUntil as number) + 1] : [entry.at + this.timing.settleMs, entry.at + this.timing.settleMs + this.rematchWaitMs + 1];
+      const moments = MkMatcher.isSign(entry) ? [(entry.busyUntil as number) + 1] : [entry.at + this.timing.settleMs, entry.at + this.timing.settleMs + this.spreadWaitMs + 1, entry.at + this.timing.settleMs + this.rematchWaitMs + 1];
       if (entry.claim) moments.push(entry.claim.at + this.timing.claimExpireMs + 1);
       moments.forEach((moment) => {
         if (moment > now && (next === null || moment < next)) next = moment;
@@ -331,13 +395,30 @@ abstract class MkMatcher {
 // 바로 전 판 상대(avoid)는 건너뛰고, 그 상대밖에 없으면 경기 중인 다른 팀(표지판)이 있을 때만 rematchWaitMs 까지 기다린다.
 // AI 와 한 판 한 팀이 곧 돌아오는데 남은 팀이 딱 둘이면, 둘을 묶지 않고 잠깐 기다린다 — 그래야 그 팀이 또 혼자 남아
 // AI 를 연달아 만나지 않고, 대신 남은 둘 중 한 팀이 다음 AI 차례가 된다(팀 수가 홀수일 때 AI 차례 돌리기).
+// 팀이 많을 때(MkCrowdGuard) 최근 2판 상대를 피한다(2026-11-03 선생님 요청): 처음 spreadWaitMs(60초) 동안은 그런 상대가 없으면 기다리고
+// (맞는 상대가 하나도 없는 항목은 "준비된 항목"에서 빼서 다른 팀끼리의 묶기를 막지 않음), 그 뒤에는 바로 전 상대만 피하는 기존 규칙으로 돌아간다.
 class MkVersusMatcher extends MkMatcher {
+  protected ready(entries: MkQueueMap | null, now: number): Array<[string, MkQueueEntry]> {
+    const all = super.ready(entries, now);
+    if (!this.isCrowded(entries, now)) return all;
+    return all.filter((item) => this.waitedOf(item, now) >= this.spreadWaitMs || all.some((other) => other !== item && !MkMatcher.metRecentTwo(item, other)));
+  }
+
+  private waitedOf(item: [string, MkQueueEntry], now: number): number {
+    return now - (item[1].at + this.timing.settleMs);
+  }
+
   protected pick(ready: Array<[string, MkQueueEntry]>, context: MkPickContext): Array<[string, MkQueueEntry]> | null {
     const fitting = ready.filter(([, entry]) => entry.size <= this.partyLimit);
     if (fitting.length < 2 || fitting[0] !== ready[0]) return null;
     const first = fitting[0];
     const holding = context.now - (first[1].at + this.timing.settleMs) < this.rematchWaitMs;
     if (holding && fitting.length === 2 && context.owedComing && !first[1].owed) return null;
+    if (context.crowded) {
+      const spread = fitting.slice(1).find((other) => !MkMatcher.metRecentTwo(first, other));
+      if (spread) return [first, spread];
+      if (this.waitedOf(first, context.now) < this.spreadWaitMs) return null;
+    }
     const fresh = fitting.slice(1).find((other) => !MkMatcher.metRecently(first, other));
     if (fresh) return [first, fresh];
     if (holding && context.othersComing) return null;
@@ -862,6 +943,7 @@ class MkQueue {
     const last = party.lastMatch();
     const entry: MkQueueEntry = { leader: party.myId, people, bots: party.bots(), size: party.size(), at: since, claim: null };
     if (last.rivals && last.rivals.length) entry.avoid = last.rivals.slice();
+    if (last.recent && Object.keys(last.recent).length) entry.recent = MkRecentRivals.push(last.recent, []);
     if (last.ai) entry.owed = true;
     const ref = this.database.ref(this.paths.entry(party.code));
     ref.onDisconnect().remove();
@@ -1079,7 +1161,11 @@ class MkQueue {
       if (made.map) ticket.map = made.map;
       updates[this.paths.party(group.code) + "/match"] = ticket;
       updates[this.paths.party(group.code) + "/search"] = null;
-      updates[this.paths.party(group.code) + "/last"] = { rivals: plan.groups.filter((other) => other !== group).map((other) => other.code), ai: plan.groups.length === 1 };
+      const rivalCodes = plan.groups.filter((other) => other !== group).map((other) => other.code);
+      const last: MkLastMatch = { rivals: rivalCodes, ai: plan.groups.length === 1 };
+      const recent = MkRecentRivals.push(group.entry.recent, rivalCodes);
+      if (recent.length) last.recent = recent;
+      updates[this.paths.party(group.code) + "/last"] = last;
     });
     // 실제 Firebase 는 ref("") 를 잘못된 경로로 거절한다. 루트는 "/" 로 연다.
     try {
