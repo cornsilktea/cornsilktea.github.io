@@ -148,12 +148,11 @@
   #dashBar { height: 14px; border-radius: 7px; background: rgba(255, 255, 255, .22); overflow: hidden; box-shadow: 0 1px 3px rgba(0, 0, 0, .4); }
   #dashFill { height: 100%; width: 100%; border-radius: 7px; background: #D97B4F; }
   #dashFill.ready { background: #FF5A5A; }
-  #keyHint { position: absolute; left: 12px; bottom: calc(env(safe-area-inset-bottom, 0px) + 12px); font-size: 12px; font-weight: 700; color: #D5DCEA; line-height: 1.6; }
   #btnGameLeave { pointer-events: auto; position: absolute; right: 12px; top: calc(env(safe-area-inset-top, 0px) + 8px); height: 36px; padding: 0 14px; font-size: 14px; font-weight: 800; border-radius: 4px; border: 1px solid rgba(255, 255, 255, .5); background: rgba(8, 10, 22, .55); color: #fff; }
   #specBox, #specList { display: none; }
   #hud.spec #specBox { display: block; min-width: 130px; }
   #hud.spec #specList { display: flex; }
-  #hud.spec #roleBox, #hud.spec #keyHint, #hud.spec #dashBox { display: none; }
+  #hud.spec #roleBox, #hud.spec #dashBox { display: none; }
   #specBox .rec { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #E0293D; margin-right: 6px; vertical-align: 1px; animation: recBlink 1.2s steps(1) infinite; }
   #specTitle { font-size: 22px; font-weight: 800; margin-top: 3px; }
   #specHint { font-size: 12px; font-weight: 700; color: #C9D3E6; margin-top: 2px; }
@@ -213,7 +212,6 @@
   #tpFlip { left: 82px; bottom: 212px; width: 66px; height: 66px; font-size: 26px; line-height: 1; }
   #tpFlip small { font-size: 10px; margin-top: 2px; }
   #tpFlip.on { background: rgba(217, 123, 79, .6); }
-  body.touch #keyHint { display: none; }
   body.touch #btnGameLeave { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: auto; }
   body.touch #hud:not(.spec) #floorMap { left: 12px; right: auto; top: calc(env(safe-area-inset-top, 0px) + 150px); bottom: auto; width: min(320px, 38vw); }
   body.touch #dashBox { bottom: calc(env(safe-area-inset-bottom, 0px) + 40px); width: min(260px, 34vw); }
@@ -221,7 +219,6 @@
     #timer { font-size: 30px; }
     #specList button { height: 36px; font-size: 14px; }
     #roleText { font-size: 20px; }
-    #keyHint { display: none; }
     .codeNum { font-size: 44px; }
   }
   #scrParty { --st-accent: var(--sg-primary); --st-accent-ink: #fff; --st-title: #F4F1E8; --st-ink: var(--sg-ink); --st-ink-mid: var(--sg-ink-mid); --st-ink-soft: var(--sg-ink-soft); --st-bg: 12, 14, 20; --st-panel: var(--sg-panel); }
@@ -325,7 +322,6 @@
     <div id="mgNote"></div>
     <button type="button" id="mgPress">누르기 [Space]</button>
   </div>
-  <div id="keyHint">WASD 이동 · ←→ 시점 회전 · ↑↓ 시점 높이 · Q 뒤돌기 · Space 대쉬(숙주 좀비)</div>
   <button type="button" id="btnGameLeave">나가기</button>
 </div>
 
@@ -355,8 +351,7 @@
         <span><kbd>←</kbd> <kbd>→</kbd></span><span>카메라를 좌우로 돌립니다.</span>
         <span><kbd>↑</kbd> <kbd>↓</kbd></span><span>카메라 높이(각도)를 바꿉니다.</span>
         <span><kbd>Q</kbd></span><span>뒤로 돌아섭니다.</span>
-        <span><kbd>Space</kbd></span><span>숙주 좀비가 바라보는 방향으로 대쉬합니다. (감염된 좀비는 대쉬할 수 없습니다)</span>
-        <span><kbd>E</kbd></span><span>인간: 미션 장소 근처에서 미션을 시작하고, 미니게임에서 누르기(스페이스·Enter도 됩니다)</span>
+        <span><kbd>Space</kbd></span><span>숙주 좀비는 바라보는 방향으로 대쉬합니다. (감염된 좀비는 대쉬할 수 없습니다) 인간은 미션 장소 근처에서 미션을 시작하고, 미니게임에서 누르기도 합니다.</span>
         <span><kbd>M</kbd></span><span>지도 크게 보기/닫기</span>
         <span><kbd>태블릿</kbd></span><span>왼쪽 조이스틱으로 이동, 오른쪽 화면을 끌어 카메라 회전, 오른쪽 화면을 톡 치면 대쉬(숙주 좀비), ↻ 버튼으로 뒤돌기</span>
       </div>
@@ -2922,7 +2917,13 @@ class ZombieMissionController {
     if (this.run) { this.run.press(); return; }
     if (this.near) this.startRun();
   }
-  pressAction() { if (!this.run) return false; this.run.press(); return true; }
+  spaceAction() {
+    if (!this.humanActive()) return false;
+    if (this.run) { this.run.press(); return true; }
+    if (!this.near) return false;
+    this.startRun();
+    return true;
+  }
   startRun() {
     const mission = this.current();
     if (!mission) return;
@@ -2936,7 +2937,7 @@ class ZombieMissionController {
     room.ref.child("missionDone").transaction(cur => (cur || 0) === index ? index + 1 : undefined);
   }
   tick(dt, t) {
-    const cur = this.humanActive() && t >= room.startAt ? this.current() : null;
+    const cur = this.humanActive() ? this.current() : null;
     this.near = cur && ZombieMissionSites.within(cur.site, me.x, me.z) && Math.abs(me.y - cur.site.floor * FLOOR_H) < 2.5 ? cur : null;
     if (this.run) {
       if (!this.near || !cur) this.stopRun();
@@ -2957,7 +2958,7 @@ class ZombieMissionController {
     }
     const prompt = $("missionPrompt");
     show(prompt, !!this.near && !this.run);
-    if (this.near && !this.run) setText(prompt, "미션 시작 [E] · " + this.near.title);
+    if (this.near && !this.run) setText(prompt, "미션 시작 [Space] · " + this.near.title);
     if (this.run) this.drawRun();
   }
   drawRun() {
@@ -2967,7 +2968,7 @@ class ZombieMissionController {
       stage.innerHTML = view.kind === "mash" ? '<div class="mgBar"><i id="mgFill"></i></div>'
         : view.kind === "center" ? '<div class="mgTrack"><div class="mgGreen" style="left:' + (50 - view.green * 50) + "%;width:" + view.green * 100 + '%"></div><div class="mgNeedle" id="mgNeedle"></div></div>'
         : '<div class="mgRingHolder"><div class="mgRing target" style="width:' + view.ringTarget * 100 + "%;height:" + view.ringTarget * 100 + '%"></div><div class="mgRing moving" id="mgRing"></div></div>';
-      setText($("mgNote"), view.kind === "mash" ? "스페이스·E·누르기를 빠르게 계속 누르세요" : view.kind === "center" ? "바늘이 초록 칸에 있을 때 누르세요" : "큰 원이 고리에 겹칠 때 누르세요");
+      setText($("mgNote"), view.kind === "mash" ? "스페이스를 빠르게 계속 누르세요" : view.kind === "center" ? "바늘이 초록 칸에 있을 때 누르세요" : "큰 원이 고리에 겹칠 때 누르세요");
     }
     if (this.run.kind === "mash") $("mgFill").style.width = view.progress * 100 + "%";
     else if (this.run.kind === "center") $("mgNeedle").style.left = view.needle * 100 + "%";
@@ -3198,7 +3199,6 @@ window.addEventListener("keydown", e => {
   const tag = e.target && e.target.tagName;
   if (tag === "INPUT" || tag === "TEXTAREA") return;
   if (touchMode && e.code && e.key !== "Unidentified") setTouchMode(false);
-  if (screenNow === "game" && !e.repeat && (e.code === "KeyE" || e.code === "Enter")) { zombieMissions.interact(); return; }
   if (screenNow === "game" && !e.repeat && (e.code === "KeyM" || e.code === "Escape")) { bigMapToggle(e.code === "Escape" ? false : undefined); return; }
   const k = keyName(e); if (!k) return;
   if (k === "space" || (screenNow === "game" && ["up", "down", "left", "right"].includes(k))) e.preventDefault();
@@ -3214,7 +3214,7 @@ window.addEventListener("blur", () => { for (const k in pressed) pressed[k] = fa
 function onSpace() {
   if (screenNow === "lobby") { if (isHost()) hostStart(); }
   else if (screenNow === "result") playAgain();
-  else if (screenNow === "game") { if (!zombieMissions.pressAction()) tryDash(); }
+  else if (screenNow === "game") { if (!zombieMissions.spaceAction()) tryDash(); }
 }
 function bigMapToggle(force) {
   const cv = $("floorMap"), big = force === undefined ? !cv.classList.contains("big") : force;
@@ -3662,10 +3662,42 @@ function botsTick(dt, t, nowMs) {
   }
 }
 
+class CameraWallGuard {
+  static MARGIN = 0.34;
+  static SHOULDER_GAP = 0.12;
+  static scratch = [];
+  static from = { x: 0, y: 0, z: 0 };
+  static to = { x: 0, y: 0, z: 0 };
+
+  static shoulderOffset(target, rx, rz, y) {
+    const from = CameraWallGuard.from, to = CameraWallGuard.to;
+    from.x = target.x; from.y = y; from.z = target.z;
+    to.x = target.x + rx * CAM_SHOULDER; to.y = y; to.z = target.z + rz * CAM_SHOULDER;
+    return Math.max(0, cameraClearance(from, to) * CAM_SHOULDER - CameraWallGuard.SHOULDER_GAP);
+  }
+
+  static pushOut(position, pivot) {
+    const m = CameraWallGuard.MARGIN;
+    for (let pass = 0; pass < 3; pass++) {
+      let moved = false;
+      for (const c of collidersNear(position.x - m, position.x + m, position.z - m, position.z + m, CameraWallGuard.scratch)) {
+        if (c.y1 - c.y0 < 0.9 || position.y < c.y0 - 0.3 || position.y > c.y1 + 0.3) continue;
+        if (position.x < c.x0 - m || position.x > c.x1 + m || position.z < c.z0 - m || position.z > c.z1 + m) continue;
+        const towardPivotX = pivot.x < (c.x0 + c.x1) / 2, towardPivotZ = pivot.z < (c.z0 + c.z1) / 2;
+        const outX = towardPivotX ? c.x0 - m : c.x1 + m, outZ = towardPivotZ ? c.z0 - m : c.z1 + m;
+        if (Math.abs(outX - position.x) < Math.abs(outZ - position.z)) position.x = outX; else position.z = outZ;
+        moved = true;
+      }
+      if (!moved) return;
+    }
+  }
+}
+
 const camPivot = new THREE.Vector3(), camWanted = new THREE.Vector3(), camLook = new THREE.Vector3();
 function updateCamera(dt, target, yaw, nowMs) {
   const fx = Math.sin(yaw), fz = Math.cos(yaw), rx = -Math.cos(yaw), rz = Math.sin(yaw);
-  camPivot.set(target.x + rx * CAM_SHOULDER, target.y + CAM_PIVOT_H, target.z + rz * CAM_SHOULDER);
+  const shoulder = CameraWallGuard.shoulderOffset(target, rx, rz, target.y + CAM_PIVOT_H);
+  camPivot.set(target.x + rx * shoulder, target.y + CAM_PIVOT_H, target.z + rz * shoulder);
   const elev = round.camElev, horiz = Math.cos(elev) * CAM_DIST;
   camWanted.set(camPivot.x - fx * horiz, camPivot.y + Math.sin(elev) * CAM_DIST, camPivot.z - fz * horiz);
   const hitT = cameraClearance(camPivot, camWanted);
@@ -3673,6 +3705,7 @@ function updateCamera(dt, target, yaw, nowMs) {
   round.camDist = wantDist < round.camDist ? wantDist : round.camDist + (wantDist - round.camDist) * clamp(dt * 5, 0, 1);
   const k = round.camDist / CAM_DIST;
   camera.position.set(camPivot.x + (camWanted.x - camPivot.x) * k, camPivot.y + (camWanted.y - camPivot.y) * k, camPivot.z + (camWanted.z - camPivot.z) * k);
+  CameraWallGuard.pushOut(camera.position, camPivot);
   const inGym = target.x > BUILDING_X;
   const inStairwell = Math.abs(target.x) > 42 && target.z > STAIR_Z0 - 0.4;
   const floorBase = inGym || inStairwell ? 0 : clamp(Math.floor((target.y + 0.3) / FLOOR_H), 0, FLOORS - 1) * FLOOR_H;
