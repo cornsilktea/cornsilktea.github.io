@@ -817,8 +817,6 @@ class FrMiniGameView {
             this.buildCenter(game);
         else if (game instanceof FrShrinkRing)
             this.buildRing(game);
-        else if (game instanceof FrHoldRelease)
-            this.buildHold(game);
         this.root.hidden = false;
     }
     hide() { this.game = null; this.root.hidden = true; this.root.classList.remove("win"); }
@@ -861,15 +859,6 @@ class FrMiniGameView {
         track.append(green, this.needle);
         this.hits = FrDom.make("div", "fr-note");
         this.stage.append(track, this.hits, FrDom.make("div", "fr-note", "바늘이 초록 칸에 있을 때 누르세요"));
-    }
-    buildHold(game) {
-        const track = this.bar();
-        const green = FrDom.make("div", "fr-green");
-        green.style.left = (game.center * 100 - (game.greenFraction * 100) / 2) + "%";
-        green.style.width = game.greenFraction * 100 + "%";
-        this.fill = FrDom.make("div", "fr-fill thin");
-        track.append(this.fill, green);
-        this.stage.append(track, FrDom.make("div", "fr-note", "꾹 누르고 있다가 초록 칸에서 떼세요"));
     }
     buildRing(game) {
         const holder = FrDom.make("div", "fr-ring-holder");

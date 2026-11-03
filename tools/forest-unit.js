@@ -1,5 +1,5 @@
 const F = require("./forest-load.js")();
-const { FrBalance, FrCatalog, FrRandom, FrFruitRoll, FrFishRoll, FrOreRoll, FrDungeonDrops, FrBag, FrPublicStore, FrChestStore, FrPersonalCraftSource, FrVillageBuildSource, FrActionPoints, FrRecipeRules, FrCraftRules, FrRingRules, FrCropRules, FrSnowRules, FrVillage, FrDungeonRules, FrClock, FrSleepVote, FrMashGauge, FrCenterStop, FrShrinkRing, FrHoldRelease, FrMiniGameFactory, FrFoodRules, FrTerrainData, FrWorld, FrLocalBackend, FrBlockStore, FrBlockRules, FrHouseKit, FrBlockKey } = F;
+const { FrBalance, FrCatalog, FrRandom, FrFruitRoll, FrFishRoll, FrOreRoll, FrDungeonDrops, FrBag, FrPublicStore, FrChestStore, FrPersonalCraftSource, FrVillageBuildSource, FrActionPoints, FrRecipeRules, FrCraftRules, FrRingRules, FrCropRules, FrSnowRules, FrVillage, FrDungeonRules, FrClock, FrSleepVote, FrMashGauge, FrCenterStop, FrShrinkRing, FrMiniGameFactory, FrFoodRules, FrTerrainData, FrWorld, FrLocalBackend, FrBlockStore, FrBlockRules, FrHouseKit, FrBlockKey } = F;
 const terrainFile = JSON.parse(require("fs").readFileSync(require("path").join(__dirname, "..", "assets/forest/island-terrain.json"), "utf8"));
 
 let passed = 0;
@@ -186,12 +186,10 @@ const sourceOf = (bag, pub = new FrPublicStore(), chest = new FrChestStore()) =>
   check("가운데 맞추기: 2번 연달아", (() => { const g = new FrCenterStop(0.3, 2, 1.4); g.press(); g.tick(0.35); g.press(); const first = g.state; g.tick(0.7); g.press(); return first === "running" && g.state === "success"; })());
   check("줄어드는 원: 고리에 겹칠 때 성공", (() => { const g = new FrShrinkRing(0.12, 1.2, 0.35); g.press(); g.tick(1.2); g.press(); return g.state === "success"; })());
   check("줄어드는 원: 지나치면 저절로 실패", (() => { const g = new FrShrinkRing(0.12); g.press(); g.tick(1.2); g.tick(0.5); return g.state === "fail"; })());
-  check("꾹 눌러 떼기: 초록 칸에서 떼면 성공", (() => { const g = new FrHoldRelease(0.25); g.press(); g.tick(0.8); g.release(); return g.state === "success"; })());
-  check("꾹 눌러 떼기: 일찍 떼면 실패", (() => { const g = new FrHoldRelease(0.25); g.press(); g.tick(0.2); g.release(); return g.state === "fail"; })());
   check("도끼 등급별 맞출 횟수 4→1", FrMiniGameFactory.create("chop", 0).hitsNeeded === 4 && FrMiniGameFactory.create("chop", 3).hitsNeeded === 1);
-  check("미니게임 종류는 뽑기로 4가지 모두 나오고, 도구가 없으면 여전히 못 함", (() => {
-    const names = new Set([0, 0.3, 0.6, 0.9].map((r) => FrMiniGameFactory.createVaried("stone", 1, r).constructor.name));
-    return names.size === 4 && FrMiniGameFactory.createVaried("dig", 0, 0.1) === null && FrMiniGameFactory.createVaried("shake", 0, 0.99) !== null;
+  check("미니게임 종류는 뽑기로 3가지 모두 나오고, 도구가 없으면 여전히 못 함", (() => {
+    const names = new Set([0, 0.4, 0.8].map((r) => FrMiniGameFactory.createVaried("stone", 1, r).constructor.name));
+    return names.size === 3 && FrMiniGameFactory.createVaried("dig", 0, 0.1) === null && FrMiniGameFactory.createVaried("shake", 0, 0.99) !== null;
   })());
   check("삽·곡괭이 없으면 못 하는 작업", FrMiniGameFactory.create("dig", 0) === null && FrMiniGameFactory.create("snow", 0) === null && FrMiniGameFactory.create("hardRock", 1) === null && FrMiniGameFactory.create("hardRock", 2) !== null);
 }

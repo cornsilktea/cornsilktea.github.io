@@ -76,24 +76,6 @@ class FrShrinkRing extends FrMiniGame {
   }
 }
 
-class FrHoldRelease extends FrMiniGame {
-  protected readonly timeLimit = 8;
-  private holding = false;
-  private holdTime = 0;
-  constructor(readonly greenFraction: number, readonly riseSeconds = 1, readonly center = 0.8) { super(); }
-  bar(): number {
-    const phase = (this.holdTime / this.riseSeconds) % 2;
-    return phase <= 1 ? phase : 2 - phase;
-  }
-  protected onPress(): void { this.holding = true; this.holdTime = 0; }
-  protected onTick(dt: number): void { if (this.holding) this.holdTime += dt; }
-  protected onRelease(): void {
-    this.holding = false;
-    if (Math.abs(this.bar() - this.center) <= this.greenFraction / 2) this.succeed(); else this.failNow();
-  }
-  progress(): number { return this.bar(); }
-}
-
 type FrMiniBuilder = (tier: FrTier) => FrMiniGame | null;
 
 class FrMiniGameFactory {
@@ -101,10 +83,10 @@ class FrMiniGameFactory {
     shake: () => new FrMashGauge(12),
     chop: (t) => new FrCenterStop(FrBalance.AXE_GREEN[t], FrBalance.AXE_HITS[t]),
     gatherRing: () => new FrShrinkRing(0.12),
-    harvest: () => new FrHoldRelease(0.25),
+    harvest: () => new FrCenterStop(0.25, 1),
     dig: (t) => (FrBalance.SHOVEL_MASH[t] > 0 ? new FrMashGauge(FrBalance.SHOVEL_MASH[t]) : null),
     stone: (t) => new FrMashGauge(FrBalance.PICK_STONE_MASH[t]),
-    snow: (t) => (FrBalance.PICK_SNOW_GREEN[t] > 0 ? new FrHoldRelease(FrBalance.PICK_SNOW_GREEN[t]) : null),
+    snow: (t) => (FrBalance.PICK_SNOW_GREEN[t] > 0 ? new FrCenterStop(FrBalance.PICK_SNOW_GREEN[t], 1) : null),
     vein: (t) => new FrCenterStop(FrBalance.PICK_VEIN_GREEN[t], 1),
     hardRock: (t) => (FrBalance.PICK_HARD_MASH[t] > 0 ? new FrMashGauge(FrBalance.PICK_HARD_MASH[t]) : null),
   };
@@ -114,7 +96,6 @@ class FrMiniGameFactory {
     (e) => new FrMashGauge(Math.round(14 - 6 * e)),
     (e) => new FrCenterStop(0.12 + 0.12 * e, e < 0.5 ? 2 : 1),
     (e) => new FrShrinkRing(0.1 + 0.06 * e),
-    (e) => new FrHoldRelease(0.18 + 0.12 * e),
   ];
 
   static create(task: FrTaskKind, tier: FrTier): FrMiniGame | null {

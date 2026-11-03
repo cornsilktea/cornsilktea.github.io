@@ -1,5 +1,5 @@
 const F = require("./forest-load.js")();
-const { FrBalance, FrCatalog, FrRandom, FrFruitRoll, FrSeedRoll, FrFishRoll, FrOreRoll, FrDungeonDrops, FrItems, FrBag, FrPublicStore, FrChestStore, FrPersonalCraftSource, FrVillageBuildSource, FrVillage, FrCraftRules, FrRingRules, FrDungeonRules, FrMineRules, FrMiniGameFactory, FrHoldRelease, FrMashGauge, FrCenterStop, FrShrinkRing, FrFishingRules } = F;
+const { FrBalance, FrCatalog, FrRandom, FrFruitRoll, FrSeedRoll, FrFishRoll, FrOreRoll, FrDungeonDrops, FrItems, FrBag, FrPublicStore, FrChestStore, FrPersonalCraftSource, FrVillageBuildSource, FrVillage, FrCraftRules, FrRingRules, FrDungeonRules, FrMineRules, FrMiniGameFactory, FrMashGauge, FrCenterStop, FrShrinkRing, FrFishingRules } = F;
 
 class SimConfig {
   static readonly = null;
@@ -66,10 +66,6 @@ class SkillTable {
       game.press();
       const target = 1.2 + this.gauss() * 0.1;
       for (let t = 0; game.state === "running" && t < 4; t += dt) { game.tick(dt); if (t >= target) game.press(); }
-    } else if (game instanceof FrHoldRelease) {
-      game.press();
-      const target = 0.8 + this.gauss() * 0.12;
-      for (let t = 0; game.state === "running" && t < 4; t += dt) { game.tick(dt); if (t >= target) game.release(); }
     }
     return game.state === "success";
   }
