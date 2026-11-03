@@ -86,6 +86,8 @@
   .badge.host { background: #D97B4F; color: #fff; }
   .badge.zombie { background: var(--sg-danger); color: #fff; }
   .badge.alive { background: var(--sg-ok); color: #fff; }
+  .badge.origin { background: #D62A36; color: #fff; }
+  .badge.infected { background: #F0922B; color: #fff; }
   .row2 { display: flex; gap: 10px; }
   .row2 .btn { flex: 1 1 0; }
 
@@ -95,7 +97,9 @@
   table.res { width: 100%; border-collapse: collapse; font-size: 17px; }
   table.res th { text-align: left; font-size: 14px; color: var(--sg-ink-soft); font-weight: 700; padding: 6px 8px; border-bottom: 2px solid var(--sg-line-mid); }
   table.res td { padding: 10px 8px; border-bottom: 1px solid var(--sg-line); font-weight: 700; }
-  table.res tr.me td { background: var(--sg-primary-soft); }
+  table.res tr.me td { background: var(--sg-primary-soft); border-top: 2px solid #D97B4F; border-bottom: 2px solid #D97B4F; }
+  table.res tr.me td:first-child { border-left: 2px solid #D97B4F; }
+  table.res tr.me td:last-child { border-right: 2px solid #D97B4F; }
   table.res td.num { font-variant-numeric: tabular-nums; text-align: left; }
   table.res th.num { text-align: left; }
   .myRec { text-align: center; margin-top: 10px; font-size: 16px; font-weight: 700; color: var(--sg-ink-mid); }
@@ -4062,7 +4066,7 @@ function renderResult() {
     : room.quitSide === "human" ? "인간이 모두 나가서 좀비가 승리했습니다."
     : humansWon ? "미션을 모두 끝내고 끝까지 살아남은 학생: " + survivors.join(", ")
     : survivors.length ? "3분이 지났지만 미션을 모두 끝내지 못했습니다. (" + (room.missionCleared || 0) + " / " + ZombieMissionCatalog.COUNT + ")" : "모든 학생이 감염되었습니다.");
-  const label = { origin: '<span class="badge zombie">숙주 좀비</span>', infected: '<span class="badge zombie">감염</span>', survived: '<span class="badge alive">생존</span>' };
+  const label = { origin: '<span class="badge origin">숙주 좀비</span>', infected: '<span class="badge infected">감염</span>', survived: '<span class="badge alive">생존</span>' };
   $("resBody").innerHTML = ids.map(id => {
     const f = final[id];
     return '<tr class="' + (id === myId ? "me" : "") + '"><td>' + escapeHtml(f.n) + (id === myId ? " (나)" : "") + "</td><td>" + label[f.r] + '</td><td class="num">' + (f.r === "origin" ? "-" : f.s + "초") + '</td><td class="num">' + missionsDoneBy(id) + '</td><td class="num">' + infectsMadeBy(id) + "</td></tr>";
