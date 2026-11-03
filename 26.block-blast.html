@@ -454,10 +454,10 @@ function preloadThemes(){
 }
 
 function markDead(){
-  let anyDead = false;
-  for (const p of G.tray) if (p) { p.dead = !canPlaceAnywhere(G.board, p.shape); if (p.dead) anyDead = true; }
+  let remaining = 0, deadCount = 0;
+  for (const p of G.tray) if (p) { remaining++; p.dead = !canPlaceAnywhere(G.board, p.shape); if (p.dead) deadCount++; }
   renderTray();
-  return anyDead;
+  return remaining > 0 && deadCount === remaining;
 }
 
 function popText(text, x, y, size, big){
