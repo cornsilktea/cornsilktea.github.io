@@ -2412,12 +2412,14 @@ function cameraClearance(from, to) {
 class InfectionSight {
   static from = { x: 0, y: 0, z: 0 };
   static to = { x: 0, y: 0, z: 0 };
+  static BODY_TOUCH = PLAYER_RADIUS * 2 + 0.1;
 
   static clear(zombiePrev, zombiePos, targetX, targetY, targetZ) {
     const dx = zombiePos.x - zombiePrev.x, dz = zombiePos.z - zombiePrev.z, l2 = dx * dx + dz * dz;
     const k = l2 > 0 ? clamp(((targetX - zombiePrev.x) * dx + (targetZ - zombiePrev.z) * dz) / l2, 0, 1) : 0;
     const from = InfectionSight.from, to = InfectionSight.to;
     from.x = zombiePrev.x + dx * k; from.z = zombiePrev.z + dz * k; from.y = zombiePos.y + CHEST_H;
+    if (Math.hypot(targetX - from.x, targetZ - from.z) < InfectionSight.BODY_TOUCH) return true;
     to.x = targetX; to.y = targetY + CHEST_H; to.z = targetZ;
     return cameraClearance(from, to) >= 0.999;
   }
