@@ -38,7 +38,7 @@
   #hudClock { font-variant-numeric: tabular-nums; min-width: 84px; justify-content: center; }
   #hudClock.sudden { color: #FFB27A; border-left-color: #FF6B5A; }
   .teamDot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-left: 4px; border: 1px solid rgba(255,255,255,.7); }
-  #hudMine { position: fixed; left: 12px; top: 54px; z-index: 5; pointer-events: none; font-size: 15px; font-weight: 800; }
+  #hudMine { position: fixed; left: 12px; top: 12px; z-index: 5; pointer-events: none; font-size: 15px; font-weight: 800; }
   .hudWho { font-size: 13px; color: #FFD7BF; margin-bottom: 4px; }
   .statRow { display: flex; gap: 10px; align-items: center; }
   .statRow + .statRow { margin-top: 5px; }
@@ -87,7 +87,7 @@
   #resultBox tr.me td { background: rgba(217,123,79,.3); }
   #resultBox .tc { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; }
   #resultBox small { font-size: 11px; color: #9FB3C8; }
-  #specPanel { position: fixed; left: 12px; top: 50px; bottom: 16px; width: 230px; z-index: 6; display: flex; flex-direction: column; gap: 6px; overflow-y: auto; }
+  #specPanel { position: fixed; left: 12px; top: 8px; bottom: 16px; width: 230px; z-index: 6; display: flex; flex-direction: column; gap: 6px; overflow-y: auto; }
   .spCard { background: rgba(10,22,44,.86); border-radius: 8px; padding: 6px 9px; border-left: 5px solid; cursor: pointer; }
   .spCard.watched { box-shadow: 0 0 0 3px #D97B4F; }
   .spCard.trapped { background: rgba(40,90,140,.9); }
@@ -100,7 +100,7 @@
   body.spectating #hudMine { left: 50%; top: auto; bottom: 16px; transform: translateX(-50%); }
   @media (max-width: 700px) { #specPanel { width: 150px; } .spStats { font-size: 11px; } .spName { font-size: 12px; } }
   .seat { color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,.7); }
-  #btnGameLeave { position: fixed; right: 12px; top: 54px; z-index: 7; font: inherit; font-size: 15px; font-weight: 800; color: #fff; cursor: pointer; border-top: 0; border-right: 0; border-bottom: 0; padding: 7px 14px; }
+  #btnGameLeave { position: fixed; right: 12px; top: 12px; z-index: 7; font: inherit; font-size: 15px; font-weight: 800; color: #fff; cursor: pointer; border-top: 0; border-right: 0; border-bottom: 0; padding: 7px 14px; }
   #btnGameLeave.confirm { background: #D97B4F; border-left-color: #fff; }
   #btnResultLeave { margin-top: 8px; width: 100%; min-height: 44px; font: inherit; font-size: 16px; font-weight: 800; border-radius: 8px; border: 2px solid rgba(255,255,255,.5); background: transparent; color: #fff; cursor: pointer; }
   #netMeter { position: fixed; right: 10px; bottom: 6px; z-index: 30; font-size: 12px; color: #CFE8F7; font-weight: 800; }

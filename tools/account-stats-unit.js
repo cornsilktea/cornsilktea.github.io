@@ -1,10 +1,10 @@
 const fs = require("fs"), vm = require("vm"), path = require("path");
 const root = path.join(__dirname, "..");
-const files = ["match-kit.js", "account-match-kit.js", "account-stats.js", "24.turbo-lap-stats.js", "25.fps-survival-stats.js", "31.zombie-outbreak-stats.js", "31.zombie-versus.js", "38.snow-account.js", "38.snow-versus.js", "39.balloon-account.js", "39.balloon-versus.js", "patch-notes.js"];
+const files = ["match-kit.js", "account-match-kit.js", "account-stats.js", "24.turbo-lap-stats.js", "25.fps-survival-stats.js", "31.zombie-outbreak-stats.js", "31.zombie-versus.js", "31.zombie-missions.js", "38.snow-account.js", "38.snow-versus.js", "39.balloon-account.js", "39.balloon-versus.js", "patch-notes.js"];
 const names = ["AccountNumbers", "AccountRates", "AccountMatchKey", "AccountKeyLedger", "AccountForfeit", "AccountShape", "AccountRecentHeadCodec", "RecentMatchRing", "AccountLoginNotice", "RecentBlockList", "AccountGameProfile", "AccountMatchStore",
   "TeamBattleRates", "AccountMvpJudge", "TeamBattlePlan", "TeamBattleCodec", "TeamBattleRing", "AccountStatsMath", "AccountStatsTable", "ClassStatsSummary", "TeamBattleProfile", "AccountStatsStore",
   "TurboLapPlan", "TurboLapCodec", "TurboLapStatsMath", "TurboLapProfile", "TurboLapStatsView", "FpsPlan", "FpsCodec", "FpsStatsMath", "FpsProfile", "FpsStatsView",
-  "ZombiePlan", "ZombieCodec", "ZombieStatsMath", "ZombieProfile", "ZombieStatsView", "ZombieRandomTallyMath", "ZombieOriginRotation", "ZombieVersusCards", "ZombieVersusLineup", "SnAccountPlan", "SnAccountCodec", "SnAccountMath", "SnAccountProfile", "SnAccountView", "SnReportBuilder", "SnVersusCards",
+  "ZombiePlan", "ZombieCodec", "ZombieStatsMath", "ZombieProfile", "ZombieStatsView", "ZombieRandomTallyMath", "ZombieOriginRotation", "ZombieVersusCards", "ZombieVersusLineup", "ZombieMissionSites", "ZombieMissionCatalog", "ZombieMissionProgress", "SnAccountPlan", "SnAccountCodec", "SnAccountMath", "SnAccountProfile", "SnAccountView", "SnReportBuilder", "SnVersusCards",
   "WbAccountPlan", "WbAccountCodec", "WbAccountMath", "WbAccountProfile", "WbAccountView", "WbReportBuilder", "WbRandomTallyMath", "WbVersusCards", "WbVersusLineupBuilder",
   "AccountClassRank", "RandomMatchPlan", "RandomMatchCodec", "RandomMatchMath", "RandomMatchProfile", "RandomMatchView",
   "AccountPendingCodec", "AccountMatchSender", "AccountPendingGuard", "MkStreakMath", "TurboLapClock", "TurboLapOutcome", "TeamBattleScore", "PatchNoteCodec", "PatchNoteSeen"];
@@ -341,6 +341,23 @@ const zombieReport = (extra) => Object.assign({ matchId: "m31", myIndex: 1, rows
   const matchedSeats = K.ZombieVersusLineup.build(people, 5, true, 3).map((seat) => seat.kind).join(",");
   const roomSeats = K.ZombieVersusLineup.build(people, 5, false, 0).map((seat) => seat.kind).join(",");
   check("31번 대결 화면 자리: 랜덤 매칭은 사람 → 입장하는 중 → AI, 일반 방은 사람 → 빈 자리", matchedSeats === "player,player,coming,ai,ai" && roomSeats === "player,player,empty,empty,empty", [matchedSeats, roomSeats]);
+}
+
+{
+  const plans = [
+    { N: [["stairs", 0, 0], ["class", 1, 1, "1학년 1반"], ["staff", 3, 4, "교무실"], ["nurse", 5, 5, "보건실"], ["class", 6, 6, "1학년 3반"]], S: [["science", 0, 0, "과학실"], ["lobby", 3, 5], ["art", 8, 8, "미술실"]] },
+    { N: [["class", 1, 1, "2학년 1반"], ["library", 4, 5, "도서실"]], S: [["computer", 0, 0, "컴퓨터실"], ["class", 1, 1, "3학년 1반"]] }
+  ];
+  const sites = K.ZombieMissionSites.build(plans, 54, 12, 3, 18);
+  check("31번 미션 장소: 계단·로비는 빼고 방마다 앞쪽 벽 가운데 한 곳", sites.length === 10 && !sites.some((x) => x.type === "stairs" || x.type === "lobby") && sites.every((x) => Math.abs(Math.abs(x.z) - 10.4) < 1e-9) && sites[0].x === -54 + 12 + 0.3 && sites.filter((x) => x.floor === 1).length === 4);
+  const picks = K.ZombieMissionCatalog.pick(12345, sites);
+  check("31번 미션 뽑기: 같은 씨앗은 같은 3개, 종류·장소가 서로 다르고 장소가 종류에 맞음", picks.length === 3 && same(picks, K.ZombieMissionCatalog.pick(12345, sites)) && new Set(picks.map((m) => m.p)).size === 3 && picks.every((m) => K.ZombieMissionCatalog.KINDS[m.p].accepts(sites[m.s]) && K.ZombieMissionCatalog.GAMES.indexOf(m.g) >= 0), picks);
+  check("31번 미션 뽑기: 씨앗이 다르면 다른 조합이 나옴", new Set(Array.from({ length: 40 }, (_, i) => JSON.stringify(K.ZombieMissionCatalog.pick(i * 977 + 3, sites)))).size > 20);
+  const missions = K.ZombieMissionCatalog.decode(JSON.parse(JSON.stringify(picks)), sites);
+  check("31번 미션 복원: 방 값(배열·번호 키 객체)을 읽고 잘못된 값은 버림", missions.length === 3 && K.ZombieMissionCatalog.decode({ 0: picks[0], 1: { p: 99, s: 0, g: "mash" } }, sites).length === 1 && K.ZombieMissionCatalog.decode(null, sites).length === 0);
+  const P = K.ZombieMissionProgress;
+  check("31번 미션 진행: 현재 미션·클리어 문구·모두 완료", P.current(missions, 0) === missions[0] && P.current(missions, 3) === null && P.clear(2) === "미션 2개 클리어" && P.allClear() === "미션 모두 완료!" && P.complete(missions, 3) && !P.complete(missions, 2));
+  check("31번 승패: 미션 3개를 끝내고 살아남아야 인간 승리, 못 끝내면 3분이 지나도 좀비 승리", P.humansWin(2, missions, 3) && !P.humansWin(2, missions, 2) && !P.humansWin(0, missions, 3) && P.humansWin(1, [], 0));
 }
 
 const snow = new GameCase("38번", new K.SnAccountProfile(), K.SnAccountCodec, "snowroyale");

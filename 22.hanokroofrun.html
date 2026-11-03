@@ -19,7 +19,7 @@
   * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
   html, body { width: 100%; height: 100%; overflow: hidden; background: #0a0d2b; font-family: "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif; color: #f4f6ff; }
   #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
-  #hud { position: fixed; top: 0; left: 0; right: 0; padding: calc(46px + env(safe-area-inset-top, 0px)) 10px 0; display: none; flex-direction: row; align-items: stretch; gap: 6px; pointer-events: none; z-index: 5; }
+  #hud { position: fixed; top: 0; left: 0; right: 0; padding: calc(8px + env(safe-area-inset-top, 0px)) 10px 0; display: none; flex-direction: row; align-items: stretch; gap: 6px; pointer-events: none; z-index: 5; }
   .chip { flex: 1 1 0; min-width: 0; height: clamp(26px, 3.6vw, 40px); display: flex; align-items: center; justify-content: center; background: rgba(244, 246, 255, 0.92); color: #1b2350; border-radius: 10px; padding: 0 8px; font-size: clamp(13px, 2.2vw, 24px); font-weight: 700; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.2; }
   #minimap { flex: 2 1 0; min-width: 0; height: clamp(26px, 3.6vw, 40px); background: rgba(244, 246, 255, 0.92); border-radius: 10px; display: block; }
   #catLayer { position: fixed; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; z-index: 6; }
@@ -45,7 +45,7 @@
   .hall em { font-style: normal; font-weight: 800; }
   .hall small { display: block; font-size: 0.8em; font-weight: 600; opacity: 0.85; margin-top: 2px; }
   #overlay.st-screen { display: block; align-items: initial; justify-content: initial; z-index: 10;
-    padding: 54px 16px calc(env(safe-area-inset-bottom, 0px) + 24px);
+    padding: 16px 16px calc(env(safe-area-inset-bottom, 0px) + 24px);
     --st-bg: 6, 8, 30; --st-panel: rgba(14, 18, 52, .8); --st-accent: #D97B4F; --st-title2: #FFD98A; --st-glow: rgba(255, 217, 138, .5);
     --st-ink-mid: #D4D9F2; --st-ink-soft: #9EA6CC;
     background: linear-gradient(90deg, rgba(6, 8, 30, .9) 0%, rgba(6, 8, 30, .66) 46%, rgba(6, 8, 30, .18) 82%); }

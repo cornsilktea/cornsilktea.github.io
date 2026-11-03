@@ -33,7 +33,7 @@
   #loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 800; color: #D6EBC9; }
   .hud-box { background: rgba(16, 24, 38, .74); border-left: 3px solid #D97B4F; border-radius: 6px; padding: 6px 12px; font-weight: 800; }
   #hudClockBox { position: fixed; top: 8px; right: 12px; z-index: 5; text-align: center; font-size: 17px; font-variant-numeric: tabular-nums; }
-  #hudButtons { position: fixed; top: 52px; right: 12px; z-index: 5; display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
+  #hudButtons { position: fixed; top: 10px; right: 12px; z-index: 5; display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
   #hudButtons button { font: inherit; font-size: 14px; color: #fff; cursor: pointer; border-top: 0; border-right: 0; border-bottom: 0; }
   #hudAp { position: fixed; left: 50%; bottom: 76px; transform: translateX(-50%); z-index: 5; width: 456px; max-width: 94vw; }
   #hudApBar { position: relative; height: 18px; background: rgba(16, 24, 38, .75); border: 2px solid rgba(255,255,255,.35); border-radius: 9px; overflow: hidden; }
@@ -50,7 +50,7 @@
   #hudAreaBox { position: fixed; top: 8px; left: 50%; transform: translateX(-50%); z-index: 5; text-align: center; font-size: 16px; white-space: nowrap; }
   #hudSleep { font-size: 13px; margin-top: 6px; color: #FFE2C9; }
   #toast { position: fixed; left: 50%; top: 104px; transform: translateX(-50%); z-index: 12; max-width: 88vw; text-align: center; font-size: 16px; font-weight: 800; background: rgba(16, 24, 38, .88); border-left: 3px solid #D97B4F; border-radius: 6px; padding: 8px 14px; pointer-events: none; }
-  #questPanel { position: fixed; left: 12px; top: 54px; z-index: 5; width: 232px; max-width: 46vw; padding: 8px 10px; background: rgba(16, 24, 38, .62); border-left: 3px solid #D97B4F; border-radius: 6px; font-size: 14px; line-height: 1.45; pointer-events: none; }
+  #questPanel { position: fixed; left: 12px; top: 12px; z-index: 5; width: 232px; max-width: 46vw; padding: 8px 10px; background: rgba(16, 24, 38, .62); border-left: 3px solid #D97B4F; border-radius: 6px; font-size: 14px; line-height: 1.45; pointer-events: none; }
   .fr-quest-head { font-weight: 800; margin-bottom: 4px; color: #FFD9B8; }
   .fr-quest-row { font-variant-numeric: tabular-nums; }
   .fr-quest-row.done { text-decoration: line-through; opacity: .6; }
@@ -129,7 +129,7 @@
   .fr-fishing { position: fixed; inset: 0; z-index: 25; background: rgba(4, 12, 24, .82); display: flex; align-items: center; justify-content: center; }
   .fr-fishing canvas { width: min(92vw, 720px); height: auto; border-radius: 12px; border: 2px solid rgba(255,255,255,.25); touch-action: none; }
   .fr-fishing-hint { position: absolute; left: 50%; top: calc(50% - min(26vw, 190px) - 40px); transform: translateX(-50%); font-size: 18px; font-weight: 800; background: rgba(16,24,38,.85); border-left: 3px solid #D97B4F; border-radius: 6px; padding: 6px 14px; white-space: nowrap; max-width: 94vw; }
-  .fr-fishing-exit { position: absolute; left: 14px; top: 54px; }
+  .fr-fishing-exit { position: absolute; left: 14px; top: 14px; }
   .fr-fishing-pull { position: absolute; right: 26px; bottom: 26px; width: 120px; height: 120px; border-radius: 50%; border: 3px solid rgba(255,255,255,.6); background: rgba(217,123,79,.9); color: #fff; font: inherit; font-size: 22px; font-weight: 800; touch-action: none; }
   .fr-fishing-card { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 6px; background: rgba(16,24,38,.95); border: 4px solid #B8BEC9; border-radius: 14px; padding: 16px 28px; font-size: 20px; animation: frHit .5s ease-out; }
   .fr-cur-count { font-size: 11px; color: #dbe6f2; }

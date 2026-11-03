@@ -98,7 +98,7 @@
   --st-ink:#EEF2EE; --st-ink-mid:#CFD8D0; --st-ink-soft:#A3B0A6;
   position:fixed;top:0;right:0;bottom:0;left:0;z-index:40;
   display:block;overflow-y:auto;-webkit-overflow-scrolling:touch;
-  padding:54px 16px calc(env(safe-area-inset-bottom,0px) + 24px);
+  padding:16px 16px calc(env(safe-area-inset-bottom,0px) + 24px);
   background:linear-gradient(90deg,rgba(var(--st-bg),.9) 0%,rgba(var(--st-bg),.66) 46%,rgba(var(--st-bg),.18) 82%);
   color:var(--st-ink);font-family:var(--sg-font);text-align:left;line-height:1.5;
   touch-action:pan-y;

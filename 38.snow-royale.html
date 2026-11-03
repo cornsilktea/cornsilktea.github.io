@@ -33,7 +33,7 @@
   #loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 20px; font-weight: 800; color: #24364A; }
   .hud-box { background: rgba(16, 24, 38, .74); border-left: 3px solid #D97B4F; border-radius: 6px; padding: 8px 12px; }
   #touchZone { position: fixed; inset: 0; z-index: 2; touch-action: none; }
-  #hudMine { position: fixed; left: 12px; top: 54px; z-index: 5; width: 250px; pointer-events: none; }
+  #hudMine { position: fixed; left: 12px; top: 12px; z-index: 5; width: 250px; pointer-events: none; }
   body.spectating #hudMine { left: 50%; top: auto; bottom: 18px; transform: translateX(-50%); }
   #hudWatch { font-size: 13px; font-weight: 800; color: #FFD7BF; margin-bottom: 4px; }
   .hpBar { position: relative; height: 20px; border-radius: 5px; background: rgba(255,255,255,.14); overflow: hidden; }
@@ -103,7 +103,7 @@
   .sn-num.storm { color: #BFE3FF; font-size: 16px; }
   #frost { position: fixed; inset: 0; z-index: 3; pointer-events: none; opacity: 0; transition: opacity .3s;
     background: radial-gradient(ellipse at center, rgba(255,255,255,0) 45%, rgba(225,240,255,.85) 85%, rgba(255,255,255,.98) 100%); }
-  #specPanel { position: fixed; left: 12px; top: 50px; bottom: 16px; width: 270px; z-index: 6; display: flex; flex-direction: column; gap: 6px; overflow-y: auto; }
+  #specPanel { position: fixed; left: 12px; top: 8px; bottom: 16px; width: 270px; z-index: 6; display: flex; flex-direction: column; gap: 6px; overflow-y: auto; }
   .spTime { background: rgba(16,24,38,.86); border-radius: 10px; padding: 6px 10px; text-align: center; border: 2px solid rgba(255,255,255,.16); }
   .spTime b { display: block; font-size: 30px; line-height: 1.1; font-variant-numeric: tabular-nums; }
   .spTime small { display: block; font-size: 13px; color: #B8C6D4; font-weight: 800; }
@@ -126,7 +126,7 @@
     #specPanel { width: 160px; }
     .spTime b { font-size: 22px; } .spName { font-size: 13px; } .spHead { font-size: 13px; }
   }
-  #bigMap { position: fixed; inset: 0; z-index: 9; background: rgba(10,16,26,.82); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 50px 12px 12px; }
+  #bigMap { position: fixed; inset: 0; z-index: 9; background: rgba(10,16,26,.82); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 12px 12px 12px; }
   #bigMapTitle { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); font-size: 18px; font-weight: 800; padding: 6px 14px; }
   #bigMap.picking #bigMapTitle { background: #D97B4F; border-left-color: #fff; }
   #bigMapCanvas { width: min(92vw, calc(100vh - 70px)); height: min(92vw, calc(100vh - 70px)); border-radius: 10px; border: 2px solid rgba(255,255,255,.8); }
@@ -158,7 +158,7 @@
   #lobbyScreen.matched [data-slot] { pointer-events: none; }
   #netMeter { position: fixed; right: 10px; bottom: 6px; z-index: 30; font-size: 12px; color: #24364A; font-weight: 800; }
   #btnResultLeave { margin-top: 8px; width: 100%; min-height: 44px; font: inherit; font-size: 16px; font-weight: 800; border-radius: 8px; border: 2px solid rgba(255,255,255,.5); background: transparent; color: #fff; cursor: pointer; }
-  .snv-curtain { position: fixed; inset: 0; z-index: 30; display: flex; align-items: center; justify-content: center; overflow-y: auto; padding: calc(env(safe-area-inset-top, 0px) + 54px) 3vw 3vh;
+  .snv-curtain { position: fixed; inset: 0; z-index: 30; display: flex; align-items: center; justify-content: center; overflow-y: auto; padding: calc(env(safe-area-inset-top, 0px) + 12px) 3vw 3vh;
     background: radial-gradient(ellipse at center, rgba(24, 40, 66, .94), rgba(8, 14, 26, .97)); color: #EEF3F8; font-family: var(--sg-font); transition: opacity .35s ease; }
   .snv-curtain[hidden] { display: none; }
   .snv-curtain.out { opacity: 0; }

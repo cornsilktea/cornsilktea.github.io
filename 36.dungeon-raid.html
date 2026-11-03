@@ -83,7 +83,7 @@
   .hud-box { background: linear-gradient(135deg, rgba(16, 14, 26, .84), rgba(40, 32, 58, .74)); border: 1.5px solid rgba(255, 255, 255, .2); border-top: 3px solid #D97B4F; border-radius: 10px; padding: 6px 12px; color: #fff; font-weight: 800; font-variant-numeric: tabular-nums; text-shadow: 0 1px 3px rgba(0, 0, 0, .6); box-shadow: 0 4px 14px rgba(0, 0, 0, .3); }
   #gameUi { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 20; pointer-events: none; }
   #gameUi button { pointer-events: auto; }
-  #hudTeam { position: absolute; left: 10px; top: 50px; width: 210px; padding: 6px 8px; }
+  #hudTeam { position: absolute; left: 10px; top: 8px; width: 210px; padding: 6px 8px; }
   .rd-row { display: grid; grid-template-columns: 26px 1fr; grid-template-rows: auto 6px; column-gap: 7px; align-items: center; padding: 3px 0; font-size: 13px; }
   .rd-row i { grid-row: span 2; width: 26px; height: 26px; border-radius: 50%; color: #14101C; font-style: normal; font-size: 13px; display: flex; align-items: center; justify-content: center; }
   .rd-row span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
@@ -94,7 +94,7 @@
   .rd-row.down { opacity: .45; }
   .rd-row.down em { background: #888; }
   .rd-row.gone span::after { content: " (연결 끊김)"; font-size: 10px; color: #FF9A8A; }
-  #hudTop { position: absolute; left: 50%; top: 50px; transform: translateX(-50%); text-align: center; min-width: 260px; max-width: 52vw; }
+  #hudTop { position: absolute; left: 50%; top: 8px; transform: translateX(-50%); text-align: center; min-width: 260px; max-width: 52vw; }
   #hudFloor { font-size: 17px; }
   #hudTime { font-size: 13px; color: #F2C879; }
   #hudWave { font-size: 13px; color: #D9CCF2; }
@@ -107,7 +107,7 @@
   #hudMech { position: absolute; left: 50%; top: 172px; transform: translateX(-50%); max-width: 80vw; font-size: 18px; text-align: center; border-top-color: #4C9BFF; color: #DCEBFF; }
   #hudCount { position: absolute; left: 50%; top: 38%; transform: translate(-50%, -50%); font-size: 96px; font-weight: 800; color: #FFFFFF; text-shadow: 0 4px 0 rgba(0, 0, 0, .45), 0 0 28px rgba(217, 123, 79, .8); }
   #hudHint { position: absolute; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 92px); transform: translateX(-50%); max-width: min(620px, 70vw); text-align: center; font-size: 15px; }
-  #hudSide { position: absolute; right: 10px; top: 50px; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+  #hudSide { position: absolute; right: 10px; top: 10px; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
   #minimap { display: block; width: 168px; height: 112px; border-radius: 8px; background: rgba(16, 14, 26, .7); border: 1.5px solid rgba(255, 255, 255, .2); }
   #hudDock { position: absolute; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 18px); transform: translateX(-50%); display: flex; align-items: flex-end; gap: 6px; }
   #hudGear { display: flex; flex-direction: column; gap: 4px; }
