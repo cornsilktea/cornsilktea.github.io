@@ -4066,6 +4066,35 @@ class ResultCollector {
     if (s.blueKills !== 4 || s.redKills !== 3) bad.push("킬 " + s.blueKills + "·" + s.redKills + " (기대 4·3)");
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "피해 150.5/30, 생존 1/1, 킬 4/3");
   });
+  run(JUDGEG, "나간 선수의 쓰러짐: 나가도 상대 팀 킬이 줄지 않고, 돌아오면 두 번 세지 않으며, 동점이면 연장이 그대로인가", function (done) {
+    var y = OPEN_Y.forest, W = world("forest", [{ id: "a", team: "blue", char: "knight", x: 300, y: y }, { id: "c", team: "red", char: "knight", x: 700, y: y }, { id: "d", team: "red", char: "knight", x: 750, y: y }]), bad = [];
+    var P = api.players(), c = W.ent("c");
+    c.deaths = 4; W.ent("d").deaths = 1; W.ent("a").deaths = 5;
+    var seatOf = function (id) { return { team: P[id].team, c: "knight", ai: false, s: P[id].slot, n: id }; };
+    W.room.roster = { a: seatOf("a"), c: seatOf("c"), d: seatOf("d") };
+    var key = "r" + P.c.slot, packed = new Array(14).fill("0"), before = api.teamTotals(), saved = P.c, stateBefore = api.MATCH.stateByKey[key];
+    packed[8] = "4";
+    api.MATCH.stateByKey[key] = packed.join(",");
+    if (before.blueKills !== 5 || before.redKills !== 5) bad.push("나가기 전 " + before.blueKills + "·" + before.redKills);
+    delete P.c;
+    var gone = api.teamTotals();
+    if (gone.blueKills !== 5 || gone.redKills !== 5) bad.push("나간 뒤 " + gone.blueKills + "·" + gone.redKills + " (기대 5·5)");
+    if (gone.redN !== 1) bad.push("남은 인원은 1명이어야 함 " + gone.redN);
+    P.c = saved;
+    var back = api.teamTotals();
+    if (back.blueKills !== 5 || back.redKills !== 5) bad.push("돌아온 뒤 " + back.blueKills + "·" + back.redKills);
+    W.room.roster.old = { team: "red", c: "knight", ai: true };
+    if (api.teamTotals().blueKills !== 5) bad.push("자리 번호 없는 명단(연습 봇)을 셈");
+    if (stateBefore === undefined) delete api.MATCH.stateByKey[key]; else api.MATCH.stateByKey[key] = stateBefore;
+    var roster = api.RESULT_ROSTER, statusBefore = W.room.status, dSeat = P.d;
+    W.room.status = "playing"; roster.remember(); delete P.c;
+    if (!roster.hasLeft("c")) bad.push("경기 중 나간 선수를 나감으로 못 봄");
+    W.room.status = "ended"; roster.remember(); delete P.d;
+    if (roster.hasLeft("d")) bad.push("끝난 뒤 결과 창에서 나간 선수까지 나감으로 봄");
+    if (!roster.hasLeft("c")) bad.push("끝나기 전에 나간 선수 표시가 사라짐");
+    P.c = saved; P.d = dSeat; W.room.status = statusBefore; roster.clear();
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "나간 뒤에도 5:5 유지, 돌아와도 5:5, 연습 봇 명단 제외, 끝난 뒤 나간 선수는 나감 아님");
+  });
   run(JUDGEG, "한 팀이 모두 나갔는지(teamAllQuit): 시작할 때 양 팀에 사람이 있었고 지금 한 팀에만 남았을 때만 알려 주는가", function (done) {
     var y = OPEN_Y.forest, W = world("forest", [{ id: "a", team: "blue", char: "knight", x: 300, y: y }, { id: "b", team: "red", char: "knight", x: 700, y: y }]), bad = [];
     var P = api.players(); P.a.isAI = false; P.b.isAI = false;
@@ -5670,6 +5699,10 @@ class AccountStatsTests {
         var ok = shown.length ? names.every(function (nm) { return html.indexOf(">" + nm + "<") >= 0; }) && (shown.length > 1) === (html.indexOf("(공동)") >= 0) : html.indexOf("MVP 없음") >= 0;
         if (!ok) bad.push("MVP 표시 " + n + ": " + names.join() + " / " + html.replace(/<[^>]+>/g, " "));
       });
+      var gonePlayers = self.players({ 0: { kills: 9, dmg: 5000, left: true }, 3: { kills: 1, dmg: 100 } }), goneRows = A.report.rowsOf(gonePlayers);
+      var goneHtml = api.mvpHtml(goneRows), goneShown = TeamBattleScore.shownMvp(gonePlayers);
+      if (goneShown.indexOf(0) >= 0 || goneShown.indexOf(3) < 0 || goneHtml.indexOf(">" + gonePlayers[0].name + "<") >= 0 || goneHtml.indexOf(">" + gonePlayers[3].name + "<") < 0) bad.push("나간 선수가 MVP 후보에 남음");
+      if (api.boardRows(goneRows, "p3").indexOf(gonePlayers[0].name + " (나감)") < 0) bad.push("결과표에 (나감) 표시 없음");
       var entry = A.Codec.decode(Object.assign(JSON.parse(JSON.stringify(A.Codec.encode(self.report(), "k", true))), { at: 1700000000000 }));
       var summary = new TeamBattleMatchSummary(entry);
       if (summary.score !== TeamBattleScore.of(entry.players[0]) || summary.rank !== 1 || !summary.mvp || summary.ours !== 4 || summary.theirs !== 1) bad.push("요약 " + JSON.stringify({ s: summary.score, r: summary.rank, m: summary.mvp, o: summary.ours, t: summary.theirs }));

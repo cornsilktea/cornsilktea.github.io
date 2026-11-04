@@ -494,13 +494,13 @@ class TeamBattleScore {
       - line.deaths * TeamBattleScore.DEATH;
   }
 
-  /* 결과 창의 MVP 표시와 같은 규칙: 처치·어시스트가 있는 사람 중 점수 최고, 같으면 피해량이 큰 사람, 그래도 같으면 공동 */
+  /* 결과 창의 MVP 표시와 같은 규칙: 끝까지 남았고 처치·어시스트가 있는 사람 중 점수 최고, 같으면 피해량이 큰 사람, 그래도 같으면 공동 */
   static shownMvp(players: AccountPlayerLine[]): number[] {
     let best: number[] = [];
     let bestScore = 0;
     let bestDmg = 0;
     players.forEach((line, index) => {
-      if (line.kills + (line.assists || 0) <= 0) return;
+      if (line.left || line.kills + (line.assists || 0) <= 0) return;
       const score = TeamBattleScore.of(line);
       const dmg = Math.round(line.dmg);
       if (!best.length || score > bestScore || (score === bestScore && dmg > bestDmg)) {

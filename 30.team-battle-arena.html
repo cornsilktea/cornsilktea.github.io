@@ -291,7 +291,7 @@
 <script charset="utf-8" src="character-maker.js?v=20261026a"></script>
 <script>new CharacterMakerDialog(undefined, false);</script>
 <script charset="utf-8" src="account-match-kit.js?v=20261103e"></script>
-<script charset="utf-8" src="account-stats.js?v=20261104a"></script>
+<script charset="utf-8" src="account-stats.js?v=20261104b"></script>
 <script charset="utf-8" src="30.team-battle-versus.js?v=20261029d"></script>
 <script charset="utf-8" src="patch-notes.js?v=20261029b"></script>
 <script type="module">
@@ -3652,6 +3652,18 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
                             rise: born + NecroType.ULT.smRiseMs, stuck: 0, detour: 0, detourDir: 1 });
     }
   }
+  class DepartedSeats {
+    static deathsByTeam(services) {
+      var room = services.session.room, roster = (room && room.roster) || {}, deaths = { blue: 0, red: 0 }, taken = {};
+      services.targets.participants().forEach(function (id) { var d = services.session.players[id]; taken[services.netstate.stKey(d.team, d.slot)] = true; });
+      Object.keys(roster).forEach(function (id) {
+        var seat = roster[id];
+        if (!seat.s || !(seat.team in deaths) || taken[services.netstate.stKey(seat.team, seat.s)]) return;
+        deaths[seat.team] += +services.netstate.stateOf({ team: seat.team, slot: seat.s }).deaths || 0;
+      });
+      return deaths;
+    }
+  }
   class MatchFlow {
     constructor(services) { this.services = services; this.specHeld = false; }
     makeEnt(id, d) { var services = this.services; return new Fighter(services, id, d); }
@@ -3719,6 +3731,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         s[tm] += dmg; s[tm + "N"]++; if (alive) s[tm + "Alive"]++;
         s[(tm === "blue" ? "red" : "blue") + "Kills"] += deaths;
       });
+      var departed = DepartedSeats.deathsByTeam(services);
+      s.redKills += departed.blue; s.blueKills += departed.red;
       return s;
     }
     teamAllQuit() { var services = this.services;
@@ -8670,10 +8684,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class ResultRoster {
-    constructor(services) { this.services = services; this.entries = {}; this.startAt = null; }
-    clear() { this.entries = {}; this.startAt = null; }
+    constructor(services) { this.services = services; this.entries = {}; this.startAt = null; this.presentAtEnd = null; }
+    clear() { this.entries = {}; this.startAt = null; this.presentAtEnd = null; }
+    hasLeft(id) { return !(this.presentAtEnd || this.services.session.players || {})[id]; }
     remember() { var services = this.services;
-      if (this.startAt !== services.session.room.startAt) { this.entries = {}; this.startAt = services.session.room.startAt; }
+      if (this.startAt !== services.session.room.startAt) { this.entries = {}; this.startAt = services.session.room.startAt; this.presentAtEnd = null; }
+      if (services.session.room.status !== "ended") this.presentAtEnd = null;
+      else if (!this.presentAtEnd) this.presentAtEnd = Object.assign({}, services.session.players);
       var entries = this.entries;
       services.targets.participants().forEach(function (id) {
         var E = services.targets.ent(id);
@@ -8684,11 +8701,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     player(id) { return this.entries[id].player; }
     ent(id) { return this.entries[id].ent; }
     rows(entries) {
-      var source = entries || this.entries || {}, list = [];
+      var self = this, source = entries || this.entries || {}, list = [];
       ["blue", "red"].forEach(function (team) {
         Object.keys(source).filter(function (id) { return source[id].player.team === team; })
           .sort(function (a, b) { return (source[a].player.slot || 0) - (source[b].player.slot || 0); })
-          .forEach(function (id) { list.push({ id: id, player: source[id].player, ent: source[id].ent }); });
+          .forEach(function (id) { list.push({ id: id, player: source[id].player, ent: source[id].ent, left: !entries && self.hasLeft(id) }); });
       });
       return list;
     }
@@ -8706,7 +8723,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         var rowClass = (id === mine ? "mine" : "") + (team === "red" && !redStarted ? " teamSplit" : "");
         if (team === "red") redStarted = true;
         rows += '<tr class="' + rowClass + '"><td><span class="dot" style="background:' + (team === "blue" ? "#2F6FD6" : "#D6453D") + '"></span></td>' +
-          '<td class="nm">' + (d.isAI ? "🤖 " : "") + Dom.esc(d.nickname) + '</td><td class="job">' + services.charTypes.statsOf(E.char).name + "</td>" +
+          '<td class="nm">' + (d.isAI ? "🤖 " : "") + Dom.esc(d.nickname) + (row.left ? " (나감)" : "") + '</td><td class="job">' + services.charTypes.statsOf(E.char).name + "</td>" +
           "<td>" + E.kills + "</td><td>" + E.deaths + "</td><td>" + (E.assists || 0) + "</td><td>" + Math.round(E.dmg) + "</td>" +
           "<td>" + (services.charTypes.statsOf(E.char).heals ? Math.round(E.heal) : "-") + "</td>" +
           "<td>" + (services.charTypes.statsOf(E.char).blocks ? Math.round(E.blocked || 0) : "-") + "</td>" +
@@ -8723,7 +8740,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     mvpHtml(list) { var services = this.services;
       var best = [];
       (list || this.roster.rows()).forEach(function (entry) {
-        var E = entry.ent; if (E.kills + (E.assists || 0) <= 0) return;
+        var E = entry.ent; if (entry.left || E.kills + (E.assists || 0) <= 0) return;
         var row = { player: entry.player, E: E, score: services.resultBoard.mvpScore(E), dmg: Math.round(E.dmg) };
         if (!best.length || row.score > best[0].score || (row.score === best[0].score && row.dmg > best[0].dmg)) best = [row];
         else if (row.score === best[0].score && row.dmg === best[0].dmg) best.push(row);
@@ -8746,7 +8763,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         "<li>둔화는 둔화율을 곱합니다. 예) 50% 둔화 2초 = 2 × 0.5 × " + ResultBoard.MVP_SLOW_PER_SEC + " = " + ResultBoard.MVP_SLOW_PER_SEC + "점</li>" +
         "<li>기절·둔화는 이미 걸린 효과와 겹치지 않고 새로 늘어난 시간만 셉니다</li>" +
         "<li>블랙홀에 끌려간 시간은 " + Math.round(PriestType.ULT.bhCcRate * 100) + "% 둔화로 셉니다</li>" +
-        "<li>MVP는 환산점수가 가장 높은 사람이고, 처치·어시스트가 하나도 없으면 MVP에서 제외합니다</li></ul>";
+        "<li>MVP는 환산점수가 가장 높은 사람이고, 처치·어시스트가 하나도 없거나 경기 중에 나간 사람은 MVP에서 제외합니다</li></ul>";
     }
   }
   class AccountWindows {
@@ -8779,7 +8796,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     rowsOf(players) { var self = this, slots = [0, 0];
       return players.map(function (line, i) {
         slots[line.team]++;
-        return { id: "p" + i, player: { team: AccountReportBuilder.TEAMS[line.team], slot: slots[line.team], isAI: line.ai, nickname: line.name }, ent: self.entOf(line) };
+        return { id: "p" + i, player: { team: AccountReportBuilder.TEAMS[line.team], slot: slots[line.team], isAI: line.ai, nickname: line.name }, ent: self.entOf(line), left: !!line.left };
       });
     }
     scoreOf(line) { return this.services.resultBoard.mvpScore(this.entOf(line)); }
