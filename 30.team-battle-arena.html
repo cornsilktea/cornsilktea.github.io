@@ -1727,7 +1727,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     static LIST = [
       { id: "v1", path: "teambattle/modestats/cup" },
       { id: "v2", path: "teambattle/patchstats/v2" },
-      { id: "v3", path: "teambattle/patchstats/v3" }
+      { id: "v3", path: "teambattle/patchstats/v3" },
+      { id: "v4", path: "teambattle/patchstats/v4" }
     ];
     static get current() { return StatsPatches.LIST[StatsPatches.LIST.length - 1]; }
     static of(id) { return StatsPatches.LIST.find(function (p) { return p.id === id; }) || StatsPatches.current; }
@@ -2503,7 +2504,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     static ULT = {
       rmDur: GameTime.gameMs(4), rmRate: 1000 / GameTime.gameMs(0.5), rmDashMs: GameTime.gameMs(0.4), rmDashRange: 100
     };
-    static STATS = { name: "결투가", role: "assassin", icon: "🤺", hp: 130, speed: GameTime.gameSpeed(175), cd: GameTime.gameMs(1), dmg: 40, range: 100,
+    static STATS = { name: "결투가", role: "assassin", icon: "🤺", hp: 130, speed: GameTime.gameSpeed(175), cd: GameTime.gameMs(1), dmg: 35, range: 100,
                dashRange: 250, dashMs: GameTime.gameMs(0.5), stab: true, selfHeal: 10, ultName: "르미즈", heals: true };
     get botRole() { return "flank"; }
     isRiposting(E, t) { return E.buffUntil > t; }
@@ -3022,8 +3023,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     static ULT = {
       exRange: 600, exSpeed: 1300, exPr: 4, exDmg: 35, exStunMs: GameTime.gameMs(1.5)
     };
-    static STATS = { name: "자객", role: "assassin", icon: "🔪", hp: 130, speed: GameTime.gameSpeed(175), cd: GameTime.gameMs(1.3), dmg: 40, range: 100,
-               dashRange: 200, dashWidth: 150, dashDmg: 40, dashMs: 300, finishDelay: 125, ultName: "처형", ultAim: true };
+    static STATS = { name: "자객", role: "assassin", icon: "🔪", hp: 130, speed: GameTime.gameSpeed(175), cd: GameTime.gameMs(1.3), dmg: 35, range: 100,
+               dashRange: 200, dashWidth: 150, dashDmg: 35, dashMs: 300, finishDelay: 125, ultName: "처형", ultAim: true };
     static WAVE = { life: HitmanType.STATS.dashMs + 160, travel: HitmanType.STATS.dashMs };
     showAimGuide(E, ult, c) { var services = this.services;
       if (ult) {
@@ -3312,7 +3313,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   class DruidType extends MagicShooterType {
     static MODEL = { file: "Druid", portraitPlant: true, right: "druid_staff" };
     static ULT = {
-      drR: 150, drDur: 3600000, drTick: GameTime.gameMs(1), drHeal: 20, drCast: 450, drMin: 60, drSelfHeal: 20, drSelfGauge: 1, drRiseMs: 350, drCastMs: 500
+      drR: 150, drDur: 3600000, drTick: GameTime.gameMs(1), drHeal: 18, drCast: 450, drMin: 60, drSelfHeal: 18, drSelfGauge: 1, drRiseMs: 350, drCastMs: 500
     };
     static STATS = { name: "드루이드", role: "caster", icon: "🌿", hp: 110, speed: GameTime.gameSpeed(165), cd: GameTime.gameMs(1.4), dmg: 14, range: 350, pSpeed: 728, pr: 12, lanes: 2, fx: { slowMs: GameTime.gameMs(1.5), slowMul: 0.7 },
                ultName: "덩굴 부쉬", ultAim: true, heals: true };
@@ -3694,7 +3695,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     skillLeft(t) { return this.skillDur ? MathKit.clamp((this.skillUntil - t) / this.skillDur, 0, 1) : 0; }
     speed() { var services = this.services;
       var t = services.clock.now(), c = services.charTypes.statsOf(this.char), sp = c.speed;
-      if (this.isStunned(t) || this.isHammerWinding(t) || this.dash || services.status.shoved(this) || this.type.isRooted(this, t)) return 0;
+      if (this.isStunned(t) || this.lance || this.dash || services.status.shoved(this) || this.type.isRooted(this, t)) return 0;
       var skillSpeed = this.type.skillSpeed(this, t);
       if (skillSpeed != null) sp = skillSpeed;
       if (c.haste) sp += this.hasteBonus(t);
@@ -7763,6 +7764,164 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     dispose() { this.rightMesh.dispose(); this.leftMesh.dispose(); }
   }
+  class ChainSlamBurst {
+    static TEXTURES = null;
+    static LIFE_SEC = 0.85;
+    static CRACK_STEP = 34;
+    static DUST_COUNT = 14;
+    static BITS_COUNT = 20;
+    static EMBER_COUNT = 26;
+    static GRAVITY = 900;
+    static DUST_COLOR = 0xC9BCA6;
+    static SPRAY_COLOR = 0xE8F6FF;
+    static STONE_COLOR = 0x6E665A;
+    static EMBER_COLOR = 0xFFB65A;
+    static FLASH_COLOR = 0xFFD9A0;
+    static CRACK_COLOR = 0x2A2118;
+    static PAINT_SIZE = 256;
+    static softTexture() {
+      var cv = document.createElement("canvas"); cv.width = cv.height = 128;
+      var g = cv.getContext("2d"), grad = g.createRadialGradient(64, 64, 4, 64, 64, 64);
+      grad.addColorStop(0, "rgba(255,255,255,0.85)"); grad.addColorStop(0.45, "rgba(255,255,255,0.42)"); grad.addColorStop(1, "rgba(255,255,255,0)");
+      g.fillStyle = grad; g.fillRect(0, 0, 128, 128);
+      return new THREE.CanvasTexture(cv);
+    }
+    static crackTexture() {
+      var S = ChainSlamBurst.PAINT_SIZE, cv = document.createElement("canvas"); cv.width = cv.height = S;
+      var g = cv.getContext("2d"), n = 0;
+      function noise() { n++; var v = Math.sin(n * 12.9898) * 43758.5453; return v - Math.floor(v); }
+      function branch(x, y, a, len, width) {
+        g.lineWidth = width; g.beginPath(); g.moveTo(x, y);
+        for (var i = 0; i < 6 && len > 4; i++) {
+          a += (noise() - 0.5) * 0.9; var step = len / 6; x += Math.cos(a) * step; y += Math.sin(a) * step; g.lineTo(x, y);
+          if (noise() < 0.3 && width > 1.4) { g.stroke(); branch(x, y, a + (noise() < 0.5 ? -1 : 1) * (0.5 + noise()), len * 0.55, width * 0.6); g.lineWidth = width; g.beginPath(); g.moveTo(x, y); }
+        }
+        g.stroke();
+      }
+      g.strokeStyle = "#FFFFFF"; g.lineCap = "round"; g.lineJoin = "round";
+      branch(S / 2, S / 2, 0, S * 0.5, 6); branch(S / 2, S / 2, Math.PI, S * 0.5, 6);
+      for (var k = 0; k < 7; k++) branch(S / 2, S / 2, k / 7 * Math.PI * 2 + noise(), S * (0.2 + noise() * 0.24), 3.4);
+      return new THREE.CanvasTexture(cv);
+    }
+    static textures() { return ChainSlamBurst.TEXTURES || (ChainSlamBurst.TEXTURES = { soft: ChainSlamBurst.softTexture(), crack: ChainSlamBurst.crackTexture() }); }
+    constructor(services, d) {
+      this.services = services; this.d = d; this.seed = (d.createdAt || 0) % 97;
+      this.matrix = new THREE.Matrix4(); this.spot = new THREE.Vector3(); this.size = new THREE.Vector3(); this.turn = new THREE.Quaternion(); this.axis = new THREE.Vector3(1, 0, 0); this.heading = new THREE.Vector3(); this.spin = new THREE.Euler(); this.tint = new THREE.Color();
+      this.ca = Math.cos(d.angle); this.sa = Math.sin(d.angle);
+      this.group = new THREE.Group(); this.mats = []; this.meshes = [];
+      var tex = ChainSlamBurst.textures();
+      this.crackMat = this.material({ map: tex.crack, color: ChainSlamBurst.CRACK_COLOR, transparent: true, depthWrite: false, opacity: 0.9 });
+      this.flashMat = this.material({ map: tex.soft, color: ChainSlamBurst.FLASH_COLOR, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+      this.dustMat = this.material({ map: tex.soft, color: 0xFFFFFF, transparent: true, depthWrite: false });
+      this.bitsMat = this.material({ color: 0xFFFFFF, transparent: true });
+      this.emberMat = this.material({ color: ChainSlamBurst.EMBER_COLOR, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+      this.buildCracks(); this.buildFlash(); this.buildDust(); this.buildBits(); this.buildEmbers();
+      this.update(0);
+    }
+    material(params) { var m = new THREE.MeshBasicMaterial(params); this.mats.push(m); return m; }
+    instanced(geometry, material, count) {
+      var mesh = new THREE.InstancedMesh(geometry, material, count);
+      mesh.frustumCulled = false; this.meshes.push(mesh); this.group.add(mesh);
+      return mesh;
+    }
+    wave(i, salt) { var v = Math.sin((i + 1) * 12.9898 + salt * 78.233 + this.seed) * 43758.5453; return v - Math.floor(v); }
+    overWater(x, y) { var services = this.services;
+      return services.arenaMap.water.some(function (o) { return Math.abs(x - o.x) < o.w / 2 && Math.abs(y - o.y) < o.h / 2; });
+    }
+    alongLine(u, side) { var along = this.d.len * u; return { x: this.d.x + this.ca * along - this.sa * side, y: this.d.y + this.sa * along + this.ca * side }; }
+    buildCracks() { var services = this.services;
+      var slam = this, n = Math.max(1, Math.round(this.d.len / ChainSlamBurst.CRACK_STEP)), mesh = this.instanced(services.geo.slamQuad, this.crackMat, n);
+      var flat = new THREE.Quaternion(), roll = new THREE.Quaternion(), up = new THREE.Vector3(0, 0, 1);
+      flat.setFromAxisAngle(this.axis, -Math.PI / 2);
+      for (var i = 0; i < n; i++) {
+        var p = this.alongLine((i + 0.5) / n, (this.wave(i, 1) - 0.5) * 14), wet = this.overWater(p.x, p.y), big = wet ? 0 : 62 + this.wave(i, 2) * 44;
+        roll.setFromAxisAngle(up, this.d.angle + (this.wave(i, 3) < 0.5 ? 0 : Math.PI) + (this.wave(i, 4) - 0.5) * 0.5);
+        this.turn.copy(flat).multiply(roll);
+        this.spot.set(p.x, 1.6 + i * 0.01, p.y); this.size.setScalar(big);
+        this.matrix.compose(this.spot, this.turn, this.size); mesh.setMatrixAt(i, this.matrix);
+      }
+      mesh.instanceMatrix.needsUpdate = true; slam.crackMesh = mesh;
+    }
+    buildFlash() { var services = this.services;
+      var strip = services.arenaView.flatMesh(services.geo.strip, this.flashMat), holder = new THREE.Group();
+      strip.scale.set(this.d.len + 30, this.d.width * 0.95, 1); strip.position.set(-15, 2.4, 0);
+      holder.add(strip); holder.position.set(this.d.x, 0, this.d.y); holder.rotation.y = -this.d.angle;
+      this.group.add(holder);
+    }
+    buildDust() { var services = this.services;
+      var mesh = this.instanced(services.geo.slamQuad, this.dustMat, ChainSlamBurst.DUST_COUNT);
+      this.dust = [];
+      for (var i = 0; i < ChainSlamBurst.DUST_COUNT; i++) {
+        var u = (i + this.wave(i, 5)) / ChainSlamBurst.DUST_COUNT, p = this.alongLine(u, (this.wave(i, 6) - 0.5) * this.d.width * 0.7), wet = this.overWater(p.x, p.y);
+        this.dust.push({ x: p.x, z: p.y, delay: u * 0.07, rise: 26 + this.wave(i, 7) * 42, driftX: (this.wave(i, 8) - 0.5) * 34, driftZ: (this.wave(i, 9) - 0.5) * 34, from: 10 + this.wave(i, 10) * 8, to: 48 + this.wave(i, 11) * 34, life: 0.5 + this.wave(i, 12) * 0.33 });
+        mesh.setColorAt(i, this.tint.setHex(wet ? ChainSlamBurst.SPRAY_COLOR : ChainSlamBurst.DUST_COLOR));
+      }
+      mesh.instanceColor.needsUpdate = true; this.dustMesh = mesh;
+    }
+    buildBits() { var services = this.services;
+      var mesh = this.instanced(services.geo.meteorRock, this.bitsMat, ChainSlamBurst.BITS_COUNT);
+      this.bits = [];
+      for (var i = 0; i < ChainSlamBurst.BITS_COUNT; i++) {
+        var u = (i + this.wave(i, 13)) / ChainSlamBurst.BITS_COUNT, side = (this.wave(i, 14) - 0.5) * this.d.width * 0.45, p = this.alongLine(u, side), wet = this.overWater(p.x, p.y), push = (side >= 0 ? 1 : -1) * (40 + this.wave(i, 15) * 130), ahead = (this.wave(i, 16) - 0.35) * 110;
+        this.bits.push({ x: p.x, z: p.y, delay: u * 0.07, vx: this.ca * ahead - this.sa * push, vz: this.sa * ahead + this.ca * push, vy: 130 + this.wave(i, 17) * 210, size: (wet ? 1.2 : 2.2) + this.wave(i, 18) * 3.4, spin: 6 + this.wave(i, 19) * 14, phase: this.wave(i, 20) * 6 });
+        mesh.setColorAt(i, this.tint.setHex(wet ? ChainSlamBurst.SPRAY_COLOR : ChainSlamBurst.STONE_COLOR));
+      }
+      mesh.instanceColor.needsUpdate = true; this.bitsMesh = mesh;
+    }
+    buildEmbers() { var services = this.services;
+      this.emberMesh = this.instanced(services.geo.stabLine, this.emberMat, ChainSlamBurst.EMBER_COUNT);
+      this.embers = [];
+      for (var i = 0; i < ChainSlamBurst.EMBER_COUNT; i++) {
+        var u = (i + this.wave(i, 21)) / ChainSlamBurst.EMBER_COUNT, p = this.alongLine(u, (this.wave(i, 22) - 0.5) * 20), a = this.wave(i, 23) * Math.PI * 2, speed = 130 + this.wave(i, 24) * 300;
+        this.embers.push({ x: p.x, z: p.y, wet: this.overWater(p.x, p.y), delay: u * 0.07, vx: Math.cos(a) * speed, vz: Math.sin(a) * speed, vy: 110 + this.wave(i, 25) * 260, life: 0.16 + this.wave(i, 26) * 0.22 });
+      }
+    }
+    hideAt(mesh, i) { this.size.setScalar(0); this.matrix.compose(this.spot.set(0, -50, 0), this.turn.identity(), this.size); mesh.setMatrixAt(i, this.matrix); }
+    update(sec) { var services = this.services;
+      var slam = this, life = ChainSlamBurst.LIFE_SEC, camera = services.stage.camera, stone = this.spin;
+      this.crackMat.opacity = 0.9 * MathKit.clamp((life - sec) / (life * 0.45), 0, 1) * MathKit.clamp(sec / 0.03 + 0.4, 0, 1);
+      this.flashMat.opacity = 0.75 * MathKit.clamp(1 - sec / 0.2, 0, 1);
+      this.dustMat.opacity = 0.62 * MathKit.clamp((life - sec) / (life * 0.55), 0, 1);
+      this.bitsMat.opacity = MathKit.clamp((life - sec) / 0.2, 0, 1);
+      this.dust.forEach(function (p, i) {
+        var e = sec - p.delay, k = e / p.life;
+        if (e < 0 || k >= 1) { slam.hideAt(slam.dustMesh, i); return; }
+        var ease = 1 - (1 - k) * (1 - k);
+        slam.spot.set(p.x + p.driftX * ease, 7 + p.rise * ease, p.z + p.driftZ * ease);
+        slam.size.setScalar(p.from + (p.to - p.from) * ease);
+        slam.matrix.compose(slam.spot, camera.quaternion, slam.size);
+        slam.dustMesh.setMatrixAt(i, slam.matrix);
+      });
+      this.bits.forEach(function (p, i) {
+        var e = sec - p.delay;
+        if (e < 0) { slam.hideAt(slam.bitsMesh, i); return; }
+        var y = 3 + p.vy * e - ChainSlamBurst.GRAVITY * e * e / 2, landed = y <= 2, flight = landed ? 2 * p.vy / ChainSlamBurst.GRAVITY : e;
+        slam.spot.set(p.x + p.vx * flight, landed ? 2 : y, p.z + p.vz * flight);
+        stone.set(p.phase + flight * p.spin, p.phase * 2 + flight * p.spin * 0.7, 0);
+        slam.size.setScalar(p.size);
+        slam.matrix.compose(slam.spot, slam.turn.setFromEuler(stone), slam.size);
+        slam.bitsMesh.setMatrixAt(i, slam.matrix);
+      });
+      this.embers.forEach(function (p, i) {
+        var e = sec - p.delay, k = e / p.life;
+        if (e < 0 || k >= 1 || p.wet) { slam.hideAt(slam.emberMesh, i); return; }
+        var vy = p.vy - ChainSlamBurst.GRAVITY * e;
+        slam.heading.set(p.vx, vy, p.vz); var speed = slam.heading.length() || 1;
+        slam.heading.divideScalar(speed);
+        slam.spot.set(p.x + p.vx * e, Math.max(2, 4 + p.vy * e - ChainSlamBurst.GRAVITY * e * e / 2), p.z + p.vz * e);
+        slam.size.set(speed * 0.05 * (1 - k) + 1, 1.5, 1.5);
+        slam.turn.setFromUnitVectors(slam.axis, slam.heading);
+        slam.matrix.compose(slam.spot, slam.turn, slam.size);
+        slam.emberMesh.setMatrixAt(i, slam.matrix);
+      });
+      this.dustMesh.instanceMatrix.needsUpdate = this.bitsMesh.instanceMatrix.needsUpdate = this.emberMesh.instanceMatrix.needsUpdate = true;
+    }
+    dispose() {
+      if (this.group.parent) this.group.parent.remove(this.group);
+      this.meshes.forEach(function (m) { m.dispose(); });
+      this.mats.forEach(function (m) { m.dispose(); });
+    }
+  }
   class HookChainView {
     static LINK_CAPACITY = 90;
     static MAT = { color: 0xA7AFBC, transparent: true, opacity: 1 };
@@ -7777,7 +7936,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     static SLAM_DROP_MS = GameTime.gameMs(0.09);
     static SLAM_SHOW_MS = GameTime.gameMs(0.45);
     static SLAM_RISE = 95;
-    static SLAM_DUST_STEP = 62;
+    static SLAM_LIFE_MS = GameTime.gameMs(0.95);
     constructor(services) { this.services = services; this.from = new THREE.Vector3(); this.to = new THREE.Vector3(); this.up = new THREE.Vector3(0, 1, 0); this.dir = new THREE.Vector3(); this.axis = new THREE.Vector3(1, 0, 0); this.matrix = new THREE.Matrix4(); this.turn = new THREE.Quaternion(); this.spot = new THREE.Vector3(); this.size = new THREE.Vector3(); }
     makeChainVis(withBlade, withWrap) { var services = this.services;
       var g = new THREE.Group(), mat = services.fxMats.acquire("basic", HookChainView.MAT), links = new ChainLinkMesh(services.geo.chainLink, mat, HookChainView.LINK_CAPACITY, ModelTuning.MODEL_SCALE), vis = { group: g, mat: mat, links: links, blade: null, wrap: null, wrapMat: null };
@@ -7801,10 +7960,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     dropHook(h) { this.dropVis(h.vis); h.vis = null; }
     dropFlight(f) { this.dropVis(f.vis); f.vis = null; }
-    dropSlam(s) { this.dropVis(s.vis); s.vis = null; }
+    dropSlam(s) { this.dropVis(s.vis); s.vis = null; if (s.burst) { s.burst.dispose(); s.burst = null; } }
     warmSample() { var services = this.services;
       var vis = this.makeChainVis(true, true), lambert = new ChainLinkMesh(services.geo.chainLink, new THREE.MeshLambertMaterial({ color: WraithChainRig.COLOR, transparent: true }), 1, ModelTuning.MODEL_SCALE);
       vis.group.add(lambert.mesh); vis.links.mesh.count = 1; lambert.mesh.count = 1;
+      var burst = new ChainSlamBurst(services, { x: 0, y: 0, angle: 0, len: 120, width: 60, createdAt: 0 });
+      burst.update(0.05);
+      vis.group.add(burst.group);
       return vis.group;
     }
     addHook(e, now) { var services = this.services;
@@ -7824,7 +7986,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var view = this;
       services.field.hooks = services.field.hooks.filter(function (h) { if (h.e.tgt !== tgtId) return true; view.dropHook(h); return false; });
     }
-    addSlam(d) { var services = this.services; services.field.slams.push({ d: d, vis: null, dusted: false }); }
+    addSlam(d) { var services = this.services; services.field.slams.push({ d: d, vis: null, burst: null }); }
     step(t) { var services = this.services;
       var view = this;
       services.field.hooks = services.field.hooks.filter(function (h) {
@@ -7834,7 +7996,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         return true;
       });
       services.field.slams = services.field.slams.filter(function (s) {
-        if (t < s.d.createdAt + HookChainView.SLAM_SHOW_MS) return true;
+        if (t < s.d.createdAt + HookChainView.SLAM_LIFE_MS) return true;
         view.dropSlam(s);
         return false;
       });
@@ -7846,7 +8008,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     pulling(id, t) { var services = this.services; return services.field.hooks.some(function (h) { return h.e.owner === id && t < h.e.createdAt + h.e.pullMs; }); }
     flying(id) { var services = this.services; return services.field.hookFlights.some(function (f) { return f.d.owner === id; }); }
     handBusy(id) { var services = this.services;
-      return services.field.hooks.some(function (h) { return h.e.owner === id; }) || services.field.hookFlights.some(function (f) { return f.d.owner === id; }) || services.field.slams.some(function (s) { return s.d.owner === id; });
+      return services.field.hooks.some(function (h) { return h.e.owner === id; }) || services.field.hookFlights.some(function (f) { return f.d.owner === id; }) || services.field.slams.some(function (s) { return s.d.owner === id && services.clock.now() < s.d.createdAt + HookChainView.SLAM_SHOW_MS; });
     }
     ownerHand(id, out, fallback) { var services = this.services;
       var v = services.fighterView.fighters[id];
@@ -7933,13 +8095,15 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         if (!s.vis) s.vis = view.makeChainVis(false, false);
         var fall = MathKit.clamp(age / HookChainView.SLAM_DROP_MS, 0, 1), left = MathKit.clamp((HookChainView.SLAM_SHOW_MS - age) / (HookChainView.SLAM_SHOW_MS * 0.4), 0, 1);
         s.vis.mat.opacity = left;
-        view.drawSlamLinks(s.vis.links, d, ca, sa, (1 - fall * fall) * HookChainView.SLAM_RISE);
-        if (fall < 1 || s.dusted) return;
-        s.dusted = true;
-        for (var along = HookChainView.SLAM_DUST_STEP; along <= d.len; along += HookChainView.SLAM_DUST_STEP) {
-          services.fxView.spark(d.x + ca * along, d.y + sa * along, along % (HookChainView.SLAM_DUST_STEP * 2) ? "#FFD27A" : "#E6EBF2", 0.8);
-          services.fxView.smoke(d.x + ca * along, d.y + sa * along, 0xB7B0A2);
+        s.vis.group.visible = left > 0;
+        if (left > 0) view.drawSlamLinks(s.vis.links, d, ca, sa, (1 - fall * fall) * HookChainView.SLAM_RISE);
+        if (fall < 1) return;
+        if (!s.burst) {
+          s.burst = new ChainSlamBurst(services, d);
+          services.stage.scene.add(s.burst.group);
+          if (services.targets.hear(d)) services.sound.sfx("chain");
         }
+        s.burst.update((age - HookChainView.SLAM_DROP_MS) / services.clock.scale / 1000);
       });
     }
     drawSlamLinks(links, d, ca, sa, rise) {
@@ -9846,6 +10010,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       this.bladeSlice = new THREE.RingGeometry(0.55, 0.95, 16, 1, 0, Math.PI * 0.35);
       this.chainLink = new THREE.TorusGeometry(DraggedChain.LINK_R, DraggedChain.LINK_TUBE, DraggedChain.LINK_RADIAL, DraggedChain.LINK_TUBULAR);
       this.chainWrap = new THREE.TorusGeometry(1, 0.11, 5, 16);
+      this.slamQuad = new THREE.PlaneGeometry(1, 1);
       this.clericHalo = new THREE.CylinderGeometry(40, 32, 130, 20, 1, true);
       this.clericHalo.translate(0, 65, 0);
       this.stabLine = new THREE.BoxGeometry(1, 1, 1);
@@ -10541,7 +10706,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       HUD: services.hud, SOUND: services.sound, BACKEND: services.backend, TIMESCALE: services.timescale, THREE: THREE, CAMERA_RIG: services.cameraRig, ARENA_VIEW: services.arenaView, PROPS: services.props, PROP_THEMES: services.propThemes, camera: services.stage.camera, overlay: Canvases.overlay, QA: services.quality, PIX_MIN: Environment.PIX_MIN, PIX_START: Environment.PIX_START, SCENERY: services.arenaView.scenery,
       setDb: function (fake) { var before = services.backend.db; services.backend.db = fake; return before; },
       setTestLink: function (flag) { var before = services.backend.isTestLink; services.backend.isTestLink = flag; return before; },
-      HOOK_PATH: services.hookPath, HOOK_PULL: services.hookPull, HOOK_VIEW: services.hookView, DraggedChain: DraggedChain, WraithChainRig: WraithChainRig, FIGHTER_VIEW: services.fighterView, GEO: services.geo, FRAME_RENDERER: services.frameRenderer, stage: services.stage, CHAR_TYPES: services.charTypes, AUTO_AIM: services.autoAim, AUTO_AIM_ERR: AutoAim.AUTO_AIM_ERR, AUTO_AIM_LEAD: AutoAim.AUTO_AIM_LEAD, FullscreenKeeper: FullscreenKeeper, DRAFT_AI: services.draftAi,
+      HOOK_PATH: services.hookPath, HOOK_PULL: services.hookPull, HOOK_VIEW: services.hookView, DraggedChain: DraggedChain, WraithChainRig: WraithChainRig, ChainSlamBurst: ChainSlamBurst, FIGHTER_VIEW: services.fighterView, GEO: services.geo, FRAME_RENDERER: services.frameRenderer, stage: services.stage, CHAR_TYPES: services.charTypes, AUTO_AIM: services.autoAim, AUTO_AIM_ERR: AutoAim.AUTO_AIM_ERR, AUTO_AIM_LEAD: AutoAim.AUTO_AIM_LEAD, FullscreenKeeper: FullscreenKeeper, DRAFT_AI: services.draftAi,
       DRAFT: services.draft, DRAFT_VIEW: services.draftView, DRAFT_STEPS: Draft.STEPS, DRAFT_STEP_MS: Draft.STEP_MS, DRAFT_AI_MS: Draft.AI_MS, DRAFT_AI_TRADE_MS: Draft.AI_TRADE_MS, DRAFT_ABSENT_WAIT_MS: Draft.ABSENT_WAIT_MS, NO_BAN: Draft.NO_BAN,
       STATS: services.stats, STATS_PATH: MatchStats.path, STATS_PATCHES: StatsPatches, STATS_PENDING: MatchStats.PENDING, STATS_SETTLE_MS: MatchStats.SETTLE_MS, STATS_HOLD_MAX_MS: MatchStats.HOLD_MAX_MS,
       CLOCK: services.clock, GameClock: GameClock, CLOCK_KEEP: GameClock.KEEP, CLOCK_PINGS: GameClock.PINGS,

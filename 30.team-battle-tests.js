@@ -4731,7 +4731,7 @@ class ResultCollector {
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "현재 패치 기본·패치 메뉴 전환·실패·늦은 요청 무시·연결 없음·닫기·맵 보기");
   });
   new HookPathTests(api, { run: run }).register();
-  new WraithTests(api, { world: world, run: run, FRAME: FRAME }).register();
+  new WraithTests(api, { world: world, run: run, FRAME: FRAME, withMe: withMe, meEntry: meEntry, moveKeys: function (on) { api.KEY_ON.right = on; api.KEY_ON.d = on; } }).register();
   new DraggedChainTests(api, { run: run }).register();
   run(AUTO, "AI 6명 60초 난전 — 강 맵 + 사슬 망령 고정 (시드 2041)", function (done) {
     var r = autoMelee("river", 60, 2041, "wraith"), kinds = Object.keys(r.issues);
@@ -5392,6 +5392,69 @@ class WraithTests {
       self.untilCaught(W, 4);
       if (self.lost(T) !== api.ULT.hkDmg) bad.push("겹침: 피해 " + self.lost(T));
       self.verdict(done, bad, "모두 취소, 스킬 피해만 " + self.lost(T));
+    });
+    [["wraith", "사슬 망령"], ["blacksmith", "대장장이"]].forEach(function (c) {
+      [16, 33, 50].forEach(function (frame) {
+        run(G, c[1] + " 기본 공격 뒤 이동 키를 계속 눌러도 타격까지 움직이지 않고 피해가 들어가는가(" + frame + "ms 프레임)", function (done) {
+          var bad = [], stats = api.CHARS[c[0]];
+          api.MATCH.stateByKey = {};
+          self.kit.withMe([self.kit.meEntry(c[0], "blue", 300, 575), { id: "foe", team: "red", char: "guardian", x: 400, y: 575, slot: 1 }], function (W, me) {
+            var T = W.ent("foe"), x0 = me.x, y0 = me.y;
+            api.fireBasic(me, 0);
+            self.kit.moveKeys(true);
+            for (var ms = 0; ms < stats.windup + frame * 2; ms += frame) {
+              W.frame(frame);
+              if (self.lost(T)) break;
+              if (Math.hypot(me.x - x0, me.y - y0) > 0.01) bad.push("타격 전에 움직임 " + Math.round(ms) + "ms");
+            }
+            self.kit.moveKeys(false);
+            if (!self.lost(T)) bad.push("피해가 들어가지 않음");
+            if (bad.length > 3) bad.length = 3;
+          });
+          self.verdict(done, bad, "타격까지 제자리, 피해 들어감");
+        });
+      });
+    });
+    run(G, "창술사 꿰뚫기도 준비 뒤 이동 키를 눌러도 취소되지 않는가(33ms 프레임)", function (done) {
+      var bad = [];
+      api.MATCH.stateByKey = {};
+      self.kit.withMe([self.kit.meEntry("lancer", "blue", 300, 575, { gauge: api.GAUGE_MAX }), { id: "foe", team: "red", char: "guardian", x: 450, y: 575, slot: 1 }], function (W, me) {
+        var T = W.ent("foe");
+        api.useUlt(me, 0);
+        self.kit.moveKeys(true);
+        for (var ms = 0; ms < api.ULT.lnWind + 100; ms += 33) W.frame(33);
+        self.kit.moveKeys(false);
+        if (!self.lost(T)) bad.push("꿰뚫기가 취소됨");
+      });
+      self.verdict(done, bad, "준비 뒤 타격");
+    });
+    run(G, "내려치기 이펙트: 사슬이 땅에 닿으면 균열·먼지·파편·불티가 생기고, 물 위에는 균열이 없으며, 끝나면 남지 않는가", function (done) {
+      var bad = [], W = self.duel("river", 250, 560, 250, 900), A = W.ent("wr"), view = api.HOOK_VIEW, B = api.ChainSlamBurst;
+      api.fireBasic(A, Math.PI / 2); strike(W);
+      var s = api.FIELD.slams[0];
+      view.render(W.t(), Date.now());
+      if (s.burst) bad.push("땅에 닿기 전에 터짐");
+      W.step(api.ULT.hkWind * 0.4, 4);
+      view.render(W.t(), Date.now());
+      var burst = s.burst;
+      if (!burst || !burst.group.parent) bad.push("이펙트가 안 생김");
+      else {
+        if (burst.dust.length !== B.DUST_COUNT || burst.bits.length !== B.BITS_COUNT || burst.embers.length !== B.EMBER_COUNT) bad.push("입자 수 어긋남");
+        var m = new api.THREE.Matrix4(), wetCrack = 0, dryCrack = 0;
+        for (var i = 0; i < burst.crackMesh.count; i++) {
+          burst.crackMesh.getMatrixAt(i, m);
+          var empty = Math.abs(m.elements[0]) + Math.abs(m.elements[1]) + Math.abs(m.elements[2]) < 1e-6, y = m.elements[14];
+          if (y > 600 && y < 750 && !empty) wetCrack++;
+          if (!empty) dryCrack++;
+        }
+        if (wetCrack) bad.push("물 위 균열 " + wetCrack + "개");
+        if (!dryCrack) bad.push("땅 균열이 없음");
+      }
+      W.step(api.ULT.hkWind * 4, 16);
+      view.render(W.t(), Date.now());
+      if (api.FIELD.slams.length) bad.push("목록이 남음");
+      if (burst && burst.group.parent) bad.push("그림이 남음");
+      self.verdict(done, bad, "균열·먼지·파편·불티 후 정리");
     });
   }
 
