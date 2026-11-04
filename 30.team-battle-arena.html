@@ -350,6 +350,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     gargantuaSys;
     starfall;
     giant;
+    hookPath;
+    hookPull;
+    hookView;
     respawn;
     attack;
     autoAim;
@@ -740,6 +743,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       heal: [{ f: 523, d: 0.16, type: "sine", vol: 0.07, slide: 1.1 }, { f: 784, d: 0.2, type: "sine", vol: 0.06, at: 80 }],
       ult: [{ f: 220, d: 0.4, type: "triangle", vol: 0.08, slide: 2 }, { noise: 1200, d: 0.35, vol: 0.03 }],
       swing: [{ noise: 1800, d: 0.12, vol: 0.07 }, { f: 200, d: 0.1, type: "triangle", vol: 0.05, slide: 0.6 }],
+      chain: [{ noise: 3200, d: 0.09, vol: 0.06 }, { f: 1250, d: 0.07, type: "triangle", vol: 0.03, slide: 0.8 }, { f: 1750, d: 0.06, type: "triangle", vol: 0.025, at: 45, slide: 0.85 }],
       splash: [{ noise: 1000, d: 0.25, vol: 0.07 }, { f: 330, d: 0.2, type: "sine", vol: 0.05, slide: 0.5 }],
       star: [{ f: 1100, d: 0.07, type: "sine", vol: 0.045, slide: 0.8 }],
       zap: [{ f: 900, d: 0.08, type: "triangle", vol: 0.04, slide: 0.5 }, { noise: 3000, d: 0.06, vol: 0.03 }],
@@ -2302,12 +2306,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       this.bursts = []; this.pools = []; this.poolHit = {}; this.lunges = []; this.waves = [];
       this.holes = []; this.storms = []; this.revs = []; this.graces = []; this.domains = [];
       this.curses = {}; this.bladeSpins = []; this.turrets = []; this.groves = []; this.shells = []; this.gales = []; this.stars = [];
+      this.hooks = []; this.hookFlights = []; this.slams = [];
     }
     dropOwnedBy(ownerId) { var services = this.services;
       var field = this, owned = function (item) { return (item.e || item.d).owner === ownerId; };
       [["bursts", services.effectView, "dropBurstVis"], ["pools", services.poolView, "dropPoolVis"], ["lunges", services.effectView, "dropLungeVis"], ["holes", services.poolView, "dropHoleVis"],
        ["storms", services.stormView, "dropStormVis"], ["revs", services.revGraceView, "dropRevVis"], ["graces", services.revGraceView, "dropGraceVis"], ["domains", services.domainView, "dropDomainVis"],
-       ["turrets", services.turrets, "dropVis"], ["groves", services.groves, "dropVis"], ["shells", services.turrets, "dropShellVis"], ["gales", services.galeView, "drop"], ["stars", services.starfallView, "drop"]
+       ["turrets", services.turrets, "dropVis"], ["groves", services.groves, "dropVis"], ["shells", services.turrets, "dropShellVis"], ["gales", services.galeView, "drop"], ["stars", services.starfallView, "drop"], ["hooks", services.hookView, "dropHook"], ["hookFlights", services.hookView, "dropFlight"], ["slams", services.hookView, "dropSlam"]
       ].forEach(function (row) {
         field[row[0]] = field[row[0]].filter(function (item) {
           if (!owned(item)) return true;
@@ -2326,6 +2331,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       this.shells.forEach(services.turrets.dropShellVis.bind(services.turrets));
       this.gales.forEach(services.galeView.drop.bind(services.galeView));
       this.stars.forEach(services.starfallView.drop.bind(services.starfallView));
+      this.hooks.forEach(services.hookView.dropHook.bind(services.hookView));
+      this.hookFlights.forEach(services.hookView.dropFlight.bind(services.hookView));
+      this.slams.forEach(services.hookView.dropSlam.bind(services.hookView));
     }
     renderLingering(t, nowMs, dt) { var services = this.services;
       this.pools.forEach(function (pl) { services.poolView.renderPool(pl, t, nowMs); });
@@ -2338,6 +2346,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       this.shells.forEach(function (s) { services.turrets.renderShell(s, t); });
       this.gales.forEach(function (g) { services.galeView.render(g, t, nowMs); });
       this.stars.forEach(function (s) { services.starfallView.render(s, t, nowMs); });
+      services.hookView.render(t, nowMs);
     }
   }
 
@@ -2387,6 +2396,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     get botRole() { return CharacterType.BOT_ROLE_OF_CLASS[this.data.role] || "front"; }
     botAct(B, target, enemies, t) { return false; }
     botUltRange() { return Infinity; }
+    botUltAllowed(B, target) { return true; }
+    onStrikeShown(d) {}
+    dressPortrait(m) {}
     botUltSpot(B, target, td, t) { var services = this.services; return services.brain.ultAimSpot(B, target, td, t); }
     wantsBasicNow(B, t) { return false; }
     projectileMesh(g, d) { var services = this.services;
@@ -3504,6 +3516,68 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return ["Melee_1H_Slash", GiantType.SWING_SPEED, null, GiantType.SWING_FROM_SEC];
     }
   }
+  class WraithType extends CharacterType {
+    static MELEE = { color: 0xB9C2CF, spark: "#E6EBF2" };
+    static MODEL = { file: "Skeleton_Warrior" };
+    static BLADE_MODEL = "Skeleton_Dagger";
+    static CHAIN_MUZZLE = 20;
+    static ULT = {
+      hkWind: GameTime.gameMs(0.25), hkRange: 650, hkSpeed: GameTime.gameSpeed(1000), hkPr: 8, hkDmg: 35, hkAfterStunMs: GameTime.gameMs(0.5), hkPullSpeed: GameTime.gameSpeed(800),
+      hkPassiveGauge: 1, hkBreakDist: 40, hkBotMinPull: 80
+    };
+    static STATS = { name: "사슬 망령", role: "fighter", icon: "⛓️", hp: 400, speed: GameTime.gameSpeed(150), cd: GameTime.gameMs(1.2), dmg: 25, range: 300, width: 100, windup: GameTime.gameMs(0.25), ultName: "사슬 갈고리", ultAim: true };
+    static CHOP_FROM_SEC = 0.3;
+    static CHOP_IMPACT_SEC = 0.62;
+    static STAB_PEAK_SEC = 0.48;
+    static DRAW_SEC = 0.75;
+    get startsSkillTimer() { return false; }
+    get hidesBasicEdge() { return true; }
+    get shotSound() { return "chain"; }
+    get shotName() { return "쇠사슬"; }
+    get hasSkillClip() { return true; }
+    isLancerWinding(E, t) { return this.isRooted(E, t); }
+    isRooted(E, t) { return E.hookRootUntil > t; }
+    cannotAttack(E, t) { return this.isRooted(E, t); }
+    aimRange(btn) { return [WraithType.CHAIN_MUZZLE, WraithType.ULT.hkRange]; }
+    showAimGuide(E, ult, c) { var services = this.services;
+      if (!ult) return false;
+      var dx = Math.cos(E.angle), dy = Math.sin(E.angle), len = services.physics.rayCast(E.x + dx * WraithType.CHAIN_MUZZLE, E.y + dy * WraithType.CHAIN_MUZZLE, dx, dy, WraithType.ULT.hkRange - WraithType.CHAIN_MUZZLE, WraithType.ULT.hkPr) + WraithType.CHAIN_MUZZLE;
+      services.aimGuide.showAimStrip(18, Math.max(1, len - 18), WraithType.ULT.hkPr * 2);
+      return true;
+    }
+    ultAimShot() { return { len: WraithType.ULT.hkRange, halfWidth: WraithType.ULT.hkPr }; }
+    skillShotSpec() { return { count: 1, gap: 0, sp: WraithType.ULT.hkSpeed, dmg: WraithType.ULT.hkDmg, pr: WraithType.ULT.hkPr, range: WraithType.ULT.hkRange - WraithType.CHAIN_MUZZLE, ultKey: "hook" }; }
+    ultLeadSeconds(dist) { return dist / WraithType.ULT.hkSpeed; }
+    botUltRange() { return WraithType.ULT.hkRange; }
+    botUltAllowed(B, target) { var services = this.services; return services.hookPath.plan(target.x, target.y, B.x, B.y, target.hitR).dist >= WraithType.ULT.hkBotMinPull; }
+    cast(E, ang, reach, t) { var services = this.services; services.hookPull.cast(E, ang, t); }
+    projectileMesh(g, d) {}
+    projectileEffect(d, T, immune, fx) { var services = this.services; return d.isSkill ? services.hookPull.stunFor(d, T, immune) : fx; }
+    afterProjectileHit(d, T, immune) { var services = this.services; if (d.isSkill) services.hookPull.afterHit(d, T, immune); }
+    onHitLate(owner, h) { var services = this.services; if (h.hk != null) services.hookPull.onCasterTold(owner, h); }
+    stepPassive(T, t) { var services = this.services;
+      if (!T.alive) { T.hookGaugeNext = 0; return; }
+      if (!T.hookGaugeNext) T.hookGaugeNext = t + services.timescale.regenTickMs;
+      if (t < T.hookGaugeNext) return;
+      T.hookGaugeNext += services.timescale.regenTickMs;
+      if (!T.isGaugeLocked(t)) T.gauge = Math.min(MatchRules.GAUGE_MAX, T.gauge + WraithType.ULT.hkPassiveGauge);
+      services.match.game.forceNet = true;
+    }
+    playSkillClip(v, E, t) { var services = this.services; services.fighterMotion.playOnce(v, "Melee_1H_Attack_Stab", WraithType.STAB_PEAK_SEC * 1000 / WraithType.ULT.hkWind, t); }
+    attackClip(v, E, t) { return ["Melee_1H_Attack_Chop", (WraithType.CHOP_IMPACT_SEC - WraithType.CHOP_FROM_SEC) * 1000 / this.data.windup, null, WraithType.CHOP_FROM_SEC]; }
+    addMarkers(v, root, body) { var services = this.services; if (v.kit) v.chainRig = new WraithChainRig(services, v, root); }
+    dressPortrait(m) { var services = this.services; WraithChainRig.dressPortrait(services, m); }
+    onStrikeShown(d) { var services = this.services; services.hookView.addSlam(d); }
+    ultDesc() { var services = this.services;
+      var u = WraithType.ULT;
+      return "사거리 " + u.hkRange + "의 사슬을 던져 처음 맞은 적에게 " + u.hkDmg + "의 피해를 주고 묶어 끌어옴. 끌려오는 동안과 멈춘 뒤 " + services.skilltext.secs(u.hkAfterStunMs) + "간 기절. 사슬은 물을 넘어가고 벽에 막힘. 적은 벽과 물 앞까지만 끌려옴";
+    }
+    passiveDesc() { return "1초마다 스킬 게이지 " + WraithType.ULT.hkPassiveGauge + " 회복"; }
+    basicDesc() { var services = this.services;
+      var c = this.data;
+      return "멈춰 서서 앞쪽 길이 " + c.range + "·폭 " + c.width + "의 지역을 " + services.skilltext.secs(c.windup) + " 뒤 쇠사슬로 내려쳐 맞은 적에게 " + c.dmg + "의 피해";
+    }
+  }
   class DummyType extends CharacterType {
     static MODEL = { file: "Knight" };
     static STATS = { name: "연습 봇", role: "fighter", icon: "🎯", hp: 99999, speed: 200, cd: 1000, dmg: 0, range: 0, ultName: "없음", practiceBot: true };
@@ -3539,6 +3613,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         engineer: new EngineerType(services, "engineer"),
         druid: new DruidType(services, "druid"),
         giant: new GiantType(services, "giant"),
+        wraith: new WraithType(services, "wraith"),
         gargantua: new GargantuaType(services, "gargantua"),
         astrologer: new AstrologerType(services, "astrologer"),
         dummy: new DummyType(services, "dummy"),
@@ -4098,6 +4173,148 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return services.physics.rayObst(ax, ay, (bx - ax) / d, (by - ay) / d, 4) >= d;
     }
   }
+  class HookPath {
+    static EDGE_GAP = 8;
+    static MIN_MOVE = 4;
+    static TOUCH_SLACK = 1e-6;
+    static STOP_SHORT = 1e-5;
+    constructor(services) { this.services = services; }
+    stopGap(hitR) { return ArenaSize.BODY_R + hitR + HookPath.EDGE_GAP; }
+    plan(tx, ty, cx, cy, hitR) {
+      var apart = MathKit.hyp(cx - tx, cy - ty), want = Math.max(0, apart - this.stopGap(hitR));
+      if (want <= 0) return { kind: "full", sx: tx, sy: ty, ex: tx, ey: ty, ux: 0, uy: 0, dist: 0, want: 0, reach: 0 };
+      var ux = (cx - tx) / apart, uy = (cy - ty) / apart, reach = this.clearReach(tx, ty, ux, uy, want);
+      var kind = reach >= want ? "full" : reach < HookPath.MIN_MOVE ? "none" : "partial", dist = kind === "none" ? 0 : reach;
+      return { kind: kind, sx: tx, sy: ty, ex: tx + ux * dist, ey: ty + uy * dist, ux: ux, uy: uy, dist: dist, want: want, reach: reach };
+    }
+    clearReach(x, y, ux, uy, limit) { var services = this.services;
+      var hit = this.boundReach(x, y, ux, uy), path = this;
+      [services.arenaMap.obstacles, services.arenaMap.water].forEach(function (rects) {
+        rects.forEach(function (o) { hit = Math.min(hit, path.rectReach(x, y, ux, uy, o)); });
+      });
+      return hit > limit ? limit : Math.max(0, hit - HookPath.STOP_SHORT);
+    }
+    boundReach(x, y, ux, uy) {
+      var hit = Infinity, R = ArenaSize.BODY_R, B = ArenaSize.BOUND;
+      if (ux > 1e-12) hit = Math.min(hit, (B.r - R - x) / ux);
+      if (ux < -1e-12) hit = Math.min(hit, (B.l + R - x) / ux);
+      if (uy > 1e-12) hit = Math.min(hit, (B.b - R - y) / uy);
+      if (uy < -1e-12) hit = Math.min(hit, (B.t + R - y) / uy);
+      return Math.max(0, hit);
+    }
+    rectReach(x, y, ux, uy, o) {
+      var R = ArenaSize.BODY_R - HookPath.TOUCH_SLACK, x0 = o.x - o.w / 2, x1 = o.x + o.w / 2, y0 = o.y - o.h / 2, y1 = o.y + o.h / 2;
+      return Math.min(this.boxEntry(x, y, ux, uy, x0 - R, x1 + R, y0, y1), this.boxEntry(x, y, ux, uy, x0, x1, y0 - R, y1 + R),
+                      this.circleEntry(x, y, ux, uy, x0, y0, R), this.circleEntry(x, y, ux, uy, x1, y0, R), this.circleEntry(x, y, ux, uy, x0, y1, R), this.circleEntry(x, y, ux, uy, x1, y1, R));
+    }
+    boxEntry(x, y, ux, uy, x0, x1, y0, y1) {
+      var enter = -Infinity, leave = Infinity;
+      if (Math.abs(ux) < 1e-12) { if (x <= x0 || x >= x1) return Infinity; }
+      else { var a = (x0 - x) / ux, b = (x1 - x) / ux; enter = Math.max(enter, Math.min(a, b)); leave = Math.min(leave, Math.max(a, b)); }
+      if (Math.abs(uy) < 1e-12) { if (y <= y0 || y >= y1) return Infinity; }
+      else { var c = (y0 - y) / uy, d = (y1 - y) / uy; enter = Math.max(enter, Math.min(c, d)); leave = Math.min(leave, Math.max(c, d)); }
+      return leave <= enter || leave <= 0 ? Infinity : Math.max(0, enter);
+    }
+    circleEntry(x, y, ux, uy, cx, cy, R) {
+      var fx = x - cx, fy = y - cy, along = fx * ux + fy * uy, room = along * along - (fx * fx + fy * fy - R * R);
+      if (room <= 0) return Infinity;
+      var root = Math.sqrt(room), leave = -along + root;
+      return leave <= 0 ? Infinity : Math.max(0, -along - root);
+    }
+  }
+  class HookPullSystem {
+    constructor(services) { this.services = services; this.caught = null; }
+    flightMs(E, ang) { var services = this.services;
+      var dx = Math.cos(ang), dy = Math.sin(ang), spec = services.charTypes.of(E.char).skillShotSpec();
+      return services.physics.rayCast(E.x + dx * WraithType.CHAIN_MUZZLE, E.y + dy * WraithType.CHAIN_MUZZLE, dx, dy, spec.range, spec.pr) / spec.sp * 1000;
+    }
+    cast(E, ang, t) { var services = this.services;
+      var until = t + WraithType.ULT.hkWind + this.flightMs(E, ang);
+      E.angle = ang; E.pending = null; E.slash = null; E.lance = null; E.windUntil = 0;
+      E.ultUntil = until; E.hookRootUntil = until; E.cdUntil = Math.max(E.cdUntil, until);
+      E.hookCast = { ang: ang, x: E.x, y: E.y, fireAt: t + WraithType.ULT.hkWind };
+      E.hookGaugeNext = t + services.timescale.regenTickMs;
+      services.vision.revealBriefly(E.id, t);
+    }
+    stepCast(E, t) { var services = this.services;
+      var C = E.hookCast; if (!C) return;
+      if (!E.alive || E.isStunned(t) || MathKit.hyp(E.x - C.x, E.y - C.y) > MeleeSystem.LANCE_SLIP) { this.cancelCast(E, t); return; }
+      if (t < C.fireAt) return;
+      E.hookCast = null;
+      services.session.room.ref.child("shots").push({ o: E.id, x: Math.round(E.x), y: Math.round(E.y), a: Math.round(C.ang * 100) / 100, t: t, s: 1 });
+      services.vision.revealBriefly(E.id, t);
+      services.match.game.forceNet = true;
+    }
+    cancelCast(E, t) { var services = this.services;
+      E.hookCast = null; E.hookRootUntil = 0; E.ultUntil = Math.min(E.ultUntil, t);
+      services.match.game.forceNet = true;
+    }
+    planFor(d, T) { var services = this.services;
+      if (T.leap) return { kind: "none", sx: T.x, sy: T.y, ex: T.x, ey: T.y, ux: 0, uy: 0, dist: 0, want: 0, reach: 0 };
+      return services.hookPath.plan(T.x, T.y, d.castX, d.castY, T.hitR);
+    }
+    pullMsOf(dist) { return dist / WraithType.ULT.hkPullSpeed * 1000; }
+    stunFor(d, T, immune) {
+      this.caught = null;
+      if (immune || T.minion) return null;
+      var plan = this.planFor(d, T), pullMs = this.pullMsOf(plan.dist);
+      this.caught = { plan: plan, pullMs: pullMs };
+      return { stunMs: pullMs + WraithType.ULT.hkAfterStunMs };
+    }
+    afterHit(d, T, immune) { var services = this.services;
+      var caught = this.caught, t = services.clock.now();
+      this.caught = null;
+      if (!caught || immune || T.minion || !T.alive) { this.tellCaster(d.owner, 0, t); return; }
+      var plan = caught.plan, pullMs = caught.pullMs;
+      T.shove = null;
+      if (!T.leap) T.dash = null;
+      T.hookPull = null;
+      if (plan.dist > 0) {
+        var revealUntil = t + pullMs;
+        T.revealUntil = Math.max(T.revealUntil || 0, revealUntil);
+        T.hookPull = { sx: plan.sx, sy: plan.sy, ux: plan.ux, uy: plan.uy, dist: plan.dist, at: t, owner: d.owner, castX: d.castX, castY: d.castY, stunSet: t + pullMs + WraithType.ULT.hkAfterStunMs, revealSet: revealUntil };
+        T.mv = false;
+        T.angle = T.moveAng = Math.atan2(plan.uy, plan.ux); T.moveAt = t;
+      }
+      services.session.room.ref.child("effects").push({ type: "hook", owner: d.owner, tgt: T.id, createdAt: t, pullMs: Math.round(pullMs), kind: plan.kind });
+      this.tellCaster(d.owner, Math.round(pullMs), t);
+      services.match.game.forceNet = true;
+    }
+    tellCaster(owner, pullMs, t) { var services = this.services;
+      services.session.room.ref.child("hits/" + owner).push({ d: 0, b: 0, t: t, hk: pullMs });
+    }
+    onCasterTold(owner, h) { var services = this.services;
+      owner.hookRootUntil = h.t + h.hk;
+      owner.cdUntil = Math.max(owner.cdUntil, owner.hookRootUntil);
+      services.match.game.forceNet = true;
+    }
+    stepPull(T, t) { var services = this.services;
+      var P = T.hookPull; if (!P) return;
+      if (!T.alive) { T.hookPull = null; return; }
+      if (T.shove || this.chainSnapped(P, t)) { this.snap(T, P, t); return; }
+      var moved = Math.min(P.dist, WraithType.ULT.hkPullSpeed * (t - P.at) / 1000);
+      T.x = P.sx + P.ux * moved; T.y = P.sy + P.uy * moved;
+      T.mv = false;
+      if (moved < P.dist) return;
+      T.hookPull = null;
+      services.physics.resolve(T);
+      services.match.game.forceNet = true;
+    }
+    chainSnapped(P, t) { var services = this.services;
+      var A = services.targets.ent(P.owner);
+      return !A || !A.alive || A.isStunned(t) || MathKit.hyp(A.x - P.castX, A.y - P.castY) > WraithType.ULT.hkBreakDist;
+    }
+    snap(T, P, t) { var services = this.services;
+      T.hookPull = null;
+      if (T.stunUntil === P.stunSet) T.stunUntil = t + WraithType.ULT.hkAfterStunMs;
+      if (T.revealUntil === P.revealSet) T.revealUntil = t;
+      services.hookView.snapped(T.id);
+      services.match.game.forceNet = true;
+    }
+    releaseAll() { var services = this.services;
+      services.targets.localTargets().forEach(function (T) { if (T.hookPull) T.hookPull = null; if (T.hookCast) T.hookCast = null; if (T.hookRootUntil) T.hookRootUntil = 0; });
+    }
+  }
   class StatusEffects {
     constructor(services) { this.services = services; }
     static CC_FLUSH_MS = 500;
@@ -4338,13 +4555,17 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
 
+  class HookEffect extends EffectHandler {
+    handle(e, now) { var services = this.services; services.hookView.addHook(e, now); }
+  }
+
   class EffectIntake {
     constructor(services) {
       this.handlers = new Map([
         ["turret", new TurretEffect(services)], ["grove", new GroveEffect(services)], ["gale", new GaleEffect(services)], ["star", new StarEffect(services)],
         ["pool", new PoolEffect(services)], ["hole", new HoleEffect(services)], ["storm", new StormEffect(services)], ["rev", new RevEffect(services)],
         ["domain", new DomainEffect(services)], ["grace", new GraceEffect(services)], ["strike", new StrikeEffect(services)], ["zap", new ZapEffect(services)],
-        ["tshot", new TurretShotEffect(services)], ["curse", new CurseEffect(services)], ["revCut", new RevCutEffect(services)], ["burst", new BurstEffect(services)]
+        ["tshot", new TurretShotEffect(services)], ["curse", new CurseEffect(services)], ["revCut", new RevCutEffect(services)], ["burst", new BurstEffect(services)], ["hook", new HookEffect(services)]
       ]);
     }
     take(e, now) {
@@ -4413,7 +4634,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         if (services.session.room.status !== "playing") return true;
         var gap = e.gap || 6, pullRate = e.pull || PriestType.ULT.bhPull;
         services.targets.localTargets().forEach(function (T) {
-          if (!T.alive || T.team === e.team || T.isProtected(t)) return;
+          if (!T.alive || T.team === e.team || T.isProtected(t) || T.hookPull) return;
           var dx = center.x - T.x, dy = center.y - T.y, d = MathKit.hyp(dx, dy);
           if (d > e.r + T.hitR * 0.5 || d < gap) return;
           var pull = Math.min(d - gap, pullRate * dt);
@@ -5047,7 +5268,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var dm = Math.min(amount, T.hp), killed = false;
       T.taken = (T.taken || 0) + dm;
       T.hp -= dm; if (!noHurtGauge && !T.isGaugeLocked()) T.gauge = Math.min(MatchRules.GAUGE_MAX, T.gauge + services.catalog.roleOf(T.char).gaugeOnHurt);
-      if (T.hp <= 0) { killed = true; T.hp = 0; T.alive = false; T.deaths++; T.diedAt = services.clock.now(); T.burst = null; T.volley = null; T.slash = null; T.regenUntil = 0; T.skillUntil = 0; T.slowUntil = 0; T.slows = null; T.stunUntil = 0; T.lance = null; T.frostStacks = 0; T.hasteUntil = 0; T.hasteStacks = 0; T.burnUntil = 0; T.burnNext = 0; T.regenNext = 0; if (T === services.match.me) { services.sound.sfx("down"); services.input.reset(); } }
+      if (T.hp <= 0) { killed = true; T.hp = 0; T.alive = false; T.deaths++; T.diedAt = services.clock.now(); T.burst = null; T.volley = null; T.slash = null; T.regenUntil = 0; T.skillUntil = 0; T.slowUntil = 0; T.slows = null; T.stunUntil = 0; T.lance = null; T.windUntil = 0; T.hookPull = null; T.hookCast = null; T.hookRootUntil = 0; T.frostStacks = 0; T.hasteUntil = 0; T.hasteStacks = 0; T.burnUntil = 0; T.burnNext = 0; T.regenNext = 0; if (T === services.match.me) { services.sound.sfx("down"); services.input.reset(); } }
       else {
         if (T === services.match.me) services.sound.sfx("hit");
         services.status.afflict(T, fx, owner);
@@ -5190,7 +5411,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       for (var lane = 0; lane < lanes; lane++) {
         var side = (lane - (lanes - 1) / 2) * 2 * laneStep;
         services.projectiles.addProj(v.key + "_" + i + (lanes > 1 ? "_" + lane : ""), { team: v.team, owner: v.ev.o, ownerCharacterType: v.char, x: ox + dx * 20 - dy * side, y: oy + dy * 20 + dx * side,
-          vx: dx * sp, vy: dy * sp, isSkill: v.skill, countsAsSkill: !!v.ev.sk, swingAt: v.ev.t, dmg: sv.dmg, ultKey: sv.ultKey, fx: sv.fx, laneHit: laneHit,
+          vx: dx * sp, vy: dy * sp, castX: ox, castY: oy, isSkill: v.skill, countsAsSkill: !!v.ev.sk, swingAt: v.ev.t, dmg: sv.dmg, ultKey: sv.ultKey, fx: sv.fx, laneHit: laneHit,
           pr: sv.pr, range: sv.range + (!v.skill && E && E.isOvercharged(v.ev.t) ? StormbowType.ULT.ocRangeBonus : 0), createdAt: v.ev.t + i * v.gap });
       }
       var shooterType = services.charTypes.of(v.char);
@@ -5395,6 +5616,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         return;
       }
       services.match.melee[key] = { d: d, at: Date.now() };
+      services.charTypes.of(who).onStrikeShown(d);
       if (d.u && services.targets.hear(d)) services.sound.sfx("boom");
       if (d.slam) services.fxView.boom(d.x, d.y, d.radius + ArenaSize.BODY_R, d.team);
       if (d.hammer) services.boltFx.thunder(d.x, d.y);
@@ -5651,7 +5873,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       E.x = sp.x; E.y = sp.y; E.angle = sp.angle; E.mv = false;
       E.hp = E.maxHp; E.alive = true; E.protectUntil = t + services.timescale.respawnProtectMs;
       E.cdUntil = 0; E.pending = null; E.burst = null; E.volley = null; E.slash = null;
-      E.buffUntil = 0; E.slamAt = 0; E.leap = null; E.dash = null; E.shove = null; E.stealthUntil = 0; E.ultUntil = 0; E.skillUntil = 0; E.regenUntil = 0; E.slowUntil = 0; E.slows = null; E.stunUntil = 0; E.lance = null; E.windUntil = 0;
+      E.buffUntil = 0; E.slamAt = 0; E.leap = null; E.dash = null; E.shove = null; E.stealthUntil = 0; E.ultUntil = 0; E.skillUntil = 0; E.regenUntil = 0; E.slowUntil = 0; E.slows = null; E.stunUntil = 0; E.lance = null; E.windUntil = 0; E.hookPull = null; E.hookCast = null; E.hookRootUntil = 0;
       E.frostStacks = 0; E.frostStackAt = 0; E.revealUntil = 0; E.lastStandUsed = false; E.hasteUntil = 0; E.hasteStacks = 0;
       E.burnUntil = 0; E.burnNext = 0; E.rallyUsed = false; E.regenNext = 0; E.shield = !!services.charTypes.statsOf(E.char).respawnShield;
       if (E === services.match.me) services.cameraRig.view.snap = true;
@@ -6112,7 +6334,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       else if (B.mv) B.angle = Math.atan2(k.vy, k.vx);
       if (B.burst) return;
       if (botType.botAct(B, target, enemies, t)) return;
-      if (target && B.gauge >= MatchRules.GAUGE_MAX && t - k.seenAt > 500 && services.physics.losClear(B.x, B.y, target.x, target.y) && td <= botType.botUltRange()) {
+      if (target && B.gauge >= MatchRules.GAUGE_MAX && t - k.seenAt > 500 && services.physics.losClear(B.x, B.y, target.x, target.y) && td <= botType.botUltRange() && botType.botUltAllowed(B, target)) {
         var ultSpot = botType.botUltSpot(B, target, td, t);
         services.attack.useUlt(B, Math.atan2(ultSpot.y - B.y, ultSpot.x - B.x), MathKit.hyp(ultSpot.x - B.x, ultSpot.y - B.y)); return;
       }
@@ -6765,7 +6987,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       function load(url) { return files.load(url); }
       var weaponNames = [];
       ModelKit.modelChars(services).forEach(function (c) { [services.charTypes.modelOf(c).right, services.charTypes.modelOf(c).left].forEach(function (w) { if (w && weaponNames.indexOf(w) < 0) weaponNames.push(w); }); });
-      weaponNames.push("arrow_bow", "arrow_crossbow", ModelKit.MINION_MODEL.right);
+      weaponNames.push("arrow_bow", "arrow_crossbow", ModelKit.MINION_MODEL.right, WraithType.BLADE_MODEL);
       var jobs = [load(ModelKit.KIT_DIR + "animations/teambattle_anims.glb?v=crossbow").then(function (g) { g.animations.forEach(function (clip) { services.models.kit.clips[clip.name] = clip; }); }),
                   load(ModelKit.KIT_DIR + "animations/teambattle_large.glb?v=giant").then(function (g) { g.animations.forEach(function (clip) { services.models.kit.largeClips[clip.name] = clip; }); })];
       weaponNames.forEach(function (w) { jobs.push(load(ModelKit.KIT_DIR + "props/" + w + ".gltf").then(function (g) { services.models.kit.weapons[w] = services.modelStyle.lambertize(g.scene, w === ThrowerType.MODEL.right); })); });
@@ -6857,6 +7079,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         var mix = new THREE.AnimationMixer(m); mix.clipAction(services.charTypes.of(c).clips.Idle_A).play(); mix.update(0.3);
         m.updateMatrixWorld(true);
         if (services.charTypes.modelOf(c).portraitPlant) { services.models.plantHeldUpright(m, services.charTypes.modelOf(c).plantTurn, services.charTypes.modelOf(c).plantTilt); services.models.shrinkTallHeld(m, services.charTypes.modelOf(c).plantTurn, services.charTypes.modelOf(c).plantTilt); }
+        services.charTypes.of(c).dressPortrait(m);
         return { c: c, m: m, box: new THREE.Box3().setFromObject(m) };
       });
       var tallest = posed.reduce(function (h, p) { return services.charTypes.modelOf(p.c).portraitFit ? h : Math.max(h, p.box.max.y); }, 0);
@@ -7198,7 +7421,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       v.durRing = new DurationRing(services, v.root, Palette.C_FX[M.team], FighterView.MINION_TIMER_R);
       return v;
     }
-    dropVis(id) { var services = this.services; var v = services.fighterView.fighters[id]; if (!v) return; v.root.parent.remove(v.root); v.mats.forEach(function (m) { m.dispose(); }); if (v.curse) v.curse.userData.mats.forEach(function (m) { m.dispose(); }); delete services.fighterView.fighters[id]; }
+    dropVis(id) { var services = this.services; var v = services.fighterView.fighters[id]; if (!v) return; v.root.parent.remove(v.root); v.mats.forEach(function (m) { m.dispose(); }); if (v.curse) v.curse.userData.mats.forEach(function (m) { m.dispose(); }); if (v.chainRig) v.chainRig.dispose(); delete services.fighterView.fighters[id]; }
   }
   class FighterMotion {
     constructor(services) { this.services = services; }
@@ -7358,6 +7581,374 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       g.visible = false;
       services.stage.scene.add(g);
       services.fighterView.clericRange = g;
+    }
+  }
+  class DraggedChain {
+    static LINK_R = 0.13;
+    static LINK_TUBE = 0.042;
+    static LINK_RADIAL = 5;
+    static LINK_TUBULAR = 8;
+    static LINK_STRETCH = 1.35;
+    static RIGHT_LINKS = 9;
+    static LEFT_LINKS = 7;
+    static PITCH_MODEL = 0.21;
+    static PITCH = DraggedChain.PITCH_MODEL * ModelTuning.MODEL_SCALE;
+    static GROUND_Y = 0.05 * ModelTuning.MODEL_SCALE;
+    static FALL_PER_SEC = 2.7 * ModelTuning.MODEL_SCALE;
+    static TELEPORT = 250;
+    static BLADE_K = 1.7;
+    static BLADE_GRIP_MODEL = 0.28;
+    static BLADE_SIDE_MODEL = 0.204;
+    static BLADE_SCALE = DraggedChain.BLADE_K * ModelTuning.MODEL_SCALE;
+    static BLADE_LEAD = DraggedChain.BLADE_GRIP_MODEL * DraggedChain.BLADE_SCALE;
+    static BLADE_FLOOR = DraggedChain.BLADE_SIDE_MODEL * DraggedChain.BLADE_SCALE;
+    constructor(count) { this.points = []; for (var i = 0; i < count; i++) this.points.push({ x: 0, y: 0, z: 0 }); }
+    reset(x, y, z) { this.points.forEach(function (p) { p.x = x; p.y = y; p.z = z; }); }
+    step(x, y, z, dt) {
+      var p = this.points, fall = DraggedChain.FALL_PER_SEC * dt;
+      p[0].x = x; p[0].y = y; p[0].z = z;
+      for (var i = 1; i < p.length; i++) {
+        var a = p[i - 1], b = p[i];
+        b.y = Math.max(DraggedChain.GROUND_Y, b.y - fall);
+        var dx = b.x - a.x, dy = b.y - a.y, dz = b.z - a.z, len = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        if (len > DraggedChain.PITCH) { var k = DraggedChain.PITCH / len; b.x = a.x + dx * k; b.y = a.y + dy * k; b.z = a.z + dz * k; }
+        if (b.y < DraggedChain.GROUND_Y) b.y = DraggedChain.GROUND_Y;
+      }
+    }
+    static bladeFrame(from, end, fallback) {
+      var dx = end.x - from.x, dy = Math.max(0, end.y - from.y), dz = end.z - from.z, len = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      if (len < 1e-3) { dx = fallback.x; dy = fallback.y; dz = fallback.z; len = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1; }
+      dx /= len; dy /= len; dz /= len;
+      return { dx: dx, dy: dy, dz: dz, x: end.x + dx * DraggedChain.BLADE_LEAD, y: Math.max(end.y + dy * DraggedChain.BLADE_LEAD, DraggedChain.BLADE_FLOOR), z: end.z + dz * DraggedChain.BLADE_LEAD };
+    }
+  }
+  class ChainLinkMesh {
+    constructor(geometry, material, capacity, unit) {
+      this.mesh = new THREE.InstancedMesh(geometry, material, capacity);
+      this.mesh.frustumCulled = false; this.mesh.count = 0;
+      this.capacity = capacity; this.unit = unit;
+      this.matrix = new THREE.Matrix4(); this.along = new THREE.Vector3(); this.here = new THREE.Vector3(); this.turn = new THREE.Quaternion(); this.roll = new THREE.Quaternion(); this.up = new THREE.Vector3(0, 1, 0);
+      this.size = new THREE.Vector3(unit, unit * DraggedChain.LINK_STRETCH, unit);
+    }
+    place(i, x, y, z, ax, ay, az) {
+      this.along.set(ax, ay, az);
+      if (this.along.lengthSq() < 1e-6) this.along.set(0, -1, 0);
+      this.turn.setFromUnitVectors(this.up, this.along.normalize());
+      this.roll.setFromAxisAngle(this.up, i % 2 ? Math.PI / 2 : 0);
+      this.turn.multiply(this.roll);
+      this.here.set(x, y, z);
+      this.matrix.compose(this.here, this.turn, this.size);
+      this.mesh.setMatrixAt(i, this.matrix);
+    }
+    drawPoints(points, originX, originZ) {
+      var n = Math.min(points.length, this.capacity);
+      for (var i = 0; i < n; i++) {
+        var p = points[i], q = points[Math.min(i + 1, n - 1)], o = points[Math.max(i - 1, 0)], last = i === n - 1;
+        this.place(i, p.x - originX, p.y, p.z - originZ, last ? p.x - o.x : q.x - p.x, last ? p.y - o.y : q.y - p.y, last ? p.z - o.z : q.z - p.z);
+      }
+      this.mesh.count = n; this.mesh.instanceMatrix.needsUpdate = true;
+    }
+    drawLine(fx, fy, fz, tx, ty, tz, wobble, nowMs) {
+      var dx = tx - fx, dy = ty - fy, dz = tz - fz, len = Math.sqrt(dx * dx + dy * dy + dz * dz), n = Math.min(this.capacity, Math.max(2, Math.ceil(len / DraggedChain.PITCH) + 1));
+      var sideX = len ? -dz / len : 0, sideZ = len ? dx / len : 0;
+      for (var i = 0; i < n; i++) {
+        var k = i / (n - 1), shake = wobble ? wobble * Math.sin(Math.PI * k) * Math.sin(nowMs / 22 + i * 0.9) : 0;
+        this.place(i, fx + dx * k + sideX * shake, fy + dy * k, fz + dz * k + sideZ * shake, dx, dy, dz);
+      }
+      this.mesh.count = n; this.mesh.instanceMatrix.needsUpdate = true;
+    }
+    dispose() { if (this.mesh.parent) this.mesh.parent.remove(this.mesh); this.mesh.dispose(); }
+  }
+  class WraithChainRig {
+    static COLOR = 0x8E97A6;
+    static HOLD_MS = 200;
+    constructor(services, v, root) {
+      this.services = services; this.v = v; this.root = root;
+      var model = v.activeForm.model;
+      this.handR = model.getObjectByName("handslotr"); this.handL = model.getObjectByName("handslotl");
+      this.mat = new THREE.MeshLambertMaterial({ color: WraithChainRig.COLOR, transparent: true });
+      v.mats.push(this.mat); v.glowMats.push(this.mat);
+      this.right = new DraggedChain(DraggedChain.RIGHT_LINKS); this.left = new DraggedChain(DraggedChain.LEFT_LINKS);
+      this.rightMesh = new ChainLinkMesh(services.geo.chainLink, this.mat, DraggedChain.RIGHT_LINKS, ModelTuning.MODEL_SCALE);
+      this.leftMesh = new ChainLinkMesh(services.geo.chainLink, this.mat, DraggedChain.LEFT_LINKS, ModelTuning.MODEL_SCALE);
+      root.add(this.rightMesh.mesh); root.add(this.leftMesh.mesh);
+      this.blade = WraithChainRig.makeBlade(services, DraggedChain.BLADE_SCALE, v.mats);
+      root.add(this.blade);
+      this.handAt = new THREE.Vector3(); this.heading = new THREE.Vector3(1, 0, 0); this.up = new THREE.Vector3(0, 1, 0);
+      this.lastX = null; this.lastZ = null; this.needsReset = true; this.rightParked = true; this.heldClip = null;
+    }
+    static makeBlade(services, scale, mats) {
+      var blade = services.models.kit.weapons[WraithType.BLADE_MODEL].clone();
+      blade.scale.setScalar(scale);
+      if (mats) {
+        var made = new Map();
+        blade.traverse(function (o) {
+          if (!o.isMesh) return;
+          o.frustumCulled = false;
+          var m = made.get(o.material);
+          if (!m) { m = o.material.clone(); m.transparent = true; made.set(o.material, m); mats.push(m); }
+          o.material = m;
+        });
+      }
+      return blade;
+    }
+    static dressPortrait(services, m) {
+      var mat = new THREE.MeshLambertMaterial({ color: WraithChainRig.COLOR }), at = new THREE.Vector3(), grip = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
+      [["handslotr", DraggedChain.RIGHT_LINKS, -0.3, true], ["handslotl", DraggedChain.LEFT_LINKS, 0.3, false]].forEach(function (row) {
+        m.getObjectByName(row[0]).getWorldPosition(at);
+        var points = [], x = at.x, y = at.y, z = at.z, pitch = DraggedChain.PITCH_MODEL, floor = DraggedChain.GROUND_Y / ModelTuning.MODEL_SCALE;
+        for (var i = 0; i < row[1]; i++) {
+          points.push(m.worldToLocal(new THREE.Vector3(x, y, z)));
+          if (y - pitch >= floor) y -= pitch; else { y = floor; x += row[2] * pitch; z += pitch * 0.95; }
+        }
+        var links = new ChainLinkMesh(services.geo.chainLink, mat, row[1], 1);
+        links.drawPoints(points, 0, 0);
+        m.add(links.mesh);
+        if (!row[3]) return;
+        var end = points[points.length - 1], frame = DraggedChain.bladeFrame(points[points.length - 2], end, up);
+        var blade = WraithChainRig.makeBlade(services, DraggedChain.BLADE_K, null);
+        grip.set(frame.dx, frame.dy, frame.dz);
+        blade.quaternion.setFromUnitVectors(up, grip);
+        blade.position.set(end.x + frame.dx * DraggedChain.BLADE_GRIP_MODEL * DraggedChain.BLADE_K, end.y + frame.dy * DraggedChain.BLADE_GRIP_MODEL * DraggedChain.BLADE_K, end.z + frame.dz * DraggedChain.BLADE_GRIP_MODEL * DraggedChain.BLADE_K);
+        m.add(blade);
+      });
+    }
+    handWorld(node, out) { node.updateWorldMatrix(true, false); return node.getWorldPosition(out); }
+    rightHandWorld(out) { return this.handWorld(this.handR, out); }
+    hide() { this.rightMesh.mesh.visible = this.leftMesh.mesh.visible = this.blade.visible = false; }
+    holdPose(E, t) { var services = this.services;
+      var v = this.v, view = services.hookView;
+      if (view.pulling(E.id, t)) {
+        if (!v.once || v.once.name !== "Ranged_Bow_Draw") services.fighterMotion.playOnce(v, "Ranged_Bow_Draw", v.clips.Ranged_Bow_Draw.duration / WraithType.DRAW_SEC, t);
+        v.once.until = t + WraithChainRig.HOLD_MS;
+        this.heldClip = "Ranged_Bow_Draw";
+        return;
+      }
+      if (E.ultUntil > t || view.flying(E.id)) {
+        if (v.once && v.once.name === "Melee_1H_Attack_Stab") {
+          v.once.until = t + WraithChainRig.HOLD_MS;
+          var action = v.actions.Melee_1H_Attack_Stab;
+          if (action && action.time >= WraithType.STAB_PEAK_SEC) action.paused = true;
+          this.heldClip = "Melee_1H_Attack_Stab";
+        }
+        return;
+      }
+      if (!this.heldClip) return;
+      var held = v.actions[this.heldClip];
+      if (held) held.paused = false;
+      if (v.once && v.once.name === this.heldClip) v.once = null;
+      this.heldClip = null;
+    }
+    update(E, t, dt) { var services = this.services;
+      this.holdPose(E, t);
+      if (!E.alive) { this.hide(); this.needsReset = true; return; }
+      var jumped = this.lastX !== null && MathKit.hyp(E.x - this.lastX, E.y - this.lastZ) > DraggedChain.TELEPORT;
+      this.lastX = E.x; this.lastZ = E.y;
+      this.handWorld(this.handL, this.handAt);
+      if (this.needsReset || jumped) this.left.reset(this.handAt.x, this.handAt.y, this.handAt.z);
+      this.left.step(this.handAt.x, this.handAt.y, this.handAt.z, dt);
+      this.leftMesh.mesh.visible = true;
+      this.leftMesh.drawPoints(this.left.points, E.x, E.y);
+      this.handWorld(this.handR, this.handAt);
+      if (services.hookView.handBusy(E.id)) { this.rightMesh.mesh.visible = this.blade.visible = false; this.rightParked = true; this.needsReset = false; return; }
+      if (this.needsReset || jumped || this.rightParked) this.right.reset(this.handAt.x, this.handAt.y, this.handAt.z);
+      this.needsReset = false; this.rightParked = false;
+      this.right.step(this.handAt.x, this.handAt.y, this.handAt.z, dt);
+      this.rightMesh.mesh.visible = this.blade.visible = true;
+      this.rightMesh.drawPoints(this.right.points, E.x, E.y);
+      var p = this.right.points, frame = DraggedChain.bladeFrame(p[p.length - 2], p[p.length - 1], this.heading);
+      this.heading.set(frame.dx, frame.dy, frame.dz);
+      this.blade.quaternion.setFromUnitVectors(this.up, this.heading);
+      this.blade.position.set(frame.x - E.x, frame.y, frame.z - E.y);
+    }
+    dispose() { this.rightMesh.dispose(); this.leftMesh.dispose(); }
+  }
+  class HookChainView {
+    static LINK_CAPACITY = 90;
+    static MAT = { color: 0xA7AFBC, transparent: true, opacity: 1 };
+    static WRAP_MAT = { color: 0xC4CBD6 };
+    static WRAP_HEIGHTS = [0.55, 0.78, 1];
+    static CHEST_Y = 40;
+    static SHIVER_MS = GameTime.gameMs(0.3);
+    static SHORT_SHOW_MS = GameTime.gameMs(0.12);
+    static LATE_WAIT_MS = GameTime.gameMs(0.3);
+    static RETRACT_MS = GameTime.gameMs(0.15);
+    static SHIVER_SIZE = 3.5;
+    static SLAM_DROP_MS = GameTime.gameMs(0.09);
+    static SLAM_SHOW_MS = GameTime.gameMs(0.45);
+    static SLAM_RISE = 95;
+    static SLAM_DUST_STEP = 62;
+    constructor(services) { this.services = services; this.from = new THREE.Vector3(); this.to = new THREE.Vector3(); this.up = new THREE.Vector3(0, 1, 0); this.dir = new THREE.Vector3(); this.axis = new THREE.Vector3(1, 0, 0); this.matrix = new THREE.Matrix4(); this.turn = new THREE.Quaternion(); this.spot = new THREE.Vector3(); this.size = new THREE.Vector3(); }
+    makeChainVis(withBlade, withWrap) { var services = this.services;
+      var g = new THREE.Group(), mat = services.fxMats.acquire("basic", HookChainView.MAT), links = new ChainLinkMesh(services.geo.chainLink, mat, HookChainView.LINK_CAPACITY, ModelTuning.MODEL_SCALE), vis = { group: g, mat: mat, links: links, blade: null, wrap: null, wrapMat: null };
+      g.add(links.mesh);
+      if (withBlade && services.models.kit.weapons[WraithType.BLADE_MODEL]) { vis.blade = WraithChainRig.makeBlade(services, DraggedChain.BLADE_SCALE, null); g.add(vis.blade); }
+      if (withWrap) {
+        vis.wrapMat = services.fxMats.acquire("basic", HookChainView.WRAP_MAT);
+        vis.wrap = new THREE.InstancedMesh(services.geo.chainWrap, vis.wrapMat, HookChainView.WRAP_HEIGHTS.length);
+        vis.wrap.frustumCulled = false;
+        g.add(vis.wrap);
+      }
+      services.stage.scene.add(g);
+      return vis;
+    }
+    dropVis(vis) { var services = this.services;
+      if (!vis) return;
+      services.stage.scene.remove(vis.group);
+      vis.links.dispose();
+      if (vis.wrap) { vis.wrap.dispose(); services.fxMats.release(vis.wrapMat); }
+      services.fxMats.release(vis.mat);
+    }
+    dropHook(h) { this.dropVis(h.vis); h.vis = null; }
+    dropFlight(f) { this.dropVis(f.vis); f.vis = null; }
+    dropSlam(s) { this.dropVis(s.vis); s.vis = null; }
+    warmSample() { var services = this.services;
+      var vis = this.makeChainVis(true, true), lambert = new ChainLinkMesh(services.geo.chainLink, new THREE.MeshLambertMaterial({ color: WraithChainRig.COLOR, transparent: true }), 1, ModelTuning.MODEL_SCALE);
+      vis.group.add(lambert.mesh); vis.links.mesh.count = 1; lambert.mesh.count = 1;
+      return vis.group;
+    }
+    addHook(e, now) { var services = this.services;
+      if (now > this.endOf(e)) return;
+      var view = this;
+      services.field.hooks = services.field.hooks.filter(function (h) { if (h.e.tgt !== e.tgt) return true; view.dropHook(h); return false; });
+      services.field.hookFlights = services.field.hookFlights.filter(function (f) { if (f.d.owner !== e.owner) return true; view.dropFlight(f); return false; });
+      services.field.hooks.push({ e: e, vis: null, blocked: false });
+      var T = services.targets.ent(e.tgt);
+      if (!T) return;
+      if (this.seesTarget(T)) services.fxView.spark(T.x, T.y, "#E6EBF2", 1.5);
+      if (services.targets.hear(T)) services.sound.sfx("chain");
+    }
+    seesTarget(T) { var services = this.services; return !services.match.me || services.match.me.team === T.team || services.vision.visibleTo(T, services.match.me); }
+    endOf(e) { return e.createdAt + e.pullMs + (e.kind === "full" ? (e.pullMs ? 0 : HookChainView.SHORT_SHOW_MS) : HookChainView.SHIVER_MS); }
+    snapped(tgtId) { var services = this.services;
+      var view = this;
+      services.field.hooks = services.field.hooks.filter(function (h) { if (h.e.tgt !== tgtId) return true; view.dropHook(h); return false; });
+    }
+    addSlam(d) { var services = this.services; services.field.slams.push({ d: d, vis: null, dusted: false }); }
+    step(t) { var services = this.services;
+      var view = this;
+      services.field.hooks = services.field.hooks.filter(function (h) {
+        var e = h.e, A = services.targets.ent(e.owner), T = services.targets.ent(e.tgt);
+        if (!A || !T || !A.alive || !T.alive || t >= view.endOf(e) || (t < e.createdAt + e.pullMs && A.isStunned(t))) { view.dropHook(h); return false; }
+        if (!h.blocked && e.kind !== "full" && t >= e.createdAt + e.pullMs) { h.blocked = true; view.blockedSpark(T, A); }
+        return true;
+      });
+      services.field.slams = services.field.slams.filter(function (s) {
+        if (t < s.d.createdAt + HookChainView.SLAM_SHOW_MS) return true;
+        view.dropSlam(s);
+        return false;
+      });
+    }
+    blockedSpark(T, A) { var services = this.services;
+      var d = MathKit.hyp(A.x - T.x, A.y - T.y) || 1;
+      if (this.seesTarget(T)) services.fxView.spark(T.x + (A.x - T.x) / d * ArenaSize.BODY_R, T.y + (A.y - T.y) / d * ArenaSize.BODY_R, "#FFD27A", 1.3);
+    }
+    pulling(id, t) { var services = this.services; return services.field.hooks.some(function (h) { return h.e.owner === id && t < h.e.createdAt + h.e.pullMs; }); }
+    flying(id) { var services = this.services; return services.field.hookFlights.some(function (f) { return f.d.owner === id; }); }
+    handBusy(id) { var services = this.services;
+      return services.field.hooks.some(function (h) { return h.e.owner === id; }) || services.field.hookFlights.some(function (f) { return f.d.owner === id; }) || services.field.slams.some(function (s) { return s.d.owner === id; });
+    }
+    ownerHand(id, out, fallback) { var services = this.services;
+      var v = services.fighterView.fighters[id];
+      if (v && v.chainRig) return v.chainRig.rightHandWorld(out);
+      return out.set(fallback.x, HookChainView.CHEST_Y, fallback.y);
+    }
+    placeBlade(vis, tipX, tipY, tipZ) {
+      if (!vis.blade) return;
+      this.dir.subVectors(this.to.set(tipX, tipY, tipZ), this.from);
+      if (this.dir.lengthSq() < 1e-6) this.dir.set(1, 0, 0);
+      this.dir.normalize();
+      vis.blade.quaternion.setFromUnitVectors(this.up, this.dir);
+      vis.blade.position.set(tipX, tipY, tipZ).addScaledVector(this.dir, DraggedChain.BLADE_LEAD);
+    }
+    render(t, nowMs) {
+      this.syncFlights();
+      this.renderFlights(t);
+      this.renderHooks(t, nowMs);
+      this.renderSlams(t);
+    }
+    syncFlights() { var services = this.services;
+      var view = this, shots = services.match.remoteShots || {};
+      Object.keys(shots).forEach(function (id) {
+        var p = shots[id];
+        if (p.d.ultKey === "hook" && !p.hookSeen) { p.hookSeen = true; services.field.hookFlights.push({ id: id, p: p, d: p.d, vis: null, stoppedAt: 0, stopTip: null, waits: false }); }
+      });
+      services.field.hookFlights = services.field.hookFlights.filter(function (f) { if (shots[f.id]) return true; view.dropFlight(f); return false; });
+    }
+    renderFlights(t) { var services = this.services;
+      var view = this;
+      services.field.hookFlights = services.field.hookFlights.filter(function (f) {
+        var p = f.p, e = t - p.d.createdAt, A = services.targets.ent(p.d.owner), v = services.fighterView.fighters[p.d.owner];
+        if (!A || !A.alive) { view.dropFlight(f); return false; }
+        if (!f.stoppedAt && (p.dead || p.gone || e > p.life)) {
+          f.stoppedAt = t; f.stopTip = services.projectiles.projAt(p, Math.max(0, Math.min(e, p.life))); f.waits = p.dead || p.gone;
+        }
+        var tip = f.stoppedAt ? f.stopTip : services.projectiles.projAt(p, Math.max(0, e)), share = 1;
+        if (f.stoppedAt) {
+          var since = t - f.stoppedAt - (f.waits ? HookChainView.LATE_WAIT_MS : 0);
+          if (since >= HookChainView.RETRACT_MS) { view.dropFlight(f); return false; }
+          share = since > 0 ? 1 - since / HookChainView.RETRACT_MS : 1;
+        }
+        if (!f.vis) f.vis = view.makeChainVis(true, false);
+        f.vis.group.visible = !v || v.root.visible;
+        if (!f.vis.group.visible) return true;
+        view.ownerHand(p.d.owner, view.from, A);
+        var tx = view.from.x + (tip.x - view.from.x) * share, ty = view.from.y + (ModelTuning.PROJ_Y - view.from.y) * share, tz = view.from.z + (tip.y - view.from.z) * share;
+        f.vis.links.drawLine(view.from.x, view.from.y, view.from.z, tx, ty, tz);
+        view.placeBlade(f.vis, tx, ty, tz);
+        return true;
+      });
+    }
+    renderHooks(t, nowMs) { var services = this.services;
+      var view = this;
+      services.field.hooks.forEach(function (h) {
+        var e = h.e, A = services.targets.ent(e.owner), T = services.targets.ent(e.tgt), va = services.fighterView.fighters[e.owner], vt = services.fighterView.fighters[e.tgt];
+        if (!A || !T) return;
+        if (!h.vis) h.vis = view.makeChainVis(true, true);
+        h.vis.group.visible = (!va || va.root.visible) && (!vt || vt.root.visible);
+        if (!h.vis.group.visible) return;
+        if (t < e.createdAt + e.pullMs) { T.moveAng = Math.atan2(A.y - T.y, A.x - T.x); T.moveAt = t; }
+        view.ownerHand(e.owner, view.from, A);
+        var chest = HookChainView.CHEST_Y * (T.hitR / ArenaSize.BODY_R), shiver = t >= e.createdAt + e.pullMs && e.kind !== "full" ? HookChainView.SHIVER_SIZE : 0;
+        h.vis.links.drawLine(view.from.x, view.from.y, view.from.z, T.x, chest, T.y, shiver, nowMs);
+        view.placeBlade(h.vis, T.x, chest, T.y);
+        view.placeWraps(h.vis, T, chest);
+      });
+    }
+    placeWraps(vis, T, chest) {
+      var view = this, r = T.hitR * 0.82;
+      HookChainView.WRAP_HEIGHTS.forEach(function (k, i) {
+        view.turn.setFromAxisAngle(view.axis, Math.PI / 2 + (i - 1) * 0.12);
+        view.spot.set(T.x, chest * k * 1.1, T.y);
+        view.size.setScalar(r);
+        view.matrix.compose(view.spot, view.turn, view.size);
+        vis.wrap.setMatrixAt(i, view.matrix);
+      });
+      vis.wrap.instanceMatrix.needsUpdate = true;
+    }
+    renderSlams(t) { var services = this.services;
+      var view = this;
+      services.field.slams.forEach(function (s) {
+        var d = s.d, age = t - d.createdAt, ca = Math.cos(d.angle), sa = Math.sin(d.angle);
+        if (!s.vis) s.vis = view.makeChainVis(false, false);
+        var fall = MathKit.clamp(age / HookChainView.SLAM_DROP_MS, 0, 1), left = MathKit.clamp((HookChainView.SLAM_SHOW_MS - age) / (HookChainView.SLAM_SHOW_MS * 0.4), 0, 1);
+        s.vis.mat.opacity = left;
+        view.drawSlamLinks(s.vis.links, d, ca, sa, (1 - fall * fall) * HookChainView.SLAM_RISE);
+        if (fall < 1 || s.dusted) return;
+        s.dusted = true;
+        for (var along = HookChainView.SLAM_DUST_STEP; along <= d.len; along += HookChainView.SLAM_DUST_STEP) {
+          services.fxView.spark(d.x + ca * along, d.y + sa * along, along % (HookChainView.SLAM_DUST_STEP * 2) ? "#FFD27A" : "#E6EBF2", 0.8);
+          services.fxView.smoke(d.x + ca * along, d.y + sa * along, 0xB7B0A2);
+        }
+      });
+    }
+    drawSlamLinks(links, d, ca, sa, rise) {
+      var n = Math.min(links.capacity, Math.max(2, Math.ceil(d.len / DraggedChain.PITCH) + 1));
+      for (var i = 0; i < n; i++) {
+        var k = i / (n - 1);
+        links.place(i, d.x + ca * d.len * k, DraggedChain.GROUND_Y + rise * k, d.y + sa * d.len * k, ca * d.len, rise, sa * d.len);
+      }
+      links.mesh.count = n; links.mesh.instanceMatrix.needsUpdate = true;
     }
   }
   class EffectView {
@@ -8413,7 +9004,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   class TourView {
     static SPOTS = [["warrior", "blue", 330, 585], ["ranger", "blue", 450, 555], ["mage", "blue", 570, 585],
-                    ["knight", "red", 330, 765], ["rogue", "red", 450, 795], ["sniper", "red", 570, 765]];
+                    ["knight", "red", 330, 765], ["rogue", "red", 450, 795], ["sniper", "red", 570, 765], ["wraith", "red", 450, 700]];
     static SHOTS = [
       { name: "아레나 전경", orbit: true, center: [450, 0, 675], radius: 1350, height: 850, arc: [1.1, 1.95] },
       { name: "중앙 대치", from: [110, 100, 930], to: [790, 100, 930], lookFrom: [380, 60, 675], lookTo: [520, 60, 675] },
@@ -8503,6 +9094,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         if (!s.E.nextAtk || s.E.nextAtk < 100000) s.E.nextAtk = t + s.E.nextAtk;
         if (t >= s.E.nextAtk) { s.E.atkAt = t; s.E.nextAtk = t + 1800 + Math.random() * 2600; }
         services.fighterMotion.animate(s.v, s.E, t, dt, false);
+        if (s.v.chainRig) s.v.chainRig.update(s.E, t, dt);
       });
       services.arenaView.bushVis.forEach(function (bv) { bv.mats.forEach(function (m) { m.opacity = bv.full; }); });
       services.cameraRig.renderer.render(services.stage.scene, services.stage.camera);
@@ -8573,6 +9165,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         if (v.kit) v.body.rotation.y = v.yaw;
         else { v.body.rotation.set(0, v.yaw, E.alive ? 0 : Math.PI / 2); v.body.position.y = E.alive ? 0 : 17; }
         services.fighterMotion.animate(v, E, t, dt, hurt);
+        if (v.chainRig) v.chainRig.update(E, t, dt);
         v.mats.forEach(function (m) { m.opacity = alpha; });
         var glow = services.frameRenderer.glowOf(E, t);
         v.glowMats.forEach(function (m) { m.emissive.setHex(glow); });
@@ -9251,6 +9844,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       this.shieldEdge = new THREE.IcosahedronGeometry(47, 1);
       this.shieldRing = new THREE.RingGeometry(44, 50, 6);
       this.bladeSlice = new THREE.RingGeometry(0.55, 0.95, 16, 1, 0, Math.PI * 0.35);
+      this.chainLink = new THREE.TorusGeometry(DraggedChain.LINK_R, DraggedChain.LINK_TUBE, DraggedChain.LINK_RADIAL, DraggedChain.LINK_TUBULAR);
+      this.chainWrap = new THREE.TorusGeometry(1, 0.11, 5, 16);
       this.clericHalo = new THREE.CylinderGeometry(40, 32, 130, 20, 1, true);
       this.clericHalo.translate(0, 65, 0);
       this.stabLine = new THREE.BoxGeometry(1, 1, 1);
@@ -9757,7 +10352,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         function () { return services.gargantua.make(Object.assign({}, e, { ga: true })); },
         function () { return services.galeView.make(e); },
         function () { return services.starfallView.make(e); },
-        function () { return services.starfallView.make(Object.assign({}, e, { stun: true })); }
+        function () { return services.starfallView.make(Object.assign({}, e, { stun: true })); },
+        function () { return services.hookView.warmSample(); }
       ];
       return makers.map(function (make) {
         try {
@@ -9833,6 +10429,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.flow.syncRemote(viewDt == null ? dt : viewDt);
       services.world.stepFlightsAndFields(t, dt);
       if (services.session.room.status === "playing" && t >= services.session.room.startAt) services.world.stepPlaying(t, dt, driveBots);
+      else services.hookPull.releaseAll();
     }
     pruneLocal(t) { var services = this.services;
       Object.keys(services.match.remoteShots || {}).forEach(function (id) { if (t - services.match.remoteShots[id].d.createdAt > services.match.remoteShots[id].life + 1000) delete services.match.remoteShots[id]; });
@@ -9854,6 +10451,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.groves.step(t);
       services.melee.stepLunges(t);
       services.melee.stepWaves(t);
+      services.hookView.step(t);
       services.world.pruneLocal(t);
     }
     stepPlaying(t, dt, driveBots) { var services = this.services;
@@ -9887,12 +10485,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.dashMoves.stepKnightSlam(E);
       services.dashMoves.stepHammerLeap(E);
       services.melee.stepLance(E);
+      services.hookPull.stepCast(E, t);
       services.dashMoves.stepDash(E);
       services.minions.stepMinions(E, dt, t);
       services.damage.payKillGaugeOwed(E, t);
     }
     stepStatusTicks(t) { var services = this.services;
-      services.targets.localTargets().forEach(function (T) { services.status.stepShove(T, t); if (!T.minion) { services.status.stepBurn(T, t); services.status.stepRally(T, t); services.domainFx.stepDomainBolt(T, t); services.domainFx.stepCurse(T, t); T.type.stepPassive(T, t); } });
+      services.targets.localTargets().forEach(function (T) { services.status.stepShove(T, t); services.hookPull.stepPull(T, t); if (!T.minion) { services.status.stepBurn(T, t); services.status.stepRally(T, t); services.domainFx.stepDomainBolt(T, t); services.domainFx.stepCurse(T, t); T.type.stepPassive(T, t); } });
     }
   }
 
@@ -9942,7 +10541,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       HUD: services.hud, SOUND: services.sound, BACKEND: services.backend, TIMESCALE: services.timescale, THREE: THREE, CAMERA_RIG: services.cameraRig, ARENA_VIEW: services.arenaView, PROPS: services.props, PROP_THEMES: services.propThemes, camera: services.stage.camera, overlay: Canvases.overlay, QA: services.quality, PIX_MIN: Environment.PIX_MIN, PIX_START: Environment.PIX_START, SCENERY: services.arenaView.scenery,
       setDb: function (fake) { var before = services.backend.db; services.backend.db = fake; return before; },
       setTestLink: function (flag) { var before = services.backend.isTestLink; services.backend.isTestLink = flag; return before; },
-      CHAR_TYPES: services.charTypes, AUTO_AIM: services.autoAim, AUTO_AIM_ERR: AutoAim.AUTO_AIM_ERR, AUTO_AIM_LEAD: AutoAim.AUTO_AIM_LEAD, FullscreenKeeper: FullscreenKeeper, DRAFT_AI: services.draftAi,
+      HOOK_PATH: services.hookPath, HOOK_PULL: services.hookPull, HOOK_VIEW: services.hookView, DraggedChain: DraggedChain, WraithChainRig: WraithChainRig, FIGHTER_VIEW: services.fighterView, GEO: services.geo, FRAME_RENDERER: services.frameRenderer, stage: services.stage, CHAR_TYPES: services.charTypes, AUTO_AIM: services.autoAim, AUTO_AIM_ERR: AutoAim.AUTO_AIM_ERR, AUTO_AIM_LEAD: AutoAim.AUTO_AIM_LEAD, FullscreenKeeper: FullscreenKeeper, DRAFT_AI: services.draftAi,
       DRAFT: services.draft, DRAFT_VIEW: services.draftView, DRAFT_STEPS: Draft.STEPS, DRAFT_STEP_MS: Draft.STEP_MS, DRAFT_AI_MS: Draft.AI_MS, DRAFT_AI_TRADE_MS: Draft.AI_TRADE_MS, DRAFT_ABSENT_WAIT_MS: Draft.ABSENT_WAIT_MS, NO_BAN: Draft.NO_BAN,
       STATS: services.stats, STATS_PATH: MatchStats.path, STATS_PATCHES: StatsPatches, STATS_PENDING: MatchStats.PENDING, STATS_SETTLE_MS: MatchStats.SETTLE_MS, STATS_HOLD_MAX_MS: MatchStats.HOLD_MAX_MS,
       CLOCK: services.clock, GameClock: GameClock, CLOCK_KEEP: GameClock.KEEP, CLOCK_PINGS: GameClock.PINGS,
@@ -10271,6 +10870,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.gargantuaSys = new GargantuaSystem(services);
       services.starfall = new StarfallSystem(services);
       services.giant = new GiantSystem(services);
+      services.hookPath = new HookPath(services);
+      services.hookPull = new HookPullSystem(services);
+      services.hookView = new HookChainView(services);
       services.respawn = new RespawnSystem(services);
       services.attack = new AttackController(services);
       services.autoAim = new AutoAim(services);

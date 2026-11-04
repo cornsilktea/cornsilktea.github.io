@@ -993,7 +993,7 @@ class ResultCollector {
     done(killed === 2 && during === 0 && dn.gauge === want ? "pass" : "fail", killed + "명 처치, 폭풍 중 게이지 " + during + " → 끝난 뒤 " + dn.gauge + " (기대 " + want + ")");
   });
 
-  function autoMelee(mapId, seconds, seed) {
+  function autoMelee(mapId, seconds, seed, forcedChar) {
     var rnd = seededRandom(seed), realRandom = Math.random;
     Math.random = rnd;
     try {
@@ -1006,6 +1006,7 @@ class ResultCollector {
       ["blue", "red"].forEach(function (team) {
         for (var s = 1; s <= 3; s++) list.push({ id: team + s, team: team, char: pickFree(team), slot: s });
       });
+      if (forcedChar) { list[0].char = forcedChar; list[3].char = forcedChar; }
       var W = world(mapId, list);
       list.forEach(function (e) {
         var E = W.ent(e.id), sp = api.spawnOf(e.team, e.slot);
@@ -1030,7 +1031,7 @@ class ResultCollector {
         for (var i = logStart; i < W.log.length; i++) { var p = W.log[i]; if (p.v.tp) teleported[p.path.split("/")[1]] = 1; }
         list.forEach(function (e) {
           var E = W.ent(e.id), P0 = prev[e.id];
-          prev[e.id] = { x: E.x, y: E.y, alive: E.alive, leap: !!E.leap, dash: !!E.dash, shove: !!E.shove, stunned: api.stunned(E, t - ms), stunUntil: E.stunUntil };
+          prev[e.id] = { x: E.x, y: E.y, alive: E.alive, leap: !!E.leap, dash: !!E.dash, shove: !!E.shove, hook: !!E.hookPull, stunned: api.stunned(E, t - ms), stunUntil: E.stunUntil };
           if (!isFinite(E.x) || !isFinite(E.y) || !isFinite(E.hp) || !isFinite(E.gauge)) { flag("숫자 아님(NaN)", E, t); return; }
           if (E.hp < 0 || E.hp > E.maxHp) flag("체력 범위 이탈", E, t, "hp " + E.hp);
           if (E.gauge < 0 || E.gauge > api.GAUGE_MAX) flag("게이지 범위 이탈", E, t, "gauge " + E.gauge);
@@ -1043,7 +1044,7 @@ class ResultCollector {
           if (!P0 || !P0.alive) return;
           var jump = hyp(E.x - P0.x, E.y - P0.y);
           if (!E.leap && !P0.leap && !teleported[e.id] && jump > 0.5 && segmentCrossesWall(P0.x, P0.y, E.x, E.y)) flag("벽 통과", E, t, Math.round(jump) + "만큼 이동");
-          if (P0.stunned && P0.stunUntil >= t && api.stunned(E, t) && jump > 0.5 && !E.shove && !P0.shove && !E.dash && !P0.dash && !E.leap && !P0.leap && !teleported[e.id] && !holeActive(t)) flag("기절 중 이동", E, t, Math.round(jump) + "만큼");
+          if (P0.stunned && P0.stunUntil >= t && api.stunned(E, t) && jump > 0.5 && !E.shove && !P0.shove && !E.dash && !P0.dash && !E.leap && !P0.leap && !E.hookPull && !P0.hook && !teleported[e.id] && !holeActive(t)) flag("기절 중 이동", E, t, Math.round(jump) + "만큼");
         });
       }
       var ults = W.log.filter(function (p) { return (p.path === "meleeHits" && p.v.u) || (p.path === "effects" && p.v.u !== 0 && p.v.type !== "pool" && p.v.type !== "grace") || (p.path === "shots" && p.v.s); }).length;
@@ -3010,7 +3011,7 @@ class ResultCollector {
 
   run(AIMG, "AI 역할: 기사·창술사·대장장이는 앞, 화염술사·주술사·궁수·뇌전사수·저격수는 뒤, 은신자·자객·결투가는 틈새를 노리는 역할인가", function (done) {
     var want = { knight: "front", lancer: "front", blacksmith: "front", guardian: "front", warrior: "front", mage: "back", shaman: "back", ranger: "back", stormbow: "back", sniper: "back", frost: "back", cleric: "back", necro: "back", thrower: "back",
-                 rogue: "flank", hitman: "flank", duelist: "flank", dancer: "back", engineer: "back", druid: "back", giant: "front", astrologer: "back" }, bad = [];
+                 rogue: "flank", hitman: "flank", duelist: "flank", dancer: "back", engineer: "back", druid: "back", giant: "front", astrologer: "back", wraith: "front" }, bad = [];
     Object.keys(want).forEach(function (c) { var got = api.CHAR_TYPES.of(c).botRole; if (got !== want[c]) bad.push(c + " " + got + " (기대 " + want[c] + ")"); });
     api.CHAR_LIST.forEach(function (c) { if (!want[c]) bad.push(c + " 역할이 정해지지 않음"); });
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : Object.keys(want).length + "명 역할이 맞음");
@@ -4729,6 +4730,15 @@ class ResultCollector {
     ["statsModal", "mapViewModal"].forEach(function (id) { document.getElementById(id).hidden = true; });
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "현재 패치 기본·패치 메뉴 전환·실패·늦은 요청 무시·연결 없음·닫기·맵 보기");
   });
+  new HookPathTests(api, { run: run }).register();
+  new WraithTests(api, { world: world, run: run, FRAME: FRAME }).register();
+  new DraggedChainTests(api, { run: run }).register();
+  run(AUTO, "AI 6명 60초 난전 — 강 맵 + 사슬 망령 고정 (시드 2041)", function (done) {
+    var r = autoMelee("river", 60, 2041, "wraith"), kinds = Object.keys(r.issues);
+    var roster = r.list.map(function (e) { return api.CHARS[e.char].name; }).join("·");
+    done(kinds.length ? "fail" : "pass", "출전: " + roster + " / 킬 " + r.kills + ", 궁극기 " + r.ults + "번" +
+      (kinds.length ? " / 규칙 위반: " + kinds.map(function (k) { return k + " " + r.issues[k].n + "번 (처음: " + r.issues[k].first + ")"; }).join("; ") : " / 규칙 위반 없음"));
+  });
   new EngineerDruidTests(api, { world: world, run: run, OPEN_Y: OPEN_Y, FRAME: FRAME }).register();
   new GiantTests(api, { world: world, run: run, OPEN_Y: OPEN_Y, FRAME: FRAME }).register();
   new GargantuaTests(api, { world: world, run: run, OPEN_Y: OPEN_Y, FRAME: FRAME }).register();
@@ -4739,6 +4749,945 @@ class ResultCollector {
   new AccountStatsTests(api, { run: run, runAsync: runAsync }).register();
   results.pending = Promise.resolve().then(function () { api.finish(api.currentMap()); }).then(drainAsync);
   return results;
+  }
+}
+
+class HookPathTests {
+  static GROUP = "사슬 경로";
+  static CASES = [
+    ["A1 같은 강변", 200, 300, 200, 560, "full", 200, 504, 204, 24],
+    ["A2 다리 정면", 450, 800, 450, 560, "full", 450, 616, 184, 24],
+    ["A3 강 건너 정면", 250, 840, 250, 560, "partial", 250, 774, 66, 24],
+    ["A4 강가에 붙은 적", 300, 774, 300, 576, "none", 300, 774, 0, 24],
+    ["A5 다리 경계 바로 안", 424, 790, 424, 560, "full", 424, 616, 174, 24],
+    ["A6 다리 경계 1 바깥(모서리)", 423, 790, 423, 560, "partial", 423, 756.9, 33.1, 24],
+    ["A7 비스듬히 다리 통과", 470, 790, 430, 540, "full", 438.8, 595.3, 197.2, 24],
+    ["A8 비스듬히 건너다 다리 위 정지", 476, 790, 380, 560, "partial", 424, 665.4, 135, 24],
+    ["A9 비스듬히 끌다 강가 정지", 300, 790, 200, 560, "partial", 293, 774, 17.4, 24],
+    ["A10 다리 위에서 옆으로", 450, 675, 300, 560, "partial", 424, 655.1, 32.8, 24],
+    ["A11 다리 위 정면", 450, 675, 450, 560, "full", 450, 616, 59, 24],
+    ["A12 시전자가 다리 위, 대상 정면", 450, 860, 450, 675, "full", 450, 731, 129, 24],
+    ["A13 시전자가 다리 위, 대상은 옆 강변", 300, 790, 450, 675, "partial", 320.9, 774, 26.3, 24],
+    ["A14 벽 모서리에 몸만 걸림", 130, 100, 130, 350, "partial", 130, 186.7, 86.7, 24],
+    ["A15 이미 가까움", 450, 600, 450, 560, "full", 450, 600, 0, 24],
+    ["A16 거신이 강 건너", 250, 840, 250, 560, "partial", 250, 774, 66, 36]
+  ];
+  static PAIRS_PER_MAP = 20000;
+  constructor(api, kit) { this.api = api; this.kit = kit; }
+
+  random(seed) {
+    var s = seed >>> 0;
+    return function () { s = (s + 0x6D2B79F5) >>> 0; var q = Math.imul(s ^ (s >>> 15), 1 | s); q = (q + Math.imul(q ^ (q >>> 7), 61 | q)) ^ q; return ((q ^ (q >>> 14)) >>> 0) / 4294967296; };
+  }
+  canStand(x, y, slack) {
+    var R = this.api.BODY_R, B = this.api.BOUND, o = this.api.obstacles();
+    slack = slack == null ? 1e-3 : slack;
+    if (!isFinite(x) || !isFinite(y) || x < B.l + R - slack || x > B.r - R + slack || y < B.t + R - slack || y > B.b - R + slack) return false;
+    function clear(list) {
+      return list.every(function (q) {
+        var dx = x - Math.max(q.x - q.w / 2, Math.min(x, q.x + q.w / 2)), dy = y - Math.max(q.y - q.h / 2, Math.min(y, q.y + q.h / 2));
+        return dx * dx + dy * dy >= (R - slack) * (R - slack);
+      });
+    }
+    return clear(o.walls) && clear(o.water);
+  }
+  standingSpot(rnd) {
+    var B = this.api.BOUND;
+    for (var i = 0; i < 200; i++) {
+      var x = B.l + rnd() * (B.r - B.l), y = B.t + rnd() * (B.b - B.t);
+      if (this.canStand(x, y)) return { x: x, y: y };
+    }
+    return null;
+  }
+  acrossRiver(T, C) { return (T.y >= 774 && C.y <= 576) || (C.y >= 774 && T.y <= 576); }
+  lineInsideBridge(T, C) {
+    var lanes = [[124, 176], [424, 476], [724, 776]];
+    function xAt(y) { return T.x + (C.x - T.x) * (y - T.y) / (C.y - T.y); }
+    var a = xAt(600), b = xAt(750);
+    return lanes.some(function (l) { return Math.min(a, b) >= l[0] - 1e-6 && Math.max(a, b) <= l[1] + 1e-6; });
+  }
+  checkPair(T, C, hitR, map, bad) {
+    var path = this.api.HOOK_PATH, p = path.plan(T.x, T.y, C.x, C.y, hitR), self = this;
+    function fail(text) { if (bad.length < 8) bad.push(map + " (" + T.x.toFixed(1) + "," + T.y.toFixed(1) + ")→(" + C.x.toFixed(1) + "," + C.y.toFixed(1) + "): " + text); }
+    [p.ex, p.ey, p.dist, p.want, p.reach, p.ux, p.uy].forEach(function (v) { if (!isFinite(v)) fail("숫자가 아님"); });
+    if (!self.canStand(p.ex, p.ey)) fail("끝 위치에 설 수 없음");
+    for (var s = 1; s < p.dist; s += 1) if (!self.canStand(T.x + p.ux * s, T.y + p.uy * s)) { fail("거리 " + s + " 에서 벽·물 통과"); break; }
+    var apart = Math.hypot(C.x - T.x, C.y - T.y);
+    if (apart > 1e-6 && Math.abs((p.ex - T.x) * (C.y - T.y) - (p.ey - T.y) * (C.x - T.x)) / apart > 0.01) fail("끝 위치가 직선을 벗어남");
+    if (p.dist < 0 || p.dist > p.want + 1e-6) fail("이동 거리 " + p.dist + " / 원하는 거리 " + p.want);
+    if (Math.hypot(C.x - p.ex, C.y - p.ey) > apart + 1e-6) fail("대상이 멀어짐");
+    var again = path.plan(T.x, T.y, C.x, C.y, hitR);
+    if (again.ex !== p.ex || again.ey !== p.ey || again.kind !== p.kind) fail("같은 입력에 다른 결과");
+    if (p.kind !== "full") {
+      var blocked = false;
+      for (var more = 0.005; more <= 1 && !blocked; more += 0.005) blocked = !self.canStand(T.x + p.ux * (p.reach + more), T.y + p.uy * (p.reach + more), 1e-9);
+      if (!blocked) fail(p.kind + " 인데 막힌 곳에서 1 더 갈 수 있음");
+    }
+    if (p.kind === "full" && Math.abs(p.dist - p.want) > 1e-6) fail("full 인데 목표까지 못 감");
+    if (p.kind === "partial" && (p.dist < 4 || p.dist >= p.want)) fail("partial 조건 어긋남: " + p.dist);
+    if (p.kind === "none" && (p.dist !== 0 || p.reach >= 4)) fail("none 조건 어긋남: " + p.reach);
+    if (map === "river" && self.acrossRiver(T, C)) {
+      var bankY = C.y <= 576 ? 576 : 774, reachedBank = C.y <= 576 ? p.ey <= bankY + 1e-6 : p.ey >= bankY - 1e-6;
+      if (reachedBank && !self.lineInsideBridge(T, C)) fail("다리 폭 밖의 직선인데 건너편 둑까지 옴");
+    }
+  }
+  register() {
+    var self = this, api = this.api, run = this.kit.run, G = HookPathTests.GROUP;
+    HookPathTests.CASES.forEach(function (c) {
+      run(G, c[0] + ": " + c[5] + ", 끝 (" + c[6] + "," + c[7] + "), 이동 " + c[8], function (done) {
+        api.loadMapData("river");
+        var p = api.HOOK_PATH.plan(c[1], c[2], c[3], c[4], c[9]), ok = p.kind === c[5] && Math.abs(p.ex - c[6]) <= 1 && Math.abs(p.ey - c[7]) <= 1 && Math.abs(p.dist - c[8]) <= 1;
+        done(ok ? "pass" : "fail", p.kind + ", 끝 (" + p.ex.toFixed(1) + "," + p.ey.toFixed(1) + "), 이동 " + p.dist.toFixed(1));
+      });
+    });
+    ["forest", "river", "dungeon", "windhill", "practice"].forEach(function (map, i) {
+      run(G, "무작위 경로 불변식 — " + map + " " + HookPathTests.PAIRS_PER_MAP + "쌍: 설 수 있음·벽 통과 없음·직선 위·길이·재현·막힘·이름·숫자·강 건너기", function (done) {
+        api.loadMapData(map);
+        var rnd = self.random(7300 + i * 31), bad = [], made = 0, kinds = { full: 0, partial: 0, none: 0 };
+        for (var n = 0; n < HookPathTests.PAIRS_PER_MAP; n++) {
+          var T = self.standingSpot(rnd), C = self.standingSpot(rnd);
+          if (!T || !C) continue;
+          made++;
+          kinds[api.HOOK_PATH.plan(T.x, T.y, C.x, C.y, 24).kind]++;
+          self.checkPair(T, C, n % 7 === 0 ? 36 : 24, map, bad);
+        }
+        done(bad.length || !made ? "fail" : "pass", bad.length ? bad.join(" / ") : made + "쌍 위반 없음 (끝까지 " + kinds.full + ", 중간 멈춤 " + kinds.partial + ", 못 끌림 " + kinds.none + ")");
+      });
+    });
+  }
+}
+
+class WraithTests {
+  static GROUP = "사슬 망령";
+  static OPEN_Y = 700;
+  constructor(api, kit) { this.api = api; this.kit = kit; }
+
+  scene(map, list) {
+    this.api.MATCH.stateByKey = {};
+    return this.kit.world(map, list.map(function (e, i) {
+      return Object.assign({ team: "red", char: "guardian", slot: (i % 3) + 1 }, e);
+    }));
+  }
+  duel(map, cx, cy, tx, ty, targetChar) {
+    return this.scene(map, [{ id: "wr", team: "blue", char: "wraith", x: cx, y: cy, slot: 1 }, { id: "foe", char: targetChar || "guardian", x: tx, y: ty, slot: 1 }]);
+  }
+  angleTo(A, x, y) { return Math.atan2(y - A.y, x - A.x); }
+  throwChain(W, A, x, y) { A.gauge = this.api.GAUGE_MAX; this.api.useUlt(A, this.angleTo(A, x, y)); }
+  hookEffects(W) { return W.log.filter(function (p) { return p.path === "effects" && p.v.type === "hook"; }).map(function (p) { return p.v; }); }
+  hookShots(W) { return W.log.filter(function (p) { return p.path === "shots" && p.v.s; }); }
+  untilCaught(W, frameMs, each) {
+    var n = this.hookEffects(W).length;
+    for (var ms = 0; ms < 2000 && this.hookEffects(W).length === n; ms += frameMs) { W.frame(frameMs); if (each) each(); }
+    return this.hookEffects(W).length > n;
+  }
+  untilArrived(W, T, frameMs, each) {
+    for (var ms = 0; ms < 3000 && T.hookPull; ms += frameMs) { W.frame(frameMs); if (each) each(); }
+  }
+  lost(E) { return E.maxHp - E.hp; }
+  canStand(x, y) {
+    var R = this.api.BODY_R - 0.01, B = this.api.BOUND, o = this.api.obstacles();
+    if (!isFinite(x) || !isFinite(y) || x < B.l + R || x > B.r - R || y < B.t + R || y > B.b - R) return false;
+    return o.walls.concat(o.water).every(function (q) {
+      return Math.hypot(x - Math.max(q.x - q.w / 2, Math.min(x, q.x + q.w / 2)), y - Math.max(q.y - q.h / 2, Math.min(y, q.y + q.h / 2))) >= R;
+    });
+  }
+  verdict(done, bad, okText) { done(bad.length ? "fail" : "pass", bad.length ? bad.slice(0, 6).join(" / ") : okText); }
+
+  register() {
+    this.registerPull();
+    this.registerHits();
+    this.registerInteractions();
+    this.registerBasic();
+    this.registerPassiveAndCard();
+    this.registerAi();
+    this.registerNetwork();
+  }
+
+  registerPull() {
+    var self = this, api = this.api, run = this.kit.run, G = WraithTests.GROUP, FRAME = this.kit.FRAME, ULT = api.ULT;
+    [["A2", 450, 800, 450, 560, 450, 616], ["A3", 250, 840, 250, 560, 250, 774], ["A4", 300, 774, 300, 576, 300, 774], ["A8", 476, 790, 380, 560, 424, 665.4]].forEach(function (c) {
+      run(G, "실제 끌기 " + c[0] + ": 끝 위치가 경로 표와 같고, 프레임마다 벽·물 밖이며, 끝난 뒤 위치가 밀리지 않는가", function (done) {
+        var bad = [], W = self.duel("river", c[3], c[4], c[0 + 1], c[2]), A = W.ent("wr"), T = W.ent("foe");
+        function each() { if (!self.canStand(T.x, T.y)) bad.push("(" + T.x.toFixed(1) + "," + T.y.toFixed(1) + ") 에 설 수 없음"); }
+        self.throwChain(W, A, T.x, T.y);
+        if (!self.untilCaught(W, FRAME, each)) bad.push("맞지 않음");
+        self.untilArrived(W, T, FRAME, each);
+        if (Math.abs(T.x - c[5]) > 1 || Math.abs(T.y - c[6]) > 1) bad.push("끝 (" + T.x.toFixed(1) + "," + T.y.toFixed(1) + ")");
+        var copy = { x: T.x, y: T.y };
+        api.resolve(copy);
+        if (Math.hypot(copy.x - T.x, copy.y - T.y) > 0.01) bad.push("끝난 뒤 밀림 " + Math.hypot(copy.x - T.x, copy.y - T.y).toFixed(3));
+        self.verdict(done, bad, "끝 (" + T.x.toFixed(1) + "," + T.y.toFixed(1) + ")");
+      });
+    });
+    run(G, "프레임 간격 8·16·33·100·250ms 에서 끌기 끝 위치가 같은가(터널링 없음)", function (done) {
+      var bad = [], ends = [];
+      [8, 16, 33, 100, 250].forEach(function (frame) {
+        var W = self.duel("river", 380, 560, 476, 790), A = W.ent("wr"), T = W.ent("foe");
+        self.throwChain(W, A, T.x, T.y);
+        self.untilCaught(W, frame);
+        self.untilArrived(W, T, frame, function () { if (!self.canStand(T.x, T.y)) bad.push(frame + "ms 프레임에서 물 안"); });
+        ends.push([frame, T.x, T.y]);
+        if (Math.abs(T.x - 424) > 1 || Math.abs(T.y - 665.4) > 1) bad.push(frame + "ms: (" + T.x.toFixed(1) + "," + T.y.toFixed(1) + ")");
+      });
+      self.verdict(done, bad, ends.map(function (e) { return e[0] + "ms (" + e[1].toFixed(1) + "," + e[2].toFixed(1) + ")"; }).join(" "));
+    });
+    run(G, "최대 사거리 끌기: 실제 300ms 동안 250 미만을 움직여 원격 화면에서 순간이동으로 처리되지 않는가", function (done) {
+      var bad = [], W = self.duel("practice", 450, 340, 450, 340 + 670), A = W.ent("wr"), T = W.ent("foe");
+      self.throwChain(W, A, T.x, T.y);
+      if (!self.untilCaught(W, 4)) bad.push("맞지 않음");
+      var y0 = T.y, gameMs = 300 * api.timeScale();
+      W.step(gameMs, 4);
+      var moved = Math.abs(T.y - y0);
+      if (moved >= 250) bad.push("300ms 에 " + moved.toFixed(1));
+      self.verdict(done, bad, "실제 300ms 에 " + moved.toFixed(1) + " 이동");
+    });
+    run(G, "끌리는 동안 매 프레임 기절·속도 0·공격 불가이고, 도착 뒤 정확히 0.5초 뒤 기절이 풀리는가(짧은 거리·최대 거리)", function (done) {
+      var bad = [], shown = [];
+      [["짧은 거리", "river", 200, 560, 200, 300], ["최대 거리", "practice", 450, 340, 450, 1010]].forEach(function (c) {
+        var W = self.duel(c[1], c[2], c[3], c[4], c[5]), A = W.ent("wr"), T = W.ent("foe"), hitAt = 0, atk = T.atkAt;
+        self.throwChain(W, A, T.x, T.y);
+        self.untilCaught(W, 4);
+        hitAt = W.t();
+        var planned = T.hookPull ? T.hookPull.dist : 0, arriveAt = T.hookPull.at + planned / ULT.hkPullSpeed * 1000, freeAt = arriveAt + ULT.hkAfterStunMs;
+        if (Math.abs(T.stunUntil - freeAt) > 0.001) bad.push(c[0] + " 기절 끝 " + (T.stunUntil - T.hookPull.at).toFixed(1));
+        self.untilArrived(W, T, 4, function () {
+          if (T.hookPull) {
+            if (!api.stunned(T, W.t()) || api.speedOf(T) !== 0) bad.push(c[0] + " 끌리는 중 기절·속도 어긋남");
+            api.fireBasic(T, 0);
+            T.gauge = api.GAUGE_MAX; api.useUlt(T, 0);
+            if (T.atkAt !== atk) bad.push(c[0] + " 끌리는 중 공격됨");
+          }
+        });
+        if (!api.stunned(T, freeAt - 1)) bad.push(c[0] + " 풀리기 직전 기절 아님");
+        if (api.stunned(T, freeAt + 1)) bad.push(c[0] + " 풀린 뒤에도 기절");
+        shown.push(c[0] + " " + planned.toFixed(0) + " 이동, 기절 실제 " + ((freeAt - hitAt) / api.timeScale() / 1000).toFixed(2) + "초");
+      });
+      [["강가 none", "river", 300, 576, 300, 774]].forEach(function (c) {
+        var W = self.duel(c[1], c[2], c[3], c[4], c[5]), A = W.ent("wr"), T = W.ent("foe");
+        self.throwChain(W, A, T.x, T.y);
+        self.untilCaught(W, 4);
+        var left = T.stunUntil - W.t();
+        if (T.hookPull) bad.push("none 인데 끌림");
+        if (Math.abs(left - ULT.hkAfterStunMs) > 8) bad.push("none 기절 " + left.toFixed(1));
+        shown.push("none 기절 게임 " + left.toFixed(0) + "ms");
+      });
+      self.verdict(done, bad, shown.join(" / "));
+    });
+    run(G, "끌리는 중 상태가 신호 간격으로 나가고 도착한 뒤에는 멈추는가", function (done) {
+      var bad = [], realNow = Date.now, fake = 1000000, writes = [];
+      Date.now = function () { return fake; };
+      try {
+        var W = self.duel("practice", 450, 340, 450, 1000), A = W.ent("wr"), T = W.ent("foe"), key = "st/" + api.stKey("red", 1);
+        W.room.ref.update = function (u) { if (u[key]) writes.push(fake); };
+        self.throwChain(W, A, T.x, T.y);
+        var realStep = 16, gameStep = realStep * api.timeScale();
+        function tick() { fake += realStep; W.frame(gameStep); api.netWrite(false); }
+        for (var i = 0; i < 200 && !T.hookPull; i++) tick();
+        writes.length = 0;
+        var from = fake;
+        for (var j = 0; j < 400 && T.hookPull; j++) tick();
+        var pullReal = fake - from, during = writes.length;
+        writes.length = 0;
+        for (var k = 0; k < 40; k++) tick();
+        if (during < Math.floor(pullReal / api.NET_MS) - 1) bad.push("끌리는 " + pullReal + "ms 동안 쓰기 " + during + "번");
+        if (during > Math.ceil(pullReal / api.NET_MS) + 2) bad.push("끌리는 " + pullReal + "ms 동안 쓰기가 너무 많음 " + during + "번");
+        if (writes.length) bad.push("도착 뒤에도 " + writes.length + "번 씀");
+      } finally { Date.now = realNow; }
+      self.verdict(done, bad, "실제 " + pullReal + "ms 에 " + during + "번, 도착 뒤 0번");
+    });
+  }
+
+  registerHits() {
+    var self = this, api = this.api, run = this.kit.run, G = WraithTests.GROUP, FRAME = this.kit.FRAME, ULT = api.ULT;
+    run(G, "물 건너 거리 280 의 적이 맞아 피해 35·기절을 받는가", function (done) {
+      var bad = [], W = self.duel("river", 250, 560, 250, 840), A = W.ent("wr"), T = W.ent("foe");
+      self.throwChain(W, A, T.x, T.y);
+      if (!self.untilCaught(W, FRAME)) bad.push("맞지 않음");
+      if (self.lost(T) !== ULT.hkDmg) bad.push("피해 " + self.lost(T));
+      if (!api.stunned(T, W.t())) bad.push("기절 아님");
+      self.verdict(done, bad, "피해 " + self.lost(T) + "·기절");
+    });
+    run(G, "벽 뒤의 적은 맞지 않고 게이지를 돌려받지 않으며, 비행 시간이 끝나면 묶임이 풀리는가", function (done) {
+      var bad = [], W = self.duel("river", 200, 350, 200, 100), A = W.ent("wr"), T = W.ent("foe");
+      self.throwChain(W, A, T.x, T.y);
+      var rootEnd = A.hookRootUntil;
+      if (api.speedOf(A) !== 0) bad.push("준비 중 움직일 수 있음");
+      W.step(rootEnd - W.t() - 5);
+      if (api.speedOf(A) !== 0) bad.push("비행 중 움직일 수 있음");
+      W.step(20);
+      if (api.speedOf(A) === 0) bad.push("비행이 끝나도 묶여 있음");
+      if (self.lost(T) || self.hookEffects(W).length) bad.push("벽 뒤 적이 맞음");
+      if (A.gauge > 1) bad.push("게이지 " + A.gauge);
+      self.verdict(done, bad, "빗나감, 게이지 " + A.gauge + ", 묶임 풀림");
+    });
+    run(G, "앞뒤 두 명이면 앞 사람만 맞고, 아군은 지나 뒤의 적을 맞히는가", function (done) {
+      var bad = [], W = self.scene("practice", [{ id: "wr", team: "blue", char: "wraith", x: 450, y: 340, slot: 1 }, { id: "front", x: 450, y: 540, slot: 1 }, { id: "back", x: 450, y: 700, slot: 2 }]), A = W.ent("wr");
+      self.throwChain(W, A, 450, 700);
+      self.untilCaught(W, FRAME); W.step(500);
+      if (self.lost(W.ent("front")) !== ULT.hkDmg) bad.push("앞 사람 피해 " + self.lost(W.ent("front")));
+      if (self.lost(W.ent("back"))) bad.push("뒤 사람이 맞음");
+      var W2 = self.scene("practice", [{ id: "wr", team: "blue", char: "wraith", x: 450, y: 340, slot: 1 }, { id: "ally", team: "blue", x: 450, y: 540, slot: 2 }, { id: "back", x: 450, y: 700, slot: 2 }]), A2 = W2.ent("wr");
+      self.throwChain(W2, A2, 450, 700);
+      self.untilCaught(W2, FRAME);
+      if (self.lost(W2.ent("ally"))) bad.push("아군이 맞음");
+      if (self.lost(W2.ent("back")) !== ULT.hkDmg) bad.push("아군 뒤 적 피해 " + self.lost(W2.ent("back")));
+      self.verdict(done, bad, "앞 사람만·아군 통과");
+    });
+    run(G, "사거리 경계: 650 에 몸과 판정을 더한 거리 안쪽은 맞아 끌리고, 바깥은 맞지 않는가", function (done) {
+      var bad = [], reach = ULT.hkRange + ULT.hkPr + api.BODY_R;
+      var W = self.duel("practice", 450, 340, 450, 340 + reach - 3), A = W.ent("wr"), T = W.ent("foe");
+      self.throwChain(W, A, T.x, T.y);
+      if (!self.untilCaught(W, 4)) bad.push("안쪽 적이 안 맞음");
+      if (!T.hookPull || !api.stunned(T, W.t())) bad.push("안쪽 적이 안 끌림");
+      var W2 = self.duel("practice", 450, 340, 450, 340 + reach + 4), A2 = W2.ent("wr"), T2 = W2.ent("foe");
+      self.throwChain(W2, A2, T2.x, T2.y);
+      W2.step(1500, 4);
+      if (self.lost(T2)) bad.push("바깥 적이 맞음");
+      self.verdict(done, bad, "경계 " + reach + " 안쪽 맞음·바깥 빗나감");
+    });
+    run(G, "풀숲 안·은신 중인 적은 끌리는 동안 드러나고, 끝나면 원래 규칙으로 돌아가는가", function (done) {
+      var bad = [], W = self.duel("river", 100, 600, 100, 350), A = W.ent("wr"), T = W.ent("foe");
+      self.throwChain(W, A, T.x, T.y);
+      if (!api.inBush(T.x, T.y)) bad.push("풀숲 자리 아님");
+      if (api.revealedTo(T, A, W.t())) bad.push("맞기 전에 드러남");
+      self.untilCaught(W, FRAME);
+      if (!api.revealedTo(T, A, W.t())) bad.push("풀숲 적이 끌리는 동안 안 드러남");
+      var W2 = self.duel("practice", 450, 340, 450, 800, "rogue"), A2 = W2.ent("wr"), R = W2.ent("foe");
+      R.stealthUntil = W2.t() + ULT.asDur;
+      self.throwChain(W2, A2, R.x, R.y);
+      self.untilCaught(W2, FRAME);
+      if (!api.revealedTo(R, A2, W2.t())) bad.push("은신 적이 끌리는 동안 안 드러남");
+      self.untilArrived(W2, R, FRAME);
+      W2.frame(FRAME);
+      if (R.revealUntil > W2.t()) bad.push("끝난 뒤에도 드러남");
+      self.verdict(done, bad, "끌리는 동안만 드러남");
+    });
+    run(G, "해골 병사는 피해만 받고 움직이지 않으며 사슬이 끝나는가", function (done) {
+      var bad = [], W = self.scene("practice", [{ id: "wr", team: "blue", char: "wraith", x: 450, y: 340, slot: 1 }, { id: "ne", char: "necro", x: 450, y: 900, gauge: api.GAUGE_MAX, slot: 1 }, { id: "back", x: 450, y: 900, slot: 2 }]), A = W.ent("wr"), N = W.ent("ne");
+      api.useUlt(N, -Math.PI / 2);
+      W.step(ULT.smRiseMs + 100);
+      N.minions.forEach(function (m) { m.cdUntil = Infinity; m.x = 450; m.y = 600; });
+      var M = N.minions[0];
+      N.minions.slice(1).forEach(function (m) { m.x = 700; m.y = 600; });
+      var hp = M.hp;
+      self.throwChain(W, A, M.x, M.y);
+      for (var ms = 0; ms < 600 && M.hp === hp; ms += FRAME) { M.x = 450; M.y = 600; W.frame(FRAME); }
+      if (M.hp !== hp - ULT.hkDmg) bad.push("해골 피해 " + (hp - M.hp));
+      if (M.hookPull) bad.push("해골이 끌림");
+      W.step(300);
+      if (self.lost(N) || self.lost(W.ent("back"))) bad.push("뒤의 적이 맞음");
+      if (self.hookEffects(W).length) bad.push("사슬 효과가 나감");
+      if (api.speedOf(A) === 0) bad.push("해골을 맞힌 뒤 묶임이 안 풀림");
+      self.verdict(done, bad, "해골 피해 " + ULT.hkDmg + ", 끌림 없음");
+    });
+    run(G, "부활 보호 중인 적은 아무 효과가 없고 사슬이 끝나는가", function (done) {
+      var bad = [], W = self.scene("practice", [{ id: "wr", team: "blue", char: "wraith", x: 450, y: 340, slot: 1 }, { id: "safe", x: 450, y: 600, slot: 1 }, { id: "back", x: 450, y: 800, slot: 2 }]), A = W.ent("wr"), T = W.ent("safe");
+      T.protectUntil = W.t() + 5000;
+      self.throwChain(W, A, 450, 800);
+      W.step(900);
+      if (self.lost(T) || api.stunned(T, W.t()) || T.hookPull) bad.push("보호 중인 적에게 효과");
+      if (self.lost(W.ent("back"))) bad.push("뒤의 적이 맞음");
+      self.verdict(done, bad, "효과 없음·사슬 끝");
+    });
+    run(G, "빗나가면 돌려받는 게이지가 0 이고 비행 시간 뒤 게이지는 패시브로 오른 만큼만 있는가", function (done) {
+      var bad = [], W = self.duel("practice", 450, 340, 850, 900), A = W.ent("wr");
+      A.gauge = api.GAUGE_MAX; api.useUlt(A, Math.PI / 2);
+      if (A.gauge !== 0) bad.push("쓰는 순간 게이지 " + A.gauge);
+      var flight = A.hookRootUntil - W.t();
+      W.step(flight + 5);
+      var want = Math.floor((flight + 5) / api.TIMESCALE.regenTickMs);
+      if (A.gauge !== want) bad.push("게이지 " + A.gauge + " (기대 " + want + ")");
+      self.verdict(done, bad, "비행 게임 " + Math.round(flight) + "ms, 게이지 " + A.gauge);
+    });
+  }
+
+  registerInteractions() {
+    var self = this, api = this.api, run = this.kit.run, G = WraithTests.GROUP, FRAME = this.kit.FRAME, ULT = api.ULT;
+    function pulled(map, cx, cy, tx, ty, targetChar, extra) {
+      var list = [{ id: "wr", team: "blue", char: "wraith", x: cx, y: cy, slot: 1 }, { id: "foe", char: targetChar || "guardian", x: tx, y: ty, slot: 1 }].concat(extra || []);
+      var W = self.scene(map, list), A = W.ent("wr"), T = W.ent("foe");
+      self.throwChain(W, A, T.x, T.y);
+      self.untilCaught(W, FRAME);
+      return { W: W, A: A, T: T };
+    }
+    run(G, "사슬 피해로 쓰러진 적은 끌리지 않고, 끌리는 중 쓰러졌다 부활하면 출발 자리에 서는가", function (done) {
+      var bad = [], W = self.duel("practice", 450, 340, 450, 800), A = W.ent("wr"), T = W.ent("foe");
+      T.hp = 10;
+      self.throwChain(W, A, T.x, T.y);
+      W.step(900);
+      if (T.alive || T.hookPull || Math.abs(T.y - 800) > 1) bad.push("쓰러진 적 상태 어긋남");
+      var s = pulled("practice", 450, 340, 450, 900), sp = api.spawnOf("red", 1);
+      api.damage(s.T, 99999, "wr", false, null);
+      s.W.frame(FRAME);
+      if (s.T.hookPull) bad.push("쓰러진 뒤 끌기가 남음");
+      s.W.step(api.RESPAWN_MS + 100);
+      if (!s.T.alive || s.T.hookPull || Math.abs(s.T.x - sp.x) > 1 || Math.abs(s.T.y - sp.y) > 1) bad.push("부활 위치 (" + s.T.x + "," + s.T.y + ")");
+      self.verdict(done, bad, "끌기 없음·출발 자리 부활");
+    });
+    run(G, "도약 중인 대장장이·거신은 끌리지 않고 원래 곳에 착지하며 기절은 0.5초인가", function (done) {
+      var bad = [];
+      ["blacksmith", "giant"].forEach(function (c) {
+        var W = self.duel("practice", 200, 700, 400, 700, c), A = W.ent("wr"), T = W.ent("foe");
+        T.gauge = api.GAUGE_MAX; api.useUlt(T, 0, 250);
+        var landX = T.leap.tx;
+        self.throwChain(W, A, 500, 700);
+        var caught = self.untilCaught(W, 4);
+        if (!caught) { bad.push(c + " 맞지 않음"); return; }
+        var left = T.stunUntil - W.t();
+        if (T.hookPull) bad.push(c + " 끌림");
+        if (Math.abs(left - ULT.hkAfterStunMs) > 8) bad.push(c + " 기절 " + left.toFixed(1));
+        for (var ms = 0; ms < 2000 && T.leap; ms += FRAME) W.frame(FRAME);
+        if (Math.abs(T.x - landX) > 2) bad.push(c + " 착지 " + T.x.toFixed(1) + " (기대 " + landX + ")");
+      });
+      self.verdict(done, bad, "둘 다 도약을 마치고 착지");
+    });
+    run(G, "돌진 중인 결투가·자객은 돌진이 끊기고 끌려오는가", function (done) {
+      var bad = [];
+      ["duelist", "hitman"].forEach(function (c) {
+        var W = self.duel("practice", 300, 700, 700, 700, c), A = W.ent("wr"), T = W.ent("foe");
+        T.dash = { sx: T.x, sy: T.y, tx: T.x + 40, ty: T.y, at: W.t(), ang: 0, swingId: W.t(), ms: 3000 };
+        self.throwChain(W, A, 700, 700);
+        self.untilCaught(W, 4);
+        if (T.dash) bad.push(c + " 돌진이 남음");
+        if (!T.hookPull) bad.push(c + " 안 끌림");
+        var end = 300 + (24 + T.hitR + 8);
+        self.untilArrived(W, T, FRAME);
+        if (Math.abs(T.x - end) > 2) bad.push(c + " 끝 " + T.x.toFixed(1));
+      });
+      self.verdict(done, bad, "돌진 끊김·끌림");
+    });
+    run(G, "끌리는 중 수문장 밀치기: 끌기가 끝나고 넉백되며 벽·물을 넘지 않는가", function (done) {
+      var bad = [], s = pulled("river", 450, 560, 450, 800), T = s.T, W = s.W;
+      W.room.ref.child("meleeHits").push({ team: "blue", owner: "wr", x: T.x + 30, y: T.y, angle: Math.PI, radius: 100, arc: 6.28, dmg: 1, kb: 200, createdAt: W.t() });
+      if (!T.shove) bad.push("넉백이 안 걸림");
+      W.frame(FRAME);
+      if (T.hookPull) bad.push("끌기가 남음");
+      W.step(ULT.gdKbMs + 50, FRAME, function () { if (!self.canStand(T.x, T.y)) bad.push("물 안 (" + T.x.toFixed(1) + "," + T.y.toFixed(1) + ")"); });
+      if (T.shove) bad.push("넉백이 안 끝남");
+      self.verdict(done, bad, "끌기 끝, 넉백 후 (" + T.x.toFixed(1) + "," + T.y.toFixed(1) + ")");
+    });
+    run(G, "끌리는 중 블랙홀: 경로를 벗어나지 않고, 끝나면 블랙홀로 끌려가는가", function (done) {
+      var bad = [], s = pulled("practice", 450, 340, 450, 900), T = s.T, W = s.W;
+      W.room.ref.child("effects").push({ type: "hole", team: "blue", owner: "wr", x: 700, y: 700, r: 900, dur: 6000, delay: 0, createdAt: W.t() });
+      self.untilArrived(W, T, FRAME, function () { if (T.hookPull && Math.abs(T.x - 450) > 0.01) bad.push("경로 이탈 " + T.x.toFixed(2)); });
+      var x0 = T.x;
+      W.step(300);
+      if (!(T.x > x0 + 1)) bad.push("끝난 뒤 블랙홀로 안 끌림 " + T.x.toFixed(1));
+      self.verdict(done, bad, "경로 유지, 이후 x " + x0.toFixed(0) + " → " + T.x.toFixed(0));
+    });
+    run(G, "끌리는 중 시전자 사망·기절·넉백: 대상이 멈추고 기절이 지금 + 0.5초로 줄며, 더 긴 기절은 줄지 않는가", function (done) {
+      var bad = [];
+      [["사망", function (s) { api.damage(s.A, 99999, "foe", false, null); }], ["기절", function (s) { api.afflict(s.A, { stunMs: 2000 }, "foe"); }], ["밀림", function (s) { s.A.y -= 60; }]].forEach(function (c) {
+        var s = pulled("practice", 450, 340, 450, 900);
+        s.W.step(100);
+        var y0 = s.T.y;
+        c[1](s);
+        s.W.frame(FRAME);
+        var y1 = s.T.y, left = s.T.stunUntil - s.W.t();
+        if (s.T.hookPull) bad.push(c[0] + " 끌기가 남음");
+        s.W.step(100);
+        if (Math.abs(s.T.y - y1) > 0.01) bad.push(c[0] + " 멈추지 않음");
+        if (Math.abs(left - ULT.hkAfterStunMs) > FRAME + 1) bad.push(c[0] + " 기절 " + left.toFixed(1));
+        if (y1 > y0) bad.push(c[0] + " 위치 역행");
+      });
+      var s = pulled("practice", 450, 340, 450, 900);
+      api.afflict(s.T, { stunMs: 8000 }, "wr");
+      var longUntil = s.T.stunUntil;
+      s.W.step(50);
+      api.damage(s.A, 99999, "foe", false, null);
+      s.W.frame(FRAME);
+      if (s.T.stunUntil !== longUntil) bad.push("더 긴 기절이 줄어듦");
+      self.verdict(done, bad, "세 경우 모두 끊김, 더 긴 기절 유지");
+    });
+    run(G, "준비 중 시전자가 기절하거나 밀리면 사슬이 나가지 않고 게이지는 돌아오지 않는가", function (done) {
+      var bad = [];
+      [["기절", function (W, A) { api.afflict(A, { stunMs: 500 }, "foe"); }], ["밀림", function (W, A) { A.x += 10; }]].forEach(function (c) {
+        var W = self.duel("practice", 450, 340, 450, 800), A = W.ent("wr");
+        self.throwChain(W, A, 450, 800);
+        W.frame(FRAME);
+        c[1](W, A);
+        W.step(ULT.hkWind + 200);
+        if (self.hookShots(W).length) bad.push(c[0] + " 사슬이 나감");
+        if (A.hookCast || A.hookRootUntil) bad.push(c[0] + " 묶임이 남음");
+        if (A.gauge > 1) bad.push(c[0] + " 게이지 " + A.gauge);
+      });
+      self.verdict(done, bad, "취소, 게이지 그대로");
+    });
+    run(G, "끌리는 중 다시 사슬에 맞으면 새 계획으로 바뀌고 그림이 하나인가", function (done) {
+      var bad = [], s = pulled("practice", 450, 340, 450, 1000, null, [{ id: "wr2", team: "blue", char: "wraith", x: 480, y: 340, slot: 2 }]), W = s.W, T = s.T, B = W.ent("wr2");
+      W.step(60);
+      var firstOwner = T.hookPull && T.hookPull.owner;
+      self.throwChain(W, B, T.x, T.y);
+      for (var ms = 0; ms < 800 && T.hookPull && T.hookPull.owner === firstOwner; ms += 4) W.frame(4);
+      if (!T.hookPull || T.hookPull.owner !== "wr2") bad.push("새 계획으로 안 바뀜");
+      if (api.FIELD.hooks.filter(function (h) { return h.e.tgt === "foe"; }).length !== 1) bad.push("그림이 하나가 아님");
+      self.verdict(done, bad, "두 번째 사슬로 바뀜");
+    });
+    run(G, "창술사 보호막: 피해 0, 기절·끌기 적용 / 기사 방어태세·거신 변신: 피해가 줄고 끌리는가", function (done) {
+      var bad = [], L = pulled("practice", 450, 340, 450, 800, "lancer");
+      if (self.lost(L.T) || !L.T.hookPull || !api.stunned(L.T, L.W.t()) || L.T.shield) bad.push("보호막 처리 어긋남");
+      var W = self.duel("practice", 450, 340, 450, 800, "knight"), A = W.ent("wr"), K = W.ent("foe");
+      K.gauge = api.GAUGE_MAX; api.useUlt(K, 0);
+      self.throwChain(W, A, K.x, K.y);
+      self.untilCaught(W, 4);
+      if (!(self.lost(K) < ULT.hkDmg) || !K.hookPull) bad.push("기사 피해 " + self.lost(K));
+      var W2 = self.duel("practice", 450, 340, 450, 800, "giant"), A2 = W2.ent("wr"), Gi = W2.ent("foe");
+      Gi.buffUntil = W2.t() + ULT.gjDur - 1;
+      self.throwChain(W2, A2, Gi.x, Gi.y);
+      self.untilCaught(W2, 4);
+      if (!(self.lost(Gi) < ULT.hkDmg) || !Gi.hookPull) bad.push("거신 피해 " + self.lost(Gi));
+      self.verdict(done, bad, "기사 " + self.lost(K) + "·거신 " + self.lost(Gi) + " 피해, 모두 끌림");
+    });
+    run(G, "클레릭 요한계시록·검무희 칼날 폭풍·창술사 꿰뚫기 준비·궁수 난사가 끊기는가", function (done) {
+      var bad = [];
+      [["cleric", function (T, t) { return T.isRevealing(t); }], ["dancer", function (T, t) { return T.isBladeStorming(t); }], ["lancer", function (T) { return !!T.lance; }], ["ranger", function (T) { return !!T.volley; }]].forEach(function (c) {
+        var W = self.duel("practice", 450, 340, 450, 800, c[0]), A = W.ent("wr"), T = W.ent("foe");
+        self.throwChain(W, A, T.x, T.y);
+        W.step(ULT.hkWind - 8);
+        T.gauge = api.GAUGE_MAX; api.useUlt(T, 0);
+        T.shield = false;
+        if (!c[1](T, W.t())) { if (c[0] !== "ranger") bad.push(c[0] + " 스킬이 시작되지 않음"); T.volley = { until: W.t() + 3000 }; }
+        self.untilCaught(W, 4);
+        W.frame(4);
+        if (c[1](T, W.t())) bad.push(c[0] + " 끊기지 않음");
+      });
+      self.verdict(done, bad, "넷 다 끊김");
+    });
+    run(G, "네크로 마지막 은신: 체력 규칙과 부딪히지 않고 끌리는가", function (done) {
+      var bad = [], W = self.duel("practice", 450, 340, 450, 800, "necro"), A = W.ent("wr"), T = W.ent("foe"), floor = api.CHARS.necro.lastStandHp;
+      T.hp = floor + 5; T.lastStandUsed = false;
+      self.throwChain(W, A, T.x, T.y);
+      self.untilCaught(W, 4);
+      if (!T.alive || T.hp !== floor) bad.push("체력 " + T.hp + " (기대 " + floor + ")");
+      if (!T.hookPull) bad.push("안 끌림");
+      self.untilArrived(W, T, FRAME);
+      if (!self.canStand(T.x, T.y)) bad.push("끝 위치 어긋남");
+      self.verdict(done, bad, "체력 " + T.hp + " 유지, 끌림");
+    });
+    run(G, "연습 봇: 끌린 뒤 제자리 복귀가 끌기 중에 끼어들지 않는가", function (done) {
+      var bad = [], W = self.duel("practice", 450, 340, 450, 800, "dummy"), A = W.ent("wr"), T = W.ent("foe");
+      W.frame(FRAME, true);
+      self.throwChain(W, A, T.x, T.y);
+      for (var ms = 0; ms < 1000 && !T.hookPull; ms += 4) W.frame(4, true);
+      if (!T.hookPull) bad.push("안 끌림");
+      var last = T.y;
+      for (var m2 = 0; m2 < 1500 && T.hookPull; m2 += FRAME) { W.frame(FRAME, true); if (T.y > last + 0.01) bad.push("끌리는 중 되돌아감"); last = T.y; }
+      var end = T.y;
+      W.step(ULT.hkAfterStunMs - 20);
+      if (Math.abs(T.y - end) > 0.01) bad.push("기절 중 복귀");
+      self.verdict(done, bad, "끌리는 중·기절 중 복귀 없음");
+    });
+    run(G, "경기가 끝나면 끌기·묶임·사슬 그림이 남지 않는가", function (done) {
+      var bad = [], s = pulled("practice", 450, 340, 450, 900), W = s.W;
+      W.room.status = "ended";
+      W.frame(FRAME);
+      if (s.T.hookPull) bad.push("끌기가 남음");
+      if (s.A.hookRootUntil) bad.push("묶임이 남음");
+      W.step(1500);
+      if (api.FIELD.hooks.length) bad.push("사슬 그림 " + api.FIELD.hooks.length + "개가 남음");
+      self.verdict(done, bad, "모두 정리됨");
+    });
+    run(G, "시전자 묶임은 적중 신호가 오지 않아도 풀리는가", function (done) {
+      var bad = [], realOnHit = api.onHit;
+      api.onHit = function (snap) { if (snap.val().hk == null) realOnHit(snap); };
+      try {
+        var W = self.duel("practice", 450, 340, 450, 800), A = W.ent("wr"), T = W.ent("foe");
+        self.throwChain(W, A, T.x, T.y);
+        var until = A.hookRootUntil;
+        W.step(until - W.t() + 10);
+        if (api.speedOf(A) === 0) bad.push("묶임이 안 풀림");
+      } finally { api.onHit = realOnHit; }
+      self.verdict(done, bad, "비행 시간 뒤 풀림");
+    });
+  }
+
+  registerBasic() {
+    var self = this, api = this.api, run = this.kit.run, G = WraithTests.GROUP, FRAME = this.kit.FRAME, C = api.CHARS.wraith, y = WraithTests.OPEN_Y;
+    function strike(W) { W.step(C.windup + 8, 4); }
+    run(G, "기본 공격: 거리 " + C.range + " 의 적이 " + C.dmg + " 을 받고, 닿지 않는 거리의 적은 맞지 않으며, 여럿이 맞아도 게이지는 한 번만 오르는가", function (done) {
+      var bad = [], W = self.scene("practice", [{ id: "wr", team: "blue", char: "wraith", x: 150, y: y, slot: 1 }, { id: "n", x: 300, y: y, slot: 1 }, { id: "f", x: 450, y: y, slot: 2 }, { id: "o", x: 150 + C.range + api.BODY_R + 6, y: y + 120, slot: 3 }]), A = W.ent("wr");
+      A.gauge = 0; api.fireBasic(A, 0);
+      strike(W);
+      if (self.lost(W.ent("n")) !== C.dmg || self.lost(W.ent("f")) !== C.dmg) bad.push("피해 " + self.lost(W.ent("n")) + "·" + self.lost(W.ent("f")));
+      if (self.lost(W.ent("o"))) bad.push("바깥 적이 맞음");
+      if (A.gauge !== api.roleGauge("wraith")) bad.push("게이지 " + A.gauge);
+      var W2 = self.duel("practice", 150, y, 150 + C.range + api.BODY_R + 4, y), A2 = W2.ent("wr");
+      api.fireBasic(A2, 0); strike(W2);
+      if (self.lost(W2.ent("foe"))) bad.push("거리 밖 적이 맞음");
+      self.verdict(done, bad, "둘 다 " + C.dmg + ", 게이지 +" + A.gauge);
+    });
+    run(G, "기본 공격 폭 " + C.width + " 경계: 옆으로 닿는 적은 맞고 벗어난 적은 맞지 않는가", function (done) {
+      var bad = [], reach = C.width / 2 + api.BODY_R;
+      var W = self.duel("practice", 150, y, 300, y + reach - 2), A = W.ent("wr");
+      api.fireBasic(A, 0); strike(W);
+      if (!self.lost(W.ent("foe"))) bad.push("안쪽 적이 안 맞음");
+      var W2 = self.duel("practice", 150, y, 300, y + reach + 2), A2 = W2.ent("wr");
+      api.fireBasic(A2, 0); strike(W2);
+      if (self.lost(W2.ent("foe"))) bad.push("바깥 적이 맞음");
+      self.verdict(done, bad, "경계 ±" + reach);
+    });
+    run(G, "공격 간격이 실제 1.2초이고, 대기 중 두 번째 공격이 나가지 않는가", function (done) {
+      var bad = [], W = self.duel("practice", 150, y, 300, y), A = W.ent("wr");
+      api.fireBasic(A, 0);
+      var gap = (A.cdUntil - W.t()) / api.timeScale() / 1000;
+      if (Math.abs(gap - 1.2) > 0.001) bad.push("간격 " + gap);
+      if (A.cdUntil <= A.windUntil) bad.push("대기보다 간격이 짧음");
+      W.step(C.cd + 50);
+      var hits = W.log.filter(function (p) { return p.path === "meleeHits" && !p.v.zone && p.v.owner === "wr"; }).length;
+      if (hits !== 1) bad.push("타격 " + hits + "번");
+      self.verdict(done, bad, "간격 " + gap.toFixed(2) + "초, 타격 1번");
+    });
+    run(G, "기본 공격: 벽 뒤는 맞지 않고 강 건너는 맞으며, 아군·보호 중인 적은 영향이 없고, 그림 길이가 벽에서 줄어든 길이와 같은가", function (done) {
+      var bad = [], W = self.duel("river", 200, 350, 200, 100), A = W.ent("wr"), up = -Math.PI / 2;
+      api.fireBasic(A, up); strike(W);
+      if (self.lost(W.ent("foe"))) bad.push("벽 뒤 적이 맞음");
+      var hit = W.log.filter(function (p) { return p.path === "meleeHits" && !p.v.zone && p.v.owner === "wr"; })[0].v;
+      if (!(hit.len < C.range)) bad.push("길이가 줄지 않음 " + hit.len);
+      var slam = api.FIELD.slams[0];
+      if (!slam || slam.d.len !== hit.len) bad.push("그림 길이 " + (slam && slam.d.len) + " / 판정 " + hit.len);
+      var W2 = self.duel("river", 250, 576, 250, 790), A2 = W2.ent("wr");
+      api.fireBasic(A2, Math.PI / 2); strike(W2);
+      if (self.lost(W2.ent("foe")) !== C.dmg) bad.push("강 건너 피해 " + self.lost(W2.ent("foe")));
+      var W3 = self.scene("practice", [{ id: "wr", team: "blue", char: "wraith", x: 150, y: y, slot: 1 }, { id: "al", team: "blue", x: 250, y: y, slot: 2 }, { id: "sf", x: 350, y: y, slot: 1 }]), A3 = W3.ent("wr"), S = W3.ent("sf");
+      S.protectUntil = W3.t() + 5000;
+      api.fireBasic(A3, 0); strike(W3);
+      if (self.lost(W3.ent("al")) || self.lost(S)) bad.push("아군·보호 중인 적이 맞음");
+      self.verdict(done, bad, "벽에서 길이 " + hit.len + "·강 건너 맞음");
+    });
+    run(G, "대기 0.25초: 누른 직후에는 피해가 없고 대기 중 멈춰 있으며, 판정은 누른 순간의 자리·방향이고, 기절이 없는가", function (done) {
+      var bad = [], W = self.duel("practice", 150, y, 300, y), A = W.ent("wr"), T = W.ent("foe");
+      api.fireBasic(A, 0);
+      W.step(C.windup - 8, 4);
+      if (self.lost(T)) bad.push("대기 중 피해");
+      if (api.speedOf(A) !== 0) bad.push("대기 중 움직임");
+      W.step(16, 4);
+      if (self.lost(T) !== C.dmg) bad.push("대기 뒤 피해 " + self.lost(T));
+      if (api.stunned(T, W.t())) bad.push("기절이 붙음");
+      var W2 = self.scene("practice", [{ id: "wr", team: "blue", char: "wraith", x: 150, y: y, slot: 1 }, { id: "out", x: 300, y: y, slot: 1 }, { id: "in", x: 300, y: y + 300, slot: 2 }]), A2 = W2.ent("wr");
+      api.fireBasic(A2, 0);
+      W2.frame(4);
+      W2.ent("out").y = y + 300; W2.ent("in").y = y;
+      A2.angle = Math.PI;
+      strike(W2);
+      if (self.lost(W2.ent("out"))) bad.push("벗어난 적이 맞음");
+      if (self.lost(W2.ent("in")) !== C.dmg) bad.push("들어온 적이 안 맞음");
+      self.verdict(done, bad, "대기 뒤 " + C.dmg + ", 자리·방향 고정, 기절 없음");
+    });
+    run(G, "대기 중 기절·밀림·쓰러짐이면 취소되어 피해가 없고, 대기 중 스킬을 쓰면 두 공격이 겹치지 않는가", function (done) {
+      var bad = [];
+      [["기절", function (A) { api.afflict(A, { stunMs: 500 }, "foe"); }], ["밀림", function (A) { A.x += 10; }], ["쓰러짐", function (A) { api.damage(A, 99999, "foe", false, null); }]].forEach(function (c) {
+        var W = self.duel("practice", 150, y, 300, y), A = W.ent("wr"), T = W.ent("foe");
+        api.fireBasic(A, 0);
+        W.frame(4);
+        c[1](A);
+        W.step(C.windup + 50, 4);
+        if (self.lost(T)) bad.push(c[0] + " 피해가 들어감");
+        if (A.lance || A.windUntil) bad.push(c[0] + " 대기 상태가 남음");
+      });
+      var W = self.duel("practice", 150, y, 300, y), A = W.ent("wr"), T = W.ent("foe");
+      api.fireBasic(A, 0);
+      W.frame(4);
+      self.throwChain(W, A, 300, y);
+      if (A.lance || A.windUntil) bad.push("스킬을 썼는데 대기가 남음");
+      self.untilCaught(W, 4);
+      if (self.lost(T) !== api.ULT.hkDmg) bad.push("겹침: 피해 " + self.lost(T));
+      self.verdict(done, bad, "모두 취소, 스킬 피해만 " + self.lost(T));
+    });
+  }
+
+  registerPassiveAndCard() {
+    var self = this, api = this.api, run = this.kit.run, G = WraithTests.GROUP, FRAME = this.kit.FRAME, ULT = api.ULT, TICK = api.TIMESCALE.regenTickMs;
+    run(G, "패시브: 실제 3초에 3, 10초에 10, 그 뒤 10 을 넘지 않고, 프레임 간격이 달라도 같은가", function (done) {
+      var bad = [], W = self.duel("practice", 100, 700, 800, 1000), A = W.ent("wr");
+      A.gauge = 0;
+      W.step(TICK * 3 + FRAME * 2);
+      if (A.gauge !== 3) bad.push("3초 " + A.gauge);
+      W.step(TICK * 7);
+      if (A.gauge !== 10) bad.push("10초 " + A.gauge);
+      W.step(TICK * 5);
+      if (A.gauge !== api.GAUGE_MAX) bad.push("상한 " + A.gauge);
+      [8, 33, 100].forEach(function (frame) {
+        var W2 = self.duel("practice", 100, 700, 800, 1000), A2 = W2.ent("wr");
+        A2.gauge = 0;
+        W2.step(TICK * 4 + frame * 2, frame);
+        if (A2.gauge !== 4) bad.push(frame + "ms 프레임 " + A2.gauge);
+      });
+      self.verdict(done, bad, "3·10·상한 10, 프레임 무관");
+    });
+    run(G, "패시브: 기절·묶임 중에도 오르고, 스킬을 쓰면 0 이 되어 1초 뒤부터 오르며, 쓰러진 동안 멈췄다 부활 1초 뒤 다시 오르는가", function (done) {
+      var bad = [], W = self.duel("practice", 100, 700, 800, 1000), A = W.ent("wr");
+      A.gauge = 0;
+      api.afflict(A, { stunMs: TICK * 3 }, "foe");
+      W.step(TICK * 2 + FRAME * 2);
+      if (A.gauge !== 2) bad.push("기절 중 " + A.gauge);
+      W.step(TICK * 2);
+      self.throwChain(W, A, 800, 1000);
+      if (A.gauge !== 0) bad.push("쓰는 순간 " + A.gauge);
+      W.step(TICK - 10);
+      if (A.gauge !== 0) bad.push("1초 전 " + A.gauge);
+      W.step(20);
+      if (A.gauge !== 1) bad.push("1초 뒤 " + A.gauge);
+      api.damage(A, 99999, "foe", false, null);
+      var g = A.gauge;
+      W.step(TICK * 2);
+      if (A.gauge !== g) bad.push("쓰러진 동안 오름 " + A.gauge);
+      W.step(api.RESPAWN_MS - TICK * 2 + FRAME * 2);
+      var revived = A.gauge;
+      if (!A.alive) bad.push("부활 안 됨");
+      W.step(TICK - FRAME * 3);
+      if (A.gauge !== revived) bad.push("부활 1초 전 오름");
+      W.step(FRAME * 4);
+      if (A.gauge !== revived + 1) bad.push("부활 1초 뒤 " + A.gauge);
+      self.verdict(done, bad, "기절 중 상승·0 뒤 1초·부활 뒤 1초");
+    });
+    run(G, "패시브: 맡은 기기에서만 오르고 다른 캐릭터의 게이지를 바꾸지 않는가", function (done) {
+      var bad = [], W = self.duel("practice", 100, 700, 800, 1000), A = W.ent("wr"), T = W.ent("foe");
+      A.gauge = 0; T.gauge = 0;
+      W.room.host = "다른기기";
+      W.step(TICK * 3);
+      if (A.gauge !== 0) bad.push("맡지 않은 기기에서 오름 " + A.gauge);
+      W.room.host = api.myId;
+      W.step(TICK * 3);
+      if (T.gauge !== 0) bad.push("다른 캐릭터 게이지 " + T.gauge);
+      if (!(A.gauge >= 2)) bad.push("맡은 기기에서 안 오름 " + A.gauge);
+      self.verdict(done, bad, "맡은 기기만, 다른 캐릭터 그대로");
+    });
+    run(G, "카드 설명: undefined·NaN 없이 숫자가 STATS·ULT 와 같은가", function (done) {
+      var bad = [], C = api.CHARS.wraith, text = api.basicDesc("wraith") + " / " + api.passiveDesc("wraith") + " / " + api.ultDesc("wraith") + " / " + api.statTable("wraith");
+      if (/undefined|NaN/.test(text)) bad.push("undefined·NaN");
+      [String(C.range), String(C.width), "0.25초", String(C.dmg), String(ULT.hkRange), String(ULT.hkDmg), "0.5초", "1초마다 스킬 게이지 " + ULT.hkPassiveGauge + " 회복"].forEach(function (want) { if (text.indexOf(want) < 0) bad.push("없음: " + want); });
+      self.verdict(done, bad, api.ultDesc("wraith"));
+    });
+    run(G, "통계: 사슬 피해는 스킬 피해로, 끌린 시간 전체가 기절 시간으로 들어가는가", function (done) {
+      var bad = [], W = self.duel("practice", 450, 340, 450, 900), A = W.ent("wr"), T = W.ent("foe");
+      self.throwChain(W, A, T.x, T.y);
+      self.untilCaught(W, 4);
+      var hit = W.log.filter(function (p) { return p.path === "hits/wr" && p.v.d; })[0], total = T.stunUntil - W.t();
+      if (!hit || hit.v.u !== "hook" || hit.v.b) bad.push("스킬 피해 표시 어긋남 " + JSON.stringify(hit && hit.v));
+      var dealt = A.stunDealt * 1000;
+      if (Math.abs(dealt - total) > 40) bad.push("기절 기록 " + dealt.toFixed(0) + " / 기절 " + total.toFixed(0));
+      if (A.dmg !== ULT.hkDmg) bad.push("피해 기록 " + A.dmg);
+      self.verdict(done, bad, "스킬 피해 " + A.dmg + ", 기절 기록 게임 " + dealt.toFixed(0) + "ms");
+    });
+  }
+
+  registerAi() {
+    var self = this, api = this.api, run = this.kit.run, G = WraithTests.GROUP, ULT = api.ULT;
+    run(G, "AI: 사거리 안의 적에게 스킬을 쓰는가", function (done) {
+      var bad = [], W = self.duel("practice", 450, 340, 450, 800, "dummy"), A = W.ent("wr");
+      A.gauge = api.GAUGE_MAX;
+      for (var ms = 0; ms < 2500 && !self.hookShots(W).length; ms += 33) W.frame(33, true);
+      if (!self.hookShots(W).length) bad.push("스킬을 안 씀");
+      self.verdict(done, bad, "거리 안에서 사용");
+    });
+    run(G, "AI: 끌리는 거리가 " + ULT.hkBotMinPull + " 미만인 적(강 건너)에게는 스킬을 쓰지 않는가", function (done) {
+      var bad = [], W = self.duel("river", 300, 576, 300, 800, "dummy"), A = W.ent("wr"), T = W.ent("foe"), type = api.CHAR_TYPES.of("wraith");
+      if (type.botUltAllowed(A, T)) bad.push("강 건너 적을 허용");
+      A.gauge = api.GAUGE_MAX;
+      for (var ms = 0; ms < 1000; ms += 33) { A.x = 300; A.y = 576; W.frame(33, true); }
+      if (self.hookShots(W).length) bad.push("강 건너 적에게 사용");
+      A.x = 200; A.y = 350; T.x = 200; T.y = 560;
+      T.home = { x: 200, y: 560 };
+      if (!type.botUltAllowed(A, T)) bad.push("같은 쪽 적을 막음");
+      self.verdict(done, bad, "강 건너 사용 안 함");
+    });
+    run(G, "AI: 기본 공격 사거리 " + api.CHARS.wraith.range + " 을 쓰도록 붙는 거리가 맞는가", function (done) {
+      var bad = [], W = self.duel("practice", 300, 700, 700, 700, "dummy"), A = W.ent("wr");
+      var first = null;
+      for (var ms = 0; ms < 6000 && first === null; ms += 33) {
+        A.gauge = 0;
+        W.frame(33, true);
+        if (W.log.some(function (p) { return p.path === "meleeHits" && p.v.zone && p.v.owner === "wr"; })) first = Math.abs(W.ent("foe").x - A.x);
+      }
+      if (first === null || first < 150 || first > api.CHARS.wraith.range + api.BODY_R) bad.push("처음 공격 거리 " + first);
+      self.verdict(done, bad, "처음 공격 거리 " + Math.round(first));
+    });
+  }
+
+  registerNetwork() {
+    var self = this, api = this.api, run = this.kit.run, G = WraithTests.GROUP, FRAME = this.kit.FRAME, ULT = api.ULT;
+    function effectSnap(key, v) { return { key: key, val: function () { return JSON.parse(JSON.stringify(v)); }, ref: { parent: { key: "effects" } } }; }
+    run(G, "맞는 쪽 기기만 위치를 움직이고, 다른 기기는 상태를 받아 같은 곳으로 오는가", function (done) {
+      var bad = [], before = api.setMyId("wr");
+      try {
+        var W = self.duel("practice", 450, 340, 450, 800), A = W.ent("wr"), T = W.ent("foe"), far = self.duel("practice", 450, 340, 450, 800);
+        var mirror = far.ent("foe"), mirrorA = far.ent("wr");
+        self.throwChain(far, mirrorA, mirror.x, mirror.y);
+        self.untilCaught(far, 4);
+        self.untilArrived(far, mirror, FRAME);
+        var wanted = { x: mirror.x, y: mirror.y }, packed = api.packState(mirror).split(",");
+        if (+packed[0] !== Math.round(wanted.x) || +packed[1] !== Math.round(wanted.y)) bad.push("상태 문자열 위치 " + packed[0] + "," + packed[1]);
+        var W2 = self.duel("practice", 450, 340, 450, 800), A2 = W2.ent("wr"), T2 = W2.ent("foe");
+        delete api.MATCH.bots.foe; delete T2.bot; api.MATCH.remotes.foe = T2; api.MATCH.bots.wr.bot = null; delete api.MATCH.bots.wr; api.MATCH.me = A2;
+        W2.room.host = "다른기기";
+        api.MATCH.stateByKey[api.stKey("red", 1)] = api.packState(T2);
+        self.throwChain(W2, A2, 450, 800);
+        var y0 = T2.y;
+        for (var ms = 0; ms < 700; ms += FRAME) { api.MATCH.stateByKey[api.stKey("blue", 1)] = api.packState(A2); W2.frame(FRAME); }
+        if (T2.hookPull) bad.push("다른 기기의 대상이 직접 끌림");
+        if (Math.abs(T2.y - y0) > 0.5) bad.push("다른 기기의 대상이 움직임 " + T2.y);
+        api.MATCH.stateByKey[api.stKey("red", 1)] = packed.join(",");
+        for (var m2 = 0; m2 < 800; m2 += FRAME) W2.frame(FRAME);
+        if (Math.abs(T2.y - Math.round(wanted.y)) > 2) bad.push("상태를 받은 뒤 위치 " + T2.y.toFixed(1));
+      } finally { api.MATCH.me = null; api.setMyId(before); }
+      self.verdict(done, bad, "받은 상태로만 움직임");
+    });
+    run(G, "대상이 방장 기기의 AI 여도, 내 캐릭터여도 같은 결과가 나오는가", function (done) {
+      var bad = [], before = api.setMyId("foe");
+      try {
+        var W = self.duel("river", 380, 560, 476, 790), A = W.ent("wr"), T = W.ent("foe");
+        delete T.bot; delete api.MATCH.bots.foe; api.MATCH.me = T;
+        W.room.host = "foe";
+        self.throwChain(W, A, T.x, T.y);
+        self.untilCaught(W, 4);
+        self.untilArrived(W, T, FRAME);
+        if (Math.abs(T.x - 424) > 1 || Math.abs(T.y - 665.4) > 1) bad.push("내 캐릭터 끝 (" + T.x.toFixed(1) + "," + T.y.toFixed(1) + ")");
+      } finally { api.MATCH.me = null; api.setMyId(before); }
+      self.verdict(done, bad, "경로 표와 같음");
+    });
+    run(G, "사슬 효과가 늦게 오거나 두 번 와도 그림이 하나이고 오류가 없는가", function (done) {
+      var bad = [], W = self.duel("practice", 450, 340, 450, 700), t = W.t();
+      api.onEffect(effectSnap("h1", { type: "hook", owner: "wr", tgt: "foe", createdAt: t, pullMs: 300, kind: "full" }));
+      api.onEffect(effectSnap("h1", { type: "hook", owner: "wr", tgt: "foe", createdAt: t, pullMs: 300, kind: "full" }));
+      api.onEffect(effectSnap("h2", { type: "hook", owner: "wr", tgt: "foe", createdAt: t, pullMs: 300, kind: "full" }));
+      if (api.FIELD.hooks.length !== 1) bad.push("그림 " + api.FIELD.hooks.length + "개");
+      W.step(400);
+      if (api.FIELD.hooks.length) bad.push("끝난 뒤에도 남음");
+      api.onEffect(effectSnap("h3", { type: "hook", owner: "wr", tgt: "foe", createdAt: W.t() - 5000, pullMs: 300, kind: "full" }));
+      if (api.FIELD.hooks.length) bad.push("늦은 효과가 그려짐");
+      self.verdict(done, bad, "하나만, 늦은 것은 무시");
+    });
+    run(G, "시전자가 방을 나가면 대상은 멈추고 사슬 그림이 사라지는가", function (done) {
+      var bad = [], W = self.duel("practice", 450, 340, 450, 900), A = W.ent("wr"), T = W.ent("foe");
+      self.throwChain(W, A, T.x, T.y);
+      self.untilCaught(W, 4);
+      W.step(80);
+      delete api.MATCH.bots.wr; delete api.players().wr;
+      W.frame(FRAME);
+      var y = T.y;
+      if (T.hookPull) bad.push("끌기가 남음");
+      W.step(100);
+      if (Math.abs(T.y - y) > 0.01) bad.push("멈추지 않음");
+      if (api.FIELD.hooks.length) bad.push("그림이 남음");
+      self.verdict(done, bad, "멈춤·그림 없음");
+    });
+    run(G, "사슬 효과를 받으면 사슬·고리 그림을 만들고, 끝나거나 대상이 쓰러지면 남기지 않는가", function (done) {
+      var bad = [], view = api.HOOK_VIEW;
+      [["끝남", function () {}], ["대상 쓰러짐", function (W, T) { api.damage(T, 99999, "wr", false, null); }]].forEach(function (c) {
+        var W = self.duel("practice", 450, 340, 450, 900), A = W.ent("wr"), T = W.ent("foe");
+        self.throwChain(W, A, T.x, T.y);
+        self.untilCaught(W, 4);
+        view.render(W.t(), Date.now());
+        var h = api.FIELD.hooks[0], vis = h && h.vis, group = vis && vis.group;
+        if (!vis || !group.parent || !vis.wrap || !vis.links.mesh.count) bad.push(c[0] + " 그림이 안 생김");
+        c[1](W, T);
+        W.step(1200);
+        view.render(W.t(), Date.now());
+        if (group && group.parent) bad.push(c[0] + " 그림이 남음");
+        if (api.FIELD.hooks.length) bad.push(c[0] + " 목록이 남음");
+      });
+      self.verdict(done, bad, "만들고 지움");
+    });
+  }
+}
+
+class DraggedChainTests {
+  static GROUP = "끌리는 쇠사슬";
+  constructor(api, kit) { this.api = api; this.kit = kit; }
+  verdict(done, bad, okText) { done(bad.length ? "fail" : "pass", bad.length ? bad.slice(0, 6).join(" / ") : okText); }
+  run(chain, leg, dt) {
+    var hand = leg.hand;
+    for (var e = 0; e < leg.seconds - 1e-9; e += dt) {
+      var heading = leg.heading + (leg.turn || 0) * e;
+      hand.x += Math.cos(heading) * leg.speed * dt; hand.z += Math.sin(heading) * leg.speed * dt;
+      chain.step(hand.x, hand.y, hand.z, dt);
+      if (leg.each) leg.each(hand);
+    }
+  }
+  register() {
+    var self = this, api = this.api, run = this.kit.run, G = DraggedChainTests.GROUP, D = api.DraggedChain;
+    run(G, "어떤 움직임에도 간격·바닥·숫자가 맞고 첫 점이 손에 붙어 있는가", function (done) {
+      var bad = [], c = new D(D.RIGHT_LINKS), hand = { x: 300, y: 28, z: 300 };
+      c.reset(hand.x, hand.y, hand.z);
+      function each(h) {
+        var p = c.points;
+        if (p[0].x !== h.x || p[0].y !== h.y || p[0].z !== h.z) bad.push("첫 점이 손에서 떨어짐");
+        for (var i = 1; i < p.length; i++) {
+          var gap = Math.hypot(p[i].x - p[i - 1].x, p[i].y - p[i - 1].y, p[i].z - p[i - 1].z);
+          if (!isFinite(gap)) bad.push("숫자 아님");
+          if (gap > D.PITCH + 1e-6) bad.push("간격 " + gap.toFixed(3));
+          if (p[i].y < D.GROUND_Y - 1e-9) bad.push("바닥 아래 " + p[i].y);
+        }
+      }
+      [{ speed: 150, heading: 0, seconds: 1.4 }, { speed: 150, heading: 0, turn: 3, seconds: 1 }, { speed: 90, heading: 2, seconds: 0.8 }, { speed: 0, heading: 0, seconds: 1.5 }].forEach(function (leg) {
+        [1 / 60, 1 / 20, 1 / 8].forEach(function (dt) { self.run(c, Object.assign({ hand: hand, each: each }, leg), dt); });
+      });
+      self.verdict(done, bad, "간격 " + D.PITCH.toFixed(2) + " 이내, 바닥 위");
+    });
+    run(G, "멈추면 바닥까지 내려와 더 움직이지 않고, 달리면 뒤쪽 점이 이동 반대편에 있는가", function (done) {
+      var bad = [], c = new D(D.RIGHT_LINKS), hand = { x: 300, y: 28, z: 300 };
+      c.reset(hand.x, hand.y, hand.z);
+      self.run(c, { hand: hand, speed: 0, heading: 0, seconds: 3 }, 1 / 60);
+      var end = c.points[c.points.length - 1];
+      if (Math.abs(end.y - D.GROUND_Y) > 1e-6) bad.push("끝 점 높이 " + end.y);
+      var before = JSON.stringify(c.points);
+      self.run(c, { hand: hand, speed: 0, heading: 0, seconds: 0.5 }, 1 / 60);
+      if (JSON.stringify(c.points) !== before) bad.push("멈췄는데 움직임");
+      self.run(c, { hand: hand, speed: 150, heading: 0, seconds: 1.5 }, 1 / 60);
+      if (!(c.points[c.points.length - 1].x < hand.x - 20)) bad.push("끝 점이 뒤에 없음 " + (hand.x - c.points[c.points.length - 1].x).toFixed(1));
+      self.verdict(done, bad, "내려앉음·뒤로 끌림");
+    });
+    run(G, "프레임 간격 8·16·33ms 에서 다 내려온 뒤 높이가 같고 끝 점 차이가 작은가", function (done) {
+      var bad = [], ends = [];
+      [8, 16, 33].forEach(function (ms) {
+        var c = new D(D.RIGHT_LINKS), hand = { x: 300, y: 28, z: 300 };
+        c.reset(hand.x, hand.y, hand.z);
+        self.run(c, { hand: hand, speed: 150, heading: 0, seconds: 2 }, ms / 1000);
+        hand.x = 600;
+        c.reset(hand.x, hand.y, hand.z);
+        self.run(c, { hand: hand, speed: 0, heading: 0, seconds: 3 }, ms / 1000);
+        ends.push(c.points[c.points.length - 1]);
+      });
+      if (Math.hypot(ends[0].x - ends[2].x, ends[0].y - ends[2].y, ends[0].z - ends[2].z) > 0.5) bad.push("끝 점 차이 " + Math.hypot(ends[0].x - ends[2].x, ends[0].y - ends[2].y, ends[0].z - ends[2].z).toFixed(3));
+      if (ends.some(function (e) { return Math.abs(e.y - D.GROUND_Y) > 1e-6; })) bad.push("높이가 다름");
+      self.verdict(done, bad, "높이 같음, 끝 점 차이 작음");
+    });
+    run(G, "순간이동·부활에서 초기화하면 모든 점이 손 위치로 돌아가는가", function (done) {
+      var bad = [], c = new D(D.LEFT_LINKS), hand = { x: 300, y: 28, z: 300 };
+      c.reset(hand.x, hand.y, hand.z);
+      self.run(c, { hand: hand, speed: 150, heading: 0, seconds: 1 }, 1 / 60);
+      c.reset(900, 28, 1100);
+      if (c.points.some(function (p) { return p.x !== 900 || p.y !== 28 || p.z !== 1100; })) bad.push("손 위치로 안 돌아감");
+      self.verdict(done, bad, "긴 줄 없음");
+    });
+    run(G, "삼각형 수가 1,280 을 넘지 않고 사슬당 화면 호출이 1번인가", function (done) {
+      var bad = [], geo = api.GEO.chainLink, tri = (geo.index ? geo.index.count : geo.attributes.position.count) / 3, total = tri * (D.RIGHT_LINKS + D.LEFT_LINKS);
+      if (total > 1280) bad.push("삼각형 " + total);
+      var mesh = new api.THREE.InstancedMesh(geo, new api.THREE.MeshBasicMaterial(), D.RIGHT_LINKS);
+      if (!mesh.isInstancedMesh) bad.push("사슬이 한 번에 그려지지 않음");
+      mesh.dispose();
+      self.verdict(done, bad, "삼각형 " + total + ", 사슬마다 InstancedMesh 1개");
+    });
+    run(G, "갈고리날이 끌릴 때와 동서남북으로 뻗을 때 모두 시전자 반대쪽을 보고 바닥을 뚫지 않는가", function (done) {
+      var bad = [], up = new api.THREE.Vector3(0, 1, 0), view = api.HOOK_VIEW;
+      [[1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1], [0.6, -0.5, 0.6]].forEach(function (d) {
+        var from = { x: 300, y: 10, z: 300 }, end = { x: 300 + d[0] * 8, y: Math.max(D.GROUND_Y, 10 + d[1] * 8), z: 300 + d[2] * 8 }, frame = D.bladeFrame(from, end, { x: 1, y: 0, z: 0 });
+        var dot = frame.dx * (end.x - from.x) + frame.dz * (end.z - from.z);
+        if (dot <= 0) bad.push("끌릴 때 날 방향 " + d.join(","));
+        if (frame.dy < 0) bad.push("끌릴 때 날이 아래로 " + d.join(","));
+        if (frame.y - D.BLADE_FLOOR < -1e-9) bad.push("날이 바닥 아래");
+      });
+      [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(function (d) {
+        var blade = new api.THREE.Object3D(), vis = { blade: blade };
+        view.from.set(300, 28, 300);
+        view.placeBlade(vis, 300 + d[0] * 200, 42, 300 + d[1] * 200);
+        var tipDir = up.clone().applyQuaternion(blade.quaternion);
+        if (tipDir.x * d[0] + tipDir.z * d[1] <= 0.9) bad.push("뻗을 때 날 방향 " + d.join(","));
+        var handToBlade = blade.position.clone().sub(view.from);
+        if (handToBlade.x * tipDir.x + handToBlade.y * tipDir.y + handToBlade.z * tipDir.z <= 0) bad.push("날이 시전자를 향함 " + d.join(","));
+      });
+      self.verdict(done, bad, "모든 방향에서 날이 바깥쪽");
+    });
   }
 }
 
