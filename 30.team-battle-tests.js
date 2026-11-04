@@ -4335,7 +4335,7 @@ class ResultCollector {
     if (api.CLOCK.scale !== 0.7) bad.push("시계 배율 " + api.CLOCK.scale);
     if (api.matchMs() !== 90000 * 0.7) bad.push("경기 시간 " + api.matchMs());
     if (T.matchMs !== 90000 * 0.7 || T.respawnMs !== 3000 * 0.7 || T.respawnProtectMs !== 2500 * 0.7 || T.burnTickMs !== 700 || T.regenTickMs !== 700) bad.push("시간 필드 " + JSON.stringify([T.matchMs, T.respawnMs, T.respawnProtectMs, T.burnTickMs, T.regenTickMs]));
-    if (K.cd !== Math.round(1.5 * 1000 * 0.7) || K.speed !== Math.round(150 / 0.7) || K.hp !== 380) bad.push("기사 수치 " + JSON.stringify([K.cd, K.speed, K.hp]));
+    if (K.cd !== Math.round(1.5 * 1000 * 0.7) || K.speed !== Math.round(150 / 0.7) || K.hp !== 400) bad.push("기사 수치 " + JSON.stringify([K.cd, K.speed, K.hp]));
     if (api.ULT.rmDur !== Math.round(4 * 1000 * 0.7)) bad.push("스킬 수치 rmDur " + api.ULT.rmDur);
     if (api.secs(K.cd) !== "1.5초" || api.shownSpeed(K.speed) !== 150) bad.push("카드 표기 " + api.secs(K.cd) + " " + api.shownSpeed(K.speed));
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "배율 0.7·경기 63초·기사 공격 간격 1.5초 이동속도 150 표기");
@@ -6367,12 +6367,16 @@ class AstrologerTests {
         W.step(ULT.sfStunMs + 200);
         return { stun: hit, left: left };
       }
-      var shots = [shoot(100), shoot(100), shoot(300), shoot(300), shoot(300), shoot(300)];
+      var every = ULT.sfStunEvery, shots = [], wanted = "";
+      for (var shotNo = 1; shotNo <= every * 2; shotNo++) {
+        shots.push(shoot(shotNo < every ? 100 : 300));
+        wanted += shotNo % every === 0 ? "O" : "-";
+      }
       shots.forEach(function (s, i) { stunned.push(s.stun ? "O" : "-"); });
-      if (stunned.join("") !== "--O--O") bad.push("기절 순서 " + stunned.join("") + " (기대 --O--O: 처음 두 번은 빈 곳을 쏴서 적중 0이어도 사용 횟수로 셈)");
-      var third = shots[2].left;
-      if (Math.abs(third - ULT.sfStunMs) > 120) bad.push("기절 길이 " + Math.round(third) + "ms (기대 " + ULT.sfStunMs + ")");
-      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "사용 3·6번째에만 기절 " + Math.round(third) + "ms, 두 적 모두");
+      if (stunned.join("") !== wanted) bad.push("기절 순서 " + stunned.join("") + " (기대 " + wanted + ": 처음 몇 번은 빈 곳을 쏴서 적중 0이어도 사용 횟수로 셈)");
+      var firstStunLeft = shots[every - 1].left;
+      if (Math.abs(firstStunLeft - ULT.sfStunMs) > 120) bad.push("기절 길이 " + Math.round(firstStunLeft) + "ms (기대 " + ULT.sfStunMs + ")");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "사용 " + every + "·" + every * 2 + "번째에만 기절 " + Math.round(firstStunLeft) + "ms, 두 적 모두");
     });
   }
 }

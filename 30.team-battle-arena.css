@@ -354,9 +354,8 @@
   .mvpBox .mvpName .r { color: #FF7A70; }
   .mvpBox .mvpNone { font-size: 20px; font-weight: 800; color: #A3B0A6; margin-top: 2px; }
 
-  .dfTopCard { position: relative; }
-  #btnLeaveDraft { position: absolute; top: 12px; right: 12px; margin: 0; }
-  .dfTopCard .dfHead { padding-top: 30px; align-items: flex-end; }
+  #btnLeaveDraft { flex: 0 0 auto; margin: 0; }
+  .dfHeadInfo { margin-top: 8px; min-height: 36px; }
   .startRow { display: flex; gap: 10px; }
   .startRow .big { margin-bottom: 12px; }
   #scrStart .card > .big, #joinBox { margin: 0 0 10px; }
@@ -366,18 +365,15 @@
   .startRow .swapBtn:hover { background: #C9433B; }
   .dfHead { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
   .dfTitle { font-size: 24px; font-weight: 800; color: #F4F1E8; }
-  .dfMap { margin-left: auto; text-align: right; font-size: 24px; font-weight: 800; line-height: 1.1; color: #F2D06B; white-space: nowrap; }
-  .dfMap small { display: block; font-size: 12px; font-weight: 700; color: var(--sg-ink-soft); margin-top: 4px; }
-  .dfTurn { margin-top: 4px; font-size: 17px; font-weight: 800; color: #F2D06B; min-height: 24px; }
-  .dfTurn.mine { color: #FFB38A; }
+  .dfMap { font-size: 24px; font-weight: 800; line-height: 1.1; color: #F2D06B; white-space: nowrap; }
   .dfCharCol { transition: box-shadow .4s ease, border-color .4s ease; }
   .dfCharCol.myTurn { border-color: #3FBF6A; animation: dfTurnGlow 1.6s ease-in-out infinite; }
   .dfCharCol.myTurnLow { border-color: #FF8A80; animation: dfTurnGlowLow 1s ease-in-out infinite; }
   @keyframes dfTurnGlow { 0%, 100% { box-shadow: 0 0 0 2px rgba(63,191,106,.55), 0 0 12px rgba(63,191,106,.25); } 50% { box-shadow: 0 0 0 3px rgba(63,191,106,.95), 0 0 26px rgba(63,191,106,.55); } }
   @keyframes dfTurnGlowLow { 0%, 100% { box-shadow: 0 0 0 2px rgba(255,138,128,.55), 0 0 12px rgba(255,138,128,.25); } 50% { box-shadow: 0 0 0 3px rgba(255,138,128,.95), 0 0 26px rgba(255,138,128,.55); } }
-  .dfTimer { flex: 0 0 auto; min-width: 84px; text-align: center; font-size: 46px; font-weight: 800; line-height: 1; color: #F4F1E8; font-variant-numeric: tabular-nums; }
+  .dfTimer { flex: 0 0 auto; display: flex; flex-direction: row-reverse; align-items: baseline; gap: 8px; font-size: 36px; font-weight: 800; line-height: 1; color: #F4F1E8; font-variant-numeric: tabular-nums; }
   .dfTimer.low { color: #FF6B6B; text-shadow: 0 0 10px rgba(255,80,80,.7); }
-  .dfTimer small { display: block; font-size: 12px; color: var(--sg-ink-soft); margin-top: 2px; }
+  .dfTimer small { font-size: 12px; color: var(--sg-ink-soft); text-shadow: none; }
   .dfBar { height: 6px; margin-top: 12px; border-radius: 3px; background: rgba(255,255,255,.1); overflow: hidden; }
   .dfBar i { display: block; height: 100%; background: #D97B4F; }
   .dfSteps { display: flex; gap: 6px; margin-top: 12px; }
@@ -524,7 +520,7 @@
     #killBanner { font-size: 15px; padding: 4px 12px; }
     .kf { font-size: 12px; padding: 3px 8px; gap: 5px; }
     .dfTitle, .dfMap { font-size: 19px; }
-    .dfTimer { min-width: 56px; font-size: 36px; }
+    .dfTimer { font-size: 30px; }
     .dfSteps { gap: 4px; }
     .dfSteps span { font-size: 12px; padding: 5px 2px; }
     .slot .pk { font-size: 13px; }
