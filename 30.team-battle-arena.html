@@ -10689,6 +10689,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     hooks() { var services = this.services;
     return {
       CHARS: services.charTypes.statsTable(), CHAR_LIST: services.charTypes.list, ULT: services.charTypes.skillTable(), ROLES: RoleKinds.TABLE, ROLE_LIST: RoleKinds.LIST, MAPS: MapCatalog.table(), roleGauge: function (c) { return services.catalog.gaugeOnHitOf(c); }, spawnOf: services.arenaMap.spawnOf.bind(services.arenaMap), BODY_R: ArenaSize.BODY_R, GAUGE_MAX: MatchRules.GAUGE_MAX, BOUND: ArenaSize.BOUND, MAP_IDS: MapCatalog.IDS, RESPAWN_MS: services.timescale.respawnMs, RESPAWN_PROTECT_MS: services.timescale.respawnProtectMs, myId: services.session.myId,
+      VERSUS: services.versus,
       obstacles: function () { return { walls: services.arenaMap.obstacles, water: services.arenaMap.water }; },
       mapTopShot: function (id, pxW, pxH) {
         if (!services.cameraRig.renderer || !services.models.kit.propsReady) return null;
@@ -10922,6 +10923,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     static MIN_MS = 2000;
     static FADE_MS = 350;
     static RELOAD_MS = 6000;
+    static UNDECIDED_MAP = "랜덤 맵";
     constructor(services) {
       this.services = services; this.root = Dom.$("versusCurtain"); this.card = null; this.stale = true; this.loading = false; this.shownAt = 0; this.timer = 0; this.startTimer = 0; this.roomTimer = 0; this.hostTimer = 0; this.assign = null;
       this.view = new TeamBattleVersusView(Dom.$("tbvBody"), { faceOf: function (c) { return services.catalog.faceImgSrc(c); }, nameOf: function (c) { return services.charTypes.statsOf(c).name; } });
@@ -10982,8 +10984,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (this.root.hidden || !room) return;
       this.view.render(this.mapName(room), this.seatsOf("blue"), this.seatsOf("red"));
     }
-    mapName(room) { var ticket = this.services.randomMatch.ticket();
-      return (ticket && ticket.map) || MapCatalog.of(room.map).name;
+    mapName(room) { var ticket = this.services.randomMatch.ticket(), map = MapCatalog.of(room.map);
+      return (ticket && ticket.map) || (map ? map.name : ArenaVersusCurtain.UNDECIDED_MAP);
     }
     writeHead() { var matched = this.matched(), room = this.services.session.room;
       Dom.setText(this.root.querySelector(".tbv-head"), matched ? "⚔️ 상대 팀을 찾았어요!" : "⚔️ 곧 대결이 시작돼요!");

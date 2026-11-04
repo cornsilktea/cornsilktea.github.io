@@ -1803,6 +1803,19 @@ class ResultCollector {
   function launchUpdate(S) { return S.room.updates.filter(function (x) { return x.u.status === "countdown"; })[0]; }
   function updatedCount(S) { return S.room.updates.length; }
 
+  run(DRAFTG, "매칭 화면: 맵이 랜덤인 방에서도 선수 승률·많이 고른 캐릭터를 그리는가", function (done) {
+    var V = api.VERSUS, bad = [], name = "";
+    if (V.mapName({ map: "forest" }) !== api.MAPS.forest.name) bad.push("정해진 맵 이름 " + V.mapName({ map: "forest" }));
+    try { name = V.mapName({ map: "random" }); } catch (e) { bad.push("랜덤 맵에서 오류: " + e.message); }
+    if (!name) bad.push("랜덤 맵 이름이 비어 있음");
+    var person = { nick: "가", ai: false, me: true, card: { g: 10, w: 5, top: [{ c: "knight", n: 4, w: 2 }] } };
+    V.view.reset();
+    V.view.render(name, [person, "empty", null], [{ nick: "AI_1", ai: true, me: false, card: null }, "empty", "empty"]);
+    var text = V.view.root.textContent;
+    ["총 승률 50%", "5승 5패", api.CHARS.knight.name, "4회 / 50%", "컴퓨터", "빈 자리", "입장하는 중"].forEach(function (want) { if (text.indexOf(want) < 0) bad.push("화면에 없음: " + want); });
+    V.view.reset();
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "랜덤 방 맵 이름 '" + name + "', 승률·캐릭터 표시");
+  });
   run(DRAFTG, "진행 순서: 밴 2단계 뒤 픽 4단계(블루 1 → 레드 1·2 → 블루 2·3 → 레드 3), 단계 이름이 맞는가", function (done) {
     var kinds = STEPS.map(function (s) { return s.ban ? "밴" : "픽"; }).join(","), sides = STEPS.map(function (s, i) { return DR.stepSide(i); }).join("");
     var labels = STEPS.map(function (s, i) { return api.DRAFT_VIEW.draftStepLabel(i); }).join(" / ");
