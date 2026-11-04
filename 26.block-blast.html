@@ -209,7 +209,8 @@
         <tr><th>동작</th><th>점수</th></tr>
         <tr><td>블록 놓기</td><td>칸 수 × 1점</td></tr>
         <tr><td>n줄 동시 제거</td><td><b>10 × n²</b><br>1줄 10 · 2줄 40 · 3줄 90 · 4줄 160</td></tr>
-        <tr><td>퍼펙트 클리어<br>(보드 비움)</td><td>+100 · 다음 여행지로 ✈️</td></tr>
+        <tr><td>퍼펙트 클리어<br>(보드 비움)</td><td>+200</td></tr>
+        <tr><td>300점마다</td><td>다음 여행지로 ✈️</td></tr>
       </table>
     </div>
     <div class="st-card">
@@ -251,8 +252,9 @@ const CONFIG = {
   TRAY: 3,
   CELL_POINT: 1,
   LINE_SCORE: n => 10 * n * n,
-  PERFECT_CLEAR_BONUS: 100,
-  GAMEOVER_DELAY: 700,
+  PERFECT_CLEAR_BONUS: 200,
+  SCORE_PER_THEME: 300,
+  GAMEOVER_DELAY: 2000,
   BLOCK_SHAPES: [
     [[0,0]],
     [[0,0],[0,1]],
@@ -555,12 +557,16 @@ function place(i, r, c){
 
   if (G.board.every(row => row.every(v => !v))) {
     gained += CONFIG.PERFECT_CLEAR_BONUS; G.perfects++;
-    G.theme = (G.theme + 1) % CONFIG.THEMES.length; applyTheme();
     const flashEl = $("flash"); flashEl.className = ""; void flashEl.offsetWidth; flashEl.classList.add("on");
     confetti(); SND.perfect();
-    toast(`퍼펙트 클리어! +${CONFIG.PERFECT_CLEAR_BONUS}\n다음 여행지로 이동합니다 ✈️\n${CONFIG.THEMES[G.theme].name}`, 2400);
+    toast(`퍼펙트 클리어! +${CONFIG.PERFECT_CLEAR_BONUS}`, 2000);
   }
   G.score += gained;
+  const themeNow = Math.floor(G.score / CONFIG.SCORE_PER_THEME) % CONFIG.THEMES.length;
+  if (themeNow !== G.theme) {
+    G.theme = themeNow; applyTheme();
+    toast(`${CONFIG.SCORE_PER_THEME * Math.floor(G.score / CONFIG.SCORE_PER_THEME)}점 돌파! 다음 여행지로 이동합니다 ✈️\n${CONFIG.THEMES[G.theme].name}`, 2400);
+  }
   if (n === 0) popText("+" + gained, cx, rect.top + 24, 22);
   renderHud();
 
