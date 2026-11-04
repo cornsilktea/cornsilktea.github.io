@@ -2911,11 +2911,25 @@ function rayBoxHit(ox, oy, oz, dx, dy, dz, c) {
   }
   return tmin;
 }
+class CameraOccluder {
+  static MIN_HEIGHT = 0.9;
+  static PILLAR_MIN_WIDTH = 0.4;
+  static PILLAR_MAX_WIDTH = 0.8;
+
+  static isPillar(c) {
+    const w = c.x1 - c.x0, d = c.z1 - c.z0, lo = CameraOccluder.PILLAR_MIN_WIDTH, hi = CameraOccluder.PILLAR_MAX_WIDTH;
+    return w >= lo && w <= hi && d >= lo && d <= hi;
+  }
+
+  static blocksCamera(c) {
+    return c.y1 - c.y0 >= CameraOccluder.MIN_HEIGHT && !CameraOccluder.isPillar(c);
+  }
+}
 function cameraClearance(from, to) {
   const dx = to.x - from.x, dy = to.y - from.y, dz = to.z - from.z;
   let best = 1;
   for (const c of collidersNear(Math.min(from.x, to.x) - 0.2, Math.max(from.x, to.x) + 0.2, Math.min(from.z, to.z) - 0.2, Math.max(from.z, to.z) + 0.2, colliderScratch)) {
-    if (c.y1 - c.y0 < 0.9) continue;
+    if (!CameraOccluder.blocksCamera(c)) continue;
     const t = rayBoxHit(from.x, from.y, from.z, dx, dy, dz, c);
     if (t < best && t >= 0) best = t;
   }
@@ -4253,7 +4267,7 @@ class CameraWallGuard {
     for (let pass = 0; pass < 3; pass++) {
       let moved = false;
       for (const c of collidersNear(position.x - m, position.x + m, position.z - m, position.z + m, CameraWallGuard.scratch)) {
-        if (c.y1 - c.y0 < 0.9 || position.y < c.y0 - 0.3 || position.y > c.y1 + 0.3) continue;
+        if (!CameraOccluder.blocksCamera(c) || position.y < c.y0 - 0.3 || position.y > c.y1 + 0.3) continue;
         if (position.x < c.x0 - m || position.x > c.x1 + m || position.z < c.z0 - m || position.z > c.z1 + m) continue;
         const towardPivotX = pivot.x < (c.x0 + c.x1) / 2, towardPivotZ = pivot.z < (c.z0 + c.z1) / 2;
         const outX = towardPivotX ? c.x0 - m : c.x1 + m, outZ = towardPivotZ ? c.z0 - m : c.z1 + m;
