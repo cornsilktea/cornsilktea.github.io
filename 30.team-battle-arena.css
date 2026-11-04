@@ -483,6 +483,9 @@
   .patchMenu[hidden] { display: none; }
   .patchMenu .mini { text-align: left; white-space: nowrap; background: rgba(255, 255, 255, .10); border-color: rgba(255, 255, 255, .34); color: #FFFFFF; }
   .patchMenu .mini.on { background: var(--sg-primary); border-color: var(--sg-primary); color: var(--sg-primary-ink); }
+  .statsTabs { display: flex; gap: 6px; margin-bottom: 10px; }
+  .statsTabs button { flex: 1; min-height: 44px; border-radius: 6px; border: 2px solid rgba(255,255,255,.25); background: rgba(255,255,255,.05); color: #EEF2EE; font-size: 16px; font-weight: 800; cursor: pointer; }
+  .statsTabs button.on { background: #D97B4F; border-color: #D97B4F; color: #fff; cursor: default; }
   .statsMsg { font-size: 14px; font-weight: 700; color: var(--sg-ink-soft); line-height: 1.5; margin-bottom: 8px; }
   .statsTable th small { display: block; font-size: 10px; font-weight: 400; }
   .statsTable td { text-align: center; }

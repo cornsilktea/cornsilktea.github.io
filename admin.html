@@ -271,6 +271,17 @@
   }
   .stats-box .msg { margin: 0 0 var(--sg-s1); font-size: var(--sg-fs-md); color: var(--sg-ink-mid); }
   .stats-box ul.hint { margin: var(--sg-s1) 0 var(--sg-s3); padding-left: var(--sg-s5); font-size: var(--sg-fs-sm); line-height: 1.7; color: var(--sg-ink-soft); }
+  /* 30번 학생 개인 통계 표: 학생이 게임에서 보는 표(30.team-battle-arena.css 의 .board.statsTable)와 같은 모양. 위 .stats-box 규칙을 이기도록 선택자를 길게 쓴다(2026-11-04 선생님 요청) */
+  .tb-mine { margin: var(--sg-s3) 0; padding: 14px 16px; border-radius: 10px; background: #18221B; overflow-x: auto; }
+  .stats-box table.tb-mine-table { margin: 0; border-collapse: collapse; font-size: 15px; line-height: normal; white-space: nowrap; }
+  .stats-box table.tb-mine-table th { position: static; padding: 4px; line-height: normal; background: transparent; color: #A3B0A6; font-size: 12px; font-weight: 700; text-align: center; white-space: nowrap; border-right: 0; border-bottom: 2px solid rgba(255,255,255,.16); }
+  .stats-box table.tb-mine-table th.nm { text-align: left; }
+  .stats-box table.tb-mine-table th small { display: block; margin: 0; font-size: 10px; font-weight: 400; }
+  .stats-box table.tb-mine-table tr td { padding: 6px 4px; background: transparent; color: #EEF2EE; font-size: 15px; font-weight: 800; text-align: center; border-right: 0; border-bottom: 1px solid rgba(255,255,255,.08); }
+  .stats-box table.tb-mine-table tr td.nm { padding-left: 4px; background: transparent; font-size: 15px; text-align: left; border-right: 0; }
+  .stats-box table.tb-mine-table tr.grp td { padding-left: 4px; background: rgba(217,123,79,.12); color: #FFB38A; font-size: 13px; text-align: left; border-right: 0; border-bottom-color: rgba(217,123,79,.5); }
+  .stats-box table.tb-mine-table td b { font-size: inherit; }
+  .stats-box table.tb-mine-table td small { display: block; margin: 0; font-size: 11px; font-weight: 400; color: #A3B0A6; }
   /* 빌드 그림의 설명 글만 위에 띄운다(통계 상자 안의 글까지 떠서 겹치지 않게 바로 아래 자식만) */
   .lightbox > p { position: absolute; top: var(--sg-s3); left: 0; right: 0; text-align: center; color: var(--sg-line); font-size: var(--sg-fs-sm); margin: 0; }
 
@@ -665,7 +676,7 @@
      30번은 StudentStatsWindow(account-stats.js), 나머지는 각 게임 통계 모듈의 Profile·View + AccountStatsDialog(StudentAccountWindow).
      통계가 있는 새 게임을 만들면 그 게임의 통계 .js 를 여기 한 줄 더하고 ClassRankPanel.GAMES 에 account 를 넘긴다. -->
 <script charset="utf-8" src="account-match-kit.js?v=20261104a"></script>
-<script charset="utf-8" src="account-stats.js?v=20261029g"></script>
+<script charset="utf-8" src="account-stats.js?v=20261104a"></script>
 <script charset="utf-8" src="teambattle-stats-repair.js?v=20261103a"></script>
 <script charset="utf-8" src="patch-notes.js?v=20261029b"></script>
 <script charset="utf-8" src="30.team-formation.js?v=20261102b"></script>
@@ -1510,6 +1521,15 @@ class StudentStatsWindow {
     return STATS_GAMES.teambattle.roles.find((r) => r.id === id) || { id, name: id, group: "" };
   }
 
+  /* 게임의 charTypes.list 와 같은 순서: 직업군 순서 → 이름 가나다순 */
+  static tableChars() {
+    const meta = STATS_GAMES.teambattle, groupAt = (role) => meta.groups.findIndex((g) => g.id === role.group);
+    return meta.roles.slice().sort((a, b) => groupAt(a) - groupAt(b) || a.name.localeCompare(b.name, "ko")).map((role) => {
+      const g = meta.groups[groupAt(role)];
+      return { id: role.id, name: role.name, icon: role.icon, group: g.icon + " " + g.name, heals: !!role.heal, blocks: !!role.block };
+    });
+  }
+
   frame(tab) {
     this.box.innerHTML = "";
     const top = el("div", "stats-top");
@@ -1544,35 +1564,10 @@ class StudentStatsWindow {
     this.frame("stats");
     const n = this.stats;
     this.msg.textContent = "유효한 경기 " + n.g + "판 · " + n.w + "승 " + n.l + "패 · 진영 승률: 블루 " + pct(n.bw, n.bg) + " · 레드 " + pct(n.rw, n.rg) + " · MVP율 " + pct(n.m, n.g);
-    const rows = AccountStatsTable.legacyRows(n);
-    const ids = Object.keys(rows).sort((a, b) => rows[b].picks - rows[a].picks);
-    if (!ids.length) { this.box.appendChild(el("p", "msg", "아직 집계된 경기가 없습니다.")); this.closeRow(); return; }
-    const table = el("table");
-    const head = el("tr");
-    [["캐릭터"], ["승률", "승리 수 / 판 수"], ["MVP", "MVP 횟수 / 판 수"], ["KDA", "(킬 + 어시스트) / 데스"], ["평균 피해량"], ["평균 회복량"], ["평균 막은 피해"], ["평균 기절"], ["평균 둔화"], ["평균 MVP 점수", "결과 화면 환산점수 평균 · 10/28부터"]].forEach((col) => {
-      const th = el("th", null, col[0]);
-      if (col[1]) th.appendChild(el("small", null, col[1]));
-      head.appendChild(th);
-    });
-    table.appendChild(head);
-    ids.forEach((id) => {
-      const d = rows[id], role = StudentStatsWindow.roleOf(id), tr = el("tr");
-      tr.appendChild(el("td", null, role.name));
-      const rate = el("td"); rate.append(el("b", null, pct(d.wins, d.picks)), el("small", null, "(" + d.wins + " / " + d.picks + ")")); tr.appendChild(rate);
-      const mvp = el("td"); mvp.append(el("b", null, String(d.mvpCount)), el("small", null, "(" + d.mvpCount + " / " + d.picks + "판)")); tr.appendChild(mvp);
-      const kda = el("td");
-      if (d.kdPicks) kda.append(el("b", null, d.deaths > 0 ? ((d.kills + d.assist) / d.deaths).toFixed(2) : "Perfect"), el("small", null, "(" + d.kills.toFixed(1) + " / " + d.deaths.toFixed(1) + " / " + d.assist.toFixed(1) + ")"));
-      else kda.textContent = "-";
-      tr.appendChild(kda);
-      tr.appendChild(el("td", null, String(Math.round(d.dmg))));
-      tr.appendChild(el("td", null, role.heal ? String(Math.round(d.heal)) : "-"));
-      tr.appendChild(el("td", null, role.block ? String(Math.round(d.block)) : "-"));
-      tr.appendChild(el("td", null, d.stun.toFixed(1) + "초"));
-      tr.appendChild(el("td", null, d.slow.toFixed(1) + "초"));
-      tr.appendChild(el("td", null, d.scPicks ? String(Math.round(d.mvpScore)) : "-"));
-      table.appendChild(tr);
-    });
-    this.box.appendChild(table);
+    /* 표는 게임의 내 통계 창과 같은 렌더러(account-stats.js 의 TeamBattleMyStatsTable)로 그린다 — 직업군 순서·플레이한 캐릭터만·칸 모양이 학생 화면과 어긋나지 않게 */
+    const panel = el("div", "tb-mine");
+    panel.innerHTML = '<table class="tb-mine-table"><thead>' + TeamBattleMyStatsTable.headHtml() + "</thead><tbody>" + TeamBattleMyStatsTable.rowsHtml(AccountStatsTable.legacyRows(n), StudentStatsWindow.tableChars()) + "</tbody></table>";
+    this.box.appendChild(panel);
     this.box.appendChild(el("p", "hint", "AI 없이 치른 대회모드 경기(랜덤 매칭 포함)만 셉니다. 학생이 게임에서 보는 내 통계와 같은 값입니다."));
     this.closeRow();
   }
@@ -1919,7 +1914,7 @@ const STATS_GAMES = {
       { id: "v2", path: "teambattle/patchstats/v2" },
       { id: "v3", path: "teambattle/patchstats/v3" }
     ],
-    /* 30번 게임의 CHARS 와 같은 아이디·이름·직업군(group)으로 둔다. 캐릭터가 새로 생기면 여기에도 한 줄 추가해야
+    /* 30번 게임의 CHARS 와 같은 아이디·이름·아이콘(icon, 학생 개인 통계 표에 쓰임)·직업군(group)으로 둔다. 캐릭터가 새로 생기면 여기에도 한 줄 추가해야
        표에 나온다(데이터베이스규칙.json 의 teambattle/patchstats 허용 목록도 함께).
        표 순서는 게임의 CHAR_LIST 처럼 groups 순서 → 직업군 안에서 이름 가나다순으로 자동 정렬하므로 줄 순서는 상관없다.
        옛 직업(marksman·healer·tank·assassin) 통계는 데이터베이스에 남아 있지만 새 직업과 비교할 수 없어서 뺐다.
@@ -1932,28 +1927,28 @@ const STATS_GAMES = {
       { id: "assassin", name: "암살자", icon: "🗡️" }
     ],
     roles: [
-      { id: "warrior",    name: "광전사", group: "fighter", heal: true },
-      { id: "knight",     name: "기사", group: "fighter", block: true },
-      { id: "duelist",    name: "결투가", group: "assassin", heal: true },
-      { id: "blacksmith", name: "대장장이", group: "fighter" },
-      { id: "guardian",   name: "수문장", group: "fighter" },
-      { id: "lancer",     name: "창술사", group: "fighter" },
-      { id: "giant",      name: "거신", group: "fighter", block: true },
-      { id: "necro",      name: "네크로", group: "caster", block: true },
-      { id: "frost",      name: "얼음술사", group: "caster" },
-      { id: "cleric",     name: "클레릭", group: "caster", heal: true },
-      { id: "mage",       name: "화염술사", group: "caster" },
-      { id: "druid",      name: "드루이드", group: "caster", heal: true },
-      { id: "astrologer", name: "점성술사", group: "caster" },
-      { id: "ranger",     name: "궁수", group: "shooter" },
-      { id: "sniper",     name: "저격수", group: "shooter" },
-      { id: "thrower",    name: "투척병", group: "shooter", heal: true },
-      { id: "stormbow",   name: "뇌전사수", group: "shooter" },
-      { id: "shaman",     name: "주술사", group: "shooter" },
-      { id: "engineer",   name: "공학자", group: "shooter" },
-      { id: "dancer",     name: "검무희", group: "assassin" },
-      { id: "rogue",      name: "은신자", group: "assassin" },
-      { id: "hitman",     name: "자객", group: "assassin" }
+      { id: "warrior",    name: "광전사", icon: "🪓", group: "fighter", heal: true },
+      { id: "knight",     name: "기사", icon: "🛡️", group: "fighter", block: true },
+      { id: "duelist",    name: "결투가", icon: "🤺", group: "assassin", heal: true },
+      { id: "blacksmith", name: "대장장이", icon: "🔨", group: "fighter" },
+      { id: "guardian",   name: "수문장", icon: "🏰", group: "fighter" },
+      { id: "lancer",     name: "창술사", icon: "🔱", group: "fighter" },
+      { id: "giant",      name: "거신", icon: "🗿", group: "fighter", block: true },
+      { id: "necro",      name: "네크로", icon: "💀", group: "caster", block: true },
+      { id: "frost",      name: "얼음술사", icon: "❄️", group: "caster" },
+      { id: "cleric",     name: "클레릭", icon: "✝️", group: "caster", heal: true },
+      { id: "mage",       name: "화염술사", icon: "🔥", group: "caster" },
+      { id: "druid",      name: "드루이드", icon: "🌿", group: "caster", heal: true },
+      { id: "astrologer", name: "점성술사", icon: "🌠", group: "caster" },
+      { id: "ranger",     name: "궁수", icon: "🏹", group: "shooter" },
+      { id: "sniper",     name: "저격수", icon: "🎯", group: "shooter" },
+      { id: "thrower",    name: "투척병", icon: "🧪", group: "shooter", heal: true },
+      { id: "stormbow",   name: "뇌전사수", icon: "⚡", group: "shooter" },
+      { id: "shaman",     name: "주술사", icon: "👊", group: "shooter" },
+      { id: "engineer",   name: "공학자", icon: "🔧", group: "shooter" },
+      { id: "dancer",     name: "검무희", icon: "🌸", group: "assassin" },
+      { id: "rogue",      name: "은신자", icon: "🗡️", group: "assassin" },
+      { id: "hitman",     name: "자객", icon: "🔪", group: "assassin" }
     ]
   }
 };

@@ -220,6 +220,56 @@ class AccountStatsTable {
         return rows;
     }
 }
+class TeamBattleMyStatsTable {
+    static headHtml() {
+        return '<tr><th class="nm">캐릭터</th>' + TeamBattleMyStatsTable.COLUMNS.map((column) => "<th>" + column[0] + (column[1] ? "<small>" + column[1] + "</small>" : "") + "</th>").join("") + "</tr>";
+    }
+    static rowsHtml(rows, chars) {
+        let lastGroup = null;
+        let html = "";
+        chars.forEach((char) => {
+            const row = rows[char.id];
+            if (!row || !(Number(row.picks) > 0))
+                return;
+            if (char.group !== lastGroup) {
+                lastGroup = char.group;
+                html += '<tr class="grp"><td colspan="' + TeamBattleMyStatsTable.COLUMN_COUNT + '">' + AccountHtml.esc(char.group) + "</td></tr>";
+            }
+            html += '<tr><td class="nm">' + AccountHtml.esc(char.icon + " " + char.name) + "</td>" + TeamBattleMyStatsTable.cellsHtml(row, char) + "</tr>";
+        });
+        return html || '<tr><td colspan="' + TeamBattleMyStatsTable.COLUMN_COUNT + '">' + TeamBattleMyStatsTable.EMPTY + "</td></tr>";
+    }
+    static cellsHtml(row, char) {
+        const picks = Number(row.picks) || 0;
+        const wins = Number(row.wins) || 0;
+        const mvps = Number(row.mvpCount) || 0;
+        const blockedKnown = Number(row.ccPicks) > 0;
+        return "<td><b>" + (wins / picks * 100).toFixed(1) + "%</b><small>(" + wins + " / " + picks + ")</small></td>"
+            + "<td><b>" + mvps + "</b><small>(" + mvps + " / " + picks + "판)</small></td>"
+            + TeamBattleMyStatsTable.kdaCell(row)
+            + "<td>" + Math.round(Number(row.dmg) || 0) + "</td>"
+            + "<td>" + (char.heals ? Math.round(Number(row.heal) || 0) : "-") + "</td>"
+            + "<td>" + (blockedKnown && char.blocks ? Math.round(Number(row.block) || 0) : "-") + "</td>"
+            + "<td>" + (blockedKnown ? (Number(row.stun) || 0).toFixed(1) + "초" : "-") + "</td>"
+            + "<td>" + (blockedKnown ? (Number(row.slow) || 0).toFixed(1) + "초" : "-") + "</td>"
+            + "<td>" + (Number(row.scPicks) > 0 ? Math.round(Number(row.mvpScore) || 0) : "-") + "</td>";
+    }
+    static kdaCell(row) {
+        if (!(Number(row.kdPicks) > 0))
+            return "<td>-</td>";
+        const kills = Number(row.kills) || 0;
+        const deaths = Number(row.deaths) || 0;
+        const assists = Number(row.asPicks) > 0 ? Number(row.assist) || 0 : 0;
+        const ratio = deaths > 0 ? ((kills + assists) / deaths).toFixed(2) : "Perfect";
+        return "<td><b>" + ratio + "</b><small>(" + kills.toFixed(1) + " / " + deaths.toFixed(1) + " / " + (Number(row.asPicks) > 0 ? assists.toFixed(1) : "-") + ")</small></td>";
+    }
+}
+TeamBattleMyStatsTable.COLUMNS = [
+    ["승률", "승리 수 / 판 수"], ["MVP", "MVP 횟수 / 판 수"], ["KDA", "(킬 + 어시스트) / 데스"],
+    ["평균 피해량", ""], ["평균 회복량", ""], ["평균 막은 피해", ""], ["평균 기절", ""], ["평균 둔화", ""], ["평균 MVP 점수", ""]
+];
+TeamBattleMyStatsTable.COLUMN_COUNT = TeamBattleMyStatsTable.COLUMNS.length + 1;
+TeamBattleMyStatsTable.EMPTY = "아직 집계된 경기가 없어요.";
 class ClassStatsSummary {
     static classKey(cls) {
         return typeof cls === "string" && ClassStatsSummary.CLASS_PATTERN.test(cls) ? cls : ClassStatsSummary.NONE;

@@ -5576,13 +5576,17 @@ class AccountStatsTests {
       node.c[ch] = { n: 8, w: 5, bg: 4, bw: 3, rg: 4, rw: 2, m: 2, kn: 8, k: 2, d: 1, a: 3, dmg: 500, hl: 0, bl: 0, st: 1, sl: 0, scn: 3, sc: 1234.4 };
       if (R.mvpRate(node) !== 0.25 || R.winRate(node) !== 0.625 || R.mvpRate({ g: 0, m: 0 }) !== null) bad.push("비율 " + R.mvpRate(node) + "·" + R.winRate(node));
       var html = A.myRowsHtml(A.Table.legacyRows(node));
-      var rows = (html.match(/<tr><td class="nm">/g) || []).length;
-      if (rows !== api.CHAR_LIST.length || html.indexOf("62.5%") < 0 || html.indexOf("(2 / 8판)") < 0 || html.indexOf("(5 / 8)") < 0 || html.indexOf("밴") >= 0) bad.push("표 " + rows + "줄");
+      var rows = (html.match(/<tr><td class="nm">/g) || []).length, groups = (html.match(/<tr class="grp">/g) || []).length;
+      if (rows !== 1 || groups !== 1) bad.push("플레이한 캐릭터·직업군만 나와야 함 " + rows + "줄·직업군 " + groups);
+      var unplayed = {}; unplayed[ch] = Object.assign({}, A.Table.legacyRows(node)[ch], { picks: 0 });
+      var emptyHtml = A.myRowsHtml(unplayed);
+      if (emptyHtml.indexOf('class="nm"') >= 0 || emptyHtml.indexOf('class="grp"') >= 0 || emptyHtml.indexOf("아직 집계된 경기가 없어요") < 0) bad.push("판 수 0 캐릭터 숨김");
+      if (html.indexOf("62.5%") < 0 || html.indexOf("(2 / 8판)") < 0 || html.indexOf("(5 / 8)") < 0 || html.indexOf("밴") >= 0) bad.push("표 내용");
       if (html.indexOf('colspan="10"') < 0) bad.push("직업군 제목 칸 수");
       if (html.indexOf("<td>1234</td>") < 0) bad.push("평균 MVP 점수 칸");
       var text = A.myStats.summaryText(node);
       if (text.indexOf("유효한 경기 8판") < 0 || text.indexOf("MVP율 25.0%") < 0 || text.indexOf("블루 75.0%") < 0 || text.indexOf("레드 50.0%") < 0) bad.push("요약 '" + text + "'");
-      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "MVP율 2/8=25%, 승률 5/8, 표 " + rows + "줄·MVP 횟수 칸");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "MVP율 2/8=25%, 승률 5/8, 플레이한 캐릭터 " + rows + "줄·직업군 " + groups + "줄만·MVP 횟수 칸");
     });
 
     run(G, "최근 매치 " + A.Ring.SLOTS + "칸: 빈 칸부터 쓰고, " + (A.Ring.SLOTS + 1) + "번째 판은 가장 오래된 판 자리에 들어가며, 같은 경기는 무시하는가", function (done) {
