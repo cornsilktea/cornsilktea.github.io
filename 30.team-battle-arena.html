@@ -26,7 +26,7 @@
   "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
 } }
 </script>
-<link rel="stylesheet" href="30.team-battle-arena.css?v=20261104a">
+<link rel="stylesheet" href="30.team-battle-arena.css?v=20261104b">
 </head>
 <body>
 <canvas id="cv"></canvas>
@@ -172,6 +172,7 @@
     <div class="secTitle">캐릭터<span class="secHint">한 번 누르면 설명이 나오고, 내 차례일 때 결정 버튼으로 골라요.</span></div>
     <div id="dfChars" class="dfChars"></div>
     <div id="dfDetail" class="dfDetail"></div>
+    <div id="dfPickBar" class="dfReadyBar" hidden></div>
     <div id="dfReadyBar" class="dfReadyBar" hidden><button id="btnDraftReady" class="dfReadyBtn" type="button">준비 완료</button><div id="dfReadyHint" class="dfReadyHint"></div></div>
   </div>
   </div>
@@ -2219,7 +2220,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var pickBtn = !canPick ? "" : banTurn ? '<button type="button" class="big danger" data-pick="' + v + '">🚫 ' + services.charTypes.statsOf(v).name + " 밴</button>" :
         '<button type="button" class="big primary" data-pick="' + v + '">✔ ' + services.charTypes.statsOf(v).name + Korean.roParticle(services.charTypes.statsOf(v).name) + " 결정</button>";
       Dom.setHtml(Dom.$("dfDetail"), v ? '<div class="dfName">' + services.charTypes.statsOf(v).icon + " " + services.charTypes.statsOf(v).name + '<small>' + services.catalog.roleOf(v).icon + " " + services.catalog.roleOf(v).name + "</small></div>" +
-        services.skilltext.statTable(v) + services.skilltext.skillBlocks(v) + pickBtn : "");
+        services.skilltext.statTable(v) + services.skilltext.skillBlocks(v) : "");
+      Dom.setHtml(Dom.$("dfPickBar"), pickBtn);
+      Dom.show(Dom.$("dfPickBar"), !!pickBtn);
     }
   }
 
@@ -10403,7 +10406,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var detail = Dom.$("dfDetail");
       if (detail.scrollIntoView) detail.scrollIntoView({ block: "nearest", behavior: "smooth" });
     };
-    Dom.$("dfDetail").onclick = function (e) {
+    Dom.$("dfPickBar").onclick = function (e) {
       var b = e.target.closest ? e.target.closest("[data-pick]") : null;
       if (b) services.draft.draftPick(b.getAttribute("data-pick"));
     };

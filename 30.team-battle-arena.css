@@ -211,7 +211,7 @@
     .dfSlots .slot .pk.picked b { font-size: 20px; }
     .dfCharCol { align-self: flex-start; min-width: 380px; position: sticky; top: 0; max-height: calc(100vh - 78px); overflow-y: auto; scrollbar-width: thin; }
     .dfCharCol .dfCard img { height: 48px; }
-    .dfCharCol .dfDetail .big, .dfCharCol .dfReadyBtn { height: 54px; font-size: 20px; }
+    .dfCharCol #dfPickBar .big, .dfCharCol .dfReadyBtn { height: 54px; font-size: 20px; }
   }
   @media (min-width: 1400px) { .lobbyCols, .draftCols { margin-left: 3vw; } }
 
@@ -466,7 +466,8 @@
   .dfDetail .st th { text-align: left; color: var(--sg-ink-soft); font-weight: 700; }
   .dfDetail .st td { text-align: right; font-weight: 800; }
   .dfDetail .ultDesc { font-size: 14px; }
-  .dfDetail .big { margin: 12px 0 0; }
+  #dfPickBar .big { margin: 0; }
+  #dfDetail { scroll-margin-bottom: 90px; }
 
   .modal { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 50; background: rgba(8, 14, 11, .7); display: flex; align-items: center; justify-content: center; padding: 16px; }
   .modalBox { background: #18221B; border: 2px solid var(--sg-line-strong); border-radius: 10px; padding: 22px 20px; width: 100%; max-width: 400px; }
