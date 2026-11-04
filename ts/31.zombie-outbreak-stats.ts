@@ -3,16 +3,17 @@
 
    집계 규칙(2026-10-26, 선생님 요청 · 정의는 코드 기준으로 정함)
      - 대상: 온라인 방(방 만들기·코드 입장·랜덤 매칭). 관전자는 기록하지 않는다.
-     - 개인 승패: 이긴 편에 선 판. 인간이 이기면 끝까지 생존한 사람이 승, 좀비가 이기면 숙주·감염된 사람이 승(감염되면 좀비 편).
-     - 인간 승률 = 인간으로 시작한 판(감염되기 전 포함) 중 인간 편이 이긴 판 ÷ 그런 판.
-       좀비 승률 = 좀비 편으로 끝난 판(숙주·감염 포함) 중 좀비가 이긴 판 ÷ 그런 판.  (감염된 판은 두 쪽에 모두 셈)
+     - 개인 승패(2026-11-04 선생님 결정): 인간이 이기면 끝까지 생존한 시민이 승, 좀비가 이기면 숙주만 승. 감염된 시민은 항상 패.
+     - 화면의 승률은 전체 승률 없이 두 가지만 보인다.
+       시민 승률 = cw / cg (시민으로 시작한 판 중 끝까지 생존해 이긴 판), 좀비 승률 = pw / pg (숙주로 시작한 판 중 이긴 판).
+       cg·cw·pg·pw 는 2026-11-04 부터 쌓는다. 옛 칸 hw·zg·zw 는 감염된 판이 섞여 나눌 수 없어 화면에 쓰지 않고, DB 규칙에 필요해 계속 적어 둔다.
      - 인간 평균 생존 시간 = 인간으로 시작한 판의 생존 초 합계 ÷ 그런 판 수(감염되면 감염된 때까지, 끝까지면 라운드 길이).
      - 완료 미션 수: 내가 끝낸 미션(한 판 최대 3). 감염 수와 같은 기준(누적은 AI 가 1명 이하인 판만).
      - 감염 수: 내가 감염시킨 사람 수(room.players[].infectedBy). 누적 통계는 AI 가 1명 이하인 판만(2026-11-03 선생님 결정: 사람 4명+AI 1명 판도 승패를 센다), 최근 매치는 AI 가 몇 명 섞여도 기록.
      - 경기 절반 뒤에 나가면 패배, 절반 전에 나가면 기록 없음. 승패가 안 가려진 판은 없다(인간·좀비 중 한쪽이 항상 이김).
 
    저장:
-     users/<uid>/stats/zombieoutbreak  { g, w, l, hg, hw, zg, zw, og 숙주 횟수, sv 끝까지 생존 횟수, ik 감염 합, ms 완료 미션 합, mi 한 판 최다 감염, hs 인간 생존 초 합, ls 최장 생존 초, ids }
+     users/<uid>/stats/zombieoutbreak  { g, w, l, cg, cw, pg, pw, hg, hw, zg, zw, og 숙주 횟수, sv 끝까지 생존 횟수, ik 감염 합, ms 완료 미션 합, mi 한 판 최다 감염, hs 인간 생존 초 합, ls 최장 생존 초, ids }
      users/<uid>/recent/zombieoutbreak/<0~19>  { v, id, at, r, ai, me, w 0인간/1좀비, p [[닉네임, 0숙주/1감염/2생존, 생존 초, 감염 수, 나감 0/1, AI 0/1, 완료 미션 수]] }
    ===================================================================== */
 
@@ -36,11 +37,15 @@ interface ZombieReport {
   random?: boolean;
 }
 
-interface ZombieRandomTally {
+interface ZombieRoleTally {
+  cg: number; cw: number; pg: number; pw: number;
+}
+
+interface ZombieRandomTally extends ZombieRoleTally {
   g: number; w: number; hg: number; hw: number; zg: number; zw: number;
 }
 
-interface ZombieStatsNode {
+interface ZombieStatsNode extends ZombieRoleTally {
   g: number; w: number; l: number; hg: number; hw: number; zg: number; zw: number;
   og: number; sv: number; ik: number; ms: number; mi: number; hs: number; ls: number;
   ids: Record<string, number>;
@@ -68,14 +73,14 @@ class ZombieRoles {
   static countsInTotals(rows: readonly { ai: boolean }[]): boolean {
     return rows.filter((row) => row.ai).length <= ZombieRoles.AI_COUNTED_MAX;
   }
-  static readonly NUMBER_KEYS = ["g", "w", "l", "hg", "hw", "zg", "zw", "og", "sv", "ik", "ms", "mi", "hs", "ls"] as const;
+  static readonly NUMBER_KEYS = ["g", "w", "l", "cg", "cw", "pg", "pw", "hg", "hw", "zg", "zw", "og", "sv", "ik", "ms", "mi", "hs", "ls"] as const;
 
   static fromResult(result: string): number {
     return result === "origin" ? ZombieRoles.ORIGIN : result === "infected" ? ZombieRoles.INFECTED : ZombieRoles.SURVIVED;
   }
 
   static wonBy(role: number, winner: number): boolean {
-    return winner === 0 ? role === ZombieRoles.SURVIVED : winner === 1 && role !== ZombieRoles.SURVIVED;
+    return winner === 0 ? role === ZombieRoles.SURVIVED : winner === 1 && role === ZombieRoles.ORIGIN;
   }
 }
 
@@ -127,15 +132,39 @@ class ZombieCodec {
     }
     const myIndex = AccountNumbers.count(stored.me);
     if (!rows.length || myIndex >= rows.length) return null;
-    return { id: head.id, at: head.at, win: head.win, withAi: stored.ai === 1, myIndex, winner: stored.w === 1 ? 1 : 0, rows };
+    return { id: head.id, at: head.at, win: head.win && rows[myIndex].role !== ZombieRoles.INFECTED, withAi: stored.ai === 1, myIndex, winner: stored.w === 1 ? 1 : 0, rows };
+  }
+}
+
+class ZombieRoleTallyMath {
+  static readonly KEYS = ["cg", "cw", "pg", "pw"] as const;
+
+  static empty(): ZombieRoleTally {
+    return { cg: 0, cw: 0, pg: 0, pw: 0 };
+  }
+
+  static normalize(raw: unknown): ZombieRoleTally {
+    const tally = ZombieRoleTallyMath.empty();
+    if (!raw || typeof raw !== "object") return tally;
+    const source = raw as Record<string, unknown>;
+    ZombieRoleTallyMath.KEYS.forEach((key) => { tally[key] = AccountNumbers.count(source[key]); });
+    return tally;
+  }
+
+  static add(before: ZombieRoleTally, role: number, win: boolean): ZombieRoleTally {
+    const origin = role === ZombieRoles.ORIGIN;
+    return {
+      cg: before.cg + (origin ? 0 : 1), cw: before.cw + (!origin && win ? 1 : 0),
+      pg: before.pg + (origin ? 1 : 0), pw: before.pw + (origin && win ? 1 : 0)
+    };
   }
 }
 
 class ZombieRandomTallyMath {
-  static readonly NUMBERS = ["g", "w", "hg", "hw", "zg", "zw"] as const;
+  static readonly NUMBERS = ["g", "w", "hg", "hw", "zg", "zw", "cg", "cw", "pg", "pw"] as const;
 
   static empty(): ZombieRandomTally {
-    return { g: 0, w: 0, hg: 0, hw: 0, zg: 0, zw: 0 };
+    return Object.assign({ g: 0, w: 0, hg: 0, hw: 0, zg: 0, zw: 0 }, ZombieRoleTallyMath.empty());
   }
 
   static normalize(raw: unknown): ZombieRandomTally {
@@ -150,17 +179,17 @@ class ZombieRandomTallyMath {
     const me = report.rows[report.myIndex];
     const startedHuman = me.role !== ZombieRoles.ORIGIN;
     const endedZombie = me.role !== ZombieRoles.SURVIVED;
-    return {
+    return Object.assign({
       g: before.g + 1, w: before.w + (win ? 1 : 0),
       hg: before.hg + (startedHuman ? 1 : 0), hw: before.hw + (startedHuman && report.winner === 0 ? 1 : 0),
       zg: before.zg + (endedZombie ? 1 : 0), zw: before.zw + (endedZombie && report.winner === 1 ? 1 : 0)
-    };
+    }, ZombieRoleTallyMath.add(before, me.role, win));
   }
 }
 
 class ZombieStatsMath {
   static empty(): ZombieStatsNode {
-    return { g: 0, w: 0, l: 0, hg: 0, hw: 0, zg: 0, zw: 0, og: 0, sv: 0, ik: 0, ms: 0, mi: 0, hs: 0, ls: 0, ids: {}, rm: ZombieRandomTallyMath.empty() };
+    return Object.assign({ g: 0, w: 0, l: 0, hg: 0, hw: 0, zg: 0, zw: 0, og: 0, sv: 0, ik: 0, ms: 0, mi: 0, hs: 0, ls: 0, ids: {}, rm: ZombieRandomTallyMath.empty() }, ZombieRoleTallyMath.empty());
   }
 
   static normalize(raw: unknown): ZombieStatsNode {
@@ -184,7 +213,7 @@ class ZombieStatsMath {
     const infects = Math.min(9, AccountNumbers.count(me.infects));
     const missions = Math.min(ZombieRoles.MISSIONS_MAX, AccountNumbers.count(me.missions));
     const rm = report.random ? ZombieRandomTallyMath.add(before.rm, report, win) : before.rm;
-    const node: ZombieStatsNode = !ZombieRoles.countsInTotals(report.rows) ? Object.assign({}, before, { ids: Object.assign({}, before.ids), rm }) : {
+    const node: ZombieStatsNode = !ZombieRoles.countsInTotals(report.rows) ? Object.assign({}, before, { ids: Object.assign({}, before.ids), rm }) : Object.assign({
       g: before.g + 1, w: before.w + (win ? 1 : 0), l: before.l + (win ? 0 : 1),
       hg: before.hg + (startedHuman ? 1 : 0), hw: before.hw + (startedHuman && report.winner === 0 ? 1 : 0),
       zg: before.zg + (endedZombie ? 1 : 0), zw: before.zw + (endedZombie && report.winner === 1 ? 1 : 0),
@@ -192,7 +221,7 @@ class ZombieStatsMath {
       ik: before.ik + infects, ms: before.ms + missions, mi: Math.max(before.mi, infects),
       hs: before.hs + (startedHuman ? secs : 0), ls: Math.max(before.ls, startedHuman ? secs : 0),
       ids: Object.assign({}, before.ids), rm
-    };
+    }, ZombieRoleTallyMath.add(before, me.role, win));
     node.ids[key] = at;
     const evicted = AccountKeyLedger.overflowKeys(node.ids);
     evicted.forEach((id) => { delete node.ids[id]; });
@@ -205,7 +234,7 @@ class ZombieProfile extends AccountGameProfile<ZombieReport, ZombiePlan, ZombieS
   private mainChanged = true;
 
   matchIdOf(report: ZombieReport): string { return report.matchId; }
-  rankFields(node: ZombieStatsNode): AccountRankFields { return { g: node.g, w: node.w, x: node.ik, y: node.ms }; }
+  rankFields(node: ZombieStatsNode): AccountRankFields { return { g: node.g, w: node.w, x: node.ik, y: node.ms, extra: { cg: node.cg, cw: node.cw, pg: node.pg, pw: node.pw } }; }
   extraPatch(user: PortalUser, extraRaw: unknown, node: ZombieStatsNode): Record<string, unknown> { return this.mainChanged ? super.extraPatch(user, extraRaw, node) : {}; }
   planOf(report: ZombieReport): ZombiePlan { return new ZombiePlan(report); }
   encodeRecent(report: ZombieReport, key: string, win: boolean): object { return ZombieCodec.encode(report, key, win); }
@@ -233,19 +262,18 @@ class ZombieStatsView implements AccountDialogView<ZombieStatsNode, ZombieRecent
 
   statsHtml(node: ZombieStatsNode | null): string {
     const s = node || ZombieStatsMath.empty();
-    return AccountHtml.record(s.g, s.w, s.l)
-      + AccountHtml.grid([
-        ["인간 승률", AccountHtml.percent(s.hw, s.hg) + " (" + s.hw + "/" + s.hg + ")"],
-        ["좀비 승률", AccountHtml.percent(s.zw, s.zg) + " (" + s.zw + "/" + s.zg + ")"],
-        ["인간 평균 생존", s.hg ? AccountHtml.average(s.hs, s.hg, 1) + "초" : "—"],
+    return AccountHtml.grid([
+        ["좀비 승률", AccountHtml.percent(s.pw, s.pg) + " (" + s.pw + "/" + s.pg + ")"],
+        ["시민 승률", AccountHtml.percent(s.cw, s.cg) + " (" + s.cw + "/" + s.cg + ")"],
+        ["시민 평균 생존", s.hg ? AccountHtml.average(s.hs, s.hg, 1) + "초" : "—"],
         ["최장 생존", s.ls ? s.ls + "초" : "—"],
         ["감염시킨 수 합계", String(s.ik)],
         ["한 판 최다 감염", String(s.mi)],
         ["완료한 미션 합계", String(s.ms)],
         ["숙주 좀비", s.og + "번"],
-        ["끝까지 생존", s.sv + "번 (" + AccountHtml.percent(s.sv, s.g) + ")"]
+        ["끝까지 생존", s.sv + "번"]
       ])
-      + '<div class="asd-sec">AI 가 1명 이하인 판만 세요(사람 4명 + AI 1명 판은 셉니다). 감염되면 좀비 편으로 계산해요.</div>';
+      + '<div class="asd-sec">좀비 승률은 숙주 좀비로 시작한 판, 시민 승률은 시민으로 시작한 판만 세요. 감염된 시민은 패배예요. 두 승률은 2026년 11월 4일부터 쌓여요. AI 가 1명 이하인 판만 셉니다(사람 4명 + AI 1명 판은 셉니다).</div>';
   }
 
   blockBodyHtml(entry: ZombieRecentEntry): string {

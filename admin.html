@@ -664,14 +664,14 @@
 <!-- 반 별 통계에서 학생 이름을 누르면 여는 개인 통계 창이 게임과 같은 계산·되살리기·표 클래스를 쓰려고 불러온다.
      30번은 StudentStatsWindow(account-stats.js), 나머지는 각 게임 통계 모듈의 Profile·View + AccountStatsDialog(StudentAccountWindow).
      통계가 있는 새 게임을 만들면 그 게임의 통계 .js 를 여기 한 줄 더하고 ClassRankPanel.GAMES 에 account 를 넘긴다. -->
-<script charset="utf-8" src="account-match-kit.js?v=20261103e"></script>
+<script charset="utf-8" src="account-match-kit.js?v=20261104a"></script>
 <script charset="utf-8" src="account-stats.js?v=20261029g"></script>
 <script charset="utf-8" src="teambattle-stats-repair.js?v=20261103a"></script>
 <script charset="utf-8" src="patch-notes.js?v=20261029b"></script>
 <script charset="utf-8" src="30.team-formation.js?v=20261102b"></script>
 <script charset="utf-8" src="24.turbo-lap-stats.js?v=20261029c"></script>
 <script charset="utf-8" src="25.fps-survival-stats.js?v=20261028c"></script>
-<script charset="utf-8" src="31.zombie-outbreak-stats.js?v=20261103e"></script>
+<script charset="utf-8" src="31.zombie-outbreak-stats.js?v=20261104a"></script>
 <script charset="utf-8" src="38.snow-account.js?v=20261028c"></script>
 <script charset="utf-8" src="39.balloon-account.js?v=20261028c"></script>
 <script charset="utf-8" src="account-stats-repair.js?v=20261103c"></script>
@@ -1188,6 +1188,29 @@ class RankGame {
   rowOf(uid, v) { return { uid, n: String(v.n || "?"), g: +v.g || 0, w: +v.w || 0, x: +v.x || 0, y: +v.y || 0 }; }
 
   stored(row) { return this.extra && this.extra.yLabel ? { n: row.n, g: row.g, w: row.w, x: row.x, y: row.y } : { n: row.n, g: row.g, w: row.w, x: row.x }; }
+
+  winColumns() {
+    return [["승률", "rate", (r) => ClassRankPanel.pct(r.w, r.g)], ["승/패", "w", (r) => r.w + " / " + (r.g - r.w)]];
+  }
+
+  sortValue(key, row) { return row[key]; }
+}
+
+/* 31번은 전체 승률 없이 좀비 승률(숙주로 시작한 판)·시민 승률만 보인다(2026-11-04 선생님 요청, 감염된 시민은 항상 패배) */
+class ZombieRankGame extends RankGame {
+  rowOf(uid, v) { return Object.assign(super.rowOf(uid, v), { cg: +v.cg || 0, cw: +v.cw || 0, pg: +v.pg || 0, pw: +v.pw || 0 }); }
+
+  stored(row) { return Object.assign(super.stored(row), { cg: row.cg, cw: row.cw, pg: row.pg, pw: row.pw }); }
+
+  winColumns() {
+    return [["좀비 승률", "zrate", (r) => ClassRankPanel.pct(r.pw, r.pg)], ["시민 승률", "crate", (r) => ClassRankPanel.pct(r.cw, r.cg)]];
+  }
+
+  sortValue(key, row) {
+    if (key === "zrate") return ClassRankPanel.rate(row.pw, row.pg);
+    if (key === "crate") return ClassRankPanel.rate(row.cw, row.cg);
+    return super.sortValue(key, row);
+  }
 }
 
 /* 30번만 classStats 에 MVP 수(m)를 둔다. 화면에서는 다른 게임의 x 칸처럼 보이고 MVP율 열이 하나 더 붙는다 */
@@ -1213,7 +1236,7 @@ class ClassRankPanel {
     new RankGame("fpsbattle", "서바이벌(25)", { label: "처치 합계" }, "팀 대전(방 만들기·코드 입장·랜덤 매칭) 중 AI 없는 판만 셉니다.",
       () => ({ profile: new FpsProfile(), view: new FpsStatsView() })),
     new TeamBattleRankGame("teambattle", "팀 배틀(30)", { label: "MVP 수", rate: "MVP율" }, "AI 없이 치른 대회모드 경기(랜덤 매칭 포함)만 셉니다."),
-    new RankGame("zombieoutbreak", "좀비(31)", { label: "감염시킨 수", yLabel: "완료한 미션" }, "온라인 방(랜덤 매칭 포함) 중 AI 가 1명 이하인 판만 셉니다(사람 4명 + AI 1명도 포함). 승 = 내 편이 이긴 판.",
+    new ZombieRankGame("zombieoutbreak", "좀비(31)", { label: "감염시킨 수", yLabel: "완료한 미션" }, "온라인 방(랜덤 매칭 포함) 중 AI 가 1명 이하인 판만 셉니다(사람 4명 + AI 1명도 포함). 좀비 승률 = 숙주로 시작한 판, 시민 승률 = 시민으로 시작한 판(감염되면 패배). 두 승률은 2026-11-04 부터 쌓입니다.",
       () => ({ profile: new ZombieProfile(), view: new ZombieStatsView() })),
     new RankGame("minigames", "미니게임(32)", { label: "3위 안" }, "랜덤 매칭에서 사람과 함께한 판만 셉니다. 승 = 우리 팀이 최종 1등.",
       () => ({ profile: new RandomMatchProfile("minigames"), view: new RandomMatchView("미니게임 랜덤 매칭 통계", true) })),
@@ -1351,7 +1374,7 @@ class ClassRankPanel {
 
   compare(a, b) {
     const k = this.sort.key, d = this.sort.dir;
-    const value = (r) => k === "rate" ? ClassRankPanel.rate(r.w, r.g) : k === "xrate" ? ClassRankPanel.rate(r.x, r.g) : k === "loss" ? r.g - r.w : r[k];
+    const value = (r) => k === "rate" ? ClassRankPanel.rate(r.w, r.g) : k === "xrate" ? ClassRankPanel.rate(r.x, r.g) : k === "loss" ? r.g - r.w : this.game.sortValue(k, r);
     const tieBreak = () => ClassRankPanel.rate(b.w, b.g) - ClassRankPanel.rate(a.w, a.g) || b.g - a.g || a.n.localeCompare(b.n, "ko");
     if (k === "n") return d * a.n.localeCompare(b.n, "ko") || tieBreak();
     if (k === "cls") return d * ClassRankPanel.labelOf(a.cls).localeCompare(ClassRankPanel.labelOf(b.cls), "ko", { numeric: true }) || tieBreak();
@@ -1360,8 +1383,7 @@ class ClassRankPanel {
 
   columns() {
     const extra = this.game.extra;
-    const cols = [["#", null, (r, i) => String(i + 1)], ["이름", "n", (r) => r.n], ["승률", "rate", (r) => ClassRankPanel.pct(r.w, r.g)],
-      ["승/패", "w", (r) => r.w + " / " + (r.g - r.w)], ["판 수", "g", (r) => String(r.g)]];
+    const cols = [["#", null, (r, i) => String(i + 1)], ["이름", "n", (r) => r.n], ...this.game.winColumns(), ["판 수", "g", (r) => String(r.g)]];
     if (this.cls === ClassRankPanel.ALL) cols.splice(2, 0, ["반", "cls", (r) => ClassRankPanel.labelOf(r.cls)]);
     if (extra) cols.push([extra.label, "x", (r) => String(r.x)]);
     if (extra && extra.rate) cols.push([extra.rate, "xrate", (r) => ClassRankPanel.pct(r.x, r.g)]);

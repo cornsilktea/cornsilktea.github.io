@@ -4,23 +4,21 @@ class ZombieVersusCards {
         return node ? ZombieVersusCards.fromRoom(node.rm) : null;
     }
     static toRoom(card) {
-        return { g: card.g, w: card.w, hg: card.hg, hw: card.hw, zg: card.zg, zw: card.zw };
+        return ZombieRoleTallyMath.normalize(card);
     }
     static fromRoom(raw) {
-        if (!raw || typeof raw !== "object")
-            return null;
-        const tally = ZombieRandomTallyMath.normalize(raw);
-        return tally.g ? tally : null;
+        const tally = ZombieRoleTallyMath.normalize(raw);
+        return tally.cg || tally.pg ? tally : null;
     }
 }
 class ZombieVersusLineup {
-    static build(humans, capacity, matched, expected) {
+    static build(humans, capacity, matched, expected, fillWithAi = matched) {
         const seats = humans.slice(0, capacity).map((human) => ({ kind: "player", nick: human.nick, me: human.me, zombie: human.zombie, card: human.card }));
         const coming = matched ? Math.max(0, Math.min(capacity, expected) - seats.length) : 0;
         while (seats.length < capacity && seats.length < humans.length + coming)
             seats.push({ kind: "coming" });
         while (seats.length < capacity)
-            seats.push(matched ? { kind: "ai" } : { kind: "empty" });
+            seats.push(fillWithAi ? { kind: "ai" } : { kind: "empty" });
         return seats;
     }
 }
@@ -58,8 +56,10 @@ class ZombieVersusView {
     cardHtml(card) {
         if (!card)
             return '<span class="zv-line"><em>기록 없음</em></span><span class="zv-line">&nbsp;</span>';
-        return '<span class="zv-line">승률 <em>' + ZombieVersusView.percent(card.w, card.g) + "</em> <small>" + card.w + "승 " + (card.g - card.w) + "패</small></span>"
-            + '<span class="zv-line">인간 <em>' + ZombieVersusView.percent(card.hw, card.hg) + "</em> · 좀비 <em>" + ZombieVersusView.percent(card.zw, card.zg) + "</em></span>";
+        return this.rateLine("좀비", card.pw, card.pg) + this.rateLine("시민", card.cw, card.cg);
+    }
+    rateLine(label, wins, games) {
+        return '<span class="zv-line">' + label + " <em>" + ZombieVersusView.percent(wins, games) + "</em> <small>" + wins + "승 " + (games - wins) + "패</small></span>";
     }
     static percent(part, total) {
         return total ? Math.round(part / total * 100) + "%" : "—";

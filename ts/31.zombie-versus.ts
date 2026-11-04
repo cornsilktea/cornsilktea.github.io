@@ -1,42 +1,37 @@
-interface ZombieVersusCard {
-  g: number; w: number; hg: number; hw: number; zg: number; zw: number;
-}
-
 type ZombieVersusSeat =
   | { kind: "ai" }
   | { kind: "coming" }
   | { kind: "empty" }
-  | { kind: "player"; nick: string; me: boolean; zombie: boolean; card: ZombieVersusCard | null };
+  | { kind: "player"; nick: string; me: boolean; zombie: boolean; card: ZombieRoleTally | null };
 
 interface ZombieVersusHuman {
   nick: string;
   me: boolean;
   zombie: boolean;
-  card: ZombieVersusCard | null;
+  card: ZombieRoleTally | null;
 }
 
 class ZombieVersusCards {
-  static fromStats(node: ZombieStatsNode | null): ZombieVersusCard | null {
+  static fromStats(node: ZombieStatsNode | null): ZombieRoleTally | null {
     return node ? ZombieVersusCards.fromRoom(node.rm) : null;
   }
 
-  static toRoom(card: ZombieVersusCard): ZombieVersusCard {
-    return { g: card.g, w: card.w, hg: card.hg, hw: card.hw, zg: card.zg, zw: card.zw };
+  static toRoom(card: ZombieRoleTally): ZombieRoleTally {
+    return ZombieRoleTallyMath.normalize(card);
   }
 
-  static fromRoom(raw: unknown): ZombieVersusCard | null {
-    if (!raw || typeof raw !== "object") return null;
-    const tally = ZombieRandomTallyMath.normalize(raw);
-    return tally.g ? tally : null;
+  static fromRoom(raw: unknown): ZombieRoleTally | null {
+    const tally = ZombieRoleTallyMath.normalize(raw);
+    return tally.cg || tally.pg ? tally : null;
   }
 }
 
 class ZombieVersusLineup {
-  static build(humans: readonly ZombieVersusHuman[], capacity: number, matched: boolean, expected: number): ZombieVersusSeat[] {
+  static build(humans: readonly ZombieVersusHuman[], capacity: number, matched: boolean, expected: number, fillWithAi: boolean = matched): ZombieVersusSeat[] {
     const seats: ZombieVersusSeat[] = humans.slice(0, capacity).map((human) => ({ kind: "player", nick: human.nick, me: human.me, zombie: human.zombie, card: human.card }));
     const coming = matched ? Math.max(0, Math.min(capacity, expected) - seats.length) : 0;
     while (seats.length < capacity && seats.length < humans.length + coming) seats.push({ kind: "coming" });
-    while (seats.length < capacity) seats.push(matched ? { kind: "ai" } : { kind: "empty" });
+    while (seats.length < capacity) seats.push(fillWithAi ? { kind: "ai" } : { kind: "empty" });
     return seats;
   }
 }
@@ -71,10 +66,13 @@ class ZombieVersusView {
     return '<div class="zv-seat' + (seat.me ? " me" : "") + (seat.zombie ? " zombie" : "") + '"><b>' + (seat.zombie ? "🧟 " : "") + AccountHtml.esc(seat.nick) + (seat.me ? " <small>(나)</small>" : "") + "</b>" + this.cardHtml(seat.card) + "</div>";
   }
 
-  private cardHtml(card: ZombieVersusCard | null): string {
+  private cardHtml(card: ZombieRoleTally | null): string {
     if (!card) return '<span class="zv-line"><em>기록 없음</em></span><span class="zv-line">&nbsp;</span>';
-    return '<span class="zv-line">승률 <em>' + ZombieVersusView.percent(card.w, card.g) + "</em> <small>" + card.w + "승 " + (card.g - card.w) + "패</small></span>"
-      + '<span class="zv-line">인간 <em>' + ZombieVersusView.percent(card.hw, card.hg) + "</em> · 좀비 <em>" + ZombieVersusView.percent(card.zw, card.zg) + "</em></span>";
+    return this.rateLine("좀비", card.pw, card.pg) + this.rateLine("시민", card.cw, card.cg);
+  }
+
+  private rateLine(label: string, wins: number, games: number): string {
+    return '<span class="zv-line">' + label + " <em>" + ZombieVersusView.percent(wins, games) + "</em> <small>" + wins + "승 " + (games - wins) + "패</small></span>";
   }
 
   private static percent(part: number, total: number): string {

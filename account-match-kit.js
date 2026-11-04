@@ -168,6 +168,8 @@ class AccountClassRank {
         const row = { n: String(user.name || "학생").slice(0, AccountClassRank.NAME_MAX) || "학생", g: fields.g, w: fields.w, x: AccountNumbers.count(fields.x) };
         if (fields.y !== undefined)
             row.y = AccountNumbers.count(fields.y);
+        if (fields.extra)
+            Object.assign(row, fields.extra);
         values[root + classKey + "/" + user.uid] = row;
         if (classKey !== AccountClassRank.NONE)
             values[root + AccountClassRank.NONE + "/" + user.uid] = null;

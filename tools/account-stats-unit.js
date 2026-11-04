@@ -4,7 +4,7 @@ const files = ["match-kit.js", "account-match-kit.js", "account-stats.js", "24.t
 const names = ["AccountNumbers", "AccountRates", "AccountMatchKey", "AccountKeyLedger", "AccountForfeit", "AccountShape", "AccountRecentHeadCodec", "RecentMatchRing", "AccountLoginNotice", "RecentBlockList", "AccountGameProfile", "AccountMatchStore",
   "TeamBattleRates", "AccountMvpJudge", "TeamBattlePlan", "TeamBattleCodec", "TeamBattleRing", "AccountStatsMath", "AccountStatsTable", "ClassStatsSummary", "TeamBattleProfile", "AccountStatsStore",
   "TurboLapPlan", "TurboLapCodec", "TurboLapStatsMath", "TurboLapProfile", "TurboLapStatsView", "FpsPlan", "FpsCodec", "FpsStatsMath", "FpsProfile", "FpsStatsView",
-  "ZombiePlan", "ZombieCodec", "ZombieStatsMath", "ZombieProfile", "ZombieStatsView", "ZombieRandomTallyMath", "ZombieOriginRotation", "ZombieVersusCards", "ZombieVersusLineup", "ZombieMissionSites", "ZombieMissionCatalog", "ZombieMissionProgress", "SnAccountPlan", "SnAccountCodec", "SnAccountMath", "SnAccountProfile", "SnAccountView", "SnReportBuilder", "SnVersusCards",
+  "ZombiePlan", "ZombieCodec", "ZombieStatsMath", "ZombieProfile", "ZombieStatsView", "ZombieRandomTallyMath", "ZombieRoleTallyMath", "ZombieOriginRotation", "ZombieVersusCards", "ZombieVersusLineup", "ZombieMissionSites", "ZombieMissionCatalog", "ZombieMissionProgress", "SnAccountPlan", "SnAccountCodec", "SnAccountMath", "SnAccountProfile", "SnAccountView", "SnReportBuilder", "SnVersusCards",
   "WbAccountPlan", "WbAccountCodec", "WbAccountMath", "WbAccountProfile", "WbAccountView", "WbReportBuilder", "WbRandomTallyMath", "WbVersusCards", "WbVersusLineupBuilder",
   "AccountClassRank", "RandomMatchPlan", "RandomMatchCodec", "RandomMatchMath", "RandomMatchProfile", "RandomMatchView",
   "AccountOutbox", "AccountRepairPlanner", "ZombieRepairGame", "TurboLapRepairGame", "FpsRepairGame", "SnowRepairGame", "BalloonRepairGame", "AccountStatsNormalizer", "AccountPendingCodec", "AccountMatchSender", "AccountPendingGuard", "MkStreakMath", "TurboLapClock", "TurboLapOutcome", "TeamBattleScore", "PatchNoteCodec", "PatchNoteSeen"];
@@ -309,7 +309,18 @@ const zombieRows = () => [{ name: "숙주", role: 0, secs: 0, infects: 3, left: 
   { name: "감염", role: 1, secs: 61, infects: 1, left: false, ai: false }, { name: "봇", role: 1, secs: 20, infects: 0, left: false, ai: true }, { name: "봇2", role: 1, secs: 10, infects: 0, left: false, ai: true }];
 const zombieReport = (extra) => Object.assign({ matchId: "m31", myIndex: 1, rows: zombieRows(), winner: 0, progress: 1, iLeft: false }, extra || {});
 {
-  check("31번 판정: 인간 승리 때 끝까지 생존한 사람이 승", new K.ZombiePlan(zombieReport()).win && !new K.ZombiePlan(zombieReport({ myIndex: 2 })).win && new K.ZombiePlan(zombieReport({ winner: 1, myIndex: 2 })).win && new K.ZombiePlan(zombieReport({ winner: 1, myIndex: 0 })).win);
+  check("31번 판정: 인간 승리는 끝까지 생존한 시민, 좀비 승리는 숙주만 승, 감염된 시민은 항상 패", new K.ZombiePlan(zombieReport()).win && !new K.ZombiePlan(zombieReport({ myIndex: 2 })).win && !new K.ZombiePlan(zombieReport({ winner: 1, myIndex: 2 })).win && new K.ZombiePlan(zombieReport({ winner: 1, myIndex: 0 })).win && !new K.ZombiePlan(zombieReport({ winner: 1, myIndex: 1 })).win && !new K.ZombiePlan(zombieReport({ winner: 0, myIndex: 0 })).win);
+  const roleRows = zombieRows().slice(0, 3);
+  const roleTally = [[1, 0], [1, 1], [2, 0], [2, 1], [0, 1], [0, 0]].reduce((raw, [myIndex, winner], i) => {
+    const report = zombieReport({ rows: roleRows, myIndex, winner, matchId: "role" + i });
+    return K.ZombieStatsMath.apply(raw, report, new K.ZombiePlan(report).win, "role" + i, i).node;
+  }, null);
+  check("31번 역할 승률: 시민 4판(생존 승 1, 생존 패 1, 감염 2판 모두 패) · 숙주 2판(승 1)", roleTally.cg === 4 && roleTally.cw === 1 && roleTally.pg === 2 && roleTally.pw === 1 && roleTally.w === 2 && roleTally.l === 4, roleTally);
+  const roleHtml = new K.ZombieStatsView().statsHtml(roleTally);
+  check("31번 통계 창: 좀비·시민 승률만 있고 전체 승률·승패 줄은 없음", roleHtml.includes("좀비 승률") && roleHtml.includes("시민 승률") && roleHtml.includes("25.0% (1/4)") && roleHtml.includes("50.0% (1/2)") && !roleHtml.includes("asd-record") && !roleHtml.includes("인간 승률"), roleHtml);
+  const oldInfectedWin = K.ZombieCodec.decode(Object.assign({}, K.ZombieCodec.encode(zombieReport({ winner: 1, myIndex: 2 }), "old1", true), { at: 5 }));
+  check("31번 최근 매치: 옛 기록의 감염된 판 승리도 패배로 보임", oldInfectedWin.win === false, oldInfectedWin);
+  check("31번 반 별 요약: 역할 승률 칸을 함께 씀", same(new K.ZombieProfile().rankFields(roleTally).extra, { cg: 4, cw: 1, pg: 2, pw: 1 }));
   check("31번 판정: 봇이 2명 이상이면 최근 매치만, 절반 전 나가기는 기록 없음", (() => { const p = new K.ZombiePlan(zombieReport()); return p.recordsRecent && !p.countsStats; })() && !new K.ZombiePlan(zombieReport({ iLeft: true, progress: 0.2, winner: -1 })).recordsRecent);
   const r = zombie.roundTrip(zombieReport(), true);
   check("31번 값 배열: 왕복(역할·생존 초·감염 수)", r.back.rows.length === 5 && r.back.rows[0].role === 0 && r.back.rows[0].infects === 3 && r.back.rows[1].secs === 180 && r.back.winner === 0 && r.back.rows[3].ai && r.size < 500, r.size);
@@ -345,13 +356,14 @@ const zombieReport = (extra) => Object.assign({ matchId: "m31", myIndex: 1, rows
     for (let i = 0; i < 400; i++) { const id = rot.pick(Object.keys(gaps).map((k) => ({ id: k, gap: gaps[k] })), rnd); hosts.push([id, Math.min(...Object.keys(gaps).map((k) => gaps[k]))]); Object.keys(gaps).forEach((k) => { gaps[k] = rot.nextGap(gaps[k], k === id); }); }
     return hosts; })();
   check("31번 숙주 순번: 5명이 400판을 돌면 아무도 연달아 숙주가 되지 않고 4판 안에 한 번씩은 돌아옴", rounds.every((h, i) => i === 0 || h[0] !== rounds[i - 1][0]) && rounds.length === 400);
-  const cardNode = K.ZombieStatsMath.normalize({ g: 9, w: 5, rm: { g: 4, w: 3, hg: 3, hw: 2, zg: 2, zw: 1 } });
+  const cardNode = K.ZombieStatsMath.normalize({ g: 9, w: 5, cg: 7, cw: 7, rm: { g: 4, w: 3, hg: 3, hw: 2, zg: 2, zw: 1, cg: 3, cw: 2, pg: 1, pw: 1 } });
   const card = K.ZombieVersusCards.fromStats(cardNode);
-  check("31번 대결 화면 카드: rm 만 읽고 자리 값으로 왕복", card.g === 4 && card.w === 3 && card.hw === 2 && same(K.ZombieVersusCards.fromRoom(JSON.parse(JSON.stringify(K.ZombieVersusCards.toRoom(card)))), card) && K.ZombieVersusCards.fromStats(null) === null && K.ZombieVersusCards.fromRoom(null) === null && K.ZombieVersusCards.fromStats(K.ZombieStatsMath.normalize({ g: 4, w: 2 })) === null);
+  check("31번 대결 화면 카드: rm 의 역할 승률만 읽고 자리 값으로 왕복", card.cg === 3 && card.cw === 2 && card.pg === 1 && card.pw === 1 && !("g" in card) && same(K.ZombieVersusCards.fromRoom(JSON.parse(JSON.stringify(K.ZombieVersusCards.toRoom(card)))), card) && K.ZombieVersusCards.fromStats(null) === null && K.ZombieVersusCards.fromRoom(null) === null && K.ZombieVersusCards.fromStats(K.ZombieStatsMath.normalize({ g: 4, w: 2 })) === null);
   const people = [{ nick: "가", me: true, card }, { nick: "나", me: false, card: null }];
   const matchedSeats = K.ZombieVersusLineup.build(people, 5, true, 3).map((seat) => seat.kind).join(",");
   const roomSeats = K.ZombieVersusLineup.build(people, 5, false, 0).map((seat) => seat.kind).join(",");
-  check("31번 대결 화면 자리: 랜덤 매칭은 사람 → 입장하는 중 → AI, 일반 방은 사람 → 빈 자리", matchedSeats === "player,player,coming,ai,ai" && roomSeats === "player,player,empty,empty,empty", [matchedSeats, roomSeats]);
+  const roomAiSeats = K.ZombieVersusLineup.build(people.slice(0, 1), 5, false, 0, true).map((seat) => seat.kind).join(",");
+  check("31번 대결 화면 자리: 랜덤 매칭은 사람 → 입장하는 중 → AI, 일반 방은 사람 → 빈 자리(AI 채우기 켜면 AI)", matchedSeats === "player,player,coming,ai,ai" && roomSeats === "player,player,empty,empty,empty" && roomAiSeats === "player,ai,ai,ai,ai", [matchedSeats, roomSeats, roomAiSeats]);
 }
 
 {

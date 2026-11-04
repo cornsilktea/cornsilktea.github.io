@@ -439,9 +439,9 @@
   </div>
 </div>
 <script charset="utf-8" src="match-kit.js?v=20261103d"></script>
-<script charset="utf-8" src="account-match-kit.js?v=20261103e"></script>
-<script charset="utf-8" src="31.zombie-outbreak-stats.js?v=20261103e"></script>
-<script charset="utf-8" src="31.zombie-versus.js?v=20261103c"></script>
+<script charset="utf-8" src="account-match-kit.js?v=20261104a"></script>
+<script charset="utf-8" src="31.zombie-outbreak-stats.js?v=20261104a"></script>
+<script charset="utf-8" src="31.zombie-versus.js?v=20261104a"></script>
 <script charset="utf-8" src="40.forest-minigame.js?v=13"></script>
 <script charset="utf-8" src="31.zombie-missions.js?v=20261104a"></script>
 <script>new CharacterMakerDialog(undefined, false);</script>
@@ -3345,9 +3345,10 @@ class ZombieVersusCurtain {
   roomLeftMs() { return this.matched() || !this.vsAt ? 0 : this.vsAt + ZombieVersusCurtain.SHOW_MS + ZombieVersusCurtain.ROOM_SLACK_MS - serverNow(); }
   follow() {
     clearTimeout(this.hideTimer); clearTimeout(this.roomTimer);
-    const lobby = screenNow === "lobby" && !!room.ref && room.status === "lobby";
-    const roomLeft = lobby ? this.roomLeftMs() : 0;
-    if (lobby && (this.matched() || roomLeft > 0)) {
+    const inRoomLobby = !!room.ref && room.status === "lobby";
+    const lobby = screenNow === "lobby" && inRoomLobby;
+    const roomLeft = inRoomLobby && (screenNow === "lobby" || screenNow === "result") ? this.roomLeftMs() : 0;
+    if ((lobby && this.matched()) || roomLeft > 0) {
       if (roomLeft > 0) this.roomTimer = setTimeout(() => this.follow(), roomLeft);
       this.show();
       return;
@@ -3361,10 +3362,10 @@ class ZombieVersusCurtain {
     if (this.root.hidden) return;
     const ticket = zombieRandom.ticket();
     const humans = playerIds().filter(isParticipant).map(id => ({ nick: room.players[id].nickname || "이름 없음", me: id === myId, zombie: !!this.originPick && id === this.originPick, card: ZombieVersusCards.fromRoom(room.players[id].vs) }));
-    this.view.render(ZombieVersusLineup.build(humans, MAX_PLAYERS, !!ticket, ticket ? ticket.expect : 0));
+    this.view.render(ZombieVersusLineup.build(humans, MAX_PLAYERS, !!ticket, ticket ? ticket.expect : 0, !!ticket || botsWanted()));
   }
   hostStart(start) {
-    if (this.matched() || participantCount() < 2) { start(); return; }
+    if (this.matched()) { start(); return; }
     if (this.roomLeftMs() > 0) return;
     const ref = room.ref;
     ref.update({ vsAt: serverNow(), originPick: chooseOrigin() });
@@ -5014,7 +5015,7 @@ class ZombieRandomMatch {
     const winner = room.winner;
     const mine = this.flow.memberIds().filter(id => final[id]);
     if (!winner || !mine.length) return;
-    const onWinningSide = id => winner === "human" ? final[id].r === "survived" : final[id].r !== "survived";
+    const onWinningSide = id => winner === "human" ? final[id].r === "survived" : final[id].r === "origin";
     this.flow.matchEnded({ result: mine.every(onWinningSide) ? "win" : "lose" }, showStreak);
   }
 }
