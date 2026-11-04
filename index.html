@@ -627,6 +627,27 @@
     });
   }
 
+  /* 전체 자료 목록(games)은 크고(약 6KB) 잘 바뀌지 않아 5분에 한 번만 읽습니다.
+     기기 한 대가 시간당 약 2.6MB 를 쓰던 것을 약 0.47MB 로 줄입니다(2026-11-04 선생님 결정).
+     반별 열림·잠김(classes)은 수업 중 바로 반영되어야 하므로 이 주기를 따르지 않고 계속 10초마다 읽습니다.
+     새 자료·제목 변경은 최대 5분 뒤 또는 새로고침할 때 보입니다.
+     읽기에 실패하거나 목록이 비어 있으면 시각을 남기지 않아 다음 차례에 바로 다시 읽습니다. */
+  class GameCatalogReader {
+    constructor(read) { this.read = read; this.data = null; this.readAt = 0; }
+    isFresh() { return !!this.data && Date.now() - this.readAt < GameCatalogReader.REFRESH_MS; }
+    load() {
+      if (this.isFresh()) return Promise.resolve(this.data);
+      var self = this;
+      return this.read("games").then(function (data) {
+        self.data = data;
+        self.readAt = Date.now();
+        return data;
+      });
+    }
+  }
+  GameCatalogReader.REFRESH_MS = 5 * 60 * 1000;
+  var catalog = new GameCatalogReader(readJson);
+
   /* 학생 목록에 나오는 자료는 제어판에 등록된 것뿐입니다.
      저장소에 파일만 올라온 자료는 제어판(admin.html)에만 보이고,
      선생님이 단원을 정해 등록해야 여기에 나타납니다.
@@ -638,7 +659,7 @@
       render();
       return;
     }
-    Promise.all([readJson("games"), readJson("classes/" + klass.id)])
+    Promise.all([catalog.load(), readJson("classes/" + klass.id)])
       .then(function (res) {
         var data = res[0], opens = res[1] || {};
         setNotice("");
