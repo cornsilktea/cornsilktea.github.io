@@ -26,7 +26,7 @@
   "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
 } }
 </script>
-<link rel="stylesheet" href="30.team-battle-arena.css?v=20261104d">
+<link rel="stylesheet" href="30.team-battle-arena.css?v=20261104e">
 </head>
 <body>
 <canvas id="cv"></canvas>
@@ -167,7 +167,7 @@
         <div class="team red"><h3>레드팀<span id="dfBanR" class="dfBanBox"></span></h3><div id="dfRed" class="dfSlots"></div></div>
       </div>
     </div>
-    <div class="card dfMapCard"><div class="dfMapHead"><span id="dfMapName"></span><small><span class="b">◀ 블루 진영</span> · <span class="r">레드 진영 ▶</span></small></div><img id="dfMapImg" class="dfMapImg" alt=""></div>
+    <img id="dfMapImg" class="dfMapImg" alt="">
     <div id="dfTradeBox" class="dfTradeBox" hidden></div>
   </div>
   <div class="card charCol dfCharCol">
@@ -2144,9 +2144,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var me = services.session.players[services.session.myId], myTeam = me ? me.team : null, mySide = services.draft.draftSideOf(d, services.session.myId);
       var left = Math.max(0, d.stepAt + Draft.SHOWN_MS - t), humans = services.draft.draftHumans(d).length, readyN = services.draft.draftReadyCount(d);
       var arena = MapCatalog.of(services.session.room.arena) || MapCatalog.of(services.arenaMap.id);
-      Dom.setText(Dom.$("dfMap"), arena ? "맵 " + arena.name : "");
+      Dom.setHtml(Dom.$("dfMap"), arena ? '<span class="dfMapLabel">맵</span> ' + Dom.esc(arena.name) : "");
       var arenaId = MapCatalog.of(services.session.room.arena) ? services.session.room.arena : services.arenaMap.id, mapImg = Dom.$("dfMapImg");
-      Dom.setText(Dom.$("dfMapName"), arena ? "맵 " + arena.name : "");
       if (mapImg.getAttribute("src") !== services.arenaMap.shotSrc(arenaId, true)) mapImg.setAttribute("src", services.arenaMap.shotSrc(arenaId, true));
       var timer = Dom.$("dfTimer");
       if (done) {

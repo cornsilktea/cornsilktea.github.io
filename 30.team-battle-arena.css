@@ -205,8 +205,6 @@
     .draftLeft { display: flex; flex-direction: column; }
     .dfSlots { display: flex; flex-direction: column; gap: 8px; }
     .dfTeamCard .dfSlots .slot { margin: 0; }
-    .dfMapCard { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 220px; }
-    .dfMapCard .dfMapImg { flex: 1 1 0; min-height: 0; height: auto; }
     .dfCharCol { align-self: flex-start; min-width: 380px; position: sticky; top: 0; max-height: calc(100vh - 78px); overflow-y: auto; scrollbar-width: thin; }
     .dfCharCol .dfCard img { height: 48px; }
     .dfCharCol #dfPickBar .big, .dfCharCol .dfReadyBtn { height: 54px; font-size: 20px; }
@@ -366,6 +364,7 @@
   .dfHead { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
   .dfTitle { font-size: 24px; font-weight: 800; color: #F4F1E8; }
   .dfMap { font-size: 24px; font-weight: 800; line-height: 1.1; color: #F2D06B; white-space: nowrap; }
+  .dfMapLabel { font-size: .5em; color: #fff; }
   .dfCharCol { transition: box-shadow .4s ease, border-color .4s ease; }
   .dfCharCol.myTurn { border-color: #3FBF6A; animation: dfTurnGlow 1.6s ease-in-out infinite; }
   .dfCharCol.myTurnLow { border-color: #FF8A80; animation: dfTurnGlowLow 1s ease-in-out infinite; }
@@ -391,12 +390,7 @@
   .dfBan .pface { width: 34px; height: 34px; filter: grayscale(.6); }
   .dfBan.wait { font-size: 13px; font-weight: 700; color: var(--sg-ink-faint); }
   .dfBan.now { font-size: 13px; color: #FFB38A; }
-  .dfMapCard { padding: 12px 14px 14px; }
-  .dfMapHead { margin-bottom: 8px; font-size: 15px; font-weight: 800; color: #F2D06B; display: flex; align-items: center; gap: 10px; }
-  .dfMapHead small { margin-left: auto; font-size: 12px; font-weight: 700; }
-  .dfMapHead .b { color: #8DB8FF; }
-  .dfMapHead .r { color: #FF9A92; }
-  .dfMapImg { display: block; width: 100%; height: auto; object-fit: contain; border-radius: 6px; }
+  .dfMapImg { display: block; flex: 0 0 auto; width: 100%; height: auto; margin-bottom: 14px; border-radius: 8px; }
   .lobbyTop #btnMapView { margin-left: auto; align-self: flex-end; margin-bottom: 11px; }
   .modalBox.mapViewBox { max-width: 1100px; max-height: calc(100vh - 32px); overflow-y: auto; overscroll-behavior: contain; }
   .mapViewGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
