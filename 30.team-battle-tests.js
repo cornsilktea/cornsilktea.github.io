@@ -4746,7 +4746,7 @@ class ResultCollector {
   new WraithTests(api, { world: world, run: run, FRAME: FRAME, withMe: withMe, meEntry: meEntry, moveKeys: function (on) { api.KEY_ON.right = on; api.KEY_ON.d = on; } }).register();
   new DraggedChainTests(api, { run: run }).register();
   new BannerBearerTests(api, { world: world, run: run, recordRef: recordRef }).register();
-  run(AUTO, "AI 6명 60초 난전 — 숲 맵 + 기수 고정 (시드 2042)", function (done) {
+  run(AUTO, "AI 6명 60초 난전 — 숲 맵 + 선봉장 고정 (시드 2042)", function (done) {
     var r = autoMelee("forest", 60, 2042, "bearer"), kinds = Object.keys(r.issues);
     done(kinds.length ? "fail" : "pass", kinds.length ? kinds.join(" / ") : "문제 없음");
   });
@@ -5694,7 +5694,7 @@ class WraithTests {
 }
 
 class BannerBearerTests {
-  static GROUP = "기수";
+  static GROUP = "선봉장";
   static Y = 700;
   constructor(api, kit) { this.api = api; this.kit = kit; }
   scene(list) {
@@ -5732,7 +5732,7 @@ class BannerBearerTests {
       if (Math.abs(api.speedOf(far) - api.CHARS.guardian.speed) > 1e-6 || api.BANNER_AURA.speedBonusFor(near, W.t())) bad.push("쓰러진 뒤에도 남음");
       self.verdict(done, bad, "실제 이동속도 +" + Math.round(plus * api.timeScale()));
     });
-    run(G, "패시브: 연습에서 캐릭터를 바꾸거나 기수가 나가면 기수를 다시 찾는가", function (done) {
+    run(G, "패시브: 연습에서 캐릭터를 바꾸거나 선봉장이 나가면 선봉장을 다시 찾는가", function (done) {
       var bad = [], W = self.squad([{ id: "al", team: "blue", char: "knight", x: 320, slot: 2 }]), al = W.ent("al"), players = api.MATCH.bots;
       if (!api.BANNER_AURA.speedBonusFor(al, W.t())) bad.push("처음에 못 찾음");
       var seats = api.playersNow ? api.playersNow() : null;
@@ -5777,7 +5777,7 @@ class BannerBearerTests {
       if (rig.aura.visible) bad.push("끝났는데 보임");
       self.verdict(done, bad, "스킬 중에만");
     });
-    run(G, "몸 오라: 반경 안의 모든 아군과 기수에게 나오고, 반경 밖 아군·상대에게는 안 나오며 끝나면 사라지는가", function (done) {
+    run(G, "몸 오라: 반경 안의 모든 아군과 선봉장에게 나오고, 반경 밖 아군·상대에게는 안 나오며 끝나면 사라지는가", function (done) {
       var bad = [], W = self.squad([{ id: "al", team: "blue", char: "guardian", x: 300 + ULT.bnR - 5, slot: 2 }, { id: "far", team: "blue", char: "knight", x: 300 + ULT.bnR + 5, slot: 3 }, { id: "foe", x: 340, slot: 1 }]);
       self.stance(W);
       var shown = function (id) { var E = W.ent(id), v = api.FIGHTER_VIEW.makeVis(E, new api.THREE.Group()); api.BANNER_AURA.renderFollower(v, E, W.t(), 0); return { v: v, E: E, on: !!v.stanceMark && v.stanceMark.visible, glow: api.BANNER_AURA.stanceGlow(E, W.t()) }; };
@@ -5881,7 +5881,7 @@ class BannerBearerTests {
   }
   registerStats() {
     var self = this, api = this.api, run = this.kit.run, G = BannerBearerTests.GROUP, ULT = api.ULT;
-    run(G, "통계: 공격자 기록에는 올리기 전 값, 기수에게 추가 피해와 막은 피해, 넘친 피해는 빼고 합산", function (done) {
+    run(G, "통계: 공격자 기록에는 올리기 전 값, 선봉장에게 추가 피해와 막은 피해, 넘친 피해는 빼고 합산", function (done) {
       var bad = [], W = self.squad([{ id: "al", team: "blue", char: "knight", x: 320, slot: 2 }, { id: "foe", x: 500, slot: 1 }, { id: "low", x: 520, slot: 2 }]), B = W.ent("bn"), al = W.ent("al"), foe = W.ent("foe"), low = W.ent("low");
       self.stance(W);
       api.damage(foe, 100, "al", false, "x");
@@ -5894,14 +5894,14 @@ class BannerBearerTests {
       api.damage(al, 5, "foe", false, "x");
       al.hp = al.maxHp;
       W.step(ULT.bnDur + 50);
-      if (B.dmg !== 15) bad.push("기수 추가 피해 " + B.dmg);
-      if (B.blocked !== 21) bad.push("기수 막은 피해 " + B.blocked);
-      self.verdict(done, bad, "공격자 145 · 기수 피해 +15 · 막은 피해 +21");
+      if (B.dmg !== 15) bad.push("선봉장 추가 피해 " + B.dmg);
+      if (B.blocked !== 21) bad.push("선봉장 막은 피해 " + B.blocked);
+      self.verdict(done, bad, "공격자 145 · 선봉장 피해 +15 · 막은 피해 +21");
     });
   }
   registerLedger() {
     var self = this, api = this.api, run = this.kit.run, G = BannerBearerTests.GROUP, ULT = api.ULT, kit = this.kit;
-    run(G, "합친 통계: 스킬 중에는 쓰지 않고, 8초 지남·기수 사망·경기 종료 때 한 번만 쓰며, 0 이면 안 쓰는가", function (done) {
+    run(G, "합친 통계: 스킬 중에는 쓰지 않고, 8초 지남·선봉장 사망·경기 종료 때 한 번만 쓰며, 0 이면 안 쓰는가", function (done) {
       var bad = [], W = self.squad([{ id: "al", team: "blue", char: "guardian", x: 320, slot: 2 }, { id: "foe", x: 500, slot: 1 }]);
       self.stance(W);
       for (var i = 0; i < 5; i++) { api.damage(W.ent("foe"), 10, "al", false, "x"); api.damage(W.ent("al"), 10, "foe", false, "x"); }
@@ -5921,7 +5921,7 @@ class BannerBearerTests {
       var W4 = self.squad([{ id: "al", team: "blue", char: "guardian", x: 320, slot: 2 }, { id: "foe", x: 500, slot: 1 }]);
       self.stance(W4); api.damage(W4.ent("foe"), 100, "al", false, "x");
       api.BANNER_LEDGER.bearerId = "gone"; W4.frame(5);
-      if (api.BANNER_LEDGER.bearerId || self.creditHits(W4).length) bad.push("나간 기수 값을 버리지 않음");
+      if (api.BANNER_LEDGER.bearerId || self.creditHits(W4).length) bad.push("나간 선봉장 값을 버리지 않음");
       self.verdict(done, bad, "1번씩");
     });
     run(G, "경기 종료: 합친 값이 기록·전송 상태·MVP 에 들어가고, 켜진 판만 도착 기록이 미뤄지며, 오래전에 끝난 판은 바로 쓰는가", function (done) {
@@ -5936,7 +5936,7 @@ class BannerBearerTests {
       api.onEnded();
       cap.updates.length = 0;
       cap.pushes.filter(function (p) { return p.path === "hits/" + me; }).forEach(function (p, i) { api.onHit({ key: "end" + i, val: function () { return p.v; }, ref: { parent: { key: me }, remove: function () {} } }); });
-      if (B.dmg !== 10 || B.blocked !== 20) bad.push("기수 기록 " + B.dmg + "·" + B.blocked);
+      if (B.dmg !== 10 || B.blocked !== 20) bad.push("선봉장 기록 " + B.dmg + "·" + B.blocked);
       if (Math.abs(api.mvpScore(B) - scoreBefore - 30) > 1e-6) bad.push("MVP 점수 차이 " + (api.mvpScore(B) - scoreBefore));
       if (!cap.updates.length) bad.push("상태를 보내지 않음");
       if (cap.sets.some(function (x) { return x.path === "done/" + me; })) bad.push("켜진 판인데 도착 기록을 바로 씀");
@@ -5963,7 +5963,7 @@ class BannerBearerTests {
   }
   registerAssistCardAi() {
     var self = this, api = this.api, run = this.kit.run, G = BannerBearerTests.GROUP, ULT = api.ULT;
-    run(G, "어시스트: 전투태세 중에는 helpedBy 에 기수가 들어가고, 패시브만으로는 안 들어가는가", function (done) {
+    run(G, "어시스트: 전투태세 중에는 helpedBy 에 선봉장이 들어가고, 패시브만으로는 안 들어가는가", function (done) {
       var bad = [], W = self.squad([{ id: "al", team: "blue", char: "guardian", x: 320, slot: 2 }, { id: "foe", x: 340, slot: 1 }]), al = W.ent("al");
       W.step(1500);
       if (al.helpedBy.bn) bad.push("패시브만으로 들어감");
