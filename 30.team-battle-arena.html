@@ -26,7 +26,7 @@
   "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
 } }
 </script>
-<link rel="stylesheet" href="30.team-battle-arena.css?v=20261104b">
+<link rel="stylesheet" href="30.team-battle-arena.css?v=20261104c">
 </head>
 <body>
 <canvas id="cv"></canvas>
@@ -2157,7 +2157,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       else if (done) turn = mySide ? (ready[services.session.myId] ? "준비 완료! 다른 선수를 기다리는 중…" : "선택 완료! 준비가 되면 준비 완료를 눌러 주세요.") : "선수들이 준비하는 중…";
       else if (myTurn) turn = banTurn ? "내 차례예요! 밴할 캐릭터를 골라 주세요." : "내 차례예요! 캐릭터를 골라 주세요.";
       else if (!banTurn && picks[services.session.myId] && services.draft.draftStepIds(d, d.step).indexOf(services.session.myId) >= 0) turn = "선택 완료 — 다른 선수를 기다리는 중…";
-      else turn = services.draftView.draftTeamName(services.draft.stepSide(d.step) === "b" ? "blue" : "red") + " " + Draft.STEPS[d.step].keys.map(function (k) { return k.charAt(1); }).join("·") + "번 선수가 " + doing + " 중…";
+      else turn = services.draftView.draftTeamName(services.draft.stepSide(d.step) === "b" ? "blue" : "red") + " " + Draft.STEPS[d.step].keys.map(function (k) { var seatId = d.seq && d.seq[k], seated = seatId && services.session.players[seatId]; return (seated && seated.nickname) || (d.names && d.names[seatId]) || ""; }).filter(Boolean).join("·") + " 선수가 " + doing + " 중…";
       Dom.setText(Dom.$("dfTurn"), turn);
       Dom.$("dfTurn").className = "dfTurn" + (myTurn ? " mine" : "");
       var charCol = document.querySelector(".dfCharCol");
@@ -2175,15 +2175,16 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         else h = '<span class="dfBan ' + (banStepNow ? "now" : "wait") + '">' + (ban === Draft.NO_BAN ? "밴 없음" : (banStepNow ? "밴 고르는 중…" : "밴 대기")) + "</span>";
         Dom.setHtml(Dom.$(team === "blue" ? "dfBanB" : "dfBanR"), h);
         h = "";
+        var blankFace = '<span class="pface blank"></span>';
         for (var i = 1; i <= 3; i++) {
           var id = d.seq && d.seq[pre + i], p = id && services.session.players[id];
-          if (!p) { h += '<div class="slot empty">' + i + "번 · " + (!id ? "빈 자리" : services.draft.inSeat(d, id) ? Dom.esc((d.names && d.names[id]) || "") + " 연결 끊김 · 기다리는 중" : "나감") + "</div>"; continue; }
+          if (!p) { h += '<div class="slot empty"><span class="dfNick">' + (!id ? "빈 자리" : Dom.esc((d.names && d.names[id]) || "")) + '</span><span class="pk wait">' + (!id ? "" : services.draft.inSeat(d, id) ? "연결 끊김 · 대기 중" : "나감") + "</span>" + blankFace + "</div>"; continue; }
           var c = picks[id], isTurn = waiting.indexOf(id) >= 0, pk, tradable = services.draft.canTradeWith(d, id);
           if (c) pk = '<span class="pk picked"><b>' + services.charTypes.statsOf(c).name + '</b><span class="pface' + (tradable ? " canTrade" : "") + '"' + (tradable ? ' data-trade="' + id + '" title="캐릭터 교환 신청"' : "") +
                       ' style="background-image:url(\'' + services.catalog.faceImgSrc(c) + '\')"></span></span>';
-          else if (isTurn && hover[id] && myTeam === team && services.charTypes.statsOf(hover[id])) pk = '<span class="pk think">' + services.charTypes.statsOf(hover[id]).name + " 고민 중…</span>";
-          else pk = '<span class="pk wait">' + (isTurn ? (banTurn ? "밴하는 중…" : "고르는 중…") : "대기") + "</span>";
-          h += '<div class="slot' + (id === services.session.myId ? " mine" : "") + (isTurn ? " turn" : "") + (p.isAI ? " ai" : "") + (done && ready[id] ? " ready" : "") + '">' + i + "번 " +
+          else if (isTurn && hover[id] && myTeam === team && services.charTypes.statsOf(hover[id])) pk = '<span class="pk think">' + services.charTypes.statsOf(hover[id]).name + " 고민 중…</span>" + blankFace;
+          else pk = '<span class="pk wait">' + (isTurn ? (banTurn ? "밴하는 중…" : "고르는 중…") : "대기") + "</span>" + blankFace;
+          h += '<div class="slot' + (id === services.session.myId ? " mine" : "") + (isTurn ? " turn" : "") + (p.isAI ? " ai" : "") + (done && ready[id] ? " ready" : "") + '">' +
                '<span class="dfNick' + (id === services.session.myId ? " myNick" : "") + '">' + (p.isAI ? "🤖 " : "") + Dom.esc(p.nickname) + "</span>" + pk + "</div>";
         }
         return h;

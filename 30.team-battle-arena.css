@@ -204,11 +204,9 @@
     .draftCols { align-items: stretch; min-height: calc(100vh - 78px); }
     .draftLeft { display: flex; flex-direction: column; }
     .dfSlots { display: flex; flex-direction: column; gap: 8px; }
-    .dfTeamCard .dfSlots .slot { height: 84px; margin: 0; font-size: 20px; }
+    .dfTeamCard .dfSlots .slot { margin: 0; }
     .dfMapCard { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 220px; }
     .dfMapCard .dfMapImg { flex: 1 1 0; min-height: 0; height: auto; }
-    .dfSlots .slot .pface { width: 76px; height: 76px; }
-    .dfSlots .slot .pk.picked b { font-size: 20px; }
     .dfCharCol { align-self: flex-start; min-width: 380px; position: sticky; top: 0; max-height: calc(100vh - 78px); overflow-y: auto; scrollbar-width: thin; }
     .dfCharCol .dfCard img { height: 48px; }
     .dfCharCol #dfPickBar .big, .dfCharCol .dfReadyBtn { height: 54px; font-size: 20px; }
@@ -442,7 +440,6 @@
   .slot .pk.think { font-size: 13px; color: #FFB38A; }
   .slot .pk.picked { display: flex; align-items: center; gap: 8px; }
   .pface { flex: none; width: 36px; height: 36px; border-radius: 8px; border: 1px solid rgba(255,255,255,.22); background-color: rgba(0,0,0,.28); background-repeat: no-repeat; background-size: cover; background-position: 50% 50%; }
-  .dfSlots .slot { height: 50px; }
   .dfChars .roleTag { flex-basis: 66px; }
   .dfChars .roleTag i { font-size: 22px; }
   .dfChars .roleTag b { font-size: 13px; }
@@ -547,8 +544,17 @@
   body.mkMatched #lobbyMatchNote { display: block; }
   body.mkMatched #scrLobby .optRows, body.mkMatched #btnMapView, body.mkMatched #btnStart, body.mkMatched #btnSwapTeams, body.mkMatched #scrLobby .join, body.mkMatched #btnSpec,
   body.mkMatched #scrLobby .addAi, body.mkMatched #scrLobby .aiDel, body.mkMatched #btnAgain { display: none !important; }
-  .dfSlots .slot .dfNick { flex: none; padding: 1px 7px; border: 2px solid transparent; border-radius: 6px; }
+  .dfSlots { --slot-h: 60px; --face: 52px; --nick-size: 16px; --label-size: 14px; --line: 20px; --line-gap: 2px; }
+  @media (min-width: 1000px) { .dfSlots { --slot-h: 84px; --face: 76px; --nick-size: 20px; --label-size: 17px; --line: 24px; --line-gap: 5px; } }
+  .dfSlots .slot { display: grid; grid-template-columns: minmax(0, 1fr) var(--face); grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); column-gap: 6px; height: var(--slot-h); padding: 0 calc((var(--slot-h) - var(--face)) / 2) 0 10px; font-size: var(--nick-size); }
+  .dfSlots .slot .pk.picked { display: contents; }
+  .dfSlots .slot .dfNick { grid-column: 1; grid-row: 1; align-self: end; justify-self: start; min-width: 0; max-width: 100%; margin-bottom: calc(var(--line-gap) - 1px); padding: 0 7px; border: 2px solid transparent; border-radius: 6px; line-height: var(--line); overflow: hidden; text-overflow: ellipsis; }
   .dfSlots .slot .dfNick.myNick { border-color: var(--sg-primary); background: rgba(95,168,118,.12); }
+  .dfSlots .slot .pk.picked b, .dfSlots .slot .pk:not(.picked) { grid-column: 1; grid-row: 2; align-self: start; min-width: 0; margin: calc(var(--line-gap) + 3px) 0 0; padding-left: 9px; font-size: var(--label-size); font-weight: 800; line-height: var(--line); text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dfSlots .slot .pk.picked b, .dfSlots .slot .pk.think { color: #F2D06B; }
+  .dfSlots .slot .pk.think { font-size: calc(var(--label-size) - 2px); letter-spacing: -.2px; }
+  .dfSlots .slot .pface { grid-column: 2; grid-row: 1 / 3; align-self: center; box-sizing: border-box; width: var(--face); height: var(--face); }
+  .dfSlots .slot .pface.blank { border: 2px dashed rgba(255,255,255,.22); background-color: rgba(0,0,0,.18); }
   #hudTimer.ot { font-size: 22px; color: #FFCF5A; text-shadow: 0 0 12px rgba(255,190,70,.75); animation: otPulse 1.4s ease-in-out infinite; }
   #hudTop.ot { border-color: rgba(255,207,90,.55); box-shadow: 0 6px 18px rgba(0,0,0,.3), 0 0 18px rgba(255,190,70,.28); }
   #hudCount .otHint { color: #FFCF5A; font-size: 12px; }
