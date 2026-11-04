@@ -170,7 +170,6 @@
   .charCard:disabled { opacity: .5; cursor: default; }
   .charCard .soon { position: absolute; top: 8px; right: 8px; font-size: 12px; font-weight: 800; background: var(--sg-ink-faint); color: #fff; border-radius: 4px; padding: 2px 6px; }
   .tankPh { flex: 1 1 auto; display: flex; align-items: center; justify-content: center; font-size: 60px; }
-  .secHint { font-size: 12px; font-weight: 700; color: var(--sg-ink-soft); margin-left: 6px; }
   .startHint { text-align: center; font-size: 15px; font-weight: 700; color: var(--sg-ink-soft); margin-top: 8px; min-height: 20px; }
   .secTitle { font-size: 17px; font-weight: 800; margin-bottom: 10px; }
   .charHead { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
@@ -186,7 +185,6 @@
   #charCardBox.zoomed .charCard { transition: none; }
   .liteMotion #charCardBox.zoomed { animation-name: charZoomFade; }
   .liteMotion #charCardBox.zoomed .cardIn { transition-duration: .22s; }
-  @media (max-width: 640px) { #charCardBox.zoomed .charHead .secHint { display: none; } }
   @keyframes charZoomIn { from { opacity: 0; transform: scale(.97); } to { opacity: 1; transform: none; } }
   @keyframes charZoomFade { from { opacity: 0; } to { opacity: 1; } }
   @media (prefers-reduced-motion: reduce) { #charCardBox.zoomed { animation: none; } #charCardBox.zoomed .cardIn { transition: none; } }

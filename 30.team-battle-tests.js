@@ -3895,7 +3895,7 @@ class ResultCollector {
       fake.put(base + "players/" + me() + "/characterType", HUMAN_CHARS[5]); fake.put(base + "players/ai2", person("AI2", "red", 3, 0, true)); await sleep(10); api.renderLobby();
       if (el("btnStart").disabled) bad.push("AI 끼리 겹치는 건 막으면 안 됨: '" + el("startHint").textContent + "'");
       fake.put(base + "mode", "cup"); fake.put(base + "players/r1/isAI", false); await sleep(10); api.renderLobby();
-      if (el("btnStart").disabled || el("listBlue").innerHTML.indexOf('class="ch"') >= 0 || el("charHint").textContent.indexOf("대회모드에서는") < 0) bad.push("대회모드 표시(캐릭터 이름 숨김·안내) 시작 잠김 " + el("btnStart").disabled);
+      if (el("btnStart").disabled || el("listBlue").innerHTML.indexOf('class="ch"') >= 0) bad.push("대회모드 표시(캐릭터 이름 숨김) 시작 잠김 " + el("btnStart").disabled);
       fake.put(base + "mode", "practice"); fake.put(base + "map", "practice"); await sleep(10); api.renderLobby();
       if (el("btnStart").disabled || el("startHint").textContent.indexOf("연습 봇을 상대로") < 0 || el("listSpec").textContent.indexOf("(0/0)") < 0 || !el("btnSpec").disabled) bad.push("연습모드 표시 '" + el("startHint").textContent + "' " + el("listSpec").textContent);
       fake.put(base + "players/" + me() + "/team", "spec"); await sleep(10); api.renderLobby();
@@ -5339,11 +5339,11 @@ class WraithTests {
       if (self.lost(W2.ent("foe"))) bad.push("바깥 적이 맞음");
       self.verdict(done, bad, "경계 ±" + reach);
     });
-    run(G, "공격 간격이 실제 1.2초이고, 대기 중 두 번째 공격이 나가지 않는가", function (done) {
+    run(G, "공격 간격이 실제 1.5초이고, 대기 중 두 번째 공격이 나가지 않는가", function (done) {
       var bad = [], W = self.duel("practice", 150, y, 300, y), A = W.ent("wr");
       api.fireBasic(A, 0);
       var gap = (A.cdUntil - W.t()) / api.timeScale() / 1000;
-      if (Math.abs(gap - 1.2) > 0.001) bad.push("간격 " + gap);
+      if (Math.abs(gap - 1.5) > 0.001) bad.push("간격 " + gap);
       if (A.cdUntil <= A.windUntil) bad.push("대기보다 간격이 짧음");
       W.step(C.cd + 50);
       var hits = W.log.filter(function (p) { return p.path === "meleeHits" && !p.v.zone && p.v.owner === "wr"; }).length;

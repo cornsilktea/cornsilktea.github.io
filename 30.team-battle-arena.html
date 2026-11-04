@@ -26,7 +26,7 @@
   "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
 } }
 </script>
-<link rel="stylesheet" href="30.team-battle-arena.css?v=20261104g">
+<link rel="stylesheet" href="30.team-battle-arena.css?v=20261104h">
 </head>
 <body>
 <canvas id="cv"></canvas>
@@ -114,7 +114,7 @@
     </div>
   </div>
   <div id="charCardBox" class="card charCol">
-    <div class="secTitle charHead"><span>캐릭터<span id="charHint" class="secHint">선택한 캐릭터를 한 번 더 누르면 자세한 설명이 나와요.</span></span><span class="charBtns"><button id="btnPatchNote" class="mini" type="button">패치노트</button><button id="btnStats" class="mini" type="button">전체 통계</button><button id="btnZoomChars" class="mini" type="button">확대</button><button id="btnFlipAll" class="mini" type="button">모든 카드 뒤집기</button></span></div>
+    <div class="secTitle charHead"><span>캐릭터</span><span class="charBtns"><button id="btnPatchNote" class="mini" type="button">패치노트</button><button id="btnStats" class="mini" type="button">전체 통계</button><button id="btnZoomChars" class="mini" type="button">확대</button><button id="btnFlipAll" class="mini" type="button">모든 카드 뒤집기</button></span></div>
     <div class="chars" id="chars"></div>
   </div>
   </div>
@@ -170,7 +170,7 @@
     <div id="dfTradeBox" class="dfTradeBox" hidden></div>
   </div>
   <div class="card charCol dfCharCol">
-    <div class="secTitle">캐릭터<span class="secHint">한 번 누르면 설명이 나오고, 내 차례일 때 결정 버튼으로 골라요.</span></div>
+    <div class="secTitle">캐릭터</div>
     <div id="dfChars" class="dfChars"></div>
     <div id="dfDetail" class="dfDetail"></div>
     <div id="dfPickBar" class="dfReadyBar" hidden></div>
@@ -1349,7 +1349,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     charsViewOnly() { var services = this.services; return services.screens.now === "start" || services.screens.now === "party" || !!(services.session.room && services.session.room.mode === "cup"); }
     renderStartChars() { var services = this.services;
       Dom.show(Dom.$("charCardBox"), true);
-      Dom.setText(Dom.$("charHint"), services.screens.now === "party" ? "대회모드에서는 게임 시작 후 캐릭터를 골라요. 카드를 누르면 자세한 설명이 나와요." : "카드를 누르면 자세한 설명이 나와요.");
       Dom.setHtmlKeepScroll(Dom.$("chars"), services.cards.cardsHtml({}, true)); services.cards.fitCardHeight(); services.cards.fitCharCol(Dom.$("charCardBox"));
     }
     playersChanged() { var services = this.services;
@@ -1409,7 +1408,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var cup = mode === "cup";
       Dom.show(Dom.$("charCardBox"), cup || !imSpec);
       if (!cup && imSpec) services.cards.setCharZoom(false);
-      Dom.setText(Dom.$("charHint"), cup ? "대회모드에서는 게임 시작 후 캐릭터를 골라요. 카드를 누르면 자세한 설명이 나와요." : "선택한 캐릭터를 한 번 더 누르면 자세한 설명이 나와요.");
       Dom.show(Dom.$("btnSwapTeams"), services.session.isHost() && services.session.room.status === "lobby");
 
       Dom.setHtmlKeepScroll(Dom.$("chars"), services.cards.cardsHtml(me, cup)); services.cards.fitCardHeight(); services.cards.fitCharCol(Dom.$("charCardBox"));
@@ -3521,7 +3519,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       hkWind: GameTime.gameMs(0.25), hkRange: 650, hkSpeed: GameTime.gameSpeed(1000), hkPr: 8, hkDmg: 45, hkAfterStunMs: GameTime.gameMs(0.5), hkPullSpeed: GameTime.gameSpeed(800),
       hkPassiveGauge: 1, hkBreakDist: 40, hkBotMinPull: 80
     };
-    static STATS = { name: "사슬 망령", role: "fighter", icon: "⛓️", hp: 400, speed: GameTime.gameSpeed(150), cd: GameTime.gameMs(1.2), dmg: 28, range: 300, width: 100, windup: GameTime.gameMs(0.25), ultName: "사슬 갈고리", ultAim: true };
+    static STATS = { name: "사슬 망령", role: "fighter", icon: "⛓️", hp: 400, speed: GameTime.gameSpeed(150), cd: GameTime.gameMs(1.5), dmg: 28, range: 300, width: 100, windup: GameTime.gameMs(0.25), ultName: "사슬 갈고리", ultAim: true };
     static CHOP_FROM_SEC = 0.3;
     static CHOP_IMPACT_SEC = 0.62;
     static STAB_PEAK_SEC = 0.48;
