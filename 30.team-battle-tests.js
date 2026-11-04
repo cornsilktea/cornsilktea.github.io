@@ -5762,12 +5762,13 @@ class BannerBearerTests {
       if (self.lost(al) !== 100) bad.push("쓰러진 뒤 피해 감소 " + self.lost(al));
       self.verdict(done, bad, "8초·사망·기절·게이지");
     });
-    run(G, "전투태세 그림: 깃발·오라·바닥 테두리가 스킬 중에만 보이고 쓰러지면 사라지는가", function (done) {
+    run(G, "전투태세 그림: 깃발·파도 오라가 스킬 중에만 보이고 쓰러지면 사라지며, 바닥 테두리는 없는가", function (done) {
       var bad = [], W = self.squad([]), B = W.ent("bn"), v = api.FIGHTER_VIEW.makeVis(B, new api.THREE.Group()), rig = v.bannerRig;
       rig.update(B, W.t(), 0);
-      if (rig.aura.visible || rig.stanceEdge.visible) bad.push("켜기 전에 보임");
+      if (rig.aura.visible) bad.push("켜기 전에 보임");
+      if (rig.stanceEdge) bad.push("하늘색 테두리가 남음");
       self.stance(W); rig.update(B, W.t(), 0);
-      if (!rig.aura.visible || !rig.stanceEdge.visible) bad.push("켜졌는데 안 보임");
+      if (!rig.aura.visible) bad.push("켜졌는데 안 보임");
       if (rig.flag && !rig.flag.visible) bad.push("깃발 안 보임");
       if (rig.aura.parent !== v.root) bad.push("오라가 몸과 함께 숨지 않음");
       B.alive = false; rig.update(B, W.t(), 0);
@@ -5775,6 +5776,48 @@ class BannerBearerTests {
       B.alive = true; W.step(ULT.bnDur + 10); rig.update(B, W.t(), 0);
       if (rig.aura.visible) bad.push("끝났는데 보임");
       self.verdict(done, bad, "스킬 중에만");
+    });
+    run(G, "몸 오라: 반경 안의 모든 아군과 기수에게 나오고, 반경 밖 아군·상대에게는 안 나오며 끝나면 사라지는가", function (done) {
+      var bad = [], W = self.squad([{ id: "al", team: "blue", char: "guardian", x: 300 + ULT.bnR - 5, slot: 2 }, { id: "far", team: "blue", char: "knight", x: 300 + ULT.bnR + 5, slot: 3 }, { id: "foe", x: 340, slot: 1 }]);
+      self.stance(W);
+      var shown = function (id) { var E = W.ent(id), v = api.FIGHTER_VIEW.makeVis(E, new api.THREE.Group()); api.BANNER_AURA.renderFollower(v, E, W.t(), 0); return { v: v, E: E, on: !!v.stanceMark && v.stanceMark.visible, glow: api.BANNER_AURA.stanceGlow(E, W.t()) }; };
+      ["bn", "al"].forEach(function (id) { var s = shown(id); if (!s.on || !s.glow) bad.push(id + " 안 나옴"); });
+      ["far", "foe"].forEach(function (id) { var s = shown(id); if (s.on || s.glow) bad.push(id + " 나옴"); });
+      var al = shown("al"); W.step(ULT.bnDur + 10); api.BANNER_AURA.renderFollower(al.v, al.E, W.t(), 0);
+      if (al.v.stanceMark.visible) bad.push("끝났는데 남음");
+      self.verdict(done, bad, "반경 안 아군 모두");
+    });
+    run(G, "파도 오라: 고리가 중심에서 반경까지 퍼져 나가며 양 끝에서 사라지는가", function (done) {
+      var bad = [], W = self.squad([]), B = W.ent("bn"), v = api.FIGHTER_VIEW.makeVis(B, new api.THREE.Group()), rig = v.bannerRig, P = api.BannerBearerRig.WAVE_PERIOD_MS, wave = rig.waves[0];
+      rig.spreadWaves(P * 10);
+      var small = wave.scale.x, faintStart = wave.material.opacity;
+      rig.spreadWaves(P * 10 + P * 0.5);
+      var middle = wave.scale.x, brightMiddle = wave.material.opacity;
+      rig.spreadWaves(P * 10 + P * 0.999);
+      if (!(small < middle && middle < wave.scale.x)) bad.push("퍼지지 않음 " + small + "·" + middle + "·" + wave.scale.x);
+      if (wave.scale.x > ULT.bnR + 1) bad.push("반경 밖까지 나감");
+      if (!(faintStart < 0.01 && wave.material.opacity < 0.01 && brightMiddle > 0.15)) bad.push("밝기 " + faintStart + "·" + brightMiddle + "·" + wave.material.opacity);
+      self.verdict(done, bad, "반경 " + ULT.bnR + " 까지");
+    });
+    run(G, "깃발: 보는 방향을 천천히 따라가고, 스킬을 처음 켜면 바로 그 방향인가", function (done) {
+      var bad = [], W = self.squad([]), B = W.ent("bn"), v = api.FIGHTER_VIEW.makeVis(B, new api.THREE.Group()), rig = v.bannerRig;
+      self.stance(W); v.yaw = 1; rig.update(B, W.t(), 1000);
+      if (Math.abs(rig.flagYaw - 1) > 1e-6) bad.push("처음 방향 " + rig.flagYaw);
+      v.yaw = 2; rig.update(B, W.t(), 1050);
+      if (!(rig.flagYaw > 1 && rig.flagYaw < 1.5)) bad.push("바로 돌아감 " + rig.flagYaw);
+      for (var ms = 1100; ms < 4000; ms += 50) rig.update(B, W.t(), ms);
+      if (Math.abs(rig.flagYaw - 2) > 0.01) bad.push("따라가지 못함 " + rig.flagYaw);
+      self.verdict(done, bad, "따라감");
+    });
+    run(G, "타격 효과: 땅 갈라짐·돌·먼지 없이 황금빛 하나만 나오고 사라지는가", function (done) {
+      var bad = [], glow = api.makeBannerGlow({ x: 0, y: 0, angle: 0, len: 120, width: 60, createdAt: 0 }), meshes = 0, many = 0;
+      glow.group.traverse(function (o) { if (o.isMesh) meshes++; if (o.isInstancedMesh) many++; });
+      if (meshes !== 1 || many) bad.push("그림 " + meshes + "·" + many);
+      if (glow.mat.color.getHex() !== api.BannerBearerRig.GOLD) bad.push("색");
+      glow.update(0.5);
+      if (glow.mat.opacity !== 0) bad.push("안 사라짐");
+      glow.dispose();
+      self.verdict(done, bad, "빛 1개");
     });
   }
   registerDamage() {

@@ -3581,7 +3581,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
                 rightRecolor: [[2, 7, 1, "#FFF0B0", "#EDB73F"], [2, 4, 1, "#FFF0B0", "#E0A83A"], [1, 6, 1, "#E8B44A", "#A9741F"], [3, 0, 1, "#FFF0B0", "#EDB73F"]],
                 recolor: [[0, 3, 1, "#25386E", "#121C3D"], [1, 0, 1, "#25386E", "#121C3D"], [2, 2, 1, "#25386E", "#121C3D"], [1, 1, 1, "#FFE08A", "#C8892A"], [1, 2, 2, "#E8EDF2", "#8F9AA6"]] };
     static ULT = {
-      bnDur: GameTime.gameMs(8), bnR: 400, bnDef: 0.8, bnAtk: 1.1, bnMarchR: 300, bnMarchSpeed: GameTime.gameSpeed(40), bnBotFoeR: 500, bnRaiseMs: GameTime.gameMs(0.6)
+      bnDur: GameTime.gameMs(8), bnR: 350, bnDef: 0.8, bnAtk: 1.1, bnMarchR: 350, bnMarchSpeed: GameTime.gameSpeed(40), bnBotFoeR: 500, bnRaiseMs: GameTime.gameMs(0.6)
     };
     static STATS = { name: "기수", role: "fighter", icon: "🚩", hp: 400, speed: GameTime.gameSpeed(140), cd: GameTime.gameMs(1.5), dmg: 28, range: 160, width: 90, ultName: "전투태세", blocks: true };
     static BOT_LEASH = 240;
@@ -3601,11 +3601,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       E.skillDur = BannerBearerType.ULT.bnDur;
       E.ultUntil = t + BannerBearerType.ULT.bnRaiseMs;
     }
-    skillGlow(E, t) { return E.alive && E.buffUntil > t ? 0x3A2C00 : 0; }
     playSkillClip(v, E, t) { var services = this.services; services.fighterMotion.playOnce(v, "Ranged_Magic_Raise", BannerBearerType.RAISE_SPEED, t); }
     attackClip(v, E, t) { return ["Melee_2H_Attack_Slice", BannerBearerType.SLAM_SPEED, null, BannerBearerType.SLAM_FROM_SEC]; }
     addMarkers(v, root, body) { v.bannerRig = new BannerBearerRig(this.services, v, root, body); }
-    onStrikeShown(d) { var services = this.services; if (d.len) services.hammerStrikes.add(d, BannerStrikeBurst); }
+    onStrikeShown(d) { var services = this.services; if (d.len) services.hammerStrikes.add(d, BannerStrikeGlow); }
     ultDesc() { var services = this.services;
       var u = BannerBearerType.ULT;
       return services.skilltext.secs(u.bnDur) + "간 반경 " + u.bnR + " 안의 아군은 받는 피해 " + services.skilltext.pctOf(1 - u.bnDef) + "% 감소, 주는 피해 " + services.skilltext.pctOf(u.bnAtk - 1) + "% 증가";
@@ -3622,6 +3621,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   class BannerAura {
     static CHAR_ID = "bearer";
     static RESCAN_MS = 100;
+    static BODY_GLOW = 0x3A2C00;
+    static BODY_RINGS = [[38, 28, 0.3], [46, 58, -0.28]];
     constructor(services) { this.services = services; this.bearerId = null; this.scannedPlayers = null; this.scannedSlice = -1; }
     forget() { this.bearerId = null; this.scannedPlayers = null; }
     isBearerSeat(d) { return !!d && !!d.slot && d.characterType === BannerAura.CHAR_ID && (d.team === "blue" || d.team === "red"); }
@@ -3670,14 +3671,30 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       T.bannerHelpAt = t + services.timescale.regenTickMs;
       services.damage.noteHelp(T, B.id, t);
     }
-    renderFollower(v, E, t) { var services = this.services;
-      var B = this.stanceBearer(t), on = !!B && E.alive && E.team === B.team && this.inStance(E, B);
+    receivesStance(E, t) { var B = this.stanceBearer(t); return !!B && E.alive && E.team === B.team && this.inStance(E, B); }
+    stanceGlow(E, t) { return this.receivesStance(E, t) ? BannerAura.BODY_GLOW : 0; }
+    buildBodyAura(v, E) { var services = this.services, foot = E.hitR / ArenaSize.BODY_R, g = new THREE.Group();
+      var mark = services.arenaView.flatMesh(services.geo.ring, services.models.glowMat("bannerFollower", BannerBearerRig.GOLD, 0.7));
+      mark.position.y = 1.6; mark.scale.setScalar(1.25 * foot); g.add(mark);
+      g.add(new THREE.Mesh(services.geo.aura, services.models.glowMat("bannerBodyColumn", BannerBearerRig.GOLD, 0.2)));
+      var spins = BannerAura.BODY_RINGS.map(function (spec, i) {
+        var ring = new THREE.Mesh(services.geo.stormRing, services.models.glowMat("bannerBodyRing" + i, BannerBearerRig.GOLD_PALE, 0.28));
+        ring.scale.setScalar(spec[0] * foot); ring.position.y = spec[1]; ring.rotation.set(Math.PI / 2 + spec[2], 0, 0);
+        var holder = new THREE.Group(); holder.add(ring); g.add(holder);
+        return holder;
+      });
+      g.userData.spins = spins;
+      v.root.add(g);
+      return g;
+    }
+    renderFollower(v, E, t, nowMs) {
+      var on = this.receivesStance(E, t);
       if (!on && !v.stanceMark) return;
-      if (!v.stanceMark) {
-        v.stanceMark = services.arenaView.flatMesh(services.geo.ring, services.models.glowMat("bannerFollower", BannerBearerRig.GOLD, 0.7));
-        v.stanceMark.position.y = 1.6; v.stanceMark.scale.setScalar(1.25 * E.hitR / ArenaSize.BODY_R); v.root.add(v.stanceMark);
-      }
+      if (!v.stanceMark) v.stanceMark = this.buildBodyAura(v, E);
       v.stanceMark.visible = on;
+      if (!on) return;
+      v.stanceMark.userData.spins[0].rotation.y = nowMs / 700;
+      v.stanceMark.userData.spins[1].rotation.y = -nowMs / 900;
     }
   }
   class BannerCreditLedger {
@@ -8109,18 +8126,19 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     constructor(services, d) { super(services, HammerStrikeBurst.impactLine(d)); }
   }
-  class BannerStrikeBurst extends HammerStrikeBurst {
-    static FLASH_OPACITY = 0.8;
-    static GOLD_FLASH = 0xFFD66B;
-    static GOLD_EMBER = 0xFFE7A8;
-    static DUST_COUNT = 4;
-    static BITS_COUNT = 4;
-    static EMBER_COUNT = 16;
+  class BannerStrikeGlow {
+    static FADE_SEC = 0.28;
+    static OPACITY = 0.85;
     constructor(services, d) {
-      super(services, d);
-      this.flashMat.color.setHex(BannerStrikeBurst.GOLD_FLASH);
-      this.emberMat.color.setHex(BannerStrikeBurst.GOLD_EMBER);
+      this.group = new THREE.Group();
+      this.mat = new THREE.MeshBasicMaterial({ map: ChainSlamBurst.textures().soft, color: BannerBearerRig.GOLD, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+      var strip = services.arenaView.flatMesh(services.geo.strip, this.mat);
+      strip.scale.set(d.len + 30, d.width * 1.1, 1); strip.position.set(-15, 2.4, 0);
+      this.group.add(strip); this.group.position.set(d.x, 0, d.y); this.group.rotation.y = -d.angle;
+      this.update(0);
     }
+    update(sec) { this.mat.opacity = BannerStrikeGlow.OPACITY * MathKit.clamp(1 - sec / BannerStrikeGlow.FADE_SEC, 0, 1); }
+    dispose() { if (this.group.parent) this.group.parent.remove(this.group); this.mat.dispose(); }
   }
   class BannerBearerRig {
     static GOLD = 0xFFD66B;
@@ -8128,9 +8146,26 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     static POLE_COLOR = 0xD9A441;
     static POLE_RADIUS = 0.04;
     static POLE_BOTTOM = -0.7;
-    static POLE_TOP = 3;
-    static CLOTH_SCALE = 0.5;
-    static CLOTH_SPOT = [0.42, 1.04, -0.27];
+    static POLE_TOP = 3.4;
+    static CLOTH_SCALE = 0.6;
+    static CLOTH_SPOT = [-0.5, 1.06, -0.32];
+    static FLAG_FOLLOW_RATE = 5;
+    static FLAG_SWAY = 0.09;
+    static FLAG_SWAY_MS = 190;
+    static WAVE_COUNT = 3;
+    static WAVE_PERIOD_MS = 1800;
+    static WAVE_OPACITY = 0.2;
+    static WAVE_START = 0.06;
+    static WAVE = null;
+    static waveGeo() {
+      if (BannerBearerRig.WAVE) return BannerBearerRig.WAVE;
+      var geo = new THREE.RingGeometry(0.8, 1, 72, 2), radii = geo.attributes.position, colors = [];
+      for (var i = 0; i < radii.count; i++) { var r = Math.hypot(radii.getX(i), radii.getY(i)), bright = 1 - Math.abs(r - 0.9) / 0.1; colors.push(bright, bright, bright); }
+      geo.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+      return BannerBearerRig.WAVE = geo;
+    }
+    static waveMat(services, i) { var mat = services.models.glowMat("bannerWave" + i, BannerBearerRig.GOLD_PALE, BannerBearerRig.WAVE_OPACITY); mat.vertexColors = true; return mat; }
+    static warmSample(services) { return services.arenaView.flatMesh(BannerBearerRig.waveGeo(), BannerBearerRig.waveMat(services, 0)); }
     static RANGE_RING = null;
     static POLE = null;
     static rangeRing() { return BannerBearerRig.RANGE_RING || (BannerBearerRig.RANGE_RING = new THREE.RingGeometry(0.985, 1, 72)); }
@@ -8139,10 +8174,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return BannerBearerRig.POLE || (BannerBearerRig.POLE = new THREE.CylinderGeometry(BannerBearerRig.POLE_RADIUS, BannerBearerRig.POLE_RADIUS, length, 8).translate(0, BannerBearerRig.POLE_BOTTOM + length / 2, 0));
     }
     constructor(services, v, root, body) {
-      this.services = services; this.v = v; this.flag = null; this.hand = null; this.handTurn = new THREE.Quaternion();
+      this.services = services; this.v = v; this.flag = null; this.hand = null; this.handTurn = new THREE.Quaternion(); this.yawTurn = new THREE.Quaternion(); this.yUp = new THREE.Vector3(0, 1, 0); this.flagYaw = v.yaw; this.stanceShown = false; this.lastMs = 0;
       if (v.kit) this.holdFlag(body);
-      this.buildAura(root);
-      this.buildGround(root);
+      this.buildWaves(root);
+      this.buildMarchRange(root);
     }
     holdFlag(body) { var services = this.services, v = this.v, hand = body.getObjectByName("handslotl");
       if (!hand) return;
@@ -8154,23 +8189,16 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       flag.name = "bannerFlag"; flag.visible = false;
       hand.add(flag); this.flag = flag; this.hand = hand;
     }
-    buildAura(root) { var services = this.services;
-      this.aura = new THREE.Group();
-      this.column = new THREE.Mesh(services.geo.aura, services.models.glowMat("bannerAura", BannerBearerRig.GOLD, 0.22)); this.aura.add(this.column);
-      this.rings = [[38, 28, 0.3], [46, 58, -0.28]].map(function (spec, i) {
-        var ring = new THREE.Mesh(services.geo.stormRing, services.models.glowMat("bannerAuraRing" + i, BannerBearerRig.GOLD_PALE, 0.28));
-        ring.scale.setScalar(spec[0]); ring.position.y = spec[1]; ring.rotation.set(Math.PI / 2 + spec[2], 0, 0);
-        var holder = new THREE.Group(); holder.add(ring);
-        return holder;
-      });
-      var aura = this.aura;
-      this.rings.forEach(function (holder) { aura.add(holder); });
+    buildWaves(root) { var services = this.services, count = BannerBearerRig.WAVE_COUNT;
+      this.aura = new THREE.Group(); this.waves = [];
+      for (var i = 0; i < count; i++) {
+        var wave = services.arenaView.flatMesh(BannerBearerRig.waveGeo(), BannerBearerRig.waveMat(services, i));
+        wave.position.y = 1.5 + i * 0.05; this.aura.add(wave); this.waves.push(wave);
+      }
       this.aura.visible = false;
       root.add(this.aura);
     }
-    buildGround(root) { var services = this.services, v = this.v, team = v.team;
-      this.stanceEdge = services.arenaView.flatMesh(BannerBearerRig.rangeRing(), services.models.glowMat("bannerStance-" + team, Palette.C_TEAM[team] || BannerBearerRig.GOLD, 0.6));
-      this.stanceEdge.scale.setScalar(BannerBearerType.ULT.bnR); this.stanceEdge.position.y = 1.5; this.stanceEdge.visible = false; root.add(this.stanceEdge);
+    buildMarchRange(root) { var services = this.services, v = this.v;
       this.marchRange = null;
       if (!v.meRing) return;
       var range = new THREE.Group();
@@ -8179,17 +8207,30 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       range.scale.set(BannerBearerType.ULT.bnMarchR, 1, BannerBearerType.ULT.bnMarchR);
       root.add(range); this.marchRange = range;
     }
-    keepFlagUpright() {
+    followFacing(nowMs) { var v = this.v;
+      if (!this.stanceShown) this.flagYaw = v.yaw;
+      else this.flagYaw += MathKit.angDiff(v.yaw, this.flagYaw) * Math.min(1, Math.max(0, nowMs - this.lastMs) / 1000 * BannerBearerRig.FLAG_FOLLOW_RATE);
+      this.lastMs = nowMs;
+    }
+    placeFlag(nowMs) {
       this.hand.getWorldQuaternion(this.handTurn);
-      this.flag.quaternion.copy(this.handTurn.invert());
+      this.yawTurn.setFromAxisAngle(this.yUp, this.flagYaw + BannerBearerRig.FLAG_SWAY * Math.sin(nowMs / BannerBearerRig.FLAG_SWAY_MS));
+      this.flag.quaternion.copy(this.handTurn.invert()).multiply(this.yawTurn);
+    }
+    spreadWaves(nowMs) { var count = BannerBearerRig.WAVE_COUNT, start = BannerBearerRig.WAVE_START, self = this;
+      this.waves.forEach(function (wave, i) {
+        var k = (nowMs / BannerBearerRig.WAVE_PERIOD_MS + i / count) % 1;
+        wave.scale.setScalar(BannerBearerType.ULT.bnR * (start + (1 - start) * k));
+        wave.material.opacity = BannerBearerRig.WAVE_OPACITY * Math.sin(Math.PI * k);
+      });
     }
     update(E, t, nowMs) { var on = this.services.bannerAura.stanceOn(E, t);
-      if (this.flag) { this.flag.visible = on; if (on) this.keepFlagUpright(); }
-      this.aura.visible = on; this.stanceEdge.visible = on;
+      if (on) this.followFacing(nowMs);
+      this.stanceShown = on;
+      if (this.flag) { this.flag.visible = on; if (on) this.placeFlag(nowMs); }
+      this.aura.visible = on;
       if (this.marchRange) this.marchRange.visible = E.alive;
-      if (!on) return;
-      this.column.scale.set(1.15 + 0.05 * Math.sin(nowMs / 200), 1 + 0.05 * Math.sin(nowMs / 260), 1.15 + 0.05 * Math.sin(nowMs / 200));
-      this.rings[0].rotation.y = nowMs / 700; this.rings[1].rotation.y = -nowMs / 900;
+      if (on) this.spreadWaves(nowMs);
     }
   }
   class HammerStrikeView {
@@ -9591,6 +9632,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (E.flashUntil > Date.now()) return 0x999999;
       var skillGlow = services.charTypes.of(E.char).skillGlow(E, t);
       if (skillGlow) return skillGlow;
+      var stanceGlow = services.bannerAura.stanceGlow(E, t);
+      if (stanceGlow) return stanceGlow;
       if (E.isHammerLeaping(t)) return 0x553000;
       if (E.isRiposting(t)) return 0x9A9A9A;
       if (E.isBladeStorming(t)) return 0x551020;
@@ -9645,7 +9688,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         services.fighterMotion.animate(v, E, t, dt, hurt);
         if (v.chainRig) v.chainRig.update(E, t, dt);
         if (v.bannerRig) v.bannerRig.update(E, t, nowMs);
-        services.bannerAura.renderFollower(v, E, t);
+        services.bannerAura.renderFollower(v, E, t, nowMs);
         v.mats.forEach(function (m) { m.opacity = alpha; });
         var glow = services.frameRenderer.glowOf(E, t);
         v.glowMats.forEach(function (m) { m.emissive.setHex(glow); });
@@ -10835,7 +10878,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         function () { return services.starfallView.make(e); },
         function () { return services.starfallView.make(Object.assign({}, e, { stun: true })); },
         function () { return services.hookView.warmSample(); },
-        function () { return new BannerStrikeBurst(services, { x: P, y: P, angle: 0, len: 120, width: 60, createdAt: 0 }).group; }
+        function () { return new BannerStrikeGlow(services, { x: P, y: P, angle: 0, len: 120, width: 60, createdAt: 0 }).group; },
+        function () { return BannerBearerRig.warmSample(services); }
       ];
       return makers.map(function (make) {
         try {
@@ -11026,7 +11070,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       HUD: services.hud, SOUND: services.sound, BACKEND: services.backend, TIMESCALE: services.timescale, THREE: THREE, CAMERA_RIG: services.cameraRig, ARENA_VIEW: services.arenaView, PROPS: services.props, PROP_THEMES: services.propThemes, camera: services.stage.camera, overlay: Canvases.overlay, QA: services.quality, PIX_MIN: Environment.PIX_MIN, PIX_START: Environment.PIX_START, SCENERY: services.arenaView.scenery,
       setDb: function (fake) { var before = services.backend.db; services.backend.db = fake; return before; },
       setTestLink: function (flag) { var before = services.backend.isTestLink; services.backend.isTestLink = flag; return before; },
-      HOOK_PATH: services.hookPath, HOOK_PULL: services.hookPull, HOOK_VIEW: services.hookView, playersNow: function () { return services.session.players; }, HAMMER_STRIKES: services.hammerStrikes, HammerStrikeBurst: HammerStrikeBurst, BANNER_AURA: services.bannerAura, BANNER_LEDGER: services.bannerLedger, BannerCreditLedger: BannerCreditLedger, BannerStrikeBurst: BannerStrikeBurst, DraggedChain: DraggedChain, WraithChainRig: WraithChainRig, ChainSlamBurst: ChainSlamBurst, FIGHTER_VIEW: services.fighterView, GEO: services.geo, FRAME_RENDERER: services.frameRenderer, stage: services.stage, CHAR_TYPES: services.charTypes, AUTO_AIM: services.autoAim, AUTO_AIM_ERR: AutoAim.AUTO_AIM_ERR, AUTO_AIM_LEAD: AutoAim.AUTO_AIM_LEAD, FullscreenKeeper: FullscreenKeeper, DRAFT_AI: services.draftAi,
+      HOOK_PATH: services.hookPath, HOOK_PULL: services.hookPull, HOOK_VIEW: services.hookView, playersNow: function () { return services.session.players; }, HAMMER_STRIKES: services.hammerStrikes, HammerStrikeBurst: HammerStrikeBurst, BANNER_AURA: services.bannerAura, BANNER_LEDGER: services.bannerLedger, BannerCreditLedger: BannerCreditLedger, makeBannerGlow: function (d) { return new BannerStrikeGlow(services, d); }, BannerStrikeGlow: BannerStrikeGlow, BannerBearerRig: BannerBearerRig, DraggedChain: DraggedChain, WraithChainRig: WraithChainRig, ChainSlamBurst: ChainSlamBurst, FIGHTER_VIEW: services.fighterView, GEO: services.geo, FRAME_RENDERER: services.frameRenderer, stage: services.stage, CHAR_TYPES: services.charTypes, AUTO_AIM: services.autoAim, AUTO_AIM_ERR: AutoAim.AUTO_AIM_ERR, AUTO_AIM_LEAD: AutoAim.AUTO_AIM_LEAD, FullscreenKeeper: FullscreenKeeper, DRAFT_AI: services.draftAi,
       DRAFT: services.draft, DRAFT_VIEW: services.draftView, DRAFT_STEPS: Draft.STEPS, DRAFT_STEP_MS: Draft.STEP_MS, DRAFT_AI_MS: Draft.AI_MS, DRAFT_AI_TRADE_MS: Draft.AI_TRADE_MS, DRAFT_ABSENT_WAIT_MS: Draft.ABSENT_WAIT_MS, NO_BAN: Draft.NO_BAN,
       STATS: services.stats, STATS_PATH: MatchStats.path, STATS_PATCHES: StatsPatches, STATS_PENDING: MatchStats.PENDING, STATS_SETTLE_MS: MatchStats.SETTLE_MS, STATS_HOLD_MAX_MS: MatchStats.HOLD_MAX_MS,
       CLOCK: services.clock, GameClock: GameClock, CLOCK_KEEP: GameClock.KEEP, CLOCK_PINGS: GameClock.PINGS,
