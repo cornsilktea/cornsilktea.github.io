@@ -254,7 +254,8 @@ const CONFIG = {
   LINE_SCORE: n => 10 * n * n,
   PERFECT_CLEAR_BONUS: 200,
   SCORE_PER_THEME: 300,
-  GAMEOVER_DELAY: 2000,
+  GAMEOVER_DELAY: 700,
+  GAMEOVER_DELAY_AFTER_REFILL: 2000,
   BLOCK_SHAPES: [
     [[0,0]],
     [[0,0],[0,1]],
@@ -570,8 +571,9 @@ function place(i, r, c){
   if (n === 0) popText("+" + gained, cx, rect.top + 24, 22);
   renderHud();
 
-  if (G.tray.every(x => !x)) refillTray();
-  if (markDead()) { G.playing = false; setTimeout(gameOver, CONFIG.GAMEOVER_DELAY); }
+  const justRefilled = G.tray.every(x => !x);
+  if (justRefilled) refillTray();
+  if (markDead()) { G.playing = false; setTimeout(gameOver, justRefilled ? CONFIG.GAMEOVER_DELAY_AFTER_REFILL : CONFIG.GAMEOVER_DELAY); }
   return true;
 }
 
@@ -652,7 +654,7 @@ function start(){
   G.playing = true; preloadThemes();
   $("scrStart").classList.remove("on"); $("scrEnd").classList.remove("on");
   applyTheme(); renderBoard(); refillTray(); renderHud();
-  if (markDead()) { G.playing = false; setTimeout(gameOver, CONFIG.GAMEOVER_DELAY); }
+  if (markDead()) { G.playing = false; setTimeout(gameOver, CONFIG.GAMEOVER_DELAY_AFTER_REFILL); }
 }
 function gameOver(){
   G.playing = false; SND.over();
