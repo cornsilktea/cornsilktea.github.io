@@ -41,13 +41,18 @@ ZombieMissionSites.REACH = 2.6;
 class ZombieMissionCatalog {
     static pick(seed, sites) {
         const rng = new ZombieMissionRng(seed);
-        const usable = ZombieMissionCatalog.KINDS.map((kind, index) => index).filter((index) => sites.some((site) => ZombieMissionCatalog.KINDS[index].accepts(site)));
+        const usable = ZombieMissionCatalog.KINDS.map((kind, index) => index);
         const picks = [];
-        while (picks.length < ZombieMissionCatalog.COUNT && usable.length) {
-            const p = usable.splice(rng.int(usable.length), 1)[0];
-            const matching = sites.map((site, index) => index).filter((index) => ZombieMissionCatalog.KINDS[p].accepts(sites[index]));
+        ZombieMissionCatalog.FLOOR_ORDER.forEach((floor) => {
+            const sitesOf = (kindIndex) => sites.map((site, index) => index).filter((index) => sites[index].floor === floor && ZombieMissionCatalog.KINDS[kindIndex].accepts(sites[index]));
+            const onFloor = usable.filter((kindIndex) => sitesOf(kindIndex).length > 0);
+            if (!onFloor.length)
+                return;
+            const p = onFloor[rng.int(onFloor.length)];
+            usable.splice(usable.indexOf(p), 1);
+            const matching = sitesOf(p);
             picks.push({ p, s: matching[rng.int(matching.length)], g: ZombieMissionCatalog.GAMES[rng.int(ZombieMissionCatalog.GAMES.length)] });
-        }
+        });
         return picks;
     }
     static decode(raw, sites) {
@@ -76,7 +81,8 @@ ZombieMissionCatalog.KINDS = [
 ];
 ZombieMissionCatalog.GAMES = ["mash", "center", "ring"];
 ZombieMissionCatalog.GAME_LABELS = { mash: "연타", center: "가운데 맞추기", ring: "줄어드는 원" };
-ZombieMissionCatalog.COUNT = 3;
+ZombieMissionCatalog.FLOOR_ORDER = [1, 0, 1];
+ZombieMissionCatalog.COUNT = ZombieMissionCatalog.FLOOR_ORDER.length;
 ZombieMissionCatalog.SUCCESSES_NEEDED = 2;
 class ZombieMissionProgress {
     static clear(done) {

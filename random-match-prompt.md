@@ -118,6 +118,8 @@
   **미션 탈출(2026-11-03)**: 인간은 판마다 미션 3개를 하나씩 받는다(`ts/31.zombie-missions.ts`: `ZombieMissionCatalog` 10종 중 서로 다른 3개, 장소는 방의 앞쪽 가운데 벽 = 칠판 벽 x0 쪽, 숲 미니게임 연타·가운데 맞추기·줄어드는 원 중 하나를 2번 성공). 방장이 시작할 때 `missions`·`missionDone` 을 방에 쓰고(씨앗은 시작 시각), 인간 누구나 끝내면 `missionDone` 이 트랜잭션으로 +1(모두 같은 진행). 좀비·관전자는 미션 UI 가 없다.
   승패: 3분이 지났을 때 인간이 살아 있고 `missionDone` 이 3이어야 인간 승리, 아니면 좀비 승리(결과에 `missionCleared`). 모두 감염되면 좀비 승리. 위쪽 안내 글씨는 `ZombieTopMessages` 큐로 차례대로 나온다.
   숙주 판정 반경 1.365(=1.05×1.3)와 벽 막힘 검사(`InfectionSight`). 같은 방 최대 2명(`maxRepeat 1`, 90초) — `node tools/zombie-queue-sim.js`(20명 평균 대기 50초, 25명 40초).
+  **지도·미션·Space(2026-11-04 선생님 요청)**: 지도 불빛은 생존자 초록·좀비 빨강·미션 노랑(`ZombieMapLight`). 좀비는 아군 좀비를 항상 보고, 인간 위치는 `ZombieHumanPing` 공유 시간 3초에만 본다. 인간은 공유 시간에만 좀비를 본다. 미션은 시작 15초 뒤(`ZombieMissionController.OPEN_AFTER_MS`)부터 나오고 층 순서는 2층→1층→2층(`ZombieMissionCatalog.FLOOR_ORDER`).
+  랜덤 매칭 방은 `다시하기` 버튼을 CSS 로 숨겨도 Space 가 살아 있어, 미션 연타 중 판이 끝나면 방이 대기로 돌아가고 방장이 또 누르면 새 판이 시작됐다 → `ZombieSpaceKey` 가 매칭 방의 대기실·결과 화면에서 Space 를 무시하고, 일반 방 결과 화면은 1.5초 뒤부터 받는다. 판정은 인간 기기(1.365m)와 좀비 기기(1.0m) 양쪽(`ZombieTouchJudge`).
   주의: 사람이 4명 모일 때까지 시작하지 않으므로 혼자 있는 시험(`tools/match-result-check.js` 의 31번 `winJoined`)은 끝나지 않는다.
   **매칭 화면(2026-11-03)**: 랜덤 매칭으로 방에 들어가면 `#versusCurtain` 막(`ZombieVersusCurtain`, `ts/31.zombie-versus.ts` 의 `ZombieVersusView`)에 사람 칸(닉네임·승률·인간 승률·좀비 승률)·`입장하는 중…`·`🤖 AI` 를 5칸으로 보여 주고 방장은 4.5초 뒤 시작한다.
   일반 방은 방장이 시작을 누르면 방에 `vsAt` 를 쓰고 4.5초 뒤 시작(2명 미만 혼자 하기는 바로), 빈 자리는 `빈 자리`. 막의 자료는 **랜덤 매칭 판만 센 `stats/zombieoutbreak/rm`**(`g·w·hg·hw·zg·zw`)이고, AI 가 섞인 랜덤 매칭 판도 rm 에만 셈(39번과 같은 방식, 누적 칸은 AI 없는 판만).

@@ -93,18 +93,23 @@ class ZombieMissionCatalog {
   ];
   static readonly GAMES: ReadonlyArray<ZombieMissionGame> = ["mash", "center", "ring"];
   static readonly GAME_LABELS: Readonly<Record<ZombieMissionGame, string>> = { mash: "연타", center: "가운데 맞추기", ring: "줄어드는 원" };
-  static readonly COUNT = 3;
+  static readonly FLOOR_ORDER: ReadonlyArray<number> = [1, 0, 1];
+  static readonly COUNT = ZombieMissionCatalog.FLOOR_ORDER.length;
   static readonly SUCCESSES_NEEDED = 2;
 
   static pick(seed: number, sites: readonly ZombieMissionSite[]): ZombieMissionPick[] {
     const rng = new ZombieMissionRng(seed);
-    const usable = ZombieMissionCatalog.KINDS.map((kind, index) => index).filter((index) => sites.some((site) => ZombieMissionCatalog.KINDS[index].accepts(site)));
+    const usable = ZombieMissionCatalog.KINDS.map((kind, index) => index);
     const picks: ZombieMissionPick[] = [];
-    while (picks.length < ZombieMissionCatalog.COUNT && usable.length) {
-      const p = usable.splice(rng.int(usable.length), 1)[0];
-      const matching = sites.map((site, index) => index).filter((index) => ZombieMissionCatalog.KINDS[p].accepts(sites[index]));
+    ZombieMissionCatalog.FLOOR_ORDER.forEach((floor) => {
+      const sitesOf = (kindIndex: number): number[] => sites.map((site, index) => index).filter((index) => sites[index].floor === floor && ZombieMissionCatalog.KINDS[kindIndex].accepts(sites[index]));
+      const onFloor = usable.filter((kindIndex) => sitesOf(kindIndex).length > 0);
+      if (!onFloor.length) return;
+      const p = onFloor[rng.int(onFloor.length)];
+      usable.splice(usable.indexOf(p), 1);
+      const matching = sitesOf(p);
       picks.push({ p, s: matching[rng.int(matching.length)], g: ZombieMissionCatalog.GAMES[rng.int(ZombieMissionCatalog.GAMES.length)] });
-    }
+    });
     return picks;
   }
 
