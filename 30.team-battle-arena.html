@@ -5391,8 +5391,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   class DamageResolver {
     constructor(services) { this.services = services; }
     static ASSIST_MS = 5000;
-    static EMPOWERED_BASIC = "boosted";
-    static isSkillDamage(h) { return !!h.p || (!!h.u && h.u !== DamageResolver.EMPOWERED_BASIC); }
+    static isSkillDamage(h) { return !!h.sc || !!h.u; }
     payKillGaugeOwed(E, t) { var services = this.services;
       if (!E.killGaugeOwed || E.isGaugeLocked(t)) return;
       E.gauge = Math.min(MatchRules.GAUGE_MAX, E.gauge + E.killGaugeOwed);
@@ -5409,7 +5408,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.damage.pushHit(owner, dm, basic, ultKey, false, gaugeGain, true);
       services.match.game.forceNet = true;
     }
-    damage(T, amount, owner, basic, ultKey, fx, gaugeGain, noHurtGauge, ownBonus, passive) { var services = this.services;
+    damage(T, amount, owner, basic, ultKey, fx, gaugeGain, noHurtGauge, ownBonus, skillCredit) { var services = this.services;
       if (T.minion) { services.damage.damageMinion(T, amount, owner, basic, ultKey, gaugeGain); return; }
       if (T.isProtected()) return;
       var t = services.clock.now(), boost = services.bannerAura.dealtBoost(T, amount, owner, ownBonus, t), C = services.charTypes.statsOf(T.char);
@@ -5445,7 +5444,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       }
       var boostedPart = boost ? services.bannerAura.boostedPart(boost, dm) : 0;
       if (boostedPart) services.bannerLedger.add(boost.bearerId, 0, boostedPart);
-      services.damage.pushHit(owner, dm - boostedPart, basic, ultKey, killed, gaugeGain, false, passive);
+      services.damage.pushHit(owner, dm - boostedPart, basic, ultKey, killed, gaugeGain, false, skillCredit);
       if (killed) { T.domainBolt = null; T.curse = 0; T.curseBoom = null; services.status.breakRevelation(T, t); services.damage.reportKill(T, owner, t); T.hurtBy = {}; T.helpedBy = {}; }
       if (T === services.match.me || T.bot) services.match.game.forceNet = true;
     }
@@ -5477,10 +5476,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         if (k.t - at <= DamageResolver.ASSIST_MS && at - k.t < 500) services.damage.creditAssist(id, k.t);
       });
     }
-    pushHit(owner, dmg, basic, ultKey, killed, gaugeGain, onMinion, passive) { var services = this.services;
+    pushHit(owner, dmg, basic, ultKey, killed, gaugeGain, onMinion, skillCredit) { var services = this.services;
       var h = { d: dmg, b: basic ? 1 : 0, t: services.clock.now() };
       if (onMinion) h.mn = 1;
-      if (passive) h.p = 1;
+      if (skillCredit) h.sc = 1;
       if (gaugeGain != null) h.g = gaugeGain;
       if (ultKey) h.u = ultKey;
       if (typeof basic === "number") h.s = basic;
@@ -5584,7 +5583,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       for (var lane = 0; lane < lanes; lane++) {
         var side = (lane - (lanes - 1) / 2) * 2 * laneStep;
         services.projectiles.addProj(v.key + "_" + i + (lanes > 1 ? "_" + lane : ""), { team: v.team, owner: v.ev.o, ownerCharacterType: v.char, x: ox + dx * 20 - dy * side, y: oy + dy * 20 + dx * side,
-          vx: dx * sp, vy: dy * sp, castX: ox, castY: oy, isSkill: v.skill, countsAsSkill: !!v.ev.sk, swingAt: v.ev.t, dmg: sv.dmg, ultKey: sv.ultKey, fx: sv.fx, laneHit: laneHit,
+          vx: dx * sp, vy: dy * sp, castX: ox, castY: oy, isSkill: v.skill, countsAsSkill: !!v.ev.sk, overcharged: !v.skill && !!E && E.isOvercharged(v.ev.t), swingAt: v.ev.t, dmg: sv.dmg, ultKey: sv.ultKey, fx: sv.fx, laneHit: laneHit,
           pr: sv.pr, range: sv.range + (!v.skill && E && E.isOvercharged(v.ev.t) ? StormbowType.ULT.ocRangeBonus : 0), createdAt: v.ev.t + i * v.gap });
       }
       var shooterType = services.charTypes.of(v.char);
@@ -5618,7 +5617,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       fx = ownerType.projectileEffect(d, T, immune, fx);
       var dancer = ownerType.isBladeThrower;
       var ownBonusSum = services.projectiles.damageBonusSum(d, T);
-      services.damage.damage(T, Math.round(d.dmg * (1 + ownBonusSum)), d.owner, ownerType.basicHitMark(d), d.isSkill ? d.ultKey : (d.countsAsSkill ? DamageResolver.EMPOWERED_BASIC : null), fx, undefined, undefined, ownBonusSum ? { base: d.dmg, rate: 1 + ownBonusSum } : null);
+      services.damage.damage(T, Math.round(d.dmg * (1 + ownBonusSum)), d.owner, ownerType.basicHitMark(d), d.isSkill ? d.ultKey : (d.countsAsSkill ? "skill" : null), fx, undefined, undefined, ownBonusSum ? { base: d.dmg, rate: 1 + ownBonusSum } : null, d.overcharged);
       if (dancer) services.bladeSpins.bladeSpin(p, T.x, T.y);
       if (d.ultKey === "execute" && !immune) { services.session.room.ref.child("hits/" + d.owner).push({ d: 0, b: 0, t: services.clock.now(), tp: { x: MathKit.r1(T.x), y: MathKit.r1(T.y) } }); services.fxView.executeFx(T.x, T.y); }
       ownerType.afterProjectileHit(d, T, immune);
@@ -5763,7 +5762,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var dx = T.x - d.x, dy = T.y - d.y;
       if (T.isProtected()) return;
       if (d.slam && !d.dmg) services.status.afflict(T, d.fx, d.owner);
-      else services.damage.damage(T, d.dmg, d.owner, (d.m || !d.u) && d.createdAt + (d.mi || 0) / 1000, d.hammer ? d.createdAt : (d.u || d.m ? "skill" : (d.countsAsSkill ? DamageResolver.EMPOWERED_BASIC : null)), d.fx, d.m ? NecroType.ULT.smGauge : null, !!d.m, d.ownRate ? { base: d.ownBase, rate: d.ownRate } : null);
+      else services.damage.damage(T, d.dmg, d.owner, (d.m || !d.u) && d.createdAt + (d.mi || 0) / 1000, d.hammer ? d.createdAt : (d.u || d.m || d.countsAsSkill ? "skill" : null), d.fx, d.m ? NecroType.ULT.smGauge : null, !!d.m, d.ownRate ? { base: d.ownBase, rate: d.ownRate } : null);
       if (services.session.players[d.owner]) services.charTypes.of(services.session.players[d.owner].characterType).afterStrike(T, d);
       if (d.kb && T.alive) {
         var dd = MathKit.hyp(dx, dy) || 1, kbAt = services.clock.now(), shoveEnd = T.shove ? T.shove.at + GuardianType.ULT.gdKbMs : 0;
@@ -11061,7 +11060,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         return services.cameraRig.renderer.domElement.toDataURL("image/png");
       },
       loadMapData: services.arenaMap.load.bind(services.arenaMap), makeEnt: services.flow.makeEnt.bind(services.flow), resolve: services.physics.resolve.bind(services.physics), stepWorld: services.world.stepWorld.bind(services.world),
-      useUlt: services.attack.useUlt.bind(services.attack), fireBasic: services.attack.fireBasic.bind(services.attack), damage: services.damage.damage.bind(services.damage), empoweredBasic: DamageResolver.EMPOWERED_BASIC, onZap: services.stormFx.onZap.bind(services.stormFx), healCut: services.status.healCut.bind(services.status), healAmount: services.status.healAmount.bind(services.status), respawnIfReady: services.respawn.respawnIfReady.bind(services.respawn), afflict: services.status.afflict.bind(services.status), speedOf: function (E) { return E.speed(); }, stunned: function (E, t) { return E.isStunned(t); },
+      useUlt: services.attack.useUlt.bind(services.attack), fireBasic: services.attack.fireBasic.bind(services.attack), damage: services.damage.damage.bind(services.damage), onZap: services.stormFx.onZap.bind(services.stormFx), healCut: services.status.healCut.bind(services.status), healAmount: services.status.healAmount.bind(services.status), respawnIfReady: services.respawn.respawnIfReady.bind(services.respawn), afflict: services.status.afflict.bind(services.status), speedOf: function (E) { return E.speed(); }, stunned: function (E, t) { return E.isStunned(t); },
       onShot: services.projectiles.onShot.bind(services.projectiles), onMelee: services.melee.onMelee.bind(services.melee), potionFlightMs: services.fieldFx.potionFlightMs.bind(services.fieldFx), meteorHitAt: services.fieldFx.meteorHitAt.bind(services.fieldFx), onEffect: services.fieldFx.onEffect.bind(services.fieldFx), onHit: services.damage.onHit.bind(services.damage),
       multiKillCount: services.killfeed.multiKillCount.bind(services.killfeed), MULTI_KILL_MS: KillFeed.MULTI_KILL_MS, ASSIST_MS: DamageResolver.ASSIST_MS, onKill: services.damage.creditHelpAssists.bind(services.damage),
       hiddenFrom: services.vision.hiddenFrom.bind(services.vision), visibleTo: services.vision.visibleTo.bind(services.vision), storms: function () { return services.field.storms; }, stormCenter: services.stormFx.stormCenter.bind(services.fieldFx), revs: function () { return services.field.revs; }, domains: function () { return services.field.domains; }, graceTarget: services.fieldFx.graceTarget.bind(services.fieldFx),

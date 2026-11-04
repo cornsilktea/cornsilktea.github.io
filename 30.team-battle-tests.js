@@ -4045,9 +4045,9 @@ class ResultCollector {
     if (o.minions[1].hp !== 0 || o.minions[1].atkAt !== 0) bad.push("해골 1 " + JSON.stringify(o.minions[1]));
     done(bad.length ? "fail" : "pass", bad.length ? bad.slice(0, 5).join(" / ") : "위치·체력·게이지·시간 " + api.STATE_TIMES.length + "개·해골 2마리·보호막·통계값 모두 일치");
   });
-  run(STATSG, "스킬 비율: 기본 공격·강화 기본 공격만 빼고 스킬·패시브·추가 피해를 모두 스킬 피해로 세는가", function (done) {
+  run(STATSG, "스킬 비율: 평범한 기본 공격만 빼고 스킬·강화 기본 공격·패시브·추가 피해를 모두 스킬 피해로 세는가", function (done) {
     var y = OPEN_Y.forest, bad = [];
-    var W = world("forest", [{ id: "a", team: "blue", char: "stormbow", x: 300, y: y }, { id: "b", team: "red", char: "giant", x: 500, y: y }]);
+    var W = world("forest", [{ id: "a", team: "blue", char: "stormbow", x: 150, y: y }, { id: "b", team: "red", char: "ranger", x: 350, y: y }]);
     var A = W.ent("a"), T = W.ent("b");
     T.hp = T.maxHp = 100000;
     var seen = function (name, wantDmg, wantSkill, act) {
@@ -4057,12 +4057,21 @@ class ResultCollector {
       if (dmg !== wantDmg || skill !== wantSkill) bad.push(name + " 피해 " + dmg + " 스킬 " + skill + " (기대 " + wantDmg + "/" + wantSkill + ")");
     };
     seen("기본 공격", 10, 0, function () { api.damage(T, 10, "a", true, null, null); });
-    seen("강화 기본 공격", 10, 0, function () { api.damage(T, 10, "a", true, api.empoweredBasic, null); });
+    seen("강화 기본 공격", 10, 10, function () { api.damage(T, 10, "a", true, "skill", null); });
     seen("스킬", 10, 10, function () { api.damage(T, 10, "a", false, "blizzard", null); });
     seen("3중첩 최대 체력 피해", 1010, 1000, function () { api.damage(T, 10, "a", true, null, { maxHpRate: 0.01 }); });
     seen("평상시 튕기는 번개", 10, 10, function () { api.onZap({ pts: [[T.x, T.y]], tgt: ["b"], team: "blue", owner: "a", dmg: 10, over: 0, createdAt: api.now ? api.now() : Date.now() }); });
     seen("선봉장 추가 피해(bd)", 7, 7, function () { W.room.ref.child("hits/a").push({ d: 0, b: 0, t: W.room.startAt + 1000, bd: 7 }); });
-    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "기본 2종은 스킬 0, 스킬·패시브 3종·bd 는 스킬로 셈");
+    var shotDamage = function (buffed) {
+      A.buffUntil = buffed ? W.t() + 5000 : 0; A.zapHits = 0; A.cdUntil = 0; A.stunUntil = 0;
+      var dmg0 = A.dmg || 0, skill0 = A.skillDmg || 0;
+      api.fireBasic(A, 0); W.step(SB.cd + 100);
+      return { dmg: (A.dmg || 0) - dmg0, skill: (A.skillDmg || 0) - skill0 };
+    };
+    var plain = shotDamage(false), over = shotDamage(true);
+    if (!(plain.dmg > 0) || plain.skill !== 0) bad.push("평상시 화살 " + JSON.stringify(plain));
+    if (!(over.dmg > 0) || over.skill !== over.dmg) bad.push("과충전 화살 " + JSON.stringify(over));
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "평범한 기본 공격만 스킬 0, 강화 기본 공격·과충전 화살·스킬·패시브·bd 는 스킬로 셈");
   });
   run(NETG, "상태 문자열: 막 만든 캐릭터는 체력 가득·시간값 0·해골 없음으로, 상태가 없거나 짧으면 출발 자리·위치만으로 풀리는가", function (done) {
     var y = OPEN_Y.forest; api.MATCH.stateByKey = {};
