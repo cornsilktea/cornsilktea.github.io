@@ -355,6 +355,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     hookView;
     bannerAura;
     bannerLedger;
+    tsunamiLanes;
+    marinaStreams;
+    marinaBot;
+    marinaStreamView;
+    tsunamiView;
     respawn;
     attack;
     autoAim;
@@ -2299,13 +2304,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       this.bursts = []; this.pools = []; this.poolHit = {}; this.lunges = []; this.waves = [];
       this.holes = []; this.storms = []; this.revs = []; this.graces = []; this.domains = [];
       this.curses = {}; this.bladeSpins = []; this.turrets = []; this.groves = []; this.shells = []; this.gales = []; this.stars = [];
-      this.hooks = []; this.hookFlights = []; this.slams = []; this.hammerStrikes = [];
+      this.hooks = []; this.hookFlights = []; this.slams = []; this.hammerStrikes = []; this.streams = []; this.tsunamis = [];
     }
     dropOwnedBy(ownerId) { var services = this.services;
       var field = this, owned = function (item) { return (item.e || item.d).owner === ownerId; };
       [["bursts", services.effectView, "dropBurstVis"], ["pools", services.poolView, "dropPoolVis"], ["lunges", services.effectView, "dropLungeVis"], ["holes", services.poolView, "dropHoleVis"],
        ["storms", services.stormView, "dropStormVis"], ["revs", services.revGraceView, "dropRevVis"], ["graces", services.revGraceView, "dropGraceVis"], ["domains", services.domainView, "dropDomainVis"],
-       ["turrets", services.turrets, "dropVis"], ["groves", services.groves, "dropVis"], ["shells", services.turrets, "dropShellVis"], ["gales", services.galeView, "drop"], ["stars", services.starfallView, "drop"], ["hooks", services.hookView, "dropHook"], ["hookFlights", services.hookView, "dropFlight"], ["slams", services.hookView, "dropSlam"], ["hammerStrikes", services.hammerStrikes, "drop"]
+       ["turrets", services.turrets, "dropVis"], ["groves", services.groves, "dropVis"], ["shells", services.turrets, "dropShellVis"], ["gales", services.galeView, "drop"], ["stars", services.starfallView, "drop"], ["hooks", services.hookView, "dropHook"], ["hookFlights", services.hookView, "dropFlight"], ["slams", services.hookView, "dropSlam"], ["hammerStrikes", services.hammerStrikes, "drop"], ["streams", services.marinaStreamView, "drop"], ["tsunamis", services.tsunamiView, "drop"]
       ].forEach(function (row) {
         field[row[0]] = field[row[0]].filter(function (item) {
           if (!owned(item)) return true;
@@ -2328,6 +2333,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       this.hookFlights.forEach(services.hookView.dropFlight.bind(services.hookView));
       this.slams.forEach(services.hookView.dropSlam.bind(services.hookView));
       this.hammerStrikes.forEach(services.hammerStrikes.drop.bind(services.hammerStrikes));
+      this.streams.forEach(services.marinaStreamView.drop.bind(services.marinaStreamView));
+      this.tsunamis.forEach(services.tsunamiView.drop.bind(services.tsunamiView));
     }
     renderLingering(t, nowMs, dt) { var services = this.services;
       this.pools.forEach(function (pl) { services.poolView.renderPool(pl, t, nowMs); });
@@ -2342,6 +2349,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       this.stars.forEach(function (s) { services.starfallView.render(s, t, nowMs); });
       services.hookView.render(t, nowMs);
       services.hammerStrikes.render(t);
+      services.marinaStreamView.render(t, nowMs);
+      services.tsunamiView.render(t, nowMs);
     }
   }
 
@@ -3742,6 +3751,452 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     static MODEL = { file: "Knight" };
     static STATS = { name: "아군 봇", role: "fighter", icon: "💚", hp: 500, speed: 200, cd: 1000, dmg: 0, range: 0, ultName: "없음", practiceBot: true };
   }
+  class MarinaType extends MagicShooterType {
+    static MELEE = { color: 0x2FA8B8, spark: "#2FA8B8" };
+    static MODEL = { file: "Mage", portraitPlant: true, rightBuilt: "trident", rightScale: 1.2, rightTilt: Math.PI / 2, hide: ["Mage_Hat"],
+                recolor: [[1, 0, 1, "#1C7F8C", "#0F4A5C"], [1, 1, 1, "#173A63", "#0B1F3C"], [1, 2, 1, "#38B6C8", "#1B6F86"], [2, 1, 1, "#173A63", "#0B1F3C"], [0, 5, 1, "#38B6C8", "#1B6F86"]] };
+    static ULT = {
+      mrFlyMs: GameTime.gameMs(0.3), mrHeal: 10, mrChainR: 300, mrDmg: 40, mrKb: 150, mrStunMs: GameTime.gameMs(0.5), mrWaveHeal: 20, mrLanes: 5, mrLen: 600,
+      mrBotPushR: 150, mrBotMinFoes: 2, mrBotAllyHp: 0.5, mrCastPoseMs: GameTime.gameMs(0.6)
+    };
+    static STATS = { name: "마리나", role: "caster", icon: "🌊", hp: 115, speed: GameTime.gameSpeed(170), cd: GameTime.gameMs(1.3), dmg: 10, range: 380, noAim: true, ultName: "해일", ultAim: true, heals: true };
+    static WAVE = { travel: GameTime.gameMs(1.5), life: GameTime.gameMs(1.5) + 300 };
+    get showsHealRange() { return true; }
+    get startsSkillTimer() { return false; }
+    get hasSkillClip() { return true; }
+    cannotAttack(E, t) { return !this.services.marinaStreams.firstTarget(E, t); }
+    overrideBasic(E, ang, reach, t) { this.services.marinaStreams.fire(E, t); return true; }
+    botAct(B, target, enemies, t) { return this.services.marinaBot.act(B, target, enemies, t); }
+    botUltRange() { return MarinaType.ULT.mrLen; }
+    aimRange(btn) { return [MarinaType.ULT.mrLen, MarinaType.ULT.mrLen]; }
+    showAimGuide(E, ult, c) { var services = this.services;
+      if (!ult) return false;
+      services.aimGuide.showAimLanes(services.tsunamiLanes.plan(E.x, E.y, E.angle));
+      return true;
+    }
+    playSkillClip(v, E, t) { var services = this.services; services.fighterMotion.playOnce(v, "Ranged_Magic_Summon", services.models.kit.clips.Ranged_Magic_Summon.duration * 1000 / MarinaType.ULT.mrCastPoseMs / services.clock.scale, t); }
+    statDamageText(c) { var services = this.services, heal = services.skilltext.num(MarinaType.ULT.mrHeal); return services.skilltext.num(c.dmg) + "(회복 " + heal + "+" + heal + ")"; }
+    cast(E, ang, reach, t) { var services = this.services, u = MarinaType.ULT;
+      var x = MathKit.r1(E.x), y = MathKit.r1(E.y), angle = TsunamiLanes.exactAngle(ang);
+      E.ultUntil = t + u.mrCastPoseMs;
+      E.pending = null;
+      services.session.room.ref.child("meleeHits").push({ team: E.team, owner: E.id, x: x, y: y, angle: angle, len: u.mrLen, width: u.mrLanes * ArenaSize.TILE, lanes: services.tsunamiLanes.plan(x, y, angle),
+                                        dmg: u.mrDmg, u: 1, heal: u.mrWaveHeal, kb: u.mrKb, kbAlong: 1, fx: { stunMs: u.mrStunMs }, wave: 1, createdAt: t });
+      services.vision.revealBriefly(E.id, t);
+    }
+    ultDesc() { var services = this.services, u = MarinaType.ULT;
+      return "앞으로 폭 " + u.mrLanes + "칸, 길이 " + u.mrLen / ArenaSize.TILE + "칸의 해일을 보내 맞은 적에게 " + u.mrDmg + "의 피해, " + u.mrKb + " 밀어냄, " + services.skilltext.secs(u.mrStunMs) + " 기절, 맞은 아군은 " + u.mrWaveHeal + " 회복. 벽 블록을 만난 칸은 거기서 멈추고 나머지는 계속 진행";
+    }
+    passiveDesc() { var c = this.data, u = MarinaType.ULT;
+      return "조준 없이 반경 " + c.range + " 안에서 체력 비율이 가장 낮은 아군의 체력 " + u.mrHeal + " 회복(반경 안 아군이 모두 가득 차 있으면 가장 가까운 적에게 " + c.dmg + "의 피해). 닿은 뒤 그 대상에서 반경 " + u.mrChainR + " 안에 체력이 깎인 아군이나 적이 있으면 가장 가까운 쪽에 물줄기가 튀어 아군은 " + u.mrHeal + " 회복, 적은 " + c.dmg + "의 피해";
+    }
+    basicDesc() { var c = this.data, u = MarinaType.ULT;
+      return "반경 " + c.range + " 안에서 체력 비율이 가장 낮은 아군 1명의 체력 " + u.mrHeal + " 회복(아군이 모두 가득 차 있으면 가장 가까운 적에게 " + c.dmg + "의 피해)";
+    }
+  }
+  class TsunamiLanes {
+    constructor(services) { this.services = services; }
+    static exactAngle(ang) { return Math.round(ang * 1000) / 1000; }
+    static laneOffset(i) { return (i - (MarinaType.ULT.mrLanes - 1) / 2) * ArenaSize.TILE; }
+    static hits(T, d, front) {
+      var dx = T.x - d.x, dy = T.y - d.y, ca = Math.cos(d.angle), sa = Math.sin(d.angle), along = dx * ca + dy * sa, side = -dx * sa + dy * ca, r = T.hitR;
+      if (along < -r) return false;
+      return d.lanes.some(function (len, i) {
+        return len > 0 && along <= Math.min(front, len) + r && Math.abs(side - TsunamiLanes.laneOffset(i)) <= ArenaSize.TILE / 2 + r;
+      });
+    }
+    blockAt(c, r) { return TileKinds.BLOCK_TILES.indexOf(this.services.arenaView.tileAt(c, r)) >= 0; }
+    walk(sx, sy, dx, dy) {
+      var limit = MarinaType.ULT.mrLen, size = ArenaSize.TILE, c = Math.floor((sx - ArenaSize.MAP_X0) / size), r = Math.floor((sy - ArenaSize.MAP_Y0) / size);
+      if (this.blockAt(c, r)) return 0;
+      var stepC = dx > 0 ? 1 : -1, stepR = dy > 0 ? 1 : -1;
+      var nextC = dx !== 0 ? ((c + (dx > 0 ? 1 : 0)) * size + ArenaSize.MAP_X0 - sx) / dx : Infinity, nextR = dy !== 0 ? ((r + (dy > 0 ? 1 : 0)) * size + ArenaSize.MAP_Y0 - sy) / dy : Infinity;
+      var gapC = dx !== 0 ? size / Math.abs(dx) : Infinity, gapR = dy !== 0 ? size / Math.abs(dy) : Infinity;
+      for (;;) {
+        var dist = Math.min(nextC, nextR);
+        if (dist >= limit) return limit;
+        if (nextC < nextR) { c += stepC; nextC += gapC; } else { r += stepR; nextR += gapR; }
+        if (this.blockAt(c, r)) return Math.floor(dist);
+      }
+    }
+    plan(x, y, ang) { var services = this.services, ca = Math.cos(ang), sa = Math.sin(ang), lens = [];
+      for (var i = 0; i < MarinaType.ULT.mrLanes; i++) {
+        var off = TsunamiLanes.laneOffset(i), sx = x - sa * off, sy = y + ca * off;
+        lens.push(services.physics.losClear(x, y, sx, sy) ? this.walk(sx, sy, ca, sa) : 0);
+      }
+      return lens;
+    }
+  }
+  class MarinaStreamSystem {
+    static LATE_MS = 1500;
+    constructor(services) { this.services = services; }
+    get landMs() { return MarinaType.ULT.mrFlyMs; }
+    get lifeMs() { return MarinaType.ULT.mrFlyMs + GameTime.gameMs(MarinaStreamView.SPLASH_SEC); }
+    unit(id) { var services = this.services;
+      return services.targets.ent(id) || services.minions.allMinions().filter(function (m) { return m.id === id; })[0] || null;
+    }
+    localOwner(id) { var services = this.services;
+      if (id === services.session.myId) return services.match.me;
+      return services.session.isHost() ? services.match.bots[id] || null : null;
+    }
+    lowestAlly(E, t) { var services = this.services, reach = MarinaType.STATS.range, best = null;
+      function rate(A) { return A.hp / A.maxHp; }
+      services.targets.fighters().forEach(function (A) {
+        if (!A || A.team !== E.team || !A.alive || A.isProtected(t) || A.hp >= A.maxHp || MathKit.hyp(A.x - E.x, A.y - E.y) > reach) return;
+        if (!best || rate(A) < rate(best) || (rate(A) === rate(best) && ((best === E && A !== E) || (A !== E && MathKit.hyp(A.x - E.x, A.y - E.y) < MathKit.hyp(best.x - E.x, best.y - E.y))))) best = A;
+      });
+      return best;
+    }
+    nearestFoe(E, t) { var services = this.services, best = null, bestDist = Infinity;
+      services.targets.everyone(t).forEach(function (o) {
+        if (!o || !o.alive || o.team === E.team || o.isProtected(t) || !services.vision.visibleTo(o, E, t)) return;
+        var d = MathKit.hyp(o.x - E.x, o.y - E.y);
+        if (d <= MarinaType.STATS.range && d < bestDist && services.physics.losClear(E.x, E.y, o.x, o.y)) { bestDist = d; best = o; }
+      });
+      return best;
+    }
+    firstTarget(E, t) {
+      var ally = this.lowestAlly(E, t);
+      if (ally) return { unit: ally, kind: "heal" };
+      var foe = this.nearestFoe(E, t);
+      return foe ? { unit: foe, kind: "hit" } : null;
+    }
+    secondTarget(E, first, t) { var services = this.services;
+      var near = services.targets.fighters().filter(function (o) {
+        return o && o.id !== first.id && o.alive && !o.isProtected(t) && services.vision.visibleTo(o, E, t) && MathKit.hyp(o.x - first.x, o.y - first.y) <= MarinaType.ULT.mrChainR;
+      }).sort(function (a, b) { return MathKit.hyp(a.x - first.x, a.y - first.y) - MathKit.hyp(b.x - first.x, b.y - first.y); });
+      for (var i = 0; i < near.length; i++) {
+        if (near[i].team !== E.team) return { unit: near[i], kind: "hit" };
+        if (near[i].hp < near[i].maxHp) return { unit: near[i], kind: "heal" };
+      }
+      return null;
+    }
+    fire(E, t) { var services = this.services, first = this.firstTarget(E, t);
+      if (!first) return;
+      E.atkAt = t;
+      services.vision.revealBriefly(E.id, t);
+      if (services.targets.hear(E)) services.sound.sfx("orb");
+      services.match.game.forceNet = true;
+      if (first.unit !== E) E.angle = Math.atan2(first.unit.y - E.y, first.unit.x - E.x);
+      services.session.room.ref.child("effects").push({ type: "marina", step: 1, team: E.team, owner: E.id, tgt: first.unit.id, kind: first.kind, createdAt: t });
+    }
+    add(e, now) { var services = this.services;
+      if (now - e.createdAt <= MarinaStreamSystem.LATE_MS) services.field.streams.push({ e: e, vis: null, landed: false, fizzled: false });
+    }
+    apply(e, t) { var services = this.services;
+      services.targets.localTargets().forEach(function (T) {
+        if (T.id !== e.tgt || !T.alive || T.isProtected(t)) return;
+        if (e.kind === "heal") {
+          if (T.minion || T.team !== e.team) return;
+          if (T.id === e.owner) services.fieldFx.healSelf(T, MarinaType.ULT.mrHeal, t);
+          else services.fieldFx.healAlly(T, e.owner, MarinaType.ULT.mrHeal, t);
+        } else if (T.team !== e.team) services.damage.damage(T, MarinaType.STATS.dmg, e.owner, true, null, null, 0);
+      });
+    }
+    leap(e, first, t) { var services = this.services, A = this.localOwner(e.owner);
+      if (!A || !A.alive) return;
+      if (!A.isGaugeLocked(t)) A.gauge = Math.min(MatchRules.GAUGE_MAX, A.gauge + services.catalog.gaugeOnHitOf(A.char));
+      services.match.game.forceNet = true;
+      var next = this.secondTarget(A, first, t);
+      if (next) services.session.room.ref.child("effects").push({ type: "marina", step: 2, team: e.team, owner: e.owner, tgt: next.unit.id, from: e.tgt, sx: MathKit.r1(first.x), sy: MathKit.r1(first.y), kind: next.kind, createdAt: t });
+    }
+    land(s, t) { var services = this.services, e = s.e, first = this.unit(e.tgt), reached = !!first && first.alive;
+      s.landed = true;
+      s.fizzled = !reached;
+      if (!reached || services.session.room.status !== "playing") return;
+      this.apply(e, t);
+      if (e.step === 1) this.leap(e, first, t);
+    }
+    step(t) { var system = this, services = this.services;
+      services.field.streams.slice().forEach(function (s) {
+        if (!s.landed && t >= s.e.createdAt + system.landMs) system.land(s, t);
+      });
+      services.field.streams = services.field.streams.filter(function (s) {
+        if (t < s.e.createdAt + system.lifeMs) return true;
+        services.marinaStreamView.drop(s);
+        return false;
+      });
+    }
+  }
+  class MarinaBotMind {
+    constructor(services) { this.services = services; }
+    bestWave(B, enemies, t) { var services = this.services, u = MarinaType.ULT;
+      var seen = enemies.filter(function (o) { return services.vision.visibleTo(o, B, t); }), hurt = services.targets.fighters().filter(function (A) { return A && A !== B && A.alive && A.team === B.team && A.hp < A.maxHp * u.mrBotAllyHp; });
+      var best = null, bestCount = 0;
+      seen.forEach(function (o) {
+        if (MathKit.hyp(o.x - B.x, o.y - B.y) > u.mrLen + o.hitR) return;
+        var angle = TsunamiLanes.exactAngle(Math.atan2(o.y - B.y, o.x - B.x)), d = { x: B.x, y: B.y, angle: angle, lanes: services.tsunamiLanes.plan(B.x, B.y, angle) };
+        function inside(T) { return TsunamiLanes.hits(T, d, u.mrLen); }
+        var caught = seen.filter(inside);
+        if (!caught.length) return;
+        var worth = caught.length >= u.mrBotMinFoes || caught.some(function (T) { return MathKit.hyp(T.x - B.x, T.y - B.y) <= u.mrBotPushR; }) || hurt.some(inside);
+        if (worth && caught.length > bestCount) { bestCount = caught.length; best = angle; }
+      });
+      return best;
+    }
+    act(B, target, enemies, t) { var services = this.services;
+      if (B.gauge >= MatchRules.GAUGE_MAX && (!target || t - B.bot.seenAt > BotThought.BOT_REACT_MS)) {
+        var angle = this.bestWave(B, enemies, t);
+        if (angle !== null) { B.angle = angle; services.attack.useUlt(B, angle); return true; }
+      }
+      if (t >= B.cdUntil && services.marinaStreams.firstTarget(B, t)) services.attack.fireBasic(B, B.angle);
+      return true;
+    }
+  }
+  class TridentProp {
+    static LENGTH = 2.6;
+    static GRIP = 0.55;
+    static SHAFT_COLOR = 0x1F4E8C;
+    static BLADE_COLOR = 0x38B6E8;
+    static JEWEL_COLOR = 0xCDEFFF;
+    static part(group, geo, mat, x, y) { var m = new THREE.Mesh(geo, mat); m.position.set(x, y, 0); group.add(m); return m; }
+    static build() {
+      var g = new THREE.Group(), shaftMat = new THREE.MeshLambertMaterial({ color: TridentProp.SHAFT_COLOR }), bladeMat = new THREE.MeshLambertMaterial({ color: TridentProp.BLADE_COLOR });
+      var top = TridentProp.LENGTH - TridentProp.GRIP, forkR = 0.2, tube = 0.035;
+      TridentProp.part(g, new THREE.CylinderGeometry(0.035, 0.035, TridentProp.LENGTH, 8), shaftMat, 0, TridentProp.LENGTH / 2 - TridentProp.GRIP);
+      var fork = TridentProp.part(g, new THREE.TorusGeometry(forkR, tube, 6, 12, Math.PI), bladeMat, 0, top);
+      fork.rotation.x = 0; fork.rotation.z = Math.PI;
+      fork.position.y = top + forkR - 0.02;
+      var bladeY = top + forkR - 0.02, side = new THREE.ConeGeometry(0.06, 0.38, 6), middle = new THREE.ConeGeometry(0.07, 0.62, 6);
+      TridentProp.part(g, side, bladeMat, -forkR, bladeY + 0.19);
+      TridentProp.part(g, side, bladeMat, forkR, bladeY + 0.19);
+      TridentProp.part(g, middle, bladeMat, 0, top + 0.28);
+      TridentProp.part(g, new THREE.SphereGeometry(0.075, 8, 6), new THREE.MeshLambertMaterial({ color: TridentProp.JEWEL_COLOR }), 0, top - 0.06);
+      return g;
+    }
+  }
+  class MarinaStreamView {
+    static SPLASH_SEC = 0.2;
+    static SEGMENTS = 9;
+    static DROPS = 7;
+    static HAND_Y = 58;
+    static BODY_Y = 42;
+    static WAVE_AMP = 13;
+    static WAVE_COUNT = 3;
+    static ARC = 16;
+    static GLOW_COLOR = 0x35C6D6;
+    static CORE_COLOR = 0xC8F7FF;
+    static HIT_DROP = 0x1E5FC8;
+    static DROP_GEO = null;
+    constructor(services) { this.services = services; this.free = []; this.place = new THREE.Object3D(); this.up = new THREE.Vector3(0, 1, 0); this.dir = new THREE.Vector3(); }
+    static dropGeo() { return MarinaStreamView.DROP_GEO || (MarinaStreamView.DROP_GEO = new THREE.TetrahedronGeometry(1)); }
+    buildVis() { var services = this.services, m = services.models, g = new THREE.Group(), n = MarinaStreamView.SEGMENTS;
+      var vis = { group: g, glow: new THREE.InstancedMesh(services.geo.boltSeg, m.glowMat("mrStreamGlow", MarinaStreamView.GLOW_COLOR, 0.7), n), core: new THREE.InstancedMesh(services.geo.boltSeg, m.basicMat("mrStreamCore", MarinaStreamView.CORE_COLOR, 0.95), n),
+                  head: new THREE.Mesh(services.geo.ball, m.basicMat("mrStreamCore", MarinaStreamView.CORE_COLOR, 0.95)), drops: new THREE.InstancedMesh(MarinaStreamView.dropGeo(), m.basicMat("mrHealDrop", Palette.HEAL_SPARK, 1), MarinaStreamView.DROPS) };
+      [vis.glow, vis.core, vis.drops].forEach(function (mesh) { mesh.frustumCulled = false; g.add(mesh); });
+      g.add(vis.head);
+      return vis;
+    }
+    acquire() { var vis = this.free.pop() || this.buildVis(); this.services.stage.scene.add(vis.group); return vis; }
+    drop(s) { if (!s.vis) return; this.services.stage.scene.remove(s.vis.group); this.free.push(s.vis); s.vis = null; }
+    warmSample() { return this.buildVis().group; }
+    bodySpot(id) { var services = this.services, v = services.fighterView.fighters[id] || services.fighterView.minions[id];
+      if (v) return { x: v.root.position.x, z: v.root.position.z, shown: v.root.visible };
+      var U = services.marinaStreams.unit(id);
+      return U ? { x: U.x, z: U.y, shown: true } : null;
+    }
+    setSeg(mesh, i, ax, ay, az, bx, by, bz, width) {
+      var d = this.dir.set(ax - bx, ay - by, az - bz), len = d.length(), p = this.place;
+      p.position.set(bx, by, bz);
+      if (len > 0.01) { p.quaternion.setFromUnitVectors(this.up, d.normalize()); p.scale.set(width, len, width); } else p.scale.setScalar(0);
+      p.updateMatrix();
+      mesh.setMatrixAt(i, p.matrix);
+    }
+    placeRibbon(vis, from, to, tail, head, nowMs) {
+      var n = MarinaStreamView.SEGMENTS, dx = to.x - from.x, dz = to.z - from.z, dist = Math.hypot(dx, dz) || 1, nx = -dz / dist, nz = dx / dist;
+      function at(u, out) {
+        var wob = MarinaStreamView.WAVE_AMP * Math.sin(u * Math.PI * MarinaStreamView.WAVE_COUNT - nowMs / 70) * Math.sin(u * Math.PI);
+        out.x = from.x + dx * u + nx * wob; out.z = from.z + dz * u + nz * wob;
+        out.y = from.y + (MarinaStreamView.BODY_Y - from.y) * u + MarinaStreamView.ARC * Math.sin(u * Math.PI);
+      }
+      var a = {}, b = {};
+      at(tail, a);
+      for (var i = 0; i < n; i++) {
+        at(tail + (head - tail) * (i + 1) / n, b);
+        this.setSeg(vis.glow, i, a.x, a.y, a.z, b.x, b.y, b.z, 4.5);
+        this.setSeg(vis.core, i, a.x, a.y, a.z, b.x, b.y, b.z, 1.6);
+        a.x = b.x; a.y = b.y; a.z = b.z;
+      }
+      vis.glow.instanceMatrix.needsUpdate = vis.core.instanceMatrix.needsUpdate = true;
+      vis.head.position.set(b.x, b.y, b.z);
+      vis.head.scale.setScalar(head - tail > 0.02 ? 5 : 0);
+    }
+    placeDrops(vis, spot, k) {
+      var p = this.place, n = MarinaStreamView.DROPS;
+      for (var i = 0; i < n; i++) {
+        var a = i / n * Math.PI * 2 + 0.6, far = 38 * k * (0.7 + 0.3 * ((i * 0.618) % 1));
+        p.position.set(spot.x + Math.cos(a) * far, MarinaStreamView.BODY_Y + 54 * k - 62 * k * k, spot.z + Math.sin(a) * far);
+        p.quaternion.identity(); p.scale.setScalar(k >= 1 ? 0 : 3.6 * (1 - k));
+        p.updateMatrix();
+        vis.drops.setMatrixAt(i, p.matrix);
+      }
+      vis.drops.instanceMatrix.needsUpdate = true;
+    }
+    renderOne(s, t, nowMs) { var services = this.services, e = s.e, age = t - e.createdAt, fly = services.marinaStreams.landMs, to = this.bodySpot(e.tgt);
+      if (!to || age < 0 || s.fizzled) { if (s.vis) s.vis.group.visible = false; return; }
+      if (!s.vis) {
+        s.vis = this.acquire();
+        s.vis.drops.material = services.models.basicMat(e.kind === "heal" ? "mrHealDrop" : "mrHitDrop", e.kind === "heal" ? Palette.HEAL_SPARK : MarinaStreamView.HIT_DROP, 1);
+        var src = e.step === 2 ? { x: e.sx, z: e.sy, shown: true } : this.bodySpot(e.owner) || to;
+        s.from = { x: src.x, y: e.step === 2 ? MarinaStreamView.BODY_Y : MarinaStreamView.HAND_Y, z: src.z };
+      }
+      s.vis.group.visible = to.shown;
+      var head = MathKit.clamp(age / fly, 0, 1), after = (age - fly) / GameTime.gameMs(MarinaStreamView.SPLASH_SEC), tail = after > 0 ? Math.min(1, after) : Math.max(0, (head - 0.6) / 0.4) * 0.6;
+      this.placeRibbon(s.vis, s.from, to, tail, head, nowMs);
+      this.placeDrops(s.vis, to, MathKit.clamp(after, 0, 1));
+      s.vis.drops.visible = after >= 0;
+    }
+    render(t, nowMs) { var view = this; this.services.field.streams.forEach(function (s) { view.renderOne(s, t, nowMs); }); }
+  }
+  class TsunamiView {
+    static WALL_HEIGHT = 70;
+    static FADE_END_SEC = 0.25;
+    static FADE_WALL_SEC = 0.3;
+    static WET_SEC = 0.8;
+    static SPRAY_PER_LANE = 8;
+    static SIDES = 6;
+    static WALL_TOP = "#2FA8B8";
+    static WALL_FOOT = "#1B6F86";
+    static WALL_ALPHA = 0.55;
+    static FOAM = "#E9FBFF";
+    static FOAM_ALPHA = 0.9;
+    static WET_COLOR = 0x2FA8B8;
+    static WET_ALPHA = 0.26;
+    static STAIN_LEN = 18;
+    static EDGE_WIDTH = 3;
+    static BACK_PROFILE = [[-36, 0], [-25, 0.46], [-11, 0.86], [2, 1], [9, 0.93], [1, 0.7], [-3, 0.34], [7, 0]];
+    static FOAM_PROFILE = [[-8, 0.94], [2, 1.05], [11, 0.97], [3, 0.78]];
+    static SHARED = null;
+    constructor(services) { this.services = services; this.free = []; this.place = new THREE.Object3D(); }
+    static addBand(pos, col, uv, idx, profile, colorAt, alpha, vRepeat) {
+      var widths = [-0.5, 0, 0.5], base = pos.length / 3;
+      profile.forEach(function (p, i) {
+        var tone = colorAt(p[1]);
+        widths.forEach(function (z, j) {
+          pos.push(p[0] + Math.sin(z * Math.PI * 2) * 3, p[1], z);
+          col.push(tone.r, tone.g, tone.b, alpha);
+          uv.push(j / 2, i / (profile.length - 1) * vRepeat);
+        });
+      });
+      for (var i = 0; i < profile.length - 1; i++) for (var j = 0; j < 2; j++) {
+        var a = base + i * 3 + j, b = a + 1, c = a + 3, d = a + 4;
+        idx.push(a, b, c, b, d, c);
+      }
+    }
+    static wallGeometry() {
+      var pos = [], col = [], uv = [], idx = [], top = new THREE.Color(TsunamiView.WALL_TOP), foot = new THREE.Color(TsunamiView.WALL_FOOT), foam = new THREE.Color(TsunamiView.FOAM);
+      TsunamiView.addBand(pos, col, uv, idx, TsunamiView.BACK_PROFILE, function (h) { return foot.clone().lerp(top, Math.min(1, h)); }, TsunamiView.WALL_ALPHA, 2);
+      TsunamiView.addBand(pos, col, uv, idx, TsunamiView.FOAM_PROFILE, function () { return foam; }, TsunamiView.FOAM_ALPHA, 0);
+      var g = new THREE.BufferGeometry();
+      g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+      g.setAttribute("color", new THREE.Float32BufferAttribute(col, 4));
+      g.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
+      g.setIndex(idx);
+      return g;
+    }
+    static stripeTexture() {
+      var cv = document.createElement("canvas"); cv.width = 32; cv.height = 256;
+      var c = cv.getContext("2d");
+      c.fillStyle = "#FFFFFF"; c.fillRect(0, 0, 32, 256);
+      c.fillStyle = "rgba(190,235,245,0.55)";
+      for (var i = 0; i < 6; i++) c.fillRect(0, 14 + i * 42, 32, 5);
+      var tex = new THREE.CanvasTexture(cv); tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      return tex;
+    }
+    static fadingMaterial(params) {
+      var mat = new THREE.MeshBasicMaterial(params);
+      mat.onBeforeCompile = function (shader) {
+        shader.vertexShader = "attribute float laneAlpha;\nvarying float vLaneAlpha;\n" + shader.vertexShader.replace("#include <begin_vertex>", "#include <begin_vertex>\nvLaneAlpha = laneAlpha;");
+        shader.fragmentShader = "varying float vLaneAlpha;\n" + shader.fragmentShader.replace("#include <dithering_fragment>", "#include <dithering_fragment>\ngl_FragColor.a *= vLaneAlpha;");
+      };
+      mat.customProgramCacheKey = function () { return "tsunami-lane-alpha"; };
+      return mat;
+    }
+    static shared() {
+      if (TsunamiView.SHARED) return TsunamiView.SHARED;
+      var stripes = TsunamiView.stripeTexture(), flat = new THREE.PlaneGeometry(1, 1); flat.rotateX(-Math.PI / 2);
+      TsunamiView.SHARED = { stripes: stripes, flat: flat, wall: TsunamiView.wallGeometry(), spray: new THREE.TetrahedronGeometry(1),
+        wallMat: TsunamiView.fadingMaterial({ map: stripes, vertexColors: true, transparent: true, depthWrite: false, side: THREE.DoubleSide }),
+        wetMat: TsunamiView.fadingMaterial({ color: TsunamiView.WET_COLOR, transparent: true, depthWrite: false }),
+        sprayMat: new THREE.MeshBasicMaterial({ color: new THREE.Color(TsunamiView.FOAM), transparent: true, opacity: 0.9, depthWrite: false }) };
+      return TsunamiView.SHARED;
+    }
+    fadingMesh(geo, mat, count) {
+      var g = geo.clone(), alpha = new THREE.InstancedBufferAttribute(new Float32Array(count).fill(1), 1);
+      g.setAttribute("laneAlpha", alpha);
+      var mesh = new THREE.InstancedMesh(g, mat, count); mesh.frustumCulled = false; mesh.laneAlpha = alpha;
+      return mesh;
+    }
+    buildVis() { var S = TsunamiView.shared(), n = MarinaType.ULT.mrLanes, group = new THREE.Group();
+      var vis = { group: group, wall: this.fadingMesh(S.wall, S.wallMat, n), wet: this.fadingMesh(S.flat, S.wetMat, n * 2), edge: new THREE.InstancedMesh(S.flat, new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false }), n + TsunamiView.SIDES), spray: new THREE.InstancedMesh(S.spray, S.sprayMat, n * TsunamiView.SPRAY_PER_LANE) };
+      [vis.wet, vis.edge, vis.spray, vis.wall].forEach(function (mesh) { mesh.frustumCulled = false; group.add(mesh); });
+      vis.wet.position.y = 1.4; vis.edge.position.y = 2.2; vis.spray.position.y = 0;
+      return vis;
+    }
+    warmSample() { var vis = this.buildVis(); this.setEdges(vis, [600, 600, 300, 600, 600], "blue"); return vis.group; }
+    add(d) { var services = this.services;
+      services.field.tsunamis.push({ d: d, vis: null });
+      if (services.targets.hear(d)) services.sound.sfx("boom");
+    }
+    drop(item) { if (!item.vis) return; this.services.stage.scene.remove(item.vis.group); this.free.push(item.vis); item.vis = null; }
+    lifeMs() { return MarinaType.WAVE.travel + GameTime.gameMs(TsunamiView.WET_SEC) + 100; }
+    step(t) { var view = this, services = this.services, life = this.lifeMs();
+      services.field.tsunamis = services.field.tsunamis.filter(function (item) {
+        if (t < item.d.createdAt + life) return true;
+        view.drop(item);
+        return false;
+      });
+    }
+    setFlat(mesh, i, x, z, sizeX, sizeZ) { var p = this.place;
+      p.position.set(x, 0, z); p.quaternion.identity(); p.scale.set(sizeX, 1, sizeZ); p.updateMatrix();
+      mesh.setMatrixAt(i, p.matrix);
+    }
+    setEdges(vis, lens, team) { var n = lens.length, half = ArenaSize.TILE / 2, w = TsunamiView.EDGE_WIDTH;
+      vis.edge.material.color.set(Palette.C_FX[team] || 0xFFFFFF);
+      for (var i = 0; i < n; i++) this.setFlat(vis.edge, i, lens[i], TsunamiLanes.laneOffset(i), lens[i] > 0 ? w : 0, ArenaSize.TILE);
+      for (var j = 0; j <= n; j++) {
+        var before = j > 0 ? lens[j - 1] : 0, after = j < n ? lens[j] : 0, z = TsunamiLanes.laneOffset(0) - half + j * ArenaSize.TILE;
+        this.setFlat(vis.edge, n + j, (before + after) / 2, z, Math.abs(before - after), w);
+      }
+      vis.edge.instanceMatrix.needsUpdate = true;
+    }
+    acquire(item) { var services = this.services, vis = this.free.pop() || this.buildVis(), d = item.d;
+      vis.group.position.set(d.x, 0, d.y); vis.group.rotation.y = -d.angle;
+      this.setEdges(vis, d.lanes, d.team);
+      services.stage.scene.add(vis.group);
+      return vis;
+    }
+    placeLane(vis, i, len, age, nowMs) { var p = this.place, u = MarinaType.ULT, travel = MarinaType.WAVE.travel, off = TsunamiLanes.laneOffset(i), S = TsunamiView.SPRAY_PER_LANE;
+      var endAge = travel * len / u.mrLen, stopped = len > 0 && len < u.mrLen, fade = GameTime.gameMs(stopped ? TsunamiView.FADE_WALL_SEC : TsunamiView.FADE_END_SEC);
+      var reach = Math.min(len, u.mrLen * age / travel), gone = len > 0 ? MathKit.clamp((age - endAge) / fade, 0, 1) : 1, rise = Math.min(1, 0.55 + age / GameTime.gameMs(0.2)), wetAlpha = len > 0 ? MathKit.clamp(1 - (age - endAge) / GameTime.gameMs(TsunamiView.WET_SEC), 0, 1) : 0;
+      p.position.set(reach, 0, off); p.quaternion.identity();
+      p.scale.set(gone >= 1 ? 0 : 1, gone >= 1 ? 0 : TsunamiView.WALL_HEIGHT * rise * (1 - gone) * (1 + 0.04 * Math.sin(nowMs / 120 + i * 1.7)), ArenaSize.TILE);
+      p.updateMatrix(); vis.wall.setMatrixAt(i, p.matrix); vis.wall.laneAlpha.setX(i, 1 - gone);
+      this.setFlat(vis.wet, i, reach / 2, off, reach, ArenaSize.TILE); vis.wet.laneAlpha.setX(i, wetAlpha * TsunamiView.WET_ALPHA);
+      this.setFlat(vis.wet, i + u.mrLanes, reach + TsunamiView.STAIN_LEN / 2, off, gone >= 1 ? 0 : TsunamiView.STAIN_LEN, ArenaSize.TILE); vis.wet.laneAlpha.setX(i + u.mrLanes, (1 - gone) * TsunamiView.WET_ALPHA * 1.2);
+      var sprayK = stopped && age >= endAge ? (age - endAge) / fade : 1;
+      for (var j = 0; j < S; j++) {
+        var seed = (i * S + j) * 0.618 % 1, lean = (j / (S - 1) - 0.5) * ArenaSize.TILE * 0.9;
+        p.position.set(len - 3 - sprayK * 26 * seed, 16 + sprayK * (70 + 48 * seed) - sprayK * sprayK * 62, off + lean);
+        p.quaternion.identity(); p.scale.setScalar(sprayK >= 1 ? 0 : 5 * (1 - sprayK * 0.6));
+        p.updateMatrix(); vis.spray.setMatrixAt(i * S + j, p.matrix);
+      }
+    }
+    render(t, nowMs) { var view = this, services = this.services, list = services.field.tsunamis;
+      if (!list.length) return;
+      TsunamiView.shared().stripes.offset.y = -nowMs / 900;
+      list.forEach(function (item) {
+        var age = t - item.d.createdAt;
+        if (age < 0) return;
+        if (!item.vis) item.vis = view.acquire(item);
+        var vis = item.vis, u = MarinaType.ULT, stop = MathKit.clamp((age - MarinaType.WAVE.travel) / GameTime.gameMs(TsunamiView.WET_SEC), 0, 1);
+        item.d.lanes.forEach(function (len, i) { view.placeLane(vis, i, len, age, nowMs); });
+        vis.edge.material.opacity = 0.85 * (1 - stop);
+        [vis.wall, vis.wet, vis.spray].forEach(function (mesh) { mesh.instanceMatrix.needsUpdate = true; });
+        vis.wall.laneAlpha.needsUpdate = vis.wet.laneAlpha.needsUpdate = true;
+      });
+    }
+  }
   class CharacterRegistry {
     constructor(services) { this.services = services;
       this.fallback = new CharacterType(services, "");
@@ -3770,6 +4225,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         giant: new GiantType(services, "giant"),
         wraith: new WraithType(services, "wraith"),
         bearer: new BannerBearerType(services, "bearer"),
+        marina: new MarinaType(services, "marina"),
         gargantua: new GargantuaType(services, "gargantua"),
         astrologer: new AstrologerType(services, "astrologer"),
         dummy: new DummyType(services, "dummy"),
@@ -4719,13 +5175,17 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     handle(e, now) { var services = this.services; services.hookView.addHook(e, now); }
   }
 
+  class MarinaStreamEffect extends EffectHandler {
+    handle(e, now) { this.services.marinaStreams.add(e, now); }
+  }
+
   class EffectIntake {
     constructor(services) {
       this.handlers = new Map([
         ["turret", new TurretEffect(services)], ["grove", new GroveEffect(services)], ["gale", new GaleEffect(services)], ["star", new StarEffect(services)],
         ["pool", new PoolEffect(services)], ["hole", new HoleEffect(services)], ["storm", new StormEffect(services)], ["rev", new RevEffect(services)],
         ["domain", new DomainEffect(services)], ["grace", new GraceEffect(services)], ["strike", new StrikeEffect(services)], ["zap", new ZapEffect(services)],
-        ["tshot", new TurretShotEffect(services)], ["curse", new CurseEffect(services)], ["revCut", new RevCutEffect(services)], ["burst", new BurstEffect(services)], ["hook", new HookEffect(services)]
+        ["tshot", new TurretShotEffect(services)], ["curse", new CurseEffect(services)], ["revCut", new RevCutEffect(services)], ["burst", new BurstEffect(services)], ["hook", new HookEffect(services)], ["marina", new MarinaStreamEffect(services)]
       ]);
     }
     take(e, now) {
@@ -4851,11 +5311,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (services.session.room.status !== "playing") return;
       services.targets.localTargets().forEach(function (T) {
         if (T.minion || T.id !== e.tgt || !T.alive || T.team !== e.team || T.isProtected(t)) return;
-        if (T.id === e.owner) services.fieldFx.graceHealSelf(T, e.heal, t);
-        else services.fieldFx.healByCleric(T, e.owner, e.heal, t);
+        if (T.id === e.owner) services.fieldFx.healSelf(T, e.heal, t);
+        else services.fieldFx.healAlly(T, e.owner, e.heal, t);
       });
     }
-    graceHealSelf(E, amount, t) { var services = this.services;
+    healSelf(E, amount, t) { var services = this.services;
       var healed = services.status.healAmount(E, amount, t);
       if (healed <= 0) return;
       E.hp += healed;
@@ -4863,7 +5323,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.match.game.forceNet = true;
       if (E === services.match.me) services.sound.sfx("heal");
     }
-    healByCleric(T, owner, amount, t) { var services = this.services;
+    healAlly(T, owner, amount, t) { var services = this.services;
       var healed = services.status.healAmount(T, amount, t);
       if (healed <= 0) return;
       T.hp += healed;
@@ -4883,7 +5343,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
           if (T.minion || T.id === e.owner || r.ticked[T.id] >= tick) return;
           r.ticked[T.id] = tick;
           if (!T.alive || T.isProtected(t)) return;
-          if (T.team === e.team) services.fieldFx.healByCleric(T, e.owner, e.heal, t);
+          if (T.team === e.team) services.fieldFx.healAlly(T, e.owner, e.heal, t);
           else services.damage.damage(T, e.dmg, e.owner, false, "revelation");
         });
         return true;
@@ -5301,7 +5761,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
           if (T.minion || !T.alive || T.team !== e.team || T.id === e.owner || T.isProtected(t) || s.ticked[T.id] >= tick) return;
           if (!services.groves.covers(s, T.x, T.y)) return;
           s.ticked[T.id] = tick;
-          services.fieldFx.healByCleric(T, e.owner, e.heal, t);
+          services.fieldFx.healAlly(T, e.owner, e.heal, t);
         });
         return true;
       });
@@ -5711,7 +6171,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var br = T.hitR;
       return along >= -br && along <= d.len + br && Math.abs(side) <= d.width / 2 + br;
     }
-    inStrike(T, d) { var services = this.services; return d.stab ? !!d.tgt && T.id === d.tgt : d.len ? services.melee.inLine(T, d) : services.melee.inArc(T, d) && services.physics.losClear(d.x, d.y, T.x, T.y); }
+    inStrike(T, d) { var services = this.services; return d.lanes ? TsunamiLanes.hits(T, d, services.melee.waveFront(d, services.clock.now(), MarinaType.WAVE.travel)) : d.stab ? !!d.tgt && T.id === d.tgt : d.len ? services.melee.inLine(T, d) : services.melee.inArc(T, d) && services.physics.losClear(d.x, d.y, T.x, T.y); }
     lineReach(x, y, ang, len) { var services = this.services; return Math.min(len, services.physics.rayObst(x, y, Math.cos(ang), Math.sin(ang), 2) + ArenaSize.BODY_R); }
     onMelee(key, d) { var services = this.services;
       if (!d) return;
@@ -5764,10 +6224,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (d.slam && !d.dmg) services.status.afflict(T, d.fx, d.owner);
       else services.damage.damage(T, d.dmg, d.owner, (d.m || !d.u) && d.createdAt + (d.mi || 0) / 1000, d.hammer ? d.createdAt : (d.u || d.m || d.countsAsSkill ? "skill" : null), d.fx, d.m ? NecroType.ULT.smGauge : null, !!d.m, d.ownRate ? { base: d.ownBase, rate: d.ownRate } : null);
       if (services.session.players[d.owner]) services.charTypes.of(services.session.players[d.owner].characterType).afterStrike(T, d);
-      if (d.kb && T.alive) {
+      if (d.kb && T.alive && !(d.kbAlong && T.minion)) {
         var dd = MathKit.hyp(dx, dy) || 1, kbAt = services.clock.now(), shoveEnd = T.shove ? T.shove.at + GuardianType.ULT.gdKbMs : 0;
         if (!T.minion) { services.status.creditCC(d.owner, Math.max(0, kbAt + GuardianType.ULT.gdKbMs - Math.max(T.stunUntil || 0, shoveEnd, kbAt)), 0, 0); services.damage.noteHurt(T, d.owner, kbAt); }
-        T.shove = { ux: dx / dd, uy: dy / dd, dist: d.kb, at: services.clock.now(), done: 0 };
+        T.shove = { ux: d.kbAlong ? Math.cos(d.angle) : dx / dd, uy: d.kbAlong ? Math.sin(d.angle) : dy / dd, dist: d.kb, at: services.clock.now(), done: 0 };
         services.status.breakBladeStorm(T, kbAt); services.status.breakRevelation(T, kbAt);
       }
     }
@@ -5784,7 +6244,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     meleeStrike(key, d) { var services = this.services;
       var who = services.session.players[d.owner] ? services.session.players[d.owner].characterType : "";
       if (services.charTypes.waveOf(who) && d.len) {
-        services.match.melee[key] = { d: d, at: Date.now() - Math.max(0, services.clock.now() - d.createdAt) / services.clock.scale };
+        if (d.lanes) services.tsunamiView.add(d);
+        else services.match.melee[key] = { d: d, at: Date.now() - Math.max(0, services.clock.now() - d.createdAt) / services.clock.scale };
         services.field.waves.push({ d: d, who: who, sparked: [], struck: [] });
         return;
       }
@@ -7179,8 +7640,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
           var m = services.models.kit.chars[c], spec = services.charTypes.modelOf(c) || ModelKit.MINION_MODEL;
           if (spec.recolor) services.modelStyle.recolorSkin(m, spec.recolor);
           if (spec.wear) services.modelStyle.wearPart(m, services.models.kit.chars[spec.wear.from], spec.wear.part);
-          if (spec.right) {
-            var held = services.models.kit.weapons[spec.right].clone(); held.name = "mainhand"; if (spec.rightRecolor) services.modelStyle.recolorProp(held, spec.rightRecolor); if (spec.rightScale) held.scale.setScalar(spec.rightScale); if (spec.rightTurn) held.rotation.y = spec.rightTurn; if (spec.rightTilt) held.rotation.z = spec.rightTilt;
+          if (spec.right || spec.rightBuilt) {
+            var held = spec.rightBuilt ? TridentProp.build() : services.models.kit.weapons[spec.right].clone(); held.name = "mainhand"; if (spec.rightRecolor) services.modelStyle.recolorProp(held, spec.rightRecolor); if (spec.rightScale) held.scale.setScalar(spec.rightScale); if (spec.rightTurn) held.rotation.y = spec.rightTurn; if (spec.rightTilt) held.rotation.z = spec.rightTilt;
             if (spec.muzzle) { var muzzle = new THREE.Object3D(); muzzle.name = "muzzle"; muzzle.position.fromArray(spec.muzzle); held.add(muzzle); }
             m.getObjectByName("handslotr").add(held);
           }
@@ -7740,7 +8201,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     renderClericRange() { var services = this.services;
       services.fighterView.clericRange.visible = !!(services.match.me && services.match.me.alive && services.charTypes.of(services.match.me.char).showsHealRange);
-      if (services.fighterView.clericRange.visible) services.fighterView.clericRange.position.set(services.match.me.x, 0, services.match.me.y);
+      if (!services.fighterView.clericRange.visible) return;
+      var healReach = services.charTypes.statsOf(services.match.me.char).range;
+      services.fighterView.clericRange.scale.set(healReach, 1, healReach);
+      services.fighterView.clericRange.position.set(services.match.me.x, 0, services.match.me.y);
     }
     renderClericHalo(v, E, t, nowMs) {
       var on = E.alive && E.isRevealing(t), ud = v.halo.userData;
@@ -9149,7 +9613,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   class AimGuide {
     static AIM_Y = 8;
     static AIM_BACK_PAD = 5;
-    constructor(services) { this.services = services; this.group = null; this.strip = null; this.sector = null; this.circle = null; }
+    constructor(services) { this.services = services; this.group = null; this.strip = null; this.sector = null; this.circle = null; this.lanes = []; }
     aimPart(geo) { var services = this.services;
       var back = services.arenaView.flatMesh(geo, services.matlib.aimBackMat), front = services.arenaView.flatMesh(geo, services.matlib.aimMat);
       back.position.y = front.position.y = AimGuide.AIM_Y; back.renderOrder = 8; front.renderOrder = 9;
@@ -9160,6 +9624,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.aimGuide.strip.front.visible = services.aimGuide.strip.back.visible = true;
       services.aimGuide.strip.front.position.x = x0; services.aimGuide.strip.front.scale.set(len, width, 1);
       services.aimGuide.strip.back.position.x = x0 - AimGuide.AIM_BACK_PAD; services.aimGuide.strip.back.scale.set(len + AimGuide.AIM_BACK_PAD * 2, width + AimGuide.AIM_BACK_PAD * 2, 1);
+    }
+    showAimLanes(lens) {
+      this.lanes.forEach(function (part, i) {
+        part.front.visible = part.back.visible = lens[i] > 0;
+        part.front.position.set(0, part.front.position.y, TsunamiLanes.laneOffset(i)); part.back.position.set(0, part.back.position.y, TsunamiLanes.laneOffset(i));
+        part.front.scale.set(lens[i], ArenaSize.TILE - 4, 1); part.back.scale.set(lens[i], ArenaSize.TILE, 1);
+      });
     }
     showAimSector(radius, arc) { var services = this.services;
       services.aimGuide.sector.front.visible = services.aimGuide.sector.back.visible = true;
@@ -9178,7 +9649,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var ult = services.input.aim.btn === "ult", c = services.charTypes.statsOf(services.match.me.char);
       services.aimGuide.group.position.set(services.match.me.x, 0, services.match.me.y); services.aimGuide.group.rotation.y = -services.match.me.angle;
       services.matlib.aimMat.color.set(ult ? 0xFF503C : 0xffffff);
-      [services.aimGuide.strip, services.aimGuide.sector, services.aimGuide.circle].forEach(function (p) { p.front.visible = p.back.visible = false; });
+      [services.aimGuide.strip, services.aimGuide.sector, services.aimGuide.circle].concat(services.aimGuide.lanes).forEach(function (p) { p.front.visible = p.back.visible = false; });
       var aimType = services.charTypes.of(services.match.me.char);
       if (aimType.showAimGuide(services.match.me, ult, c)) {
       } else if (c.stab && !ult) {
@@ -9205,6 +9676,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     build() { var services = this.services;
       services.aimGuide.group = new THREE.Group(); services.aimGuide.group.visible = false; services.stage.scene.add(services.aimGuide.group);
       services.aimGuide.strip = services.aimGuide.aimPart(services.geo.strip); services.aimGuide.sector = services.aimGuide.aimPart(services.models.sectorGeo(100, 1)); services.aimGuide.circle = services.aimGuide.aimPart(services.geo.disc);
+      for (var lane = 0; lane < MarinaType.ULT.mrLanes; lane++) services.aimGuide.lanes.push(services.aimGuide.aimPart(services.geo.strip));
     }
   }
   class FxView {
@@ -9526,7 +9998,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   class TourView {
     static SPOTS = [["warrior", "blue", 330, 585], ["ranger", "blue", 450, 555], ["mage", "blue", 570, 585],
-                    ["knight", "red", 330, 765], ["rogue", "red", 450, 795], ["sniper", "red", 570, 765], ["wraith", "red", 450, 700], ["bearer", "blue", 450, 650]];
+                    ["knight", "red", 330, 765], ["rogue", "red", 450, 795], ["sniper", "red", 570, 765], ["wraith", "red", 450, 700], ["bearer", "blue", 450, 650], ["marina", "blue", 330, 650]];
     static SHOTS = [
       { name: "아레나 전경", orbit: true, center: [450, 0, 675], radius: 1350, height: 850, arc: [1.1, 1.95] },
       { name: "중앙 대치", from: [110, 100, 930], to: [790, 100, 930], lookFrom: [380, 60, 675], lookTo: [520, 60, 675] },
@@ -10888,7 +11360,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         function () { return services.starfallView.make(Object.assign({}, e, { stun: true })); },
         function () { return services.hookView.warmSample(); },
         function () { return new BannerStrikeGlow(services, { x: P, y: P, angle: 0, len: 120, width: 60, createdAt: 0 }).group; },
-        function () { return BannerBearerRig.warmSample(services); }
+        function () { return BannerBearerRig.warmSample(services); },
+        function () { return services.marinaStreamView.warmSample(); },
+        function () { return services.tsunamiView.warmSample(); }
       ];
       return makers.map(function (make) {
         try {
@@ -10988,6 +11462,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.melee.stepWaves(t);
       services.hookView.step(t);
       services.hammerStrikes.step(t);
+      services.marinaStreams.step(t);
+      services.tsunamiView.step(t);
       services.bannerLedger.step(t);
       services.world.pruneLocal(t);
     }
@@ -11079,7 +11555,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       HUD: services.hud, SOUND: services.sound, BACKEND: services.backend, TIMESCALE: services.timescale, THREE: THREE, CAMERA_RIG: services.cameraRig, ARENA_VIEW: services.arenaView, PROPS: services.props, PROP_THEMES: services.propThemes, camera: services.stage.camera, overlay: Canvases.overlay, QA: services.quality, PIX_MIN: Environment.PIX_MIN, PIX_START: Environment.PIX_START, SCENERY: services.arenaView.scenery,
       setDb: function (fake) { var before = services.backend.db; services.backend.db = fake; return before; },
       setTestLink: function (flag) { var before = services.backend.isTestLink; services.backend.isTestLink = flag; return before; },
-      HOOK_PATH: services.hookPath, HOOK_PULL: services.hookPull, HOOK_VIEW: services.hookView, playersNow: function () { return services.session.players; }, HAMMER_STRIKES: services.hammerStrikes, HammerStrikeBurst: HammerStrikeBurst, BANNER_AURA: services.bannerAura, BANNER_LEDGER: services.bannerLedger, BannerCreditLedger: BannerCreditLedger, makeBannerGlow: function (d) { return new BannerStrikeGlow(services, d); }, BannerStrikeGlow: BannerStrikeGlow, BannerBearerRig: BannerBearerRig, DraggedChain: DraggedChain, WraithChainRig: WraithChainRig, ChainSlamBurst: ChainSlamBurst, FIGHTER_VIEW: services.fighterView, GEO: services.geo, FRAME_RENDERER: services.frameRenderer, stage: services.stage, CHAR_TYPES: services.charTypes, AUTO_AIM: services.autoAim, AUTO_AIM_ERR: AutoAim.AUTO_AIM_ERR, AUTO_AIM_LEAD: AutoAim.AUTO_AIM_LEAD, FullscreenKeeper: FullscreenKeeper, DRAFT_AI: services.draftAi,
+      MAP_X0: ArenaSize.MAP_X0, MAP_Y0: ArenaSize.MAP_Y0, TSUNAMI_LANES: services.tsunamiLanes, TsunamiLanes: TsunamiLanes, MARINA_STREAMS: services.marinaStreams, MARINA_BOT: services.marinaBot, TridentProp: TridentProp, HOOK_PATH: services.hookPath, HOOK_PULL: services.hookPull, HOOK_VIEW: services.hookView, playersNow: function () { return services.session.players; }, HAMMER_STRIKES: services.hammerStrikes, HammerStrikeBurst: HammerStrikeBurst, BANNER_AURA: services.bannerAura, BANNER_LEDGER: services.bannerLedger, BannerCreditLedger: BannerCreditLedger, makeBannerGlow: function (d) { return new BannerStrikeGlow(services, d); }, BannerStrikeGlow: BannerStrikeGlow, BannerBearerRig: BannerBearerRig, DraggedChain: DraggedChain, WraithChainRig: WraithChainRig, ChainSlamBurst: ChainSlamBurst, FIGHTER_VIEW: services.fighterView, GEO: services.geo, FRAME_RENDERER: services.frameRenderer, stage: services.stage, CHAR_TYPES: services.charTypes, AUTO_AIM: services.autoAim, AUTO_AIM_ERR: AutoAim.AUTO_AIM_ERR, AUTO_AIM_LEAD: AutoAim.AUTO_AIM_LEAD, FullscreenKeeper: FullscreenKeeper, DRAFT_AI: services.draftAi,
       DRAFT: services.draft, DRAFT_VIEW: services.draftView, DRAFT_STEPS: Draft.STEPS, DRAFT_STEP_MS: Draft.STEP_MS, DRAFT_AI_MS: Draft.AI_MS, DRAFT_AI_TRADE_MS: Draft.AI_TRADE_MS, DRAFT_ABSENT_WAIT_MS: Draft.ABSENT_WAIT_MS, NO_BAN: Draft.NO_BAN,
       STATS: services.stats, STATS_PATH: MatchStats.path, STATS_PATCHES: StatsPatches, STATS_PENDING: MatchStats.PENDING, STATS_SETTLE_MS: MatchStats.SETTLE_MS, STATS_HOLD_MAX_MS: MatchStats.HOLD_MAX_MS,
       CLOCK: services.clock, GameClock: GameClock, CLOCK_KEEP: GameClock.KEEP, CLOCK_PINGS: GameClock.PINGS,
@@ -11414,6 +11890,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.hookView = new HookChainView(services);
       services.hammerStrikes = new HammerStrikeView(services);
       services.bannerAura = new BannerAura(services);
+      services.tsunamiLanes = new TsunamiLanes(services);
+      services.marinaStreams = new MarinaStreamSystem(services);
+      services.marinaBot = new MarinaBotMind(services);
+      services.marinaStreamView = new MarinaStreamView(services);
+      services.tsunamiView = new TsunamiView(services);
       services.bannerLedger = new BannerCreditLedger(services);
       services.respawn = new RespawnSystem(services);
       services.attack = new AttackController(services);

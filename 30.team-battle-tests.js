@@ -3025,7 +3025,7 @@ class ResultCollector {
 
   run(AIMG, "AI 역할: 기사·창술사·대장장이는 앞, 화염술사·주술사·궁수·뇌전사수·저격수는 뒤, 은신자·자객·결투가는 틈새를 노리는 역할인가", function (done) {
     var want = { knight: "front", lancer: "front", blacksmith: "front", guardian: "front", warrior: "front", mage: "back", shaman: "back", ranger: "back", stormbow: "back", sniper: "back", frost: "back", cleric: "back", necro: "back", thrower: "back",
-                 rogue: "flank", hitman: "flank", duelist: "flank", dancer: "back", engineer: "back", druid: "back", giant: "front", astrologer: "back", wraith: "front", bearer: "front" }, bad = [];
+                 rogue: "flank", hitman: "flank", duelist: "flank", dancer: "back", engineer: "back", druid: "back", giant: "front", astrologer: "back", wraith: "front", bearer: "front", marina: "back" }, bad = [];
     Object.keys(want).forEach(function (c) { var got = api.CHAR_TYPES.of(c).botRole; if (got !== want[c]) bad.push(c + " " + got + " (기대 " + want[c] + ")"); });
     api.CHAR_LIST.forEach(function (c) { if (!want[c]) bad.push(c + " 역할이 정해지지 않음"); });
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : Object.keys(want).length + "명 역할이 맞음");
@@ -4793,6 +4793,11 @@ class ResultCollector {
   new WraithTests(api, { world: world, run: run, FRAME: FRAME, withMe: withMe, meEntry: meEntry, moveKeys: function (on) { api.KEY_ON.right = on; api.KEY_ON.d = on; } }).register();
   new DraggedChainTests(api, { run: run }).register();
   new BannerBearerTests(api, { world: world, run: run, recordRef: recordRef }).register();
+  new MarinaTests(api, { world: world, run: run }).register();
+  run(AUTO, "AI 6명 60초 난전 — 던전 맵 + 마리나 고정 (시드 2043)", function (done) {
+    var r = autoMelee("dungeon", 60, 2043, "marina"), kinds = Object.keys(r.issues);
+    done(kinds.length ? "fail" : "pass", kinds.length ? kinds.join(" / ") : "문제 없음");
+  });
   run(AUTO, "AI 6명 60초 난전 — 숲 맵 + 선봉장 고정 (시드 2042)", function (done) {
     var r = autoMelee("forest", 60, 2042, "bearer"), kinds = Object.keys(r.issues);
     done(kinds.length ? "fail" : "pass", kinds.length ? kinds.join(" / ") : "문제 없음");
@@ -6046,6 +6051,555 @@ class BannerBearerTests {
       for (var i = 0; i < 80; i++) W3.frame(50, true);
       if (W3.ent("bn").skillUntil <= 0) bad.push("AI 가 스킬을 안 씀");
       self.verdict(done, bad, "조건 맞음");
+    });
+  }
+}
+class MarinaTests {
+  static GROUP = "마리나";
+  static X = 450;
+  static Y = 400;
+  constructor(api, kit) { this.api = api; this.kit = kit; }
+  scene(map, list) {
+    this.api.MATCH.stateByKey = {};
+    return this.kit.world(map, list.map(function (e, i) { return Object.assign({ team: "red", char: "guardian", slot: (i % 3) + 1 }, e); }));
+  }
+  squad(extra) {
+    return this.scene("practice", [{ id: "mr", team: "blue", char: "marina", x: MarinaTests.X, y: MarinaTests.Y, slot: 1 }].concat(extra || []));
+  }
+  at(dx, dy, more) { return Object.assign({ x: MarinaTests.X + dx, y: MarinaTests.Y + dy }, more); }
+  ally(id, dx, dy, more) { return this.at(dx, dy, Object.assign({ id: id, team: "blue", char: "guardian" }, more)); }
+  foe(id, dx, dy, more) { return this.at(dx, dy, Object.assign({ id: id, team: "red", char: "guardian" }, more)); }
+  hurt(E, rate) { E.hp = E.maxHp * rate; return E; }
+  lost(E) { return E.maxHp - E.hp; }
+  streams(W, step) { return W.log.filter(function (p) { return p.path === "effects" && p.v.type === "marina" && (!step || p.v.step === step); }).map(function (p) { return p.v; }); }
+  waveTime(along) { return along / (this.api.ULT.mrLen + this.api.BODY_R) * this.api.CHAR_TYPES.of("marina").constructor.WAVE.travel; }
+  castDown(W) { var M = W.ent("mr"); M.gauge = this.api.GAUGE_MAX; this.api.useUlt(M, Math.PI / 2); return M; }
+  castRight(W) { var M = W.ent("mr"); M.gauge = this.api.GAUGE_MAX; this.api.useUlt(M, 0); return M; }
+  finishWave(W) { W.step(this.api.CHAR_TYPES.of("marina").constructor.WAVE.travel + 100); }
+  minionsOf(W, necroId, spots) { var api = this.api, N = W.ent(necroId);
+    N.gauge = api.GAUGE_MAX; api.useUlt(N, Math.PI / 2);
+    W.step(api.ULT.smRiseMs + 100);
+    N.minions.forEach(function (m, i) { var s = spots[Math.min(i, spots.length - 1)]; m.x = s[0]; m.y = s[1]; m.cdUntil = Infinity; });
+    return N.minions;
+  }
+  verdict(done, bad, okText) { done(bad.length ? "fail" : "pass", bad.length ? bad.slice(0, 6).join(" / ") : okText); }
+  tileIsBlock(x, y) { return this.api.TSUNAMI_LANES.blockAt(Math.floor((x - this.api.MAP_X0) / this.api.TILE), Math.floor((y - this.api.MAP_Y0) / this.api.TILE)); }
+  matchesSamples(sx, sy, ca, sa, len) { var max = this.api.ULT.mrLen;
+    for (var d = 0; d < len; d += 2) if (this.tileIsBlock(sx + ca * d, sy + sa * d)) return "더 앞에 벽 " + d;
+    if (len >= max) return "";
+    for (var near = len; near <= len + 1.01; near += 0.002) if (this.tileIsBlock(sx + ca * near, sy + sa * near)) return "";
+    return "멈춘 자리에 벽이 없음";
+  }
+  spotWhere(map, test) { var api = this.api;
+    api.loadMapData(map);
+    var rows = api.mapRows();
+    for (var r = 1; r < rows.length - 1; r++) for (var c = 1; c < rows[r].length - 1; c++) {
+      var x = api.tileX(c), y = api.tileY(r);
+      if ("#xo~".indexOf(rows[r].charAt(c)) >= 0) continue;
+      var angles = [0, Math.PI / 2, Math.PI, -Math.PI / 2];
+      for (var a = 0; a < angles.length; a++) {
+        var angle = api.TsunamiLanes.exactAngle(angles[a]), lens = api.TSUNAMI_LANES.plan(x, y, angle);
+        if (test(lens, x, y, angle)) return { x: x, y: y, angle: angle, lens: lens, map: map };
+      }
+    }
+    return null;
+  }
+  register() {
+    this.registerFirstStream();
+    this.registerSecondStream();
+    this.registerGaugeHeal();
+    this.registerLanes();
+    this.registerWave();
+    this.registerWaveAllies();
+    this.registerCardBot();
+    this.registerNetwork();
+  }
+  registerFirstStream() {
+    var self = this, api = this.api, run = this.kit.run, G = MarinaTests.GROUP, ULT = api.ULT, C = api.CHARS.marina, S = api.MARINA_STREAMS;
+    run(G, "첫 줄기: 사거리 " + C.range + " 안에서 체력이 깎인 아군(자신 포함) 중 비율이 가장 낮은 사람을 고르고, 같으면 다른 아군·가까운 쪽 순인가", function (done) {
+      var bad = [], W = self.squad([self.ally("a", 100, 0), self.ally("b", 200, 0), self.ally("far", C.range + 20, 0, { char: "knight" }), self.foe("foe", 50, 50)]), M = W.ent("mr"), t = W.t();
+      if (S.firstTarget(M, t).kind !== "hit") bad.push("모두 가득인데 적이 아님");
+      self.hurt(W.ent("far"), 0.1); self.hurt(W.ent("a"), 0.6); self.hurt(M, 0.5);
+      var pick = S.firstTarget(M, t);
+      if (pick.unit !== M || pick.kind !== "heal") bad.push("가장 낮은 자신을 못 고름");
+      self.hurt(W.ent("a"), 0.5);
+      if (S.firstTarget(M, t).unit !== W.ent("a")) bad.push("비율이 같으면 다른 아군 먼저");
+      self.hurt(W.ent("b"), 0.5);
+      if (S.firstTarget(M, t).unit !== W.ent("a")) bad.push("같으면 가까운 아군");
+      self.verdict(done, bad, "낮은 비율 → 다른 아군 → 가까운 쪽, 사거리 밖 제외");
+    });
+    run(G, "첫 줄기: 아군이 모두 100% 이면 가장 가까운 적을 고르고, 보이지 않는 적·보호 중·벽 뒤는 건너뛰고 해골 병사만 있어도 나가는가", function (done) {
+      var bad = [], W = self.squad([self.ally("a", 100, 0), self.foe("near", 200, 0), self.foe("mid", 250, 0), self.foe("far", C.range + 30, 0)]), M = W.ent("mr"), t = W.t();
+      if (S.firstTarget(M, t).unit !== W.ent("near")) bad.push("가까운 적이 아님");
+      W.ent("near").protectUntil = t + 1000;
+      if (S.firstTarget(M, t).unit !== W.ent("mid")) bad.push("보호 중을 건너뛰지 않음");
+      W.ent("mid").stealthUntil = t + 1000;
+      if (S.firstTarget(M, t)) bad.push("은신한 적·사거리 밖을 고름");
+      var spot = self.spotWhere("forest", function (lens, x, y, ang) {
+        if (ang !== api.TsunamiLanes.exactAngle(Math.PI / 2)) return false;
+        return self.tileIsBlock(x, y + api.TILE) && !self.tileIsBlock(x, y + api.TILE * 2) && !api.losClear(x, y, x, y + api.TILE * 2);
+      });
+      if (!spot) bad.push("벽 자리를 못 찾음");
+      else {
+        var W2 = self.scene("forest", [{ id: "mr", team: "blue", char: "marina", x: spot.x, y: spot.y, slot: 1 }, { id: "behind", x: spot.x, y: spot.y + api.TILE * 2 }]);
+        if (S.firstTarget(W2.ent("mr"), W2.t())) bad.push("벽 뒤 적을 고름");
+        var W2b = self.scene("forest", [{ id: "mr", team: "blue", char: "marina", x: spot.x, y: spot.y, slot: 1 }, { id: "ally", team: "blue", char: "knight", x: spot.x, y: spot.y + api.TILE * 2 }]);
+        self.hurt(W2b.ent("ally"), 0.5);
+        if (!S.firstTarget(W2b.ent("mr"), W2b.t())) bad.push("벽 뒤 아군 회복은 막지 않아야 함");
+      }
+      var W3 = self.squad([self.foe("nc", 0, 2000, { char: "necro" })]), minions = self.minionsOf(W3, "nc", [[MarinaTests.X + 100, MarinaTests.Y]]);
+      minions.forEach(function (m, i) { if (i) m.alive = false; });
+      var picked = S.firstTarget(W3.ent("mr"), W3.t());
+      if (!picked || picked.unit !== minions[0] || picked.kind !== "hit") bad.push("해골 병사만 있을 때 안 나감");
+      self.verdict(done, bad, "적 후보 규칙이 맞음");
+    });
+    run(G, "첫 대상이 없으면 기본 공격이 나가지 않고 대기시간·효과·소리를 쓰지 않는가", function (done) {
+      var bad = [], W = self.squad([self.ally("a", 100, 0)]), M = W.ent("mr"), cd = M.cdUntil, at = M.atkAt;
+      api.fireBasic(M, 1);
+      if (M.cdUntil !== cd) bad.push("대기시간을 씀");
+      if (M.atkAt !== at) bad.push("모션이 나감");
+      if (M.angle === 1) bad.push("방향이 바뀜");
+      if (self.streams(W).length) bad.push("효과가 올라감");
+      if (W.log.filter(function (p) { return p.path === "shots"; }).length) bad.push("기본 구슬이 나감");
+      self.verdict(done, bad, "대기시간·효과 모두 없음");
+    });
+    run(G, "첫 줄기: " + ULT.mrFlyMs / api.timeScale() / 1000 + "초 날아가는 동안에는 적용되지 않고 닿는 순간 회복·피해가 들어가며, 대기시간은 쏠 때 쓰는가", function (done) {
+      var bad = [], W = self.squad([self.ally("a", 100, 0)]), M = W.ent("mr"), a = self.hurt(W.ent("a"), 0.5), hp = a.hp;
+      api.fireBasic(M, 0);
+      if (!(M.cdUntil > W.t())) bad.push("대기시간을 안 씀");
+      if (M.atkAt !== W.t()) bad.push("공격 모션 시각");
+      W.step(ULT.mrFlyMs - 40);
+      if (a.hp !== hp) bad.push("날아가는 중에 회복됨");
+      W.step(80);
+      if (a.hp !== hp + ULT.mrHeal) bad.push("회복량 " + (a.hp - hp));
+      var W2 = self.squad([self.foe("f", 100, 0)]), f = W2.ent("f");
+      api.fireBasic(W2.ent("mr"), 0);
+      W2.step(ULT.mrFlyMs - 40);
+      if (self.lost(f)) bad.push("날아가는 중에 피해");
+      W2.step(80);
+      if (self.lost(f) !== C.dmg) bad.push("피해 " + self.lost(f));
+      self.verdict(done, bad, "닿는 순간에만 " + ULT.mrHeal + " 회복 / " + C.dmg + " 피해");
+    });
+    run(G, "닿기 전에 대상이 쓰러지면 효과·둘째 줄기·게이지가 없고, 마리나가 쓰러져도 첫 줄기는 닿지만 둘째는 안 나가는가", function (done) {
+      var bad = [], W = self.squad([self.ally("a", 100, 0), self.foe("f", 150, 0)]), M = W.ent("mr"), a = self.hurt(W.ent("a"), 0.5);
+      api.fireBasic(M, 0);
+      a.alive = false;
+      W.step(ULT.mrFlyMs + 50);
+      if (self.lost(W.ent("f"))) bad.push("쓰러진 대상에서 둘째가 나감");
+      if (self.streams(W, 2).length) bad.push("둘째 효과가 올라감");
+      if (M.gauge) bad.push("게이지 " + M.gauge);
+      var W2 = self.squad([self.ally("a", 100, 0), self.foe("f", 150, 0)]), M2 = W2.ent("mr"), a2 = self.hurt(W2.ent("a"), 0.5), hp = a2.hp;
+      api.fireBasic(M2, 0);
+      M2.alive = false;
+      W2.step(ULT.mrFlyMs + 50);
+      if (a2.hp !== hp + ULT.mrHeal) bad.push("마리나가 쓰러지면 이미 날아간 줄기가 사라짐");
+      if (self.streams(W2, 2).length) bad.push("쓰러진 뒤 둘째가 나감");
+      var W3 = self.squad([self.ally("a", 100, 0)]), M3 = W3.ent("mr"), a3 = self.hurt(W3.ent("a"), 0.5), hp3 = a3.hp;
+      api.fireBasic(M3, 0);
+      a3.protectUntil = W3.t() + 5000;
+      W3.step(ULT.mrFlyMs + 50);
+      if (a3.hp !== hp3) bad.push("보호 중이 된 대상에 적용됨");
+      self.verdict(done, bad, "닿는 순간의 상태로 판단");
+    });
+  }
+  registerSecondStream() {
+    var self = this, api = this.api, run = this.kit.run, G = MarinaTests.GROUP, ULT = api.ULT, C = api.CHARS.marina, S = api.MARINA_STREAMS;
+    run(G, "둘째 줄기: 첫 대상을 빼고 반경 " + ULT.mrChainR + " 안에서 가까운 순으로 보며 100% 아군은 건너뛰고 적이면 피해, 다친 아군이면 회복하는가", function (done) {
+      var bad = [], W = self.squad([self.ally("first", 100, 0), self.ally("full", 150, 0), self.foe("f", 250, 0), self.ally("hurt", 300, 0, { char: "knight" })]), M = W.ent("mr"), first = self.hurt(W.ent("first"), 0.5), hurt = self.hurt(W.ent("hurt"), 0.5), hp = hurt.hp;
+      var next = S.secondTarget(M, first, W.t());
+      if (next.unit !== W.ent("f") || next.kind !== "hit") bad.push("100% 아군을 건너뛰고 적을 못 고름");
+      api.fireBasic(M, 0);
+      W.step(ULT.mrFlyMs + 10);
+      var second = self.streams(W, 2);
+      if (second.length !== 1 || second[0].tgt !== "f" || second[0].from !== "first" || second[0].kind !== "hit") bad.push("둘째 효과 " + JSON.stringify(second));
+      if (self.lost(W.ent("f"))) bad.push("둘째가 바로 적용됨");
+      W.step(ULT.mrFlyMs + 50);
+      if (self.lost(W.ent("f")) !== C.dmg) bad.push("둘째 피해 " + self.lost(W.ent("f")));
+      if (hurt.hp !== hp) bad.push("먼 아군까지 회복됨");
+      if (first.hp !== first.maxHp * 0.5 + ULT.mrHeal) bad.push("첫 대상이 다시 맞음 " + first.hp);
+      var W2 = self.squad([self.ally("first", 100, 0), self.ally("hurt", 200, 0)]), first2 = self.hurt(W2.ent("first"), 0.5), hurt2 = self.hurt(W2.ent("hurt"), 0.8), hp2 = hurt2.hp;
+      self.hurt(W2.ent("first"), 0.5);
+      api.fireBasic(W2.ent("mr"), 0);
+      W2.step(ULT.mrFlyMs * 2 + 60);
+      if (hurt2.hp !== hp2 + ULT.mrHeal) bad.push("둘째 회복 " + (hurt2.hp - hp2));
+      if (first2.hp !== first2.maxHp * 0.5 + ULT.mrHeal) bad.push("첫 회복 " + first2.hp);
+      self.verdict(done, bad, "순서·피해·회복이 맞음");
+    });
+    run(G, "둘째 줄기: 첫 대상이 적이어도 같은 규칙이고, 자신 회복·반경 밖·해골 병사·보호 중 제외, 후보가 없으면 효과가 올라가지 않는가", function (done) {
+      var bad = [], W = self.squad([self.foe("f1", 100, 0), self.foe("f2", 300, 0), self.foe("out", 100 + ULT.mrChainR + 10, 0)]), M = W.ent("mr");
+      api.fireBasic(M, 0);
+      W.step(ULT.mrFlyMs * 2 + 60);
+      if (self.lost(W.ent("f1")) !== C.dmg) bad.push("첫 적 " + self.lost(W.ent("f1")));
+      if (self.lost(W.ent("f2")) !== C.dmg) bad.push("둘째 적 " + self.lost(W.ent("f2")));
+      if (self.lost(W.ent("out"))) bad.push("반경 밖 적이 맞음");
+      var W1 = self.squad([self.ally("a", 100, 0)]), M1 = W1.ent("mr"); self.hurt(W1.ent("a"), 0.3); self.hurt(M1, 0.5);
+      var hp = M1.hp;
+      api.fireBasic(M1, 0);
+      W1.step(ULT.mrFlyMs * 2 + 60);
+      if (M1.hp !== hp + ULT.mrHeal) bad.push("자신 회복 " + (M1.hp - hp));
+      if (M1.heal !== ULT.mrHeal * 2) bad.push("회복량 합 " + M1.heal);
+      var W2 = self.squad([self.foe("f1", 100, 0), self.foe("nc", 0, 2000, { char: "necro" })]);
+      self.minionsOf(W2, "nc", [[MarinaTests.X + 200, MarinaTests.Y]]);
+      api.fireBasic(W2.ent("mr"), 0);
+      W2.step(ULT.mrFlyMs + 20);
+      if (self.streams(W2, 2).length) bad.push("해골 병사에게 둘째가 나감");
+      var W3 = self.squad([self.foe("f1", 100, 0), self.foe("f2", 200, 0, { protectUntil: 0 })]);
+      W3.ent("f2").protectUntil = W3.t() + 5000;
+      api.fireBasic(W3.ent("mr"), 0);
+      W3.step(ULT.mrFlyMs + 20);
+      if (self.streams(W3, 2).length) bad.push("보호 중에게 둘째가 나감");
+      var W4 = self.squad([self.foe("f1", 100, 0), self.foe("f2", 200, 0)]);
+      W4.ent("f2").stealthUntil = W4.t() + 1000;
+      api.fireBasic(W4.ent("mr"), 0);
+      W4.step(ULT.mrFlyMs + 20);
+      if (self.streams(W4, 2).length) bad.push("보이지 않는 적에게 둘째가 나감");
+      self.verdict(done, bad, "제외 조건이 모두 맞고 후보가 없으면 발사 안 됨");
+    });
+    run(G, "둘째 줄기: 맞은 적에게 기절·상처 같은 추가 효과가 없고 딜에는 들어가는가", function (done) {
+      var bad = [], W = self.squad([self.foe("f1", 100, 0), self.foe("f2", 200, 0)]), M = W.ent("mr");
+      api.fireBasic(M, 0);
+      W.step(ULT.mrFlyMs * 2 + 60);
+      if (W.ent("f2").isStunned(W.t()) || W.ent("f2").shove) bad.push("추가 효과가 있음");
+      if (M.dmg !== C.dmg * 2) bad.push("딜 " + M.dmg);
+      if (M.skillDmg) bad.push("스킬 피해로 집계 " + M.skillDmg);
+      self.verdict(done, bad, "딜 " + M.dmg + ", 기본 공격 피해");
+    });
+  }
+  registerGaugeHeal() {
+    var self = this, api = this.api, run = this.kit.run, G = MarinaTests.GROUP, ULT = api.ULT, plus = api.roleGauge("marina");
+    run(G, "게이지: 첫 줄기에서만 +" + plus + "(회복이든 피해든 한 번), 둘째 줄기는 적이든 아군이든 0 인가", function (done) {
+      var bad = [], W = self.squad([self.foe("f1", 100, 0), self.foe("f2", 200, 0)]), M = W.ent("mr");
+      api.fireBasic(M, 0);
+      W.step(ULT.mrFlyMs - 30);
+      if (M.gauge) bad.push("닿기 전에 게이지 " + M.gauge);
+      W.step(50);
+      if (M.gauge !== plus) bad.push("적 첫 줄기 " + M.gauge);
+      W.step(ULT.mrFlyMs + 30);
+      if (M.gauge !== plus) bad.push("적 둘째 줄기 뒤 " + M.gauge);
+      var W2 = self.squad([self.ally("a", 100, 0), self.ally("b", 200, 0)]), M2 = W2.ent("mr");
+      self.hurt(W2.ent("a"), 0.5); self.hurt(W2.ent("b"), 0.8);
+      api.fireBasic(M2, 0);
+      W2.step(ULT.mrFlyMs * 2 + 50);
+      if (M2.gauge !== plus) bad.push("회복 두 줄기 뒤 " + M2.gauge);
+      if (W2.log.filter(function (p) { return p.path === "hits/mr" && p.v.d; }).some(function (p) { return p.v.g !== 0; })) bad.push("피해 기록 게이지가 0 이 아님");
+      self.verdict(done, bad, "닿는 순간 +" + plus + " 한 번");
+    });
+    run(G, "회복: 회복 감소 적용, 넘친 체력 제외, 회복량 합산, 어시스트(helpedBy) 기록이 맞는가", function (done) {
+      var bad = [], W = self.squad([self.ally("a", 100, 0)]), M = W.ent("mr"), a = self.hurt(W.ent("a"), 0.5), hp = a.hp;
+      a.burnUntil = W.t() + 5000;
+      api.fireBasic(M, 0);
+      W.step(ULT.mrFlyMs + 20);
+      if (a.hp !== hp + Math.round(ULT.mrHeal * 0.5)) bad.push("회복 감소 " + (a.hp - hp));
+      if (M.heal !== Math.round(ULT.mrHeal * 0.5)) bad.push("회복량 " + M.heal);
+      if (!a.helpedBy || !a.helpedBy.mr) bad.push("어시스트 기록 없음");
+      var W2 = self.squad([self.ally("a", 100, 0)]), a2 = W2.ent("a");
+      a2.hp = a2.maxHp - 3;
+      api.fireBasic(W2.ent("mr"), 0);
+      W2.step(ULT.mrFlyMs + 20);
+      if (a2.hp !== a2.maxHp || W2.ent("mr").heal !== 3) bad.push("넘친 회복 " + W2.ent("mr").heal);
+      self.verdict(done, bad, "회복 감소·합산·어시스트 확인");
+    });
+  }
+  registerLanes() {
+    var self = this, api = this.api, run = this.kit.run, G = MarinaTests.GROUP, ULT = api.ULT, L = api.TSUNAMI_LANES, E = api.TsunamiLanes;
+    function allFull(lens) { return lens.every(function (n) { return n === ULT.mrLen; }); }
+    run(G, "칸 계산: 벽이 없으면 5칸 모두 " + ULT.mrLen + ", 양쪽 2칸만 막히면 그 2칸만 짧고 나머지 3칸은 " + ULT.mrLen + " 인가", function (done) {
+      var bad = [];
+      api.loadMapData("practice");
+      if (!allFull(L.plan(MarinaTests.X, MarinaTests.Y, Math.PI / 2))) bad.push("연습장 " + L.plan(MarinaTests.X, MarinaTests.Y, Math.PI / 2));
+      var maps = ["forest", "river", "dungeon", "windhill"], found = null;
+      for (var i = 0; i < maps.length && !found; i++) found = self.spotWhere(maps[i], function (lens) { return lens[0] === ULT.mrLen && lens[1] === ULT.mrLen && lens[2] === ULT.mrLen && lens[3] > 0 && lens[3] < ULT.mrLen && lens[4] > 0 && lens[4] < ULT.mrLen; });
+      if (!found) bad.push("오른쪽 2칸만 막히는 자리를 못 찾음");
+      self.verdict(done, bad, found ? "일부 칸만 막힘 예 " + found.map + " " + found.lens.join(",") : "");
+    });
+    run(G, "칸 계산: 출발점이 벽 안인 칸은 0, 얇은 벽 너머 칸은 없고, 맵 밖은 벽이며, 물·다리는 막지 않는가", function (done) {
+      var bad = [];
+      var inWall = self.spotWhere("forest", function (lens, x, y, ang) {
+        var ca = Math.cos(ang), sa = Math.sin(ang), off = E.laneOffset(0);
+        return self.tileIsBlock(x - sa * off, y + ca * off) && lens[0] !== 0;
+      });
+      if (inWall) bad.push("벽 안 출발 칸이 0 이 아님 " + inWall.lens);
+      var thin = self.spotWhere("forest", function (lens, x, y, ang) {
+        var ca = Math.cos(ang), sa = Math.sin(ang), off = E.laneOffset(4);
+        return !self.tileIsBlock(x - sa * off, y + ca * off) && !api.losClear(x, y, x - sa * off, y + ca * off);
+      });
+      if (!thin) bad.push("얇은 벽 자리를 못 찾음");
+      else if (thin.lens[4] !== 0) bad.push("얇은 벽 너머 칸이 있음 " + thin.lens);
+      api.loadMapData("forest");
+      if (!L.blockAt(-1, 3) || !L.blockAt(3, -1) || !L.blockAt(9999, 3)) bad.push("맵 밖이 벽이 아님");
+      var water = self.spotWhere("river", function (lens, x, y, ang) {
+        var ca = Math.cos(ang), sa = Math.sin(ang), off = E.laneOffset(2), rows = api.mapRows(), crossed = false;
+        if (lens[2] !== ULT.mrLen) return false;
+        for (var d = 0; d < ULT.mrLen; d += 10) {
+          var c = Math.floor((x - sa * off + ca * d - api.MAP_X0) / api.TILE), r = Math.floor((y + ca * off + sa * d - api.MAP_Y0) / api.TILE);
+          if (rows[r] && rows[r].charAt(c) === "~") crossed = true;
+        }
+        return crossed;
+      });
+      if (!water) bad.push("물을 지나 끝까지 가는 칸이 없음");
+      var bridge = self.spotWhere("river", function (lens, x, y, ang) {
+        var ca = Math.cos(ang), sa = Math.sin(ang), rows = api.mapRows(), crossed = false;
+        if (lens[2] !== ULT.mrLen) return false;
+        for (var d = 0; d < ULT.mrLen; d += 10) {
+          var c = Math.floor((x + ca * d - api.MAP_X0) / api.TILE), r = Math.floor((y + sa * d - api.MAP_Y0) / api.TILE);
+          if (rows[r] && rows[r].charAt(c) === "=") crossed = true;
+        }
+        return crossed;
+      });
+      if (!bridge) bad.push("다리를 지나 끝까지 가는 칸이 없음");
+      self.verdict(done, bad, "벽 안·얇은 벽·맵 밖·물·다리 규칙 확인");
+    });
+    run(G, "칸 계산: 5맵 무작위 위치·각도(비스듬한 각도 포함)에서 표본과 어긋나지 않고 lens 는 항상 0~" + ULT.mrLen + " 의 정수 5개인가", function (done) {
+      var bad = [], seed = 20261104, checked = 0;
+      function rnd() { seed = (seed * 1664525 + 1013904223) % 4294967296; return seed / 4294967296; }
+      api.MAP_IDS.forEach(function (map) {
+        api.loadMapData(map);
+        for (var i = 0; i < 1500; i++) {
+          var x = api.BOUND.l + rnd() * (api.BOUND.r - api.BOUND.l), y = api.BOUND.t + rnd() * (api.BOUND.b - api.BOUND.t), ang = E.exactAngle(rnd() * Math.PI * 2 - Math.PI);
+          if (self.tileIsBlock(x, y)) continue;
+          var lens = L.plan(x, y, ang), ca = Math.cos(ang), sa = Math.sin(ang);
+          if (lens.length !== ULT.mrLanes) bad.push(map + " 길이");
+          lens.forEach(function (len, n) {
+            checked++;
+            if (!Number.isInteger(len) || len < 0 || len > ULT.mrLen) bad.push(map + " 값 " + len);
+            if (len === 0) return;
+            var off = E.laneOffset(n), wrong = self.matchesSamples(x - sa * off, y + ca * off, ca, sa, len);
+            if (wrong) bad.push(map + " " + wrong + " / 계산 " + len + " 각도 " + ang);
+          });
+        }
+      });
+      self.verdict(done, bad, checked.toLocaleString() + "칸이 표본과 같음");
+    });
+  }
+  registerWave() {
+    var self = this, api = this.api, run = this.kit.run, G = MarinaTests.GROUP, ULT = api.ULT;
+    run(G, "해일 판정: 앞쪽 선이 지나갈 때 맞고 " + ULT.mrDmg + " 피해·진행 방향 " + ULT.mrKb + " 밀림·기절이 들어가며 스킬 피해로 집계되는가", function (done) {
+      var bad = [], W = self.squad([self.foe("f", 50, 300)]), M = self.castDown(W), f = W.ent("f"), x0 = f.x, y0 = f.y;
+      if (M.gauge !== 0) bad.push("게이지 소모 " + M.gauge);
+      if (M.skillUntil > W.t()) bad.push("스킬 타이머가 켜짐");
+      W.step(self.waveTime(300 - 40));
+      if (self.lost(f)) bad.push("선이 닿기 전에 피해");
+      W.step(self.waveTime(40) + 30);
+      if (self.lost(f) !== ULT.mrDmg) bad.push("피해 " + self.lost(f));
+      var stunLeft = f.stunUntil - W.t();
+      if (!(stunLeft > 0 && stunLeft <= ULT.mrStunMs)) bad.push("기절 " + stunLeft);
+      W.step(self.api.ULT.gdKbMs + 50);
+      if (Math.abs(f.x - x0) > 0.5) bad.push("옆으로 밀림 " + (f.x - x0));
+      if (Math.abs(f.y - y0 - ULT.mrKb) > 1) bad.push("밀린 거리 " + (f.y - y0));
+      self.finishWave(W);
+      if (self.lost(f) !== ULT.mrDmg) bad.push("두 번 맞음 " + self.lost(f));
+      if (M.skillDmg !== ULT.mrDmg || M.dmg !== ULT.mrDmg) bad.push("스킬 피해 " + M.skillDmg + " / " + M.dmg);
+      if (M.gauge !== 0) bad.push("스킬 적중으로 게이지가 오름 " + M.gauge);
+      self.verdict(done, bad, ULT.mrDmg + " 피해, 진행 방향 " + ULT.mrKb + " 밀림");
+    });
+    run(G, "해일 판정: 맞아도 칸이 멈추지 않아 뒤의 적·해골 병사도 맞고, 해골은 피해만 받으며, 칸 둘에 걸쳐도 한 번만 맞는가", function (done) {
+      var bad = [], W = self.squad([self.foe("front", 0, 150), self.foe("back", 0, 400), self.foe("edge", 25, 200), self.foe("nc", 0, 2000, { char: "necro" })]);
+      var minions = self.minionsOf(W, "nc", [[MarinaTests.X, MarinaTests.Y + 300]]), m = minions[0];
+      minions.forEach(function (o, i) { if (i) o.alive = false; });
+      self.castDown(W);
+      self.finishWave(W);
+      ["front", "back", "edge"].forEach(function (id) { if (self.lost(W.ent(id)) !== ULT.mrDmg) bad.push(id + " " + self.lost(W.ent(id))); });
+      if (m.maxHp - m.hp !== Math.min(m.maxHp, ULT.mrDmg)) bad.push("해골 피해 " + (m.maxHp - m.hp));
+      if (m.shove) bad.push("해골이 밀림");
+      if (m.isStunned(W.t())) bad.push("해골이 기절");
+      self.verdict(done, bad, "칸이 멈추지 않고 한 번씩만 맞음");
+    });
+    run(G, "해일 판정: 선이 오기 전에 옆으로 피하면 안 맞고, 지나간 뒤 들어와도 안 맞고, 보호 중이면 면역이고, 칼날 폭풍·요한계시록이 끊기고, 기절해도 진행되는가", function (done) {
+      var bad = [], W = self.squad([self.foe("dodge", 0, 400), self.foe("late", 200, 100), self.foe("safe", 0, 100)]), late = W.ent("late"), dodge = W.ent("dodge");
+      W.ent("safe").protectUntil = W.t() + 5000;
+      self.castDown(W);
+      W.step(self.waveTime(150));
+      dodge.x += 200; late.x = MarinaTests.X;
+      W.step(self.waveTime(50));
+      self.finishWave(W);
+      if (self.lost(dodge)) bad.push("피한 적이 맞음");
+      if (self.lost(late)) bad.push("지나간 뒤 들어온 적이 맞음");
+      if (self.lost(W.ent("safe")) || W.ent("safe").isStunned(W.t())) bad.push("보호 중이 맞음");
+      var W2 = self.squad([self.foe("dc", 0, 150, { char: "dancer" }), self.foe("cl", 40, 150, { char: "cleric" })]), M2 = W2.ent("mr"), dc = W2.ent("dc"), cl = W2.ent("cl");
+      dc.gauge = api.GAUGE_MAX; api.useUlt(dc, 0); cl.gauge = api.GAUGE_MAX; api.useUlt(cl, 0);
+      if (!dc.isBladeStorming(W2.t()) || !cl.isRevealing(W2.t())) bad.push("스킬이 안 켜짐");
+      self.castDown(W2);
+      api.afflict(M2, { stunMs: 5000 }, "cl");
+      self.finishWave(W2);
+      if (!self.lost(dc) || !self.lost(cl)) bad.push("시전자 기절로 해일이 멈춤");
+      if (dc.isBladeStorming(W2.t())) bad.push("칼날 폭풍이 안 끊김");
+      if (cl.isRevealing(W2.t())) bad.push("요한계시록이 안 끊김");
+      self.verdict(done, bad, "피하기·면역·끊기·기절 중 진행 확인");
+    });
+    run(G, "해일 판정: 벽에 막힌 칸 너머 적은 안 맞고 뚫린 칸의 적은 맞는가", function (done) {
+      var bad = [], spot = self.spotWhere("forest", function (lens) { return lens[0] === ULT.mrLen && lens[4] > 100 && lens[4] < 300; }) || self.spotWhere("river", function (lens) { return lens[0] === ULT.mrLen && lens[4] > 100 && lens[4] < 300; });
+      if (!spot) { self.verdict(done, ["자리를 못 찾음"], ""); return; }
+      var ca = Math.cos(spot.angle), sa = Math.sin(spot.angle);
+      function laneSpot(i, along) { var off = api.TsunamiLanes.laneOffset(i); return { x: spot.x - sa * off + ca * along, y: spot.y + ca * off + sa * along }; }
+      var beyond = laneSpot(4, spot.lens[4] + 120), open = laneSpot(0, spot.lens[4] + 120), before = laneSpot(4, spot.lens[4] - 40);
+      var W = self.scene(spot.map, [{ id: "mr", team: "blue", char: "marina", x: spot.x, y: spot.y, slot: 1 }, { id: "beyond", x: beyond.x, y: beyond.y }, { id: "open", x: open.x, y: open.y }, { id: "before", x: before.x, y: before.y }]), M = W.ent("mr");
+      M.gauge = api.GAUGE_MAX; api.useUlt(M, spot.angle);
+      var sent = W.log.filter(function (p) { return p.path === "meleeHits"; })[0].v;
+      if (JSON.stringify(sent.lanes) !== JSON.stringify(spot.lens)) bad.push("보낸 칸 " + sent.lanes + " / " + spot.lens);
+      self.finishWave(W);
+      if (self.lost(W.ent("beyond"))) bad.push("막힌 칸 너머 적이 맞음");
+      if (self.lost(W.ent("open")) !== ULT.mrDmg) bad.push("뚫린 칸의 적 " + self.lost(W.ent("open")));
+      if (self.lost(W.ent("before")) !== ULT.mrDmg) bad.push("막히기 전 칸의 적 " + self.lost(W.ent("before")));
+      self.verdict(done, bad, spot.map + " " + spot.lens.join(",") + " 막힌 칸만 멈춤");
+    });
+  }
+  registerWaveAllies() {
+    var self = this, api = this.api, run = this.kit.run, G = MarinaTests.GROUP, ULT = api.ULT;
+    run(G, "해일: 맞은 아군은 " + ULT.mrWaveHeal + " 회복(회복 감소 적용, 한 해일에 한 번, 어시스트·회복량 통계)하고 피해·밀림·기절이 없으며 마리나 자신은 회복하지 않는가", function (done) {
+      var bad = [], W = self.squad([self.ally("a", 25, 200), self.ally("full", -50, 200), self.ally("cut", 50, 300), self.foe("f", 0, 1200)]), M = self.hurt(W.ent("mr"), 0.5), a = self.hurt(W.ent("a"), 0.5), cut = self.hurt(W.ent("cut"), 0.5), full = W.ent("full");
+      var selfHp = M.hp, hp = a.hp, cutHp = cut.hp, ax = a.x, ay = a.y;
+      cut.burnUntil = W.t() + 5000;
+      self.castDown(W);
+      self.finishWave(W);
+      if (a.hp !== hp + ULT.mrWaveHeal) bad.push("아군 회복 " + (a.hp - hp));
+      if (cut.hp !== cutHp + Math.round(ULT.mrWaveHeal * 0.5)) bad.push("회복 감소 " + (cut.hp - cutHp));
+      if (full.hp !== full.maxHp) bad.push("가득 찬 아군 " + full.hp);
+      if (M.hp !== selfHp) bad.push("자신이 회복됨");
+      if (a.x !== ax || a.y !== ay || a.shove) bad.push("아군이 밀림");
+      if (a.isStunned(W.t())) bad.push("아군이 기절");
+      if (!a.helpedBy || !a.helpedBy.mr) bad.push("어시스트 없음");
+      if (M.heal !== ULT.mrWaveHeal + Math.round(ULT.mrWaveHeal * 0.5)) bad.push("회복량 " + M.heal);
+      if (M.dmg) bad.push("아군 회복이 딜에 들어감 " + M.dmg);
+      self.verdict(done, bad, "회복 " + ULT.mrWaveHeal + " 한 번, 자신 제외");
+    });
+    run(G, "해일: 칸 판정이 아군에게도 똑같이 적용되어 막힌 칸 너머 아군은 회복하지 않는가", function (done) {
+      var bad = [], spot = self.spotWhere("forest", function (lens) { return lens[0] === ULT.mrLen && lens[4] > 100 && lens[4] < 300; }) || self.spotWhere("river", function (lens) { return lens[0] === ULT.mrLen && lens[4] > 100 && lens[4] < 300; });
+      if (!spot) { self.verdict(done, ["자리를 못 찾음"], ""); return; }
+      var ca = Math.cos(spot.angle), sa = Math.sin(spot.angle), off = api.TsunamiLanes.laneOffset(4), along = spot.lens[4] + 120;
+      var W = self.scene(spot.map, [{ id: "mr", team: "blue", char: "marina", x: spot.x, y: spot.y, slot: 1 }, { id: "a", team: "blue", char: "guardian", x: spot.x - sa * off + ca * along, y: spot.y + ca * off + sa * along, slot: 2 }]), M = W.ent("mr"), a = self.hurt(W.ent("a"), 0.5), hp = a.hp;
+      M.gauge = api.GAUGE_MAX; api.useUlt(M, spot.angle);
+      self.finishWave(W);
+      if (a.hp !== hp) bad.push("막힌 칸 너머 아군이 회복됨");
+      self.verdict(done, bad, "벽 너머 아군 회복 없음");
+    });
+  }
+  registerCardBot() {
+    var self = this, api = this.api, run = this.kit.run, G = MarinaTests.GROUP, ULT = api.ULT, C = api.CHARS.marina, Mind = api.MARINA_BOT;
+    run(G, "카드: 설명 숫자가 값과 맞고, 스킬 이름·통계표 평균 피해·직업군·통계 표시가 맞는가", function (done) {
+      var bad = [], ult = api.ultDesc("marina"), pas = api.passiveDesc("marina"), basic = api.basicDesc("marina"), table = api.statTable("marina");
+      [ULT.mrDmg + "의 피해", ULT.mrKb + " 밀어냄", api.secs(ULT.mrStunMs) + " 기절", ULT.mrWaveHeal + " 회복", "폭 " + ULT.mrLanes + "칸", "길이 " + ULT.mrLen / api.TILE + "칸"].forEach(function (w) { if (ult.indexOf(w) < 0) bad.push("스킬 설명에 없음: " + w); });
+      ["반경 " + C.range, "체력 " + ULT.mrHeal + " 회복", C.dmg + "의 피해", "반경 " + ULT.mrChainR].forEach(function (w) { if (pas.indexOf(w) < 0) bad.push("패시브 설명에 없음: " + w); });
+      if (/\.$/.test(ult) || /\.$/.test(pas)) bad.push("마침표로 끝남");
+      if ((ult + pas + basic).indexOf("undefined") >= 0 || (ult + pas + basic).indexOf("NaN") >= 0) bad.push("값이 비어 있음");
+      if (table.indexOf(C.dmg + "(회복 " + ULT.mrHeal + "+" + ULT.mrHeal + ")") < 0) bad.push("통계표 평균 피해");
+      if (C.role !== "caster" || !C.heals || !C.noAim || !C.ultAim) bad.push("표시값");
+      if (C.width || C.arc) bad.push("근접으로 분류됨");
+      self.verdict(done, bad, "설명 숫자 확인");
+    });
+    run(G, "AI: 해일 안에 적 2명, 적 1명이 " + ULT.mrBotPushR + " 안, 적 1명과 체력 " + ULT.mrBotAllyHp * 100 + "% 미만 아군일 때 쓰고 그 밖에는 아끼는가", function (done) {
+      var bad = [];
+      function decide(extra, prep) {
+        var W = self.squad(extra), M = W.ent("mr");
+        M.gauge = api.GAUGE_MAX; M.bot.seenAt = 0;
+        if (prep) prep(W);
+        var foes = extra.filter(function (e) { return e.team === "red"; }).map(function (e) { return W.ent(e.id); });
+        Mind.act(M, foes[0] || null, foes, W.t());
+        return M.gauge === 0;
+      }
+      if (!decide([self.foe("a", 300, 0), self.foe("b", 350, 30)])) bad.push("적 2명에 안 씀");
+      if (decide([self.foe("a", 350, 0)])) bad.push("먼 적 1명에 씀");
+      if (!decide([self.foe("a", 120, 0)])) bad.push("붙은 적 1명에 안 씀");
+      if (!decide([self.foe("a", 300, 0), self.ally("hurt", 200, 0)], function (W) { self.hurt(W.ent("hurt"), 0.3); })) bad.push("다친 아군과 적에 안 씀");
+      if (decide([self.foe("a", 300, 0), self.ally("hurt", -200, 0)], function (W) { self.hurt(W.ent("hurt"), 0.3); })) bad.push("해일 밖 아군만 다쳤는데 씀");
+      if (decide([self.foe("a", 300, 0), self.foe("b", -300, 0)])) bad.push("서로 반대쪽 적 2명에 씀");
+      self.verdict(done, bad, "조건대로 사용");
+    });
+    run(G, "AI: 첫 대상이 있을 때만 기본 공격을 쓰고 대기시간을 지키며 스킬은 가장 많은 적이 들어오는 쪽으로 쏘는가", function (done) {
+      var bad = [], W = self.squad([self.ally("a", 100, 0)]), M = W.ent("mr"), cd = M.cdUntil;
+      Mind.act(M, null, [], W.t());
+      if (M.cdUntil !== cd || self.streams(W).length) bad.push("대상 없이 공격");
+      self.hurt(W.ent("a"), 0.5);
+      Mind.act(M, null, [], W.t());
+      if (self.streams(W).length !== 1) bad.push("다친 아군에 안 씀");
+      Mind.act(M, null, [], W.t());
+      if (self.streams(W).length !== 1) bad.push("대기시간 무시");
+      var W2 = self.squad([self.foe("a", 300, 0), self.foe("b", -300, 0), self.foe("c", -350, 30)]), M2 = W2.ent("mr");
+      M2.gauge = api.GAUGE_MAX; M2.bot.seenAt = 0;
+      Mind.act(M2, W2.ent("a"), [W2.ent("a"), W2.ent("b"), W2.ent("c")], W2.t());
+      var sent = W2.log.filter(function (p) { return p.path === "meleeHits"; })[0];
+      if (!sent || Math.abs(Math.abs(sent.v.angle) - Math.PI) > 0.2) bad.push("많은 쪽으로 안 쏨 " + (sent && sent.v.angle));
+      if (api.CHAR_TYPES.of("marina").botUltRange() !== ULT.mrLen) bad.push("botUltRange");
+      self.verdict(done, bad, "기본 공격·스킬 방향 확인");
+    });
+  }
+  registerNetwork() {
+    var self = this, api = this.api, run = this.kit.run, G = MarinaTests.GROUP, ULT = api.ULT, C = api.CHARS.marina;
+    function effectSnap(key, v) { return { key: key, val: function () { return JSON.parse(JSON.stringify(v)); }, ref: { parent: { key: "effects" } } }; }
+    function onOtherDevice(W, meId, run2) {
+      var before = api.setMyId(meId);
+      try {
+        var me = W.ent(meId);
+        Object.keys(api.MATCH.bots).forEach(function (id) { api.MATCH.remotes[id] = api.MATCH.bots[id]; delete api.MATCH.bots[id]; });
+        delete api.MATCH.remotes[meId];
+        api.MATCH.me = me; W.room.host = "다른기기";
+        run2(me);
+      } finally { api.MATCH.me = null; api.MATCH.remotes = {}; api.setMyId(before); }
+    }
+    run(G, "네트워크: 모든 기기는 보낸 lanes 값만 쓰고 맵을 다시 계산하지 않으며, 값은 JSON 왕복 뒤에도 같은가", function (done) {
+      var bad = [], W = self.squad([self.foe("f", 0, 300), self.foe("g", 100, 300)]);
+      self.castDown(W);
+      var sent = W.log.filter(function (p) { return p.path === "meleeHits"; })[0].v;
+      if (JSON.stringify(JSON.parse(JSON.stringify(sent.lanes))) !== JSON.stringify(sent.lanes) || sent.lanes.length !== ULT.mrLanes) bad.push("lanes 왕복");
+      if (sent.angle !== api.TsunamiLanes.exactAngle(sent.angle)) bad.push("각도 자릿수");
+      ["dmg", "heal", "kb", "kbAlong", "wave", "width", "len", "u"].forEach(function (k) { if (sent[k] === undefined) bad.push("빠진 값 " + k); });
+      var W2 = self.squad([self.foe("f", 0, 300), self.foe("g", 100, 300)]), M2 = W2.ent("mr"), custom = JSON.parse(JSON.stringify(sent));
+      custom.createdAt = W2.t(); custom.lanes = [ULT.mrLen, ULT.mrLen, 100, ULT.mrLen, ULT.mrLen];
+      onOtherDevice(W2, "f", function (me) {
+        api.onMelee("wave-a", custom);
+        self.finishWave(W2);
+        if (self.lost(me)) bad.push("보낸 칸(가운데 100)을 쓰지 않고 다시 계산함 " + self.lost(me));
+      });
+      var W3 = self.squad([self.foe("f", 0, 300)]), other = JSON.parse(JSON.stringify(sent));
+      other.createdAt = W3.t();
+      onOtherDevice(W3, "f", function (me) {
+        api.onMelee("wave-b", other);
+        api.onMelee("wave-b", other);
+        self.finishWave(W3);
+        if (self.lost(me) !== ULT.mrDmg) bad.push("맞는 기기 피해 " + self.lost(me));
+      });
+      self.verdict(done, bad, "lanes " + sent.lanes.join(",") + " 그대로 사용, 같은 효과 두 번은 한 번만");
+    });
+    run(G, "네트워크: 첫 줄기는 대상 기기만 적용하고 둘째 줄기·게이지는 마리나 기기만 올리며, 늦은 효과는 버리는가", function (done) {
+      var bad = [], W = self.squad([self.foe("f", 100, 0), self.foe("g", 200, 0)]), M = W.ent("mr"), g = W.ent("g");
+      onOtherDevice(W, "f", function (me) {
+        api.onEffect(effectSnap("s1", { type: "marina", step: 1, team: "blue", owner: "mr", tgt: "f", kind: "hit", createdAt: W.t() }));
+        W.step(ULT.mrFlyMs - 30);
+        if (self.lost(me)) bad.push("닿기 전 피해");
+        W.step(60);
+        if (self.lost(me) !== C.dmg) bad.push("대상 기기 피해 " + self.lost(me));
+        if (M.gauge) bad.push("다른 기기에서 게이지가 오름");
+        if (self.streams(W, 2).length) bad.push("다른 기기가 둘째를 올림");
+        if (self.lost(g)) bad.push("남의 몸에 적용");
+      });
+      var W2 = self.squad([self.foe("f", 100, 0), self.foe("g", 200, 0)]), M2 = W2.ent("mr"), f2 = W2.ent("f"), g2 = W2.ent("g");
+      onOtherDevice(W2, "mr", function () {
+        api.fireBasic(M2, 0);
+        W2.step(ULT.mrFlyMs + 20);
+        if (self.lost(f2)) bad.push("마리나 기기가 원격 대상을 깎음");
+        if (M2.gauge !== api.roleGauge("marina")) bad.push("마리나 기기 게이지 " + M2.gauge);
+        if (self.streams(W2, 2).length !== 1) bad.push("마리나 기기가 둘째를 안 올림");
+        W2.step(ULT.mrFlyMs + 20);
+        if (self.lost(g2)) bad.push("마리나 기기가 원격 둘째 대상을 깎음");
+      });
+      var W3 = self.squad([self.foe("f", 100, 0)]);
+      api.onEffect(effectSnap("late", { type: "marina", step: 1, team: "blue", owner: "mr", tgt: "f", kind: "hit", createdAt: W3.t() - 5000 }));
+      W3.step(ULT.mrFlyMs + 20);
+      if (self.lost(W3.ent("f")) || api.FIELD.streams.length) bad.push("늦은 효과가 적용됨");
+      self.verdict(done, bad, "두 단계 네트워크 순서 확인");
+    });
+    run(G, "방 정리: 경기 시작·방 나감·연습 초기화에서 물줄기·해일 목록이 비고, 삼지창이 파일 없이 만들어지며 삼각형이 400 이내인가", function (done) {
+      var bad = [], W = self.squad([self.foe("f", 100, 0)]), M = W.ent("mr");
+      api.fireBasic(M, 0); M.gauge = api.GAUGE_MAX; api.useUlt(M, 0);
+      if (!api.FIELD.streams.length || !api.FIELD.tsunamis.length || !api.FIELD.waves.length) bad.push("목록이 안 쌓임");
+      api.FIELD.dropOwnedBy("mr");
+      if (api.FIELD.streams.length || api.FIELD.tsunamis.length || api.FIELD.waves.length) bad.push("나간 사람 효과가 남음");
+      api.fireBasic(M, 0);
+      api.FIELD.reset();
+      if (api.FIELD.streams.length || api.FIELD.tsunamis.length) bad.push("초기화");
+      var trident = api.TridentProp.build(), tris = 0;
+      trident.traverse(function (o) { if (o.isMesh) tris += (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3; });
+      if (tris > 400) bad.push("삼지창 삼각형 " + tris);
+      self.verdict(done, bad, "삼지창 삼각형 " + tris + "개");
     });
   }
 }
