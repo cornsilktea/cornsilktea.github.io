@@ -2993,11 +2993,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     passiveDesc() {
       var c = this.data;
-      return "기본 공격은 조준 없이 반경 " + c.range + " 안에서 체력 비율이 가장 낮은 아군의 체력 " + c.graceHeal + " 회복";
+      return "기본 공격은 조준 없이 반경 " + c.range + " 안에서 체력 비율이 가장 낮은 아군의 체력 " + c.graceHeal + " 회복. 반경 안 아군의 체력이 모두 가득 차 있으면 자신을 회복";
     }
     basicDesc() {
       var c = this.data;
-      return "반경 " + c.range + " 안에서 체력 비율이 가장 낮은 아군 1명의 체력 " + c.graceHeal + " 회복";
+      return "반경 " + c.range + " 안에서 체력 비율이 가장 낮은 아군 1명의 체력 " + c.graceHeal + " 회복(아군이 모두 가득 차 있으면 자신을 회복)";
     }
     attackClip(v, E, t) {
       return ["Melee_1H_Attack_Chop", 1.8];
@@ -4450,7 +4450,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         if (!A || id === E.id || A.team !== E.team || !A.alive || A.isProtected(t) || MathKit.hyp(A.x - E.x, A.y - E.y) > reach) return;
         if (!best || A.hp / A.maxHp < best.hp / best.maxHp) best = A;
       });
-      return best;
+      var alliesAllFull = !best || best.hp >= best.maxHp;
+      return alliesAllFull && E.hp < E.maxHp ? E : best;
     }
     graceStrike(E, t) { var services = this.services;
       E.atkAt = t;
@@ -4459,7 +4460,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (services.targets.hear(E)) services.sound.sfx("orb");
       services.match.game.forceNet = true;
       if (!A) return;
-      E.angle = Math.atan2(A.y - E.y, A.x - E.x);
+      if (A !== E) E.angle = Math.atan2(A.y - E.y, A.x - E.x);
       services.session.room.ref.child("effects").push({ type: "grace", team: E.team, owner: E.id, tgt: A.id, heal: ClericType.STATS.graceHeal, createdAt: t });
     }
     onGrace(e) { var services = this.services;
@@ -4469,8 +4470,17 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (services.session.room.status !== "playing") return;
       services.targets.localTargets().forEach(function (T) {
         if (T.minion || T.id !== e.tgt || !T.alive || T.team !== e.team || T.isProtected(t)) return;
-        services.fieldFx.healByCleric(T, e.owner, e.heal, t);
+        if (T.id === e.owner) services.fieldFx.graceHealSelf(T, e.heal, t);
+        else services.fieldFx.healByCleric(T, e.owner, e.heal, t);
       });
+    }
+    graceHealSelf(E, amount, t) { var services = this.services;
+      var healed = services.status.healAmount(E, amount, t);
+      if (healed <= 0) return;
+      E.hp += healed;
+      E.heal = (E.heal || 0) + healed;
+      services.match.game.forceNet = true;
+      if (E === services.match.me) services.sound.sfx("heal");
     }
     healByCleric(T, owner, amount, t) { var services = this.services;
       var healed = services.status.healAmount(T, amount, t);

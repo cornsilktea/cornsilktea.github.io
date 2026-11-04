@@ -1468,6 +1468,35 @@ class ResultCollector {
     if (enemyDmg) bad.push("기본 공격이 적에게 피해를 줌");
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "체력 비율이 가장 낮은 아군만 " + api.CHARS.cleric.graceHeal + " 회복, 자신·먼 아군·보호 중 아군 제외");
   });
+  run(CLERIC, "기본 공격: 반경 안 아군이 모두 가득 차거나 없으면 자신을 회복하고, 게이지는 채우지 않으며 회복량에는 넣는가", function (done) {
+    var W = clericTeam([{ id: "far", team: "blue", char: "ranger", x: 300, y: OPEN_Y.forest - 480 }]);
+    var cl = W.ent("cl"), kn = W.ent("kn"), rg = W.ent("rg"), far = W.ent("far"), heal = api.CHARS.cleric.graceHeal, bad = [];
+    far.hp = 5; cl.hp = 10; cl.heal = 0; cl.gauge = 0;
+    var angleBefore = cl.angle;
+    clericSwing(W);
+    if (cl.hp !== 10 + heal) bad.push("아군이 모두 가득 찼는데 자신이 회복되지 않음(자신 " + cl.hp + ")");
+    if (far.hp !== 5) bad.push("반경 밖 아군이 회복됨(" + far.hp + ")");
+    if (cl.gauge !== 0) bad.push("자가 회복이 게이지를 채움(" + cl.gauge + ")");
+    if (cl.heal !== heal) bad.push("자가 회복이 회복량에 안 들어감(" + cl.heal + ")");
+    if (cl.angle !== angleBefore) bad.push("자가 회복 때 방향이 바뀜");
+    if (W.log.some(function (p) { return p.path === "hits/cl" && p.v.hl; })) bad.push("자가 회복이 적중 기록을 올림");
+    cl.hp = cl.maxHp - 5; cl.heal = 0;
+    clericSwing(W);
+    if (cl.hp !== cl.maxHp || cl.heal !== 5) bad.push("최대 체력을 넘겨 회복(자신 " + cl.hp + "·회복량 " + cl.heal + ")");
+    cl.hp = 10; kn.hp = kn.maxHp - 1;
+    clericSwing(W);
+    if (kn.hp !== kn.maxHp || cl.hp !== 10) bad.push("체력이 조금이라도 깎인 아군보다 자신을 먼저 회복(기사 " + kn.hp + "·자신 " + cl.hp + ")");
+    kn.x = rg.x = 300; kn.y = rg.y = OPEN_Y.forest + 450;
+    clericSwing(W);
+    if (cl.hp !== 10 + heal) bad.push("반경 안에 아군이 없을 때 자신을 회복하지 않음(자신 " + cl.hp + ")");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "아군이 모두 가득 찼거나 없을 때 자신을 " + heal + " 회복, 게이지 그대로");
+  });
+  run(CLERIC, "AI: 아군이 모두 가득 차고 자신만 다쳤으면 기본 공격으로 자신을 회복하는가", function (done) {
+    var W = clericTeam(), cl = W.ent("cl"), waited = 0;
+    cl.hp = 60; cl.heal = 0; cl.cdUntil = 0; cl.gauge = 0;
+    while (!cl.heal && waited < 3000) { W.frame(FRAME, true); waited += FRAME; }
+    done(cl.heal === api.CHARS.cleric.graceHeal ? "pass" : "fail", "자가 회복량 " + cl.heal + " (" + Math.round(waited) + "ms 안에)");
+  });
   run(CLERIC, "게이지: 아군을 " + api.CHARS.cleric.healGauge + " 회복시켜야 가득 차고, 넘친 회복(체력이 가득 찬 부분)은 세지 않는가", function (done) {
     var W = clericTeam(), cl = W.ent("cl"), kn = W.ent("kn"), heal = api.CHARS.cleric.graceHeal, need = api.CHARS.cleric.healGauge, got = [];
     var n = Math.ceil(need / heal) - 1;
