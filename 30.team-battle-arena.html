@@ -2299,13 +2299,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       this.bursts = []; this.pools = []; this.poolHit = {}; this.lunges = []; this.waves = [];
       this.holes = []; this.storms = []; this.revs = []; this.graces = []; this.domains = [];
       this.curses = {}; this.bladeSpins = []; this.turrets = []; this.groves = []; this.shells = []; this.gales = []; this.stars = [];
-      this.hooks = []; this.hookFlights = []; this.slams = [];
+      this.hooks = []; this.hookFlights = []; this.slams = []; this.hammerStrikes = [];
     }
     dropOwnedBy(ownerId) { var services = this.services;
       var field = this, owned = function (item) { return (item.e || item.d).owner === ownerId; };
       [["bursts", services.effectView, "dropBurstVis"], ["pools", services.poolView, "dropPoolVis"], ["lunges", services.effectView, "dropLungeVis"], ["holes", services.poolView, "dropHoleVis"],
        ["storms", services.stormView, "dropStormVis"], ["revs", services.revGraceView, "dropRevVis"], ["graces", services.revGraceView, "dropGraceVis"], ["domains", services.domainView, "dropDomainVis"],
-       ["turrets", services.turrets, "dropVis"], ["groves", services.groves, "dropVis"], ["shells", services.turrets, "dropShellVis"], ["gales", services.galeView, "drop"], ["stars", services.starfallView, "drop"], ["hooks", services.hookView, "dropHook"], ["hookFlights", services.hookView, "dropFlight"], ["slams", services.hookView, "dropSlam"]
+       ["turrets", services.turrets, "dropVis"], ["groves", services.groves, "dropVis"], ["shells", services.turrets, "dropShellVis"], ["gales", services.galeView, "drop"], ["stars", services.starfallView, "drop"], ["hooks", services.hookView, "dropHook"], ["hookFlights", services.hookView, "dropFlight"], ["slams", services.hookView, "dropSlam"], ["hammerStrikes", services.hammerStrikes, "drop"]
       ].forEach(function (row) {
         field[row[0]] = field[row[0]].filter(function (item) {
           if (!owned(item)) return true;
@@ -2327,6 +2327,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       this.hooks.forEach(services.hookView.dropHook.bind(services.hookView));
       this.hookFlights.forEach(services.hookView.dropFlight.bind(services.hookView));
       this.slams.forEach(services.hookView.dropSlam.bind(services.hookView));
+      this.hammerStrikes.forEach(services.hammerStrikes.drop.bind(services.hammerStrikes));
     }
     renderLingering(t, nowMs, dt) { var services = this.services;
       this.pools.forEach(function (pl) { services.poolView.renderPool(pl, t, nowMs); });
@@ -2340,6 +2341,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       this.gales.forEach(function (g) { services.galeView.render(g, t, nowMs); });
       this.stars.forEach(function (s) { services.starfallView.render(s, t, nowMs); });
       services.hookView.render(t, nowMs);
+      services.hammerStrikes.render(t);
     }
   }
 
@@ -2836,6 +2838,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     };
     static STATS = { name: "대장장이", role: "fighter", icon: "🔨", hp: 445, speed: GameTime.gameSpeed(150), cd: GameTime.gameMs(1.8), dmg: 30, range: 180, width: 150, windup: GameTime.gameMs(0.5), fx: { stunMs: GameTime.gameMs(0.5) }, ultName: "내려찍기", ultAim: true };
     get hidesBasicEdge() { return true; }
+    onStrikeShown(d) { var services = this.services; if (d.len && !d.zone) services.hammerStrikes.add(d); }
     isHammerLeaping(E, t) { return E.ultUntil > t; }
     isRooted(E, t) { return this.isHammerLeaping(E, t); }
     showAimGuide(E, ult, c) { var services = this.services;
@@ -7759,7 +7762,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   class ChainSlamBurst {
     static TEXTURES = null;
     static LIFE_SEC = 0.85;
-    static CRACK_STEP = 34;
+    static WATER_CHECK_STEP = 20;
+    static CRACK_WIDTH = 170;
+    static FLASH_OPACITY = 0.75;
     static DUST_COUNT = 14;
     static BITS_COUNT = 20;
     static EMBER_COUNT = 26;
@@ -7782,17 +7787,21 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var S = ChainSlamBurst.PAINT_SIZE, cv = document.createElement("canvas"); cv.width = cv.height = S;
       var g = cv.getContext("2d"), n = 0;
       function noise() { n++; var v = Math.sin(n * 12.9898) * 43758.5453; return v - Math.floor(v); }
-      function branch(x, y, a, len, width) {
-        g.lineWidth = width; g.beginPath(); g.moveTo(x, y);
-        for (var i = 0; i < 6 && len > 4; i++) {
-          a += (noise() - 0.5) * 0.9; var step = len / 6; x += Math.cos(a) * step; y += Math.sin(a) * step; g.lineTo(x, y);
-          if (noise() < 0.3 && width > 1.4) { g.stroke(); branch(x, y, a + (noise() < 0.5 ? -1 : 1) * (0.5 + noise()), len * 0.55, width * 0.6); g.lineWidth = width; g.beginPath(); g.moveTo(x, y); }
+      function fissure(x, y, a, len, halfWidth, steps) {
+        var edgeA = [], edgeB = [];
+        for (var i = 0; i <= steps; i++) {
+          var w = halfWidth * (1 - i / steps), nx = -Math.sin(a), ny = Math.cos(a), lean = (noise() - 0.5) * w * 0.5;
+          edgeA.push([x + nx * (w + lean), y + ny * (w + lean)]); edgeB.unshift([x - nx * (w - lean), y - ny * (w - lean)]);
+          a += (noise() - 0.5) * 1.1; x += Math.cos(a) * len / steps; y += Math.sin(a) * len / steps;
         }
-        g.stroke();
+        g.beginPath();
+        edgeA.concat(edgeB).forEach(function (p, i) { if (i) g.lineTo(p[0], p[1]); else g.moveTo(p[0], p[1]); });
+        g.closePath(); g.fill();
       }
-      g.strokeStyle = "#FFFFFF"; g.lineCap = "round"; g.lineJoin = "round";
-      branch(S / 2, S / 2, 0, S * 0.5, 6); branch(S / 2, S / 2, Math.PI, S * 0.5, 6);
-      for (var k = 0; k < 7; k++) branch(S / 2, S / 2, k / 7 * Math.PI * 2 + noise(), S * (0.2 + noise() * 0.24), 3.4);
+      g.fillStyle = "#FFFFFF";
+      fissure(S / 2, S / 2, 0, S * 0.47, 15, 7);
+      fissure(S / 2, S / 2, Math.PI, S * 0.47, 15, 7);
+      fissure(S * 0.62, S / 2, 0.95, S * 0.3, 8, 3);
       return new THREE.CanvasTexture(cv);
     }
     static textures() { return ChainSlamBurst.TEXTURES || (ChainSlamBurst.TEXTURES = { soft: ChainSlamBurst.softTexture(), crack: ChainSlamBurst.crackTexture() }); }
@@ -7822,17 +7831,27 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     alongLine(u, side) { var along = this.d.len * u; return { x: this.d.x + this.ca * along - this.sa * side, y: this.d.y + this.sa * along + this.ca * side }; }
     buildCracks() { var services = this.services;
-      var slam = this, n = Math.max(1, Math.round(this.d.len / ChainSlamBurst.CRACK_STEP)), mesh = this.instanced(services.geo.slamQuad, this.crackMat, n);
+      var runs = this.dryRuns(), mesh = this.instanced(services.geo.slamQuad, this.crackMat, Math.max(1, runs.length)), width = this.constructor.CRACK_WIDTH;
       var flat = new THREE.Quaternion(), roll = new THREE.Quaternion(), up = new THREE.Vector3(0, 0, 1);
       flat.setFromAxisAngle(this.axis, -Math.PI / 2);
-      for (var i = 0; i < n; i++) {
-        var p = this.alongLine((i + 0.5) / n, (this.wave(i, 1) - 0.5) * 14), wet = this.overWater(p.x, p.y), big = wet ? 0 : 62 + this.wave(i, 2) * 44;
-        roll.setFromAxisAngle(up, this.d.angle + (this.wave(i, 3) < 0.5 ? 0 : Math.PI) + (this.wave(i, 4) - 0.5) * 0.5);
+      if (!runs.length) this.hideAt(mesh, 0);
+      for (var i = 0; i < runs.length; i++) {
+        var p = this.alongLine((runs[i].from + runs[i].to) / 2, 0), length = this.d.len * (runs[i].to - runs[i].from) * 1.12;
+        roll.setFromAxisAngle(up, -this.d.angle + (this.wave(i, 3) < 0.5 ? 0 : Math.PI));
         this.turn.copy(flat).multiply(roll);
-        this.spot.set(p.x, 1.6 + i * 0.01, p.y); this.size.setScalar(big);
+        this.spot.set(p.x, 1.6 + i * 0.01, p.y); this.size.set(length, Math.min(width, length * 0.8), 1);
         this.matrix.compose(this.spot, this.turn, this.size); mesh.setMatrixAt(i, this.matrix);
       }
-      mesh.instanceMatrix.needsUpdate = true; slam.crackMesh = mesh;
+      mesh.instanceMatrix.needsUpdate = true; this.crackMesh = mesh;
+    }
+    dryRuns() {
+      var runs = [], from = null, steps = Math.max(1, Math.ceil(this.d.len / ChainSlamBurst.WATER_CHECK_STEP));
+      for (var i = 0; i <= steps; i++) {
+        var u = i / steps, p = this.alongLine(u, 0), wet = this.overWater(p.x, p.y);
+        if (!wet && from === null) from = u;
+        if (from !== null && (wet || i === steps)) { var to = wet ? (i - 1) / steps : 1; if (to > from) runs.push({ from: from, to: to }); from = null; }
+      }
+      return runs;
     }
     buildFlash() { var services = this.services;
       var strip = services.arenaView.flatMesh(services.geo.strip, this.flashMat), holder = new THREE.Group();
@@ -7841,38 +7860,39 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       this.group.add(holder);
     }
     buildDust() { var services = this.services;
-      var mesh = this.instanced(services.geo.slamQuad, this.dustMat, ChainSlamBurst.DUST_COUNT);
+      var count = this.constructor.DUST_COUNT, mesh = this.instanced(services.geo.slamQuad, this.dustMat, count);
       this.dust = [];
-      for (var i = 0; i < ChainSlamBurst.DUST_COUNT; i++) {
-        var u = (i + this.wave(i, 5)) / ChainSlamBurst.DUST_COUNT, p = this.alongLine(u, (this.wave(i, 6) - 0.5) * this.d.width * 0.7), wet = this.overWater(p.x, p.y);
+      for (var i = 0; i < count; i++) {
+        var u = (i + this.wave(i, 5)) / count, p = this.alongLine(u, (this.wave(i, 6) - 0.5) * this.d.width * 0.7), wet = this.overWater(p.x, p.y);
         this.dust.push({ x: p.x, z: p.y, delay: u * 0.07, rise: 26 + this.wave(i, 7) * 42, driftX: (this.wave(i, 8) - 0.5) * 34, driftZ: (this.wave(i, 9) - 0.5) * 34, from: 10 + this.wave(i, 10) * 8, to: 48 + this.wave(i, 11) * 34, life: 0.5 + this.wave(i, 12) * 0.33 });
         mesh.setColorAt(i, this.tint.setHex(wet ? ChainSlamBurst.SPRAY_COLOR : ChainSlamBurst.DUST_COLOR));
       }
       mesh.instanceColor.needsUpdate = true; this.dustMesh = mesh;
     }
     buildBits() { var services = this.services;
-      var mesh = this.instanced(services.geo.meteorRock, this.bitsMat, ChainSlamBurst.BITS_COUNT);
+      var count = this.constructor.BITS_COUNT, mesh = this.instanced(services.geo.meteorRock, this.bitsMat, count);
       this.bits = [];
-      for (var i = 0; i < ChainSlamBurst.BITS_COUNT; i++) {
-        var u = (i + this.wave(i, 13)) / ChainSlamBurst.BITS_COUNT, side = (this.wave(i, 14) - 0.5) * this.d.width * 0.45, p = this.alongLine(u, side), wet = this.overWater(p.x, p.y), push = (side >= 0 ? 1 : -1) * (40 + this.wave(i, 15) * 130), ahead = (this.wave(i, 16) - 0.35) * 110;
+      for (var i = 0; i < count; i++) {
+        var u = (i + this.wave(i, 13)) / count, side = (this.wave(i, 14) - 0.5) * this.d.width * 0.45, p = this.alongLine(u, side), wet = this.overWater(p.x, p.y), push = (side >= 0 ? 1 : -1) * (40 + this.wave(i, 15) * 130), ahead = (this.wave(i, 16) - 0.35) * 110;
         this.bits.push({ x: p.x, z: p.y, delay: u * 0.07, vx: this.ca * ahead - this.sa * push, vz: this.sa * ahead + this.ca * push, vy: 130 + this.wave(i, 17) * 210, size: (wet ? 1.2 : 2.2) + this.wave(i, 18) * 3.4, spin: 6 + this.wave(i, 19) * 14, phase: this.wave(i, 20) * 6 });
         mesh.setColorAt(i, this.tint.setHex(wet ? ChainSlamBurst.SPRAY_COLOR : ChainSlamBurst.STONE_COLOR));
       }
       mesh.instanceColor.needsUpdate = true; this.bitsMesh = mesh;
     }
     buildEmbers() { var services = this.services;
-      this.emberMesh = this.instanced(services.geo.stabLine, this.emberMat, ChainSlamBurst.EMBER_COUNT);
+      var count = this.constructor.EMBER_COUNT;
+      this.emberMesh = this.instanced(services.geo.stabLine, this.emberMat, count);
       this.embers = [];
-      for (var i = 0; i < ChainSlamBurst.EMBER_COUNT; i++) {
-        var u = (i + this.wave(i, 21)) / ChainSlamBurst.EMBER_COUNT, p = this.alongLine(u, (this.wave(i, 22) - 0.5) * 20), a = this.wave(i, 23) * Math.PI * 2, speed = 130 + this.wave(i, 24) * 300;
+      for (var i = 0; i < count; i++) {
+        var u = (i + this.wave(i, 21)) / count, p = this.alongLine(u, (this.wave(i, 22) - 0.5) * 20), a = this.wave(i, 23) * Math.PI * 2, speed = 130 + this.wave(i, 24) * 300;
         this.embers.push({ x: p.x, z: p.y, wet: this.overWater(p.x, p.y), delay: u * 0.07, vx: Math.cos(a) * speed, vz: Math.sin(a) * speed, vy: 110 + this.wave(i, 25) * 260, life: 0.16 + this.wave(i, 26) * 0.22 });
       }
     }
     hideAt(mesh, i) { this.size.setScalar(0); this.matrix.compose(this.spot.set(0, -50, 0), this.turn.identity(), this.size); mesh.setMatrixAt(i, this.matrix); }
     update(sec) { var services = this.services;
-      var slam = this, life = ChainSlamBurst.LIFE_SEC, camera = services.stage.camera, stone = this.spin;
+      var slam = this, life = this.constructor.LIFE_SEC, camera = services.stage.camera, stone = this.spin;
       this.crackMat.opacity = 0.9 * MathKit.clamp((life - sec) / (life * 0.45), 0, 1) * MathKit.clamp(sec / 0.03 + 0.4, 0, 1);
-      this.flashMat.opacity = 0.75 * MathKit.clamp(1 - sec / 0.2, 0, 1);
+      this.flashMat.opacity = this.constructor.FLASH_OPACITY * MathKit.clamp(1 - sec / 0.2, 0, 1);
       this.dustMat.opacity = 0.62 * MathKit.clamp((life - sec) / (life * 0.55), 0, 1);
       this.bitsMat.opacity = MathKit.clamp((life - sec) / 0.2, 0, 1);
       this.dust.forEach(function (p, i) {
@@ -7912,6 +7932,41 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (this.group.parent) this.group.parent.remove(this.group);
       this.meshes.forEach(function (m) { m.dispose(); });
       this.mats.forEach(function (m) { m.dispose(); });
+    }
+  }
+  class HammerStrikeBurst extends ChainSlamBurst {
+    static LIFE_SEC = 0.6;
+    static CRACK_WIDTH = 105;
+    static FLASH_OPACITY = 0.3;
+    static DUST_COUNT = 5;
+    static BITS_COUNT = 6;
+    static EMBER_COUNT = 8;
+    static IMPACT_FROM = 0.4;
+    static IMPACT_LEN = 0.55;
+    static IMPACT_WIDTH = 0.5;
+    static impactLine(d) {
+      var from = d.len * HammerStrikeBurst.IMPACT_FROM;
+      return { x: d.x + Math.cos(d.angle) * from, y: d.y + Math.sin(d.angle) * from, angle: d.angle, len: d.len * HammerStrikeBurst.IMPACT_LEN, width: d.width * HammerStrikeBurst.IMPACT_WIDTH, createdAt: d.createdAt };
+    }
+    constructor(services, d) { super(services, HammerStrikeBurst.impactLine(d)); }
+  }
+  class HammerStrikeView {
+    constructor(services) { this.services = services; }
+    add(d) { this.services.field.hammerStrikes.push({ d: d, burst: null }); }
+    lifeMs() { return HammerStrikeBurst.LIFE_SEC * 1000 * this.services.clock.scale; }
+    drop(item) { if (item.burst) { item.burst.dispose(); item.burst = null; } }
+    step(t) { var view = this, services = this.services, life = this.lifeMs();
+      services.field.hammerStrikes = services.field.hammerStrikes.filter(function (item) {
+        if (t < item.d.createdAt + life) return true;
+        view.drop(item);
+        return false;
+      });
+    }
+    render(t) { var services = this.services;
+      services.field.hammerStrikes.forEach(function (item) {
+        if (!item.burst) { item.burst = new HammerStrikeBurst(services, item.d); services.stage.scene.add(item.burst.group); }
+        item.burst.update(Math.max(0, t - item.d.createdAt) / services.clock.scale / 1000);
+      });
     }
   }
   class HookChainView {
@@ -10634,6 +10689,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.melee.stepLunges(t);
       services.melee.stepWaves(t);
       services.hookView.step(t);
+      services.hammerStrikes.step(t);
       services.world.pruneLocal(t);
     }
     stepPlaying(t, dt, driveBots) { var services = this.services;
@@ -10724,7 +10780,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       HUD: services.hud, SOUND: services.sound, BACKEND: services.backend, TIMESCALE: services.timescale, THREE: THREE, CAMERA_RIG: services.cameraRig, ARENA_VIEW: services.arenaView, PROPS: services.props, PROP_THEMES: services.propThemes, camera: services.stage.camera, overlay: Canvases.overlay, QA: services.quality, PIX_MIN: Environment.PIX_MIN, PIX_START: Environment.PIX_START, SCENERY: services.arenaView.scenery,
       setDb: function (fake) { var before = services.backend.db; services.backend.db = fake; return before; },
       setTestLink: function (flag) { var before = services.backend.isTestLink; services.backend.isTestLink = flag; return before; },
-      HOOK_PATH: services.hookPath, HOOK_PULL: services.hookPull, HOOK_VIEW: services.hookView, DraggedChain: DraggedChain, WraithChainRig: WraithChainRig, ChainSlamBurst: ChainSlamBurst, FIGHTER_VIEW: services.fighterView, GEO: services.geo, FRAME_RENDERER: services.frameRenderer, stage: services.stage, CHAR_TYPES: services.charTypes, AUTO_AIM: services.autoAim, AUTO_AIM_ERR: AutoAim.AUTO_AIM_ERR, AUTO_AIM_LEAD: AutoAim.AUTO_AIM_LEAD, FullscreenKeeper: FullscreenKeeper, DRAFT_AI: services.draftAi,
+      HOOK_PATH: services.hookPath, HOOK_PULL: services.hookPull, HOOK_VIEW: services.hookView, HAMMER_STRIKES: services.hammerStrikes, HammerStrikeBurst: HammerStrikeBurst, DraggedChain: DraggedChain, WraithChainRig: WraithChainRig, ChainSlamBurst: ChainSlamBurst, FIGHTER_VIEW: services.fighterView, GEO: services.geo, FRAME_RENDERER: services.frameRenderer, stage: services.stage, CHAR_TYPES: services.charTypes, AUTO_AIM: services.autoAim, AUTO_AIM_ERR: AutoAim.AUTO_AIM_ERR, AUTO_AIM_LEAD: AutoAim.AUTO_AIM_LEAD, FullscreenKeeper: FullscreenKeeper, DRAFT_AI: services.draftAi,
       DRAFT: services.draft, DRAFT_VIEW: services.draftView, DRAFT_STEPS: Draft.STEPS, DRAFT_STEP_MS: Draft.STEP_MS, DRAFT_AI_MS: Draft.AI_MS, DRAFT_AI_TRADE_MS: Draft.AI_TRADE_MS, DRAFT_ABSENT_WAIT_MS: Draft.ABSENT_WAIT_MS, NO_BAN: Draft.NO_BAN,
       STATS: services.stats, STATS_PATH: MatchStats.path, STATS_PATCHES: StatsPatches, STATS_PENDING: MatchStats.PENDING, STATS_SETTLE_MS: MatchStats.SETTLE_MS, STATS_HOLD_MAX_MS: MatchStats.HOLD_MAX_MS,
       CLOCK: services.clock, GameClock: GameClock, CLOCK_KEEP: GameClock.KEEP, CLOCK_PINGS: GameClock.PINGS,
@@ -11057,6 +11113,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.hookPath = new HookPath(services);
       services.hookPull = new HookPullSystem(services);
       services.hookView = new HookChainView(services);
+      services.hammerStrikes = new HammerStrikeView(services);
       services.respawn = new RespawnSystem(services);
       services.attack = new AttackController(services);
       services.autoAim = new AutoAim(services);

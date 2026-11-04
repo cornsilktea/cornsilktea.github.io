@@ -5462,12 +5462,34 @@ class WraithTests {
         }
         if (wetCrack) bad.push("물 위 균열 " + wetCrack + "개");
         if (!dryCrack) bad.push("땅 균열이 없음");
+        burst.crackMesh.getMatrixAt(burst.crackMesh.count - 1, m);
+        var along = (m.elements[0] * Math.cos(burst.d.angle) + m.elements[2] * Math.sin(burst.d.angle)) / (Math.hypot(m.elements[0], m.elements[1], m.elements[2]) || 1);
+        if (Math.abs(along) < 0.9) bad.push("균열이 공격 방향과 어긋남 " + along.toFixed(2));
+        if (burst.crackMesh.count > 5) bad.push("균열이 너무 많음 " + burst.crackMesh.count);
       }
       W.step(api.ULT.hkWind * 4, 16);
       view.render(W.t(), Date.now());
       if (api.FIELD.slams.length) bad.push("목록이 남음");
       if (burst && burst.group.parent) bad.push("그림이 남음");
       self.verdict(done, bad, "균열·먼지·파편·불티 후 정리");
+    });
+    run(G, "대장장이 타격 이펙트: 기본 공격 타격 때만 작은 균열이 생기고, 사슬 망령보다 적으며, 끝나면 남지 않는가", function (done) {
+      var bad = [], W = self.scene("forest", [{ id: "bs", team: "blue", char: "blacksmith", x: 450, y: 675, slot: 1 }, { id: "foe", char: "dummy", x: 450, y: 1000, slot: 1 }]), A = W.ent("bs"), view = api.HAMMER_STRIKES, H = api.HammerStrikeBurst, P = api.ChainSlamBurst;
+      api.fireBasic(A, Math.PI / 2);
+      if (api.FIELD.hammerStrikes.length) bad.push("대기 표시 때 터짐");
+      W.step(api.CHARS.blacksmith.windup + 100, 16);
+      var item = api.FIELD.hammerStrikes[0];
+      if (!item) bad.push("타격 때 이펙트가 안 생김");
+      else {
+        view.render(W.t());
+        var burst = item.burst;
+        if (!burst || !burst.group.parent) bad.push("그림이 안 생김");
+        else if (burst.dust.length !== H.DUST_COUNT || burst.dust.length >= P.DUST_COUNT || burst.bits.length >= P.BITS_COUNT || burst.embers.length >= P.EMBER_COUNT) bad.push("입자 수 어긋남");
+        W.step(H.LIFE_SEC * 1000 + 100, 16);
+        if (api.FIELD.hammerStrikes.length) bad.push("목록이 남음");
+        if (burst && burst.group.parent) bad.push("그림이 남음");
+      }
+      self.verdict(done, bad, "타격 때 작은 균열, 끝나면 정리");
     });
   }
 
