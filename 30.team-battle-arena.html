@@ -10414,8 +10414,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.draft.view = c;
       if (services.draft.draftLeft(services.session.room.draft).indexOf(c) >= 0) services.draft.draftHover(c);
       services.draftView.renderDraft();
-      var detail = Dom.$("dfDetail");
-      if (detail.scrollIntoView) detail.scrollIntoView({ block: "nearest", behavior: "smooth" });
     };
     Dom.$("dfPickBar").onclick = function (e) {
       var b = e.target.closest ? e.target.closest("[data-pick]") : null;
