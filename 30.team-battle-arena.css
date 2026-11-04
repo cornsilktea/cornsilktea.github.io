@@ -35,11 +35,11 @@
   .row button { flex: 0 0 auto; height: 60px; padding: 0 22px; font-size: 20px; font-weight: 800; border-radius: 6px; border: 2px solid var(--sg-primary); }
   .msg { min-height: 22px; margin-top: 10px; text-align: center; font-size: 15px; font-weight: 700; color: var(--sg-danger); }
 
-  .codeBar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .codeBar { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+  .codeBar .mini { flex: 0 0 auto; margin: 0; }
   .codeBox { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
   .codeLab { font-size: 16px; font-weight: 700; color: var(--sg-ink-soft); }
   .codeNum { font-size: 60px; font-weight: 800; letter-spacing: 8px; color: var(--sg-primary); line-height: 1; }
-  .badge { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 14px; font-weight: 800; background: var(--sg-primary-soft); color: var(--sg-primary); }
   .lobbyTop { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 10px 22px; margin-top: 12px; }
   .lobbyTop .hello { justify-content: flex-start; margin: 0; font-size: 16px; min-height: 34px; }
   .optRows { display: grid; gap: 8px; padding: 10px 12px; border-radius: 8px; background: rgba(0, 0, 0, .38); border: 1px solid rgba(255, 255, 255, .14); }
@@ -172,7 +172,7 @@
   .tankPh { flex: 1 1 auto; display: flex; align-items: center; justify-content: center; font-size: 60px; }
   .startHint { text-align: center; font-size: 15px; font-weight: 700; color: var(--sg-ink-soft); margin-top: 8px; min-height: 20px; }
   .secTitle { font-size: 17px; font-weight: 800; margin-bottom: 10px; }
-  .charHead { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+  .charHead { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
   .charHead .mini { flex: 0 0 auto; }
   .charBtns { flex: 0 0 auto; display: flex; gap: 6px; }
   #btnZoomChars.on { border-color: #D97B4F; color: #F4F1E8; background: rgba(217,123,79,.28); }

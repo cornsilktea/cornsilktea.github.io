@@ -3859,7 +3859,6 @@ class ResultCollector {
       if (!el("btnJoinBlue").hidden || el("btnJoinRed").hidden || el("btnJoinRed").disabled || el("btnSpec").hidden) bad.push("팀 이동 버튼 표시");
       var modeOn = el("modeBtns").querySelector(".on");
       if (!modeOn || modeOn.getAttribute("data-id") !== "pvp" || el("modeBtns").querySelector("[disabled]")) bad.push("모드 버튼 표시");
-      if (el("lobbyMode").textContent !== "일반모드 · 숲속 공터") bad.push("방식 표시 '" + el("lobbyMode").textContent + "'");
       api.addAi("red"); await sleep(10); api.renderLobby();
       if (el("btnStart").disabled || el("startHint").textContent !== "블루 1 vs 레드 1") bad.push("양 팀 1명씩 '" + el("startHint").textContent + "' 잠김 " + el("btnStart").disabled);
       api.addAi("red"); await sleep(10); api.renderLobby();

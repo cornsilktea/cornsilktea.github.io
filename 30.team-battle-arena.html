@@ -26,7 +26,7 @@
   "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
 } }
 </script>
-<link rel="stylesheet" href="30.team-battle-arena.css?v=20261104h">
+<link rel="stylesheet" href="30.team-battle-arena.css?v=20261104i">
 </head>
 <body>
 <canvas id="cv"></canvas>
@@ -74,7 +74,7 @@
   <div class="wrap">
     <div class="card">
       <div class="codeBar">
-        <div class="codeBox"><span class="codeLab">방 코드</span><span id="lobbyCode" class="codeNum">-----</span><span id="lobbyMode" class="badge"></span></div>
+        <div class="codeBox"><span class="codeLab">방 코드</span><span id="lobbyCode" class="codeNum">-----</span></div>
         <button id="btnLeaveLobby" class="mini danger" type="button">방 나가기</button>
       </div>
       <div class="lobbyTop">
@@ -1372,7 +1372,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var me = services.session.players[services.session.myId]; if (!me) return;
       var mode = services.session.room.mode;
       var practice = mode === "practice", maps = services.lobby.mapChoices(mode);
-      Dom.setText(Dom.$("lobbyMode"), services.lobby.modeName(mode) + " · " + services.lobby.nameIn(maps, services.session.room.map, MapCatalog.of("forest").name));
       Dom.setHtml(Dom.$("modeBtns"), services.lobby.choiceButtons(GameModes.LIST, mode, "modeOpt"));
       Dom.setHtml(Dom.$("mapBtns"), services.lobby.choiceButtons(maps, services.session.room.map || "forest", "mapOpt"));
 
