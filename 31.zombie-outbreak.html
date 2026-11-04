@@ -369,7 +369,7 @@
         <li>1분마다 학교 종이 울리고, 마지막 30초에는 좀비가 더 빨라집니다.</li>
         <li>인간은 판마다 달라지는 미션 3개를 하나씩 받습니다. 미션 장소(교실 앞쪽 벽)에 가서 숲 미니게임을 2번 성공하면 한 개가 끝납니다. 좀비는 미션을 알 수 없습니다.</li>
         <li>인간이 미션 3개를 모두 끝내고 3분을 버티면 인간 승리입니다. 미션을 못 끝낸 채 3분이 지나거나 모두 감염되면 좀비 승리입니다.</li>
-        <li>오른쪽 아래 학교 지도(1·2층)를 누르면 크게 보이고 교실 이름이 나옵니다. 내 위치가 보이고 인간에게는 미션 장소가 노란 점으로 나옵니다. 남은 시간 2분 30초부터 20초마다 3초 동안, 좀비는 살아 있는 인간의 위치를, 인간은 좀비의 위치를 빨간 점으로 볼 수 있습니다.</li>
+        <li>오른쪽 아래 학교 지도(1·2층)를 누르면 크게 보이고 교실 이름이 나옵니다. 내 위치가 보이고 인간에게는 미션 장소가 노란 불빛으로 나옵니다. 남은 시간 2분 30초부터 20초마다 3초 동안만, 좀비는 인간(초록 불빛)과 다른 좀비(빨간 불빛)의 위치를, 인간은 좀비(빨간 불빛)의 위치를 볼 수 있습니다.</li>
         <li>방마다 관전자 1명이 따로 들어와 플레이어들의 시점을 번갈아 볼 수 있습니다. 게임 중에 들어온 플레이어는 다음 판부터 참가합니다.</li>
       </ul>
     </div>
@@ -3854,16 +3854,63 @@ function distToSegment2D(px, pz, ax, az, bx, bz) {
   let k = l2 > 0 ? ((px - ax) * vx + (pz - az) * vz) / l2 : 0; k = clamp(k, 0, 1);
   return Math.hypot(px - (ax + vx * k), pz - (az + vz * k));
 }
+class ZombieTouchJudge {
+  static ZOMBIE_SCREEN_RADIUS = 1.0;
+
+  constructor() { this.roundKey = 0; this.reported = new Set(); }
+
+  static zombieReaches(zombie, x, y, z, radius) {
+    if (Math.abs(zombie.pos.y - y) > INFECT_HEIGHT_GAP) return false;
+    return distToSegment2D(x, z, zombie.prevPos.x, zombie.prevPos.z, zombie.pos.x, zombie.pos.z) < radius && InfectionSight.clear(zombie.prevPos, zombie.pos, x, y, z);
+  }
+  static zombieTouching(humanId, x, y, z, t) {
+    for (const id in avatars) {
+      if (id === humanId || !zombieFormActive(id, t) || isFrozen(id, t)) continue;
+      if (ZombieTouchJudge.zombieReaches(avatars[id], x, y, z, INFECT_RADIUS)) return id;
+    }
+    return null;
+  }
+  static enterMyInfection(infectedAt, byId) {
+    round.infectSent = true; round.myInfectedAt = infectedAt; round.knownInfected[myId] = true;
+    round.forceNet = true; round.dashReadyAt = 0;
+    playInfectSound(1);
+    flashCenter("감염되었습니다!", "잠시 뒤 좀비로 깨어납니다.", INFECT_ZOMBIE_MODEL_MS, true);
+    pushKillFeed(byId, myId);
+  }
+  adoptReportedInfection(t) {
+    const mine = room.players[myId];
+    if (round.myInfectedAt || round.knownInfected[myId] || !mine || !mine.infected) return;
+    ZombieTouchJudge.enterMyInfection(mine.infectedAt || t, mine.infectedBy);
+  }
+  checkOnMyScreen(t) {
+    if (this.roundKey !== round.key) { this.roundKey = round.key; this.reported.clear(); }
+    const zombie = avatars[myId];
+    if (!round.iAmIn || !zombie || room.status !== "playing" || t < room.startAt + ZOMBIE_HOLD_MS || !zombieFormActive(myId, t) || isFrozen(myId, t)) return;
+    for (const id of roundIds()) {
+      const human = avatars[id];
+      if (!human || isZombieNow(id, t) || this.reported.has(id)) continue;
+      if (ZombieTouchJudge.zombieReaches(zombie, human.pos.x, human.pos.y, human.pos.z, ZombieTouchJudge.ZOMBIE_SCREEN_RADIUS)) this.report(id, t);
+    }
+  }
+  report(victimId, t) {
+    this.reported.add(victimId);
+    const ref = room.ref;
+    ref.child("players/" + victimId).transaction(cur => {
+      if (!cur || cur.infected || cur.role === "zombie") return;
+      return Object.assign({}, cur, { infected: true, infectedAt: t, infectedBy: myId, role: "zombie" });
+    }).then(result => {
+      if (result.committed) ref.child("zombieIds/" + victimId).set(t);
+      else this.reported.delete(victimId);
+    }).catch(() => this.reported.delete(victimId));
+  }
+}
+const zombieTouch = new ZombieTouchJudge();
 function checkInfection(t) {
   if (round.infectSent) return;
   const mine = room.players[myId];
   if (!mine || mine.infected || mine.role === "zombie") return;
-  for (const id in avatars) {
-    if (id === myId || !zombieFormActive(id, t) || isFrozen(id, t)) continue;
-    const z = avatars[id];
-    if (Math.abs(z.pos.y - me.y) > INFECT_HEIGHT_GAP) continue;
-    if (distToSegment2D(me.x, me.z, z.prevPos.x, z.prevPos.z, z.pos.x, z.pos.z) < INFECT_RADIUS && InfectionSight.clear(z.prevPos, z.pos, me.x, me.y, me.z)) { becomeInfected(t, id); return; }
-  }
+  const byId = ZombieTouchJudge.zombieTouching(myId, me.x, me.y, me.z, t);
+  if (byId) becomeInfected(t, byId);
 }
 function hasFinalConsonant(name) {
   const ch = String(name).trim().slice(-1), code = ch.charCodeAt(0);
@@ -3886,11 +3933,7 @@ function pushKillFeed(zombieId, victimId) {
 }
 function becomeInfected(t, byId) {
   if (round.infectSent || round.myInfectedAt) return;
-  round.infectSent = true; round.myInfectedAt = t; round.knownInfected[myId] = true;
-  round.forceNet = true; round.dashReadyAt = 0;
-  playInfectSound(1);
-  flashCenter("감염되었습니다!", "잠시 뒤 좀비로 깨어납니다.", INFECT_ZOMBIE_MODEL_MS, true);
-  pushKillFeed(byId, myId);
+  ZombieTouchJudge.enterMyInfection(t, byId);
   room.ref.update({
     ["players/" + myId + "/infected"]: true,
     ["players/" + myId + "/infectedAt"]: t,
@@ -4146,18 +4189,13 @@ function stepBot(id, b, dt, t, nowMs) {
 }
 function checkBotInfection(id, b, t) {
   if (b.infectSent || t < room.startAt + ZOMBIE_HOLD_MS || isZombieNow(id, t)) return;
-  for (const other in avatars) {
-    if (other === id || !zombieFormActive(other, t) || isFrozen(other, t)) continue;
-    const z = avatars[other];
-    if (Math.abs(z.pos.y - b.body.y) > INFECT_HEIGHT_GAP) continue;
-    if (distToSegment2D(b.body.x, b.body.z, z.prevPos.x, z.prevPos.z, z.pos.x, z.pos.z) >= INFECT_RADIUS || !InfectionSight.clear(z.prevPos, z.pos, b.body.x, b.body.y, b.body.z)) continue;
-    b.infectSent = true;
-    room.ref.update({
-      ["players/" + id + "/infected"]: true, ["players/" + id + "/infectedAt"]: t, ["players/" + id + "/infectedBy"]: other,
-      ["players/" + id + "/role"]: "zombie", ["zombieIds/" + id]: t
-    });
-    return;
-  }
+  const other = ZombieTouchJudge.zombieTouching(id, b.body.x, b.body.y, b.body.z, t);
+  if (!other) return;
+  b.infectSent = true;
+  room.ref.update({
+    ["players/" + id + "/infected"]: true, ["players/" + id + "/infectedAt"]: t, ["players/" + id + "/infectedBy"]: other,
+    ["players/" + id + "/role"]: "zombie", ["zombieIds/" + id]: t
+  });
 }
 function botsTick(dt, t, nowMs) {
   if (!isHost() || !round.active || room.status !== "playing") return;
@@ -4291,7 +4329,21 @@ $("specList").addEventListener("click", e => {
 
 const FLOOR_MAP = { x0: -BUILDING_X, x1: GYM.x1, z0: -BUILDING_Z, z1: BUILDING_Z, shear: 0.42, depth: 0.5, gap: 9, pad: 5, labelW: 15, edge: 1.6 };
 const MAP_COLORS = { slab: "#27303C", slabEdge: "#121821", corridor: "#3A4555", room: "#566272", stairs: "#3F5A45", gym: "#3A342C", outline: "#8A96A6",
-                     here: "#D97B4F", label: "#C9D3E6", human: "#7CC4FF", zombie: "#E0293D", origin: "#FFD27A" };
+                     here: "#D97B4F", label: "#C9D3E6", origin: "#FFD27A" };
+class ZombieMapLight {
+  static HUMAN = "62, 232, 112";
+  static ZOMBIE = "255, 38, 56";
+  static MISSION = "255, 210, 58";
+  static solid(rgb) { return "rgb(" + rgb + ")"; }
+  static alpha(rgb, a) { return "rgba(" + rgb + ", " + a.toFixed(2) + ")"; }
+  static glow(c, x, y, radius, rgb, strength) {
+    const g = c.createRadialGradient(x, y, 0, x, y, radius);
+    g.addColorStop(0, ZombieMapLight.alpha(rgb, 0.85 * strength));
+    g.addColorStop(0.45, ZombieMapLight.alpha(rgb, 0.35 * strength));
+    g.addColorStop(1, ZombieMapLight.alpha(rgb, 0));
+    c.fillStyle = g; c.beginPath(); c.arc(x, y, radius, 0, Math.PI * 2); c.fill();
+  }
+}
 class ZombieHumanPing {
   static PERIOD_MS = 20000;
   static SHOW_MS = 3000;
@@ -4393,7 +4445,7 @@ function drawFloorMap(t) {
   const myZombieSide = round.iAmIn && isZombieNow(myId, t);
   const myHumanSide = round.iAmIn && !myZombieSide;
   const pingOn = round.iAmIn && t >= room.startAt && ZombieHumanPing.activeAt(t - room.startAt);
-  const shown = roundIds().filter(id => avatars[id] && (!round.iAmIn || id === myId || (myZombieSide && (pingOn || isZombieNow(id, t))) || (myHumanSide && pingOn && isZombieNow(id, t))));
+  const shown = roundIds().filter(id => avatars[id] && (!round.iAmIn || id === myId || (pingOn && (myZombieSide || (myHumanSide && isZombieNow(id, t))))));
   shown.sort((a, b) => (a === focusId) - (b === focusId));
   const r = Math.max(3, s * 1.5);
   shown.forEach(id => {
@@ -4404,26 +4456,29 @@ function drawFloorMap(t) {
       c.beginPath(); c.moveTo(p[0] + ux * tip, p[1] + uy * tip); c.lineTo(p[0] - uy * r * 0.9, p[1] + ux * r * 0.9); c.lineTo(p[0] + uy * r * 0.9, p[1] - ux * r * 0.9); c.closePath();
       c.fillStyle = "#FFFFFF"; c.fill();
     }
-    const pinged = pingOn && id !== myId && zombie !== myZombieSide;
+    const pinged = pingOn && id !== myId, rgb = zombie ? ZombieMapLight.ZOMBIE : ZombieMapLight.HUMAN;
     if (pinged) {
-      c.beginPath(); c.arc(p[0], p[1], r * (1.8 + 1.6 * (1 - ZombieHumanPing.fadeAt(t - room.startAt))), 0, Math.PI * 2);
-      c.strokeStyle = "rgba(255, 42, 42, " + (0.35 + 0.5 * ZombieHumanPing.fadeAt(t - room.startAt)).toFixed(2) + ")"; c.lineWidth = 2; c.stroke();
-    }
+      const fade = ZombieHumanPing.fadeAt(t - room.startAt);
+      ZombieMapLight.glow(c, p[0], p[1], r * 3.6, rgb, 0.6 + 0.4 * fade);
+      c.beginPath(); c.arc(p[0], p[1], r * (1.8 + 1.6 * (1 - fade)), 0, Math.PI * 2);
+      c.strokeStyle = ZombieMapLight.alpha(rgb, 0.35 + 0.5 * fade); c.lineWidth = 2; c.stroke();
+    } else ZombieMapLight.glow(c, p[0], p[1], r * 2.6, rgb, 0.6);
     c.beginPath(); c.arc(p[0], p[1], focus ? r * 1.35 : pinged ? r * 1.25 : r, 0, Math.PI * 2);
-    c.fillStyle = zombie || pinged ? (pinged ? "#FF2A2A" : MAP_COLORS.zombie) : MAP_COLORS.human; c.fill();
+    c.fillStyle = ZombieMapLight.solid(rgb); c.fill();
     c.lineWidth = focus ? 2 : 1.2;
     c.strokeStyle = focus ? "#FFFFFF" : zombie && isOriginZombie(id) ? MAP_COLORS.origin : "rgba(0, 0, 0, .65)"; c.stroke();
   });
   const mission = zombieMissions.mapMission();
   if (mission) {
-    const mp = floorMapPoint(mission.site.x, mission.site.z, mission.site.floor, s), pulse = 0.5 + 0.5 * Math.sin(t / 220);
-    c.beginPath(); c.arc(mp[0], mp[1], r * (1.9 + 0.5 * pulse), 0, Math.PI * 2); c.strokeStyle = "rgba(255, 210, 58, " + (0.35 + 0.4 * pulse).toFixed(2) + ")"; c.lineWidth = 2; c.stroke();
-    c.beginPath(); c.arc(mp[0], mp[1], r * 1.3, 0, Math.PI * 2); c.fillStyle = "#FFD23A"; c.fill(); c.lineWidth = 1.4; c.strokeStyle = "rgba(0, 0, 0, .7)"; c.stroke();
+    const mp = floorMapPoint(mission.site.x, mission.site.z, mission.site.floor, s), pulse = 0.5 + 0.5 * Math.sin(t / 220), rgb = ZombieMapLight.MISSION;
+    ZombieMapLight.glow(c, mp[0], mp[1], r * 3.6, rgb, 0.6 + 0.4 * pulse);
+    c.beginPath(); c.arc(mp[0], mp[1], r * (1.9 + 0.5 * pulse), 0, Math.PI * 2); c.strokeStyle = ZombieMapLight.alpha(rgb, 0.35 + 0.4 * pulse); c.lineWidth = 2; c.stroke();
+    c.beginPath(); c.arc(mp[0], mp[1], r * 1.3, 0, Math.PI * 2); c.fillStyle = ZombieMapLight.solid(rgb); c.fill(); c.lineWidth = 1.4; c.strokeStyle = "rgba(0, 0, 0, .7)"; c.stroke();
   }
   if (round.iAmIn) {
     const elapsed = t - room.startAt, active = elapsed >= 0 && ZombieHumanPing.activeAt(elapsed);
     const gp = floorMapPoint((GYM.x0 + GYM.x1) / 2, 0, 1, s);
-    c.fillStyle = "#FF3B3B"; c.textAlign = "center"; c.textBaseline = "middle";
+    c.fillStyle = ZombieMapLight.solid(myZombieSide ? ZombieMapLight.HUMAN : ZombieMapLight.ZOMBIE); c.textAlign = "center"; c.textBaseline = "middle";
     c.font = "800 " + Math.max(10, Math.round(3.4 * s)) + "px " + FONT; c.fillText(myZombieSide ? "인간 위치 공유" : "좀비 위치 공유", gp[0], gp[1] - Math.max(14, 7 * s));
     c.font = "800 " + Math.max(20, Math.round(9 * s)) + "px " + FONT;
     c.fillText(active ? "●" : String(ZombieHumanPing.secondsUntilNext(elapsed)), gp[0], gp[1] + Math.max(4, 2 * s));
@@ -4431,7 +4486,7 @@ function drawFloorMap(t) {
   if (!round.iAmIn) {
     c.font = "800 " + Math.max(11, Math.round(4.6 * s)) + "px " + FONT; c.textAlign = "right"; c.textBaseline = "middle";
     const lx = w - 6, ly = FLOOR_MAP.pad * s;
-    [["사람", MAP_COLORS.human], ["좀비", MAP_COLORS.zombie]].forEach(([label, color], i) => {
+    [["사람", ZombieMapLight.solid(ZombieMapLight.HUMAN)], ["좀비", ZombieMapLight.solid(ZombieMapLight.ZOMBIE)]].forEach(([label, color], i) => {
       const y = ly + i * Math.max(14, 6 * s);
       c.fillStyle = MAP_COLORS.label; c.fillText(label, lx, y);
       const tw = c.measureText(label).width;
@@ -4824,8 +4879,9 @@ function frame(nowMs) {
     const fogEnd = GAME_VIEW.far * viewScale;
     const clipAtFog = fogClipIndoors && isIndoor(camera.position.x, camera.position.y, camera.position.z);
     setViewDistance(GAME_VIEW.near * viewScale, fogEnd, clipAtFog ? Math.ceil(fogEnd + 2) : GAME_VIEW.cameraFar);
-    if (round.iAmIn) updateLocalPlayer(dt, t, nowMs);
+    if (round.iAmIn) { zombieTouch.adoptReportedInfection(t); updateLocalPlayer(dt, t, nowMs); }
     updateRemotePlayers(dt, t, nowMs);
+    zombieTouch.checkOnMyScreen(t);
     botsTick(dt, t, nowMs);
     roundEvents(t);
     netTick(nowMs, t);
