@@ -1613,7 +1613,7 @@ class StudentStatsWindow {
       const role = StudentStatsWindow.roleOf(p.char);
       const tr = el("tr", (i === entry.myIndex ? "mine" : "") + (p.team === 1 && (i === 0 || entry.players[i - 1].team === 0) ? " split" : ""));
       tr.appendChild(el("td", "team " + (p.team === 0 ? "blue" : "red"), StudentStatsWindow.TEAMS[p.team] || "-"));
-      tr.appendChild(el("td", "nm", (p.ai ? "🤖 " : "") + p.name + (p.left ? " (나감)" : "")));
+      tr.appendChild(el("td", "nm", p.name + (p.left ? " (나감)" : "")));
       tr.appendChild(el("td", "job", role.name));
       [p.kills, p.deaths, p.assists, Math.round(p.dmg), role.heal ? Math.round(p.heal) : "-", role.block ? Math.round(p.blocked) : "-", sec(p.stun), sec(p.slow)]
         .forEach((v) => tr.appendChild(el("td", null, String(v))));
@@ -1629,7 +1629,7 @@ class StudentStatsWindow {
     best.forEach((i) => {
       const p = entry.players[i];
       const line = el("div", "name");
-      line.append(el("span", p.team === 0 ? "b" : "r", (p.ai ? "🤖 " : "") + p.name), el("small", null, StudentStatsWindow.roleOf(p.char).name + " · " + TeamBattleScore.of(p) + "점"));
+      line.append(el("span", p.team === 0 ? "b" : "r", p.name), el("small", null, StudentStatsWindow.roleOf(p.char).name + " · " + TeamBattleScore.of(p) + "점"));
       mvp.appendChild(line);
     });
     card.appendChild(mvp);

@@ -3790,14 +3790,14 @@ class ResultCollector {
       var ai = function () { var ps = playersIn(fake, code); return Object.keys(ps).filter(function (id) { return ps[id].isAI; }); };
       if (ai().length !== 2) bad.push("레드 정원(사람 1 + AI " + ai().length + ")을 못 지킴");
       var ps = playersIn(fake, code), names = ai().map(function (id) { return ps[id].nickname; }).sort().join();
-      if (names !== "AI1,AI2") bad.push("이름 " + names);
+      if (names !== "AI_1,AI_2") bad.push("이름 " + names);
       var dup = ai().some(function (id) { return api.takenInMatch(ps, "red", ps[id].characterType, id); });
       if (dup) bad.push("AI 캐릭터가 겹침");
-      var first = ai().filter(function (id) { return ps[id].nickname === "AI1"; })[0];
+      var first = ai().filter(function (id) { return ps[id].nickname === "AI_1"; })[0];
       api.removeAi(first); await sleep(5);
       api.addAi("red"); await sleep(5);
       ps = playersIn(fake, code);
-      if (ai().map(function (id) { return ps[id].nickname; }).sort().join() !== "AI1,AI2") bad.push("지운 번호 AI1 을 다시 쓰지 않음");
+      if (ai().map(function (id) { return ps[id].nickname; }).sort().join() !== "AI_1,AI_2") bad.push("지운 번호 AI_1 을 다시 쓰지 않음");
       api.removeAi("r1"); await sleep(5);
       if (!playersIn(fake, code).r1) bad.push("사람이 삭제됨");
       fake.put(base + "hostPlayerId", "r1"); await sleep(5);
@@ -6773,7 +6773,7 @@ class AccountStatsTests {
         document.getElementById("btnMyStatsRecent").click();
         A.recent.render([A.Codec.decode(Object.assign(JSON.parse(JSON.stringify(A.Codec.encode(self.report({ players: self.players({ 0: { kills: 2 }, 4: { ai: true } }) }), "k", false))), { at: 1700000000000 }))]);
         var item = document.querySelector("#rmList .rmItem");
-        if (!item || !item.classList.contains("lose") || item.textContent.indexOf("🤖 마") < 0 || item.textContent.indexOf("패배") < 0) bad.push("최근 매치 블록");
+        if (!item || !item.classList.contains("lose") || item.textContent.indexOf("마") < 0 || item.textContent.indexOf("패배") < 0) bad.push("최근 매치 블록");
         item && item.click();
         if (document.getElementById("recentResultModal").hidden || document.querySelectorAll("#rmBoardBody tr").length !== 6 || document.getElementById("rmTitle").textContent !== "패배") bad.push("결과 창");
       } finally {

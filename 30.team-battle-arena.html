@@ -26,7 +26,7 @@
   "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
 } }
 </script>
-<link rel="stylesheet" href="30.team-battle-arena.css?v=20261104e">
+<link rel="stylesheet" href="30.team-battle-arena.css?v=20261104g">
 </head>
 <body>
 <canvas id="cv"></canvas>
@@ -155,7 +155,7 @@
         <button id="btnLeaveDraft" class="mini danger" type="button">방 나가기</button>
       </div>
       <div class="dfHead dfHeadInfo">
-        <div id="dfMap" class="dfMap"></div>
+        <button id="dfMap" class="dfMap" type="button"></button>
         <div id="dfTimer" class="dfTimer">15<small>남은 시간</small></div>
       </div>
       <div class="dfBar"><i id="dfBarFill"></i></div>
@@ -167,7 +167,6 @@
         <div class="team red"><h3>레드팀<span id="dfBanR" class="dfBanBox"></span></h3><div id="dfRed" class="dfSlots"></div></div>
       </div>
     </div>
-    <img id="dfMapImg" class="dfMapImg" alt="">
     <div id="dfTradeBox" class="dfTradeBox" hidden></div>
   </div>
   <div class="card charCol dfCharCol">
@@ -269,9 +268,9 @@
 
 <div id="mapViewModal" class="modal" hidden>
   <div class="modalBox mapViewBox">
-    <div class="statsTop"><h3>맵 보기</h3><button id="btnMapViewClose" class="mini" type="button">닫기</button></div>
+    <div class="statsTop"><h3 id="mapViewTitle">맵 보기</h3><button id="btnMapViewClose" class="mini" type="button">닫기</button></div>
     <div id="mapViewGrid" class="mapViewGrid"></div>
-    <div class="mapViewNote">위쪽이 블루팀 진영, 아래쪽이 레드팀 진영이에요.</div>
+    <div id="mapViewNote" class="mapViewNote"></div>
   </div>
 </div>
 
@@ -295,7 +294,7 @@
 <script>new CharacterMakerDialog(undefined, false);</script>
 <script charset="utf-8" src="account-match-kit.js?v=20261103e"></script>
 <script charset="utf-8" src="account-stats.js?v=20261104b"></script>
-<script charset="utf-8" src="30.team-battle-versus.js?v=20261029d"></script>
+<script charset="utf-8" src="30.team-battle-versus.js?v=20261104a"></script>
 <script charset="utf-8" src="patch-notes.js?v=20261029b"></script>
 <script type="module">
 import * as THREE from "three";
@@ -1391,7 +1390,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
             continue;
           }
           var p = services.session.players[id];
-          h += '<div class="slot' + (id === services.session.myId ? " mine" : "") + (p.isAI ? " ai" : "") + '">' + (services.session.room.host === id ? '<span class="host">👑</span>' : "") + (p.isAI ? "🤖 " : "") + Dom.esc(p.nickname) +
+          h += '<div class="slot' + (id === services.session.myId ? " mine" : "") + (p.isAI ? " ai" : "") + '">' + (services.session.room.host === id ? '<span class="host">👑</span>' : "") + Dom.esc(p.nickname) +
                (id === services.session.myId ? ' <span class="me">나</span>' : "") + (services.session.room.mode === "cup" ? "" : '<span class="ch">' + Dom.esc((services.charTypes.statsOf(p.characterType) || services.charTypes.statsOf(services.charTypes.fallbackId)).name) + "</span>") +
                (p.isAI && hostCanFill ? '<button type="button" class="aiDel" data-ai-del="' + id + '" aria-label="AI 빼기">빼기</button>' : "") + "</div>";
         }
@@ -1533,8 +1532,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     freeAiName(ps) {
       var used = Object.keys(ps || {}).map(function (id) { return ps[id] && ps[id].nickname; }), n = 1;
-      while (used.indexOf("AI" + n) >= 0) n++;
-      return "AI" + n;
+      while (used.indexOf("AI_" + n) >= 0) n++;
+      return "AI_" + n;
     }
     addAi(team) { var services = this.services;
       if (!services.session.isHost() || services.session.room.status !== "lobby" || services.roster.countIn(services.session.players, team) >= MatchRules.TEAM_MAX) return;
@@ -2136,6 +2135,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (d.denied && d.denied.to === services.session.myId && t < d.denied.at + Draft.DENIED_SHOW_MS) return "<b>교환 신청이 거절되었습니다.</b>";
       return "";
     }
+    shownMapId() { var services = this.services;
+      return MapCatalog.of(services.session.room.arena) ? services.session.room.arena : services.arenaMap.id;
+    }
     renderDraft() { var services = this.services;
       if (!services.session.room || services.screens.now !== "draft") return;
       var d = services.session.room.draft; if (!d) return;
@@ -2144,9 +2146,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var me = services.session.players[services.session.myId], myTeam = me ? me.team : null, mySide = services.draft.draftSideOf(d, services.session.myId);
       var left = Math.max(0, d.stepAt + Draft.SHOWN_MS - t), humans = services.draft.draftHumans(d).length, readyN = services.draft.draftReadyCount(d);
       var arena = MapCatalog.of(services.session.room.arena) || MapCatalog.of(services.arenaMap.id);
-      Dom.setHtml(Dom.$("dfMap"), arena ? '<span class="dfMapLabel">맵</span> ' + Dom.esc(arena.name) : "");
-      var arenaId = MapCatalog.of(services.session.room.arena) ? services.session.room.arena : services.arenaMap.id, mapImg = Dom.$("dfMapImg");
-      if (mapImg.getAttribute("src") !== services.arenaMap.shotSrc(arenaId, true)) mapImg.setAttribute("src", services.arenaMap.shotSrc(arenaId, true));
+      Dom.setHtml(Dom.$("dfMap"), arena ? '<span class="dfMapLabel">맵</span><span class="dfMapName">' + Dom.esc(arena.name) + "</span>" : "");
       var timer = Dom.$("dfTimer");
       if (done) {
         Dom.setHtml(timer, "");
@@ -2182,7 +2182,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
           else if (isTurn && hover[id] && myTeam === team && services.charTypes.statsOf(hover[id])) pk = '<span class="pk think">' + services.charTypes.statsOf(hover[id]).name + " 고민 중…</span>" + blankFace;
           else pk = '<span class="pk wait">' + (isTurn ? (banTurn ? "밴하는 중…" : "고르는 중…") : "대기") + "</span>" + blankFace;
           h += '<div class="slot' + (id === services.session.myId ? " mine" : "") + (isTurn ? " turn" : "") + (p.isAI ? " ai" : "") + (done && ready[id] ? " ready" : "") + '">' +
-               '<span class="dfNick' + (id === services.session.myId ? " myNick" : "") + '">' + (p.isAI ? "🤖 " : "") + Dom.esc(p.nickname) + "</span>" + pk + "</div>";
+               '<span class="dfNick' + (id === services.session.myId ? " myNick" : "") + '">' + Dom.esc(p.nickname) + "</span>" + pk + "</div>";
         }
         return h;
       }
@@ -3935,7 +3935,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var killer = services.session.players[k.k] || {}, victim = services.session.players[k.v] || {}, feed = Dom.$("killFeed");
       var nameTag = function (d, E) {
         var team = d.team || (E && E.team), c = E && services.charTypes.statsOf(E.char) ? " <small>" + services.charTypes.statsOf(E.char).name + "</small>" : "";
-        return '<b class="' + (team === "blue" ? "b" : "r") + '">' + (d.isAI ? "🤖 " : "") + Dom.esc(d.nickname || (E && E.nickname) || "?") + c + "</b>";
+        return '<b class="' + (team === "blue" ? "b" : "r") + '">' + Dom.esc(d.nickname || (E && E.nickname) || "?") + c + "</b>";
       };
       var row = document.createElement("div");
       row.className = "kf" + (k.k === services.session.myId || k.v === services.session.myId ? " mine" : "");
@@ -9158,6 +9158,25 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.cameraRig.placeCamera(services.cameraRig.view.look.x, services.cameraRig.view.look.z, services.cameraRig.view.dist, pitch, b);
     }
   }
+  class MapWindow {
+    constructor(services) { this.services = services; }
+    open(title, single, figuresHtml, note) {
+      Dom.setText(Dom.$("mapViewTitle"), title);
+      Dom.$("mapViewGrid").classList.toggle("single", single);
+      Dom.setHtml(Dom.$("mapViewGrid"), figuresHtml);
+      Dom.setText(Dom.$("mapViewNote"), note);
+      Dom.show(Dom.$("mapViewModal"), true);
+    }
+    showAll(currentId) { var services = this.services;
+      this.open("맵 보기", false, MapCatalog.IDS.map(function (id) {
+        return '<figure class="' + (id === currentId ? "on" : "") + '"><figcaption>' + Dom.esc(MapCatalog.of(id).name) + '</figcaption><img alt="" src="' + services.arenaMap.shotSrc(id) + '"></figure>';
+      }).join(""), "위쪽이 블루팀 진영, 아래쪽이 레드팀 진영이에요.");
+    }
+    showOne(id) { var services = this.services, map = MapCatalog.of(id);
+      if (!map) return;
+      this.open(map.name, true, '<figure><img alt="" src="' + services.arenaMap.shotSrc(id, true) + '"></figure>', "왼쪽이 블루팀 진영, 오른쪽이 레드팀 진영이에요.");
+    }
+  }
   class TourView {
     static SPOTS = [["warrior", "blue", 330, 585], ["ranger", "blue", 450, 555], ["mage", "blue", 570, 585],
                     ["knight", "red", 330, 765], ["rogue", "red", 450, 795], ["sniper", "red", 570, 765], ["wraith", "red", 450, 700]];
@@ -9492,7 +9511,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         var rowClass = (id === mine ? "mine" : "") + (team === "red" && !redStarted ? " teamSplit" : "");
         if (team === "red") redStarted = true;
         rows += '<tr class="' + rowClass + '"><td><span class="dot" style="background:' + (team === "blue" ? "#2F6FD6" : "#D6453D") + '"></span></td>' +
-          '<td class="nm">' + (d.isAI ? "🤖 " : "") + Dom.esc(d.nickname) + (row.left ? " (나감)" : "") + '</td><td class="job">' + services.charTypes.statsOf(E.char).name + "</td>" +
+          '<td class="nm">' + Dom.esc(d.nickname) + (row.left ? " (나감)" : "") + '</td><td class="job">' + services.charTypes.statsOf(E.char).name + "</td>" +
           "<td>" + E.kills + "</td><td>" + E.deaths + "</td><td>" + (E.assists || 0) + "</td><td>" + Math.round(E.dmg) + "</td>" +
           "<td>" + (services.charTypes.statsOf(E.char).heals ? Math.round(E.heal) : "-") + "</td>" +
           "<td>" + (services.charTypes.statsOf(E.char).blocks ? Math.round(E.blocked || 0) : "-") + "</td>" +
@@ -9517,7 +9536,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (!best.length) return '<div class="mvpLab">MVP</div><div class="mvpNone">MVP 없음</div>';
       return '<div class="mvpLab">🏆 MVP' + (best.length > 1 ? " (공동)" : "") + "</div>" + best.map(function (b) {
         var d = b.player || {};
-        return '<div class="mvpName"><span class="' + (b.E.team === "blue" ? "b" : "r") + '">' + (d.isAI ? "🤖 " : "") + Dom.esc(d.nickname || b.E.nickname) + "</span><small>" +
+        return '<div class="mvpName"><span class="' + (b.E.team === "blue" ? "b" : "r") + '">' + Dom.esc(d.nickname || b.E.nickname) + "</span><small>" +
                services.charTypes.statsOf(b.E.char).name + " · " + b.score + "점</small></div>";
       }).join("");
     }
@@ -9781,7 +9800,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         var hp = Math.max(0, Math.round(E.hp)), ratio = MathKit.clamp(E.hp / E.maxHp, 0, 1);
         var g = Math.min(MatchRules.GAUGE_MAX, Math.floor(E.gauge)), full = g >= MatchRules.GAUGE_MAX, tn = services.clock.now(), act = E.alive && E.hasSkillActive(tn);
         h += '<div class="spCard' + (E.alive ? "" : " dead") + '"><img alt="" src="' + services.catalog.charImgSrc(E.char, team) + '">' +
-          '<div class="spInfo"><div class="spName">' + (E.isAI ? "🤖 " : "") + Dom.esc(E.nickname) + '<span class="spK">' + (E.kills || 0) + "킬</span><small>" + services.charTypes.statsOf(E.char).name + "</small></div>" +
+          '<div class="spInfo"><div class="spName">' + Dom.esc(E.nickname) + '<span class="spK">' + (E.kills || 0) + "킬</span><small>" + services.charTypes.statsOf(E.char).name + "</small></div>" +
           '<div class="spBar hp' + (ratio < 0.3 ? " low" : "") + '"><i style="width:' + Math.round(ratio * 100) + '%"></i><span>' +
             (E.alive ? "HP " + hp + " / " + E.maxHp : "부활까지 " + Math.max(1, Math.ceil((E.diedAt + services.timescale.respawnMs - services.clock.now()) / services.clock.scale / 1000)) + "초") + "</span></div>" +
           (act ? '<div class="spBar ult act"><i style="width:' + Math.round(E.skillLeft(tn) * 100) + '%"></i><span>' +
@@ -10758,7 +10777,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       party.members().forEach(function (entry) { var id = entry[0], member = entry[1];
         rows += '<div class="slot' + (id === party.myId ? " mine" : "") + '">' + (id === leaderId ? '<span class="host">👑</span>' : "") + Dom.esc(member.nick) + (id === party.myId ? ' <span class="me">나</span>' : "") + "</div>";
       });
-      for (var n = 0; n < party.bots(); n++) rows += '<div class="slot ai">🤖 AI' + (editable ? '<button type="button" class="aiDel" data-mk-seat="bot" aria-label="AI 빼기">빼기</button>' : "") + "</div>";
+      for (var n = 0; n < party.bots(); n++) rows += '<div class="slot ai">AI' + (editable ? '<button type="button" class="aiDel" data-mk-seat="bot" aria-label="AI 빼기">빼기</button>' : "") + "</div>";
       for (var count = party.members().length + party.bots(); count < this.options.partyLimit; count++)
         rows += editable ? '<button type="button" class="slot empty addAi" data-mk-seat="empty">빈 자리<span class="aiAdd">🤖 AI 추가</span></button>' : '<div class="slot empty">빈 자리</div>';
       return rows;
@@ -11069,6 +11088,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.boltFx = new BoltFx(services);
       services.cameraRig = new CameraRig(services);
       services.tourView = new TourView(services);
+      services.mapWindow = new MapWindow(services);
       services.frameRenderer = new FrameRenderer(services);
       services.resultBoard = new ResultBoard(services);
       services.hud = new Hud2D(services);
@@ -11124,13 +11144,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     services.myStats.bind();
     services.recentMatches.bind();
     Dom.$("btnStatsClose").onclick = function () { Dom.show(Dom.$("statsModal"), false); };
-    Dom.$("btnMapView").onclick = function () {
-      var current = services.session.room && services.session.room.map;
-      Dom.setHtml(Dom.$("mapViewGrid"), MapCatalog.IDS.map(function (id) {
-        return '<figure class="' + (id === current ? "on" : "") + '"><figcaption>' + Dom.esc(MapCatalog.of(id).name) + '</figcaption><img alt="" src="' + services.arenaMap.shotSrc(id) + '"></figure>';
-      }).join(""));
-      Dom.show(Dom.$("mapViewModal"), true);
-    };
+    Dom.$("btnMapView").onclick = function () { services.mapWindow.showAll(services.session.room && services.session.room.map); };
     Dom.$("btnMapViewClose").onclick = function () { Dom.show(Dom.$("mapViewModal"), false); };
     Dom.$("mapViewModal").addEventListener("click", function (e) { if (e.target === Dom.$("mapViewModal")) Dom.show(Dom.$("mapViewModal"), false); });
     Dom.$("statsModal").addEventListener("click", function (e) { if (e.target === Dom.$("statsModal")) Dom.show(Dom.$("statsModal"), false); });
@@ -11196,6 +11210,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (act === "cancel") services.draft.draftTradeCancel(); else services.draft.draftTradeAnswer(act === "yes");
     };
     Dom.$("btnLeaveDraft").onclick = function () { if (confirm("방을 나갈까요?")) services.session.leaveRoom(); };
+    Dom.$("dfMap").onclick = function () { if (services.session.room) services.mapWindow.showOne(services.draftView.shownMapId()); };
     }
   }
   class GameEvents {

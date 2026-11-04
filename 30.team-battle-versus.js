@@ -59,7 +59,7 @@ class TeamBattleVersusView {
             return '<div class="tbv-row waiting"><div class="tbv-who"><b>빈 자리</b><span class="tbv-rate">&nbsp;</span></div>' + this.picksHtml([]) + "</div>";
         if (!seat)
             return '<div class="tbv-row waiting"><div class="tbv-who"><b>입장하는 중…</b><span class="tbv-rate">&nbsp;</span></div>' + this.picksHtml([]) + "</div>";
-        return '<div class="tbv-row' + (seat.me ? " me" : "") + '"><div class="tbv-who"><b>' + (seat.ai ? "🤖 " : "") + AccountHtml.esc(seat.nick) + "</b>"
+        return '<div class="tbv-row' + (seat.me ? " me" : "") + '"><div class="tbv-who"><b>' + AccountHtml.esc(seat.nick) + "</b>"
             + '<span class="tbv-rate">' + this.rateHtml(seat) + "</span></div>"
             + this.picksHtml(seat.ai || !seat.card ? [] : seat.card.top) + "</div>";
     }

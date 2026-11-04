@@ -201,11 +201,12 @@
     .lobbyCols, .draftCols { display: flex; align-items: flex-start; gap: 14px; }
     .lobbyCols > .wrap, .draftCols > .wrap { flex: 1 1 0; min-width: 0; margin: 0 !important; }
     .charCol { flex: 0 0 auto; width: max-content; min-width: 0; max-width: 50%; margin: 0; }
-    .draftCols { align-items: stretch; min-height: calc(100vh - 78px); }
+    .draftCols { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: stretch; }
+    .dfTeamCard { margin-bottom: 0; }
     .draftLeft { display: flex; flex-direction: column; }
     .dfSlots { display: flex; flex-direction: column; gap: 8px; }
     .dfTeamCard .dfSlots .slot { margin: 0; }
-    .dfCharCol { align-self: flex-start; min-width: 380px; position: sticky; top: 0; max-height: calc(100vh - 78px); overflow-y: auto; scrollbar-width: thin; }
+    .dfCharCol { box-sizing: border-box; height: 0; min-height: 100%; min-width: 380px; max-width: calc(50vw - 24px); overflow-y: auto; scrollbar-width: thin; }
     .dfCharCol .dfCard img { height: 48px; }
     .dfCharCol #dfPickBar .big, .dfCharCol .dfReadyBtn { height: 54px; font-size: 20px; }
   }
@@ -363,8 +364,10 @@
   .startRow .swapBtn:hover { background: #C9433B; }
   .dfHead { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
   .dfTitle { font-size: 24px; font-weight: 800; color: #F4F1E8; }
-  .dfMap { font-size: 24px; font-weight: 800; line-height: 1.1; color: #F2D06B; white-space: nowrap; }
-  .dfMapLabel { font-size: .5em; color: #fff; }
+  .dfMap { padding: 0; border: 0; background: none; font: inherit; font-size: 24px; font-weight: 800; line-height: 1.1; color: #F2D06B; white-space: nowrap; cursor: pointer; }
+  .dfMapLabel { margin-right: 8px; font-size: .5em; color: #fff; }
+  .dfMapName { text-decoration: underline dotted 2px; text-underline-offset: 4px; }
+  .dfMap:hover .dfMapName { color: #FFE08A; }
   .dfCharCol { transition: box-shadow .4s ease, border-color .4s ease; }
   .dfCharCol.myTurn { border-color: #3FBF6A; animation: dfTurnGlow 1.6s ease-in-out infinite; }
   .dfCharCol.myTurnLow { border-color: #FF8A80; animation: dfTurnGlowLow 1s ease-in-out infinite; }
@@ -390,11 +393,12 @@
   .dfBan .pface { width: 34px; height: 34px; filter: grayscale(.6); }
   .dfBan.wait { font-size: 13px; font-weight: 700; color: var(--sg-ink-faint); }
   .dfBan.now { font-size: 13px; color: #FFB38A; }
-  .dfMapImg { display: block; flex: 0 0 auto; width: 100%; height: auto; margin-bottom: 14px; border-radius: 8px; }
   .lobbyTop #btnMapView { margin-left: auto; align-self: flex-end; margin-bottom: 11px; }
   .modalBox.mapViewBox { max-width: 1100px; max-height: calc(100vh - 32px); overflow-y: auto; overscroll-behavior: contain; }
   .mapViewGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
   .mapViewGrid figure { margin: 0; }
+  .mapViewGrid.single { grid-template-columns: 1fr; }
+  .mapViewGrid.single img { margin: 0 auto; }
   .mapViewGrid figcaption { margin-bottom: 6px; font-size: 16px; font-weight: 800; color: #F4F1E8; }
   .mapViewGrid figure.on figcaption { color: #F2D06B; }
   .mapViewGrid img { display: block; width: auto; max-width: 100%; height: auto; max-height: calc(100vh - 190px); border-radius: 6px; border: 2px solid transparent; }
@@ -440,9 +444,9 @@
   .dfCard .nm { font-size: 16px; font-weight: 800; }
   .dfCard.view { border-color: rgba(255,255,255,.5); }
   .dfCard.on { border-color: #D97B4F; background: rgba(217,123,79,.2); box-shadow: 0 0 0 3px rgba(217,123,79,.3); }
-  .dfCard.taken { opacity: .5; }
+  .dfCard.taken > :not(.tag) { opacity: .5; }
   .dfCard.taken img { filter: grayscale(1); }
-  .dfCard .tag { position: absolute; top: 4px; left: 4px; right: 4px; padding: 1px 3px; border-radius: 4px; font-size: 11px; font-weight: 800; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dfCard .tag { position: absolute; z-index: 1; top: 4px; left: 4px; right: 4px; padding: 1px 3px; border-radius: 4px; font-size: 11px; font-weight: 800; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .dfCard .tag.b { background: var(--blue); }
   .dfCard .tag.r { background: var(--red); }
   .dfDetail { margin-top: 12px; }
