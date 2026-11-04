@@ -2187,6 +2187,7 @@ class ResultCollector {
         db.paths.push(path);
         var cur = db.store[path] === undefined ? null : JSON.parse(JSON.stringify(db.store[path])), out = fn(cur);
         if (out === undefined) return Promise.resolve({ committed: false });
+        if (db.rejectSkill && Object.keys(out).some(function (k) { return out[k] && out[k].skPicks !== undefined; })) return Promise.reject(new Error("PERMISSION_DENIED"));
         if (db.rejectDraws && Object.keys(out).some(function (k) { return out[k] && out[k].draws !== undefined; })) return Promise.reject(new Error("PERMISSION_DENIED"));
         db.store[path] = out;
         return Promise.resolve({ committed: true });
@@ -4024,7 +4025,7 @@ class ResultCollector {
     var y = OPEN_Y.forest; api.MATCH.stateByKey = {};
     var W = world("forest", [{ id: "a", team: "blue", char: "necro", x: 333.4, y: y + 10.6, angle: 1.1 }, { id: "b", team: "red", char: "knight", x: 700, y: y }]);
     var a = W.ent("a"), start = W.room.startAt, bad = [];
-    Object.assign(a, { mv: true, hp: 77.2, alive: true, gauge: 6.37, dmg: 123.46, deaths: 2, kills: 3, heal: 17.4, skillDur: 3000, stunDealt: 2.34, slowDealt: 1.25, slowWeight: 0.456, blocked: 44.6, frostStacks: 2, shield: true, assists: 4 });
+    Object.assign(a, { mv: true, hp: 77.2, alive: true, gauge: 6.37, dmg: 123.46, deaths: 2, kills: 3, heal: 17.4, skillDur: 3000, stunDealt: 2.34, slowDealt: 1.25, slowWeight: 0.456, skillDmg: 77.77, blocked: 44.6, frostStacks: 2, shield: true, assists: 4 });
     api.STATE_TIMES.forEach(function (k, i) { a[k] = start + 1000.4 + i * 100; });
     a.slowUntil = start + 5000; a.slows = [{ mul: 0.6, until: start + 5000 }];
     a.minions = [{ x: 10.2, y: 20.7, angle: 0.5, hp: 41.2, atkAt: start + 500, born: start + 100, n: 1 }, { x: 99.5, y: 5, angle: 3, hp: 0, atkAt: 0, born: start + 200, n: 2 }];
@@ -4037,12 +4038,31 @@ class ResultCollector {
     check("heal", o.heal, 17); check("skillDur", o.skillDur, 3000);
     api.STATE_TIMES.forEach(function (k) { check(k, o[k], Math.round(a[k] - start) + start); });
     check("slowMul", o.slowMul, 0.6); check("stunDealt", o.stunDealt, 2.3); check("slowDealt", o.slowDealt, 1.3); check("slowWeight", o.slowWeight, 0.46);
-    check("blocked", o.blocked, 45); check("frostStacks", o.frostStacks, 2); check("shield", o.shield, true); check("assists", o.assists, 4);
+    check("blocked", o.blocked, 45); check("frostStacks", o.frostStacks, 2); check("shield", o.shield, true); check("assists", o.assists, 4); check("skillDmg", o.skillDmg, 77.8);
     check("해골 수", o.minions.length, 2);
     var m = o.minions[0];
     if (m.x !== 10 || m.y !== 21 || m.hp !== 42 || m.n !== 1 || m.atkAt !== start + 500 || m.born !== start + 100 || Math.abs(m.angle - 0.5) > 0.03) bad.push("해골 0 " + JSON.stringify(m));
     if (o.minions[1].hp !== 0 || o.minions[1].atkAt !== 0) bad.push("해골 1 " + JSON.stringify(o.minions[1]));
     done(bad.length ? "fail" : "pass", bad.length ? bad.slice(0, 5).join(" / ") : "위치·체력·게이지·시간 " + api.STATE_TIMES.length + "개·해골 2마리·보호막·통계값 모두 일치");
+  });
+  run(STATSG, "스킬 비율: 기본 공격·강화 기본 공격만 빼고 스킬·패시브·추가 피해를 모두 스킬 피해로 세는가", function (done) {
+    var y = OPEN_Y.forest, bad = [];
+    var W = world("forest", [{ id: "a", team: "blue", char: "stormbow", x: 300, y: y }, { id: "b", team: "red", char: "giant", x: 500, y: y }]);
+    var A = W.ent("a"), T = W.ent("b");
+    T.hp = T.maxHp = 100000;
+    var seen = function (name, wantDmg, wantSkill, act) {
+      var dmg0 = A.dmg || 0, skill0 = A.skillDmg || 0;
+      act(); W.frame(FRAME);
+      var dmg = Math.round((A.dmg || 0) - dmg0), skill = Math.round((A.skillDmg || 0) - skill0);
+      if (dmg !== wantDmg || skill !== wantSkill) bad.push(name + " 피해 " + dmg + " 스킬 " + skill + " (기대 " + wantDmg + "/" + wantSkill + ")");
+    };
+    seen("기본 공격", 10, 0, function () { api.damage(T, 10, "a", true, null, null); });
+    seen("강화 기본 공격", 10, 0, function () { api.damage(T, 10, "a", true, api.empoweredBasic, null); });
+    seen("스킬", 10, 10, function () { api.damage(T, 10, "a", false, "blizzard", null); });
+    seen("3중첩 최대 체력 피해", 1010, 1000, function () { api.damage(T, 10, "a", true, null, { maxHpRate: 0.01 }); });
+    seen("평상시 튕기는 번개", 10, 10, function () { api.onZap({ pts: [[T.x, T.y]], tgt: ["b"], team: "blue", owner: "a", dmg: 10, over: 0, createdAt: api.now ? api.now() : Date.now() }); });
+    seen("선봉장 추가 피해(bd)", 7, 7, function () { W.room.ref.child("hits/a").push({ d: 0, b: 0, t: W.room.startAt + 1000, bd: 7 }); });
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "기본 2종은 스킬 0, 스킬·패시브 3종·bd 는 스킬로 셈");
   });
   run(NETG, "상태 문자열: 막 만든 캐릭터는 체력 가득·시간값 0·해골 없음으로, 상태가 없거나 짧으면 출발 자리·위치만으로 풀리는가", function (done) {
     var y = OPEN_Y.forest; api.MATCH.stateByKey = {};
@@ -4503,6 +4523,10 @@ class ResultCollector {
     if (rows !== L.length || groups !== api.ROLE_LIST.length) bad.push("빈 통계 " + rows + "줄 " + groups + "제목");
     var s = { matches: 10 }; s[L[0]] = { picks: 4, wins: 3, games: 8, bans: 1, dmg: 123.6, heal: 5, block: 7, stun: 1.25, slow: 0.5, ccPicks: 4, asPicks: 4, kdPicks: 4, kills: 2, deaths: 1, assist: 3 };
     var one = api.statsRowsHtml(s);
+    var shared = { matches: 10 }; shared[L[0]] = { picks: 4, wins: 3, games: 8, dmg: 800.4, skill: 300, skillBase: 800, skPicks: 4 };
+    if (api.statsRowsHtml(shared).indexOf("<td><b>800</b><small>(38%)</small></td>") < 0) bad.push("스킬 비율 칸");
+    if (one.indexOf("<td>124</td>") < 0) bad.push("옛 패치 피해 칸");
+    if (document.querySelector(".statsTable thead").textContent.indexOf("(스킬 비율)") < 0) bad.push("스킬 비율 머리글");
     if (one.indexOf("75.0%") < 0 || one.indexOf("124") < 0 || one.indexOf("1.3초") < 0 || one.indexOf("(2.0 / 1.0 / 3.0)") < 0 || one.indexOf("<b>5.00</b>") < 0 || one.indexOf("(밴 1 + 픽 4 / 8)") < 0) bad.push("한 캐릭터 줄");
     if (api.mapShotSrc("river") !== "img/teambattle/maps/river.webp" || api.mapShotSrc("river", true) !== "img/teambattle/maps/river-wide.webp") bad.push("맵 그림 주소");
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "비율·밴픽·K/D/A·" + L.length + "줄+직업군 제목·맵 그림 주소");
@@ -4689,8 +4713,22 @@ class ResultCollector {
     });
     var t = strict.store[key];
     if (!t || t.matches !== 1 || (t[L[0]] && t[L[0]].draws !== undefined)) bad.push("draws 없이 저장돼야 함: " + JSON.stringify(t && t[L[0]]));
-    if (strict.paths.length !== 2) bad.push("저장 시도 " + strict.paths.length + "번 (기대 2: draws 포함 → draws 없이)");
-    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "draws 거부 → draws 없이 두 번째 시도로 저장");
+    if (strict.paths.length !== 3) bad.push("저장 시도 " + strict.paths.length + "번 (기대 3: 스킬·draws 포함 → 스킬 없이 → draws 없이)");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "draws 거부 → draws 없이 세 번째 시도로 저장");
+  });
+  runAsync(STATSG, "저장 규칙에 스킬 비율 칸이 아직 없어 거부되면 스킬 값 없이 다시 저장하는가", async function (done) {
+    var bad = [], F, L = api.CHAR_LIST, key = api.STATS_PATH, strict = fakeDb();
+    strict.rejectSkill = true;
+    await withStatsEnvAsync(async function () {
+      F = statsFixture(); api.setDb(strict);
+      var room = endedRoom(F); api.bindRoom(room, F.players);
+      STATS.save(room, F.players);
+      await sleep(20);
+    });
+    var t = strict.store[key], withSkill = t ? L.filter(function (k) { return t[k] && t[k].skPicks !== undefined; }) : [];
+    if (!t || t.matches !== 1 || withSkill.length) bad.push("스킬 없이 저장돼야 함: " + JSON.stringify(withSkill));
+    if (strict.paths.length !== 2) bad.push("저장 시도 " + strict.paths.length + "번 (기대 2)");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "스킬 거부 → 스킬 없이 두 번째 시도로 저장");
   });
   runAsync(STATSVG, "통계 창 불러오기: 열면 현재 패치 통계를 보여 주고, 오른쪽 위 패치 버튼으로 이전 패치를 고르며, 연결이 없거나 실패하면 안내하는가", async function (done) {
     var bad = [], L = HUMAN_CHARS, P = api.STATS_PATCHES, now = P.current.id, old = P.LIST[0].id, tree = {};

@@ -144,6 +144,9 @@
             "draws": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= newData.parent().child('picks').val()" },
             "mvp": { ".validate": "newData.isNumber() && newData.val() >= -20000 && newData.val() <= 20000" },
             "mvpPicks": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= newData.parent().child('picks').val()" },
+            "skill": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 5000" },
+            "skillBase": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 5000" },
+            "skPicks": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= newData.parent().child('picks').val()" },
             "$other": { ".validate": false }
           }
         }
@@ -296,7 +299,7 @@
             },
             "c": {
               "$char": {
-                ".validate": "$char.matches(/^(warrior|knight|ranger|mage|rogue|necro|sniper|thrower|lancer|blacksmith|priest|hitman|guardian|frost|dancer|duelist|stormbow|cleric|shaman|engineer|druid|giant|astrologer|wraith|bearer)$/) && newData.hasChildren(['n', 'w', 'bg', 'bw', 'rg', 'rw', 'm', 'kn', 'k', 'd', 'a', 'dmg', 'hl', 'bl', 'st', 'sl']) && ((auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3') || (!data.exists() && newData.child('n').val() === 1) || (data.exists() && newData.child('n').val() === data.child('n').val() + 1)) && newData.child('w').val() <= newData.child('n').val() && newData.child('m').val() <= newData.child('n').val() && newData.child('kn').val() <= newData.child('n').val() && newData.child('bg').val() + newData.child('rg').val() === newData.child('n').val() && newData.child('bw').val() <= newData.child('bg').val() && newData.child('rw').val() <= newData.child('rg').val() && newData.child('sc').exists() === newData.child('scn').exists() && (!newData.child('scn').exists() || newData.child('scn').val() <= newData.child('n').val())",
+                ".validate": "$char.matches(/^(warrior|knight|ranger|mage|rogue|necro|sniper|thrower|lancer|blacksmith|priest|hitman|guardian|frost|dancer|duelist|stormbow|cleric|shaman|engineer|druid|giant|astrologer|wraith|bearer)$/) && newData.hasChildren(['n', 'w', 'bg', 'bw', 'rg', 'rw', 'm', 'kn', 'k', 'd', 'a', 'dmg', 'hl', 'bl', 'st', 'sl']) && ((auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3') || (!data.exists() && newData.child('n').val() === 1) || (data.exists() && newData.child('n').val() === data.child('n').val() + 1)) && newData.child('w').val() <= newData.child('n').val() && newData.child('m').val() <= newData.child('n').val() && newData.child('kn').val() <= newData.child('n').val() && newData.child('bg').val() + newData.child('rg').val() === newData.child('n').val() && newData.child('bw').val() <= newData.child('bg').val() && newData.child('rw').val() <= newData.child('rg').val() && newData.child('sc').exists() === newData.child('scn').exists() && (!newData.child('scn').exists() || newData.child('scn').val() <= newData.child('n').val()) && (!newData.child('skn').exists() || newData.child('skn').val() <= newData.child('n').val())",
                 "n": { ".validate": "newData.isNumber() && newData.val() >= 0" },
                 "w": { ".validate": "newData.isNumber() && newData.val() >= 0" },
                 "bg": { ".validate": "newData.isNumber() && newData.val() >= 0" },
@@ -315,6 +318,9 @@
                 "sl": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 600" },
                 "scn": { ".validate": "newData.isNumber() && (newData.val() === (data.exists() ? data.val() : 0) + 1 || ((auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3') && newData.val() >= 0))" },
                 "sc": { ".validate": "newData.isNumber() && newData.val() >= -10000 && newData.val() <= 100000" },
+                "skn": { ".validate": "newData.isNumber() && newData.val() >= 0 && (newData.val() === (data.exists() ? data.val() : 0) || newData.val() === (data.exists() ? data.val() : 0) + 1 || auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')" },
+                "sk": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 5000" },
+                "skb": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 5000" },
                 "$other": { ".validate": false }
               }
             },
@@ -510,7 +516,7 @@
             "p": {
               "$i": {
                 ".validate": "$i.matches(/^[0-5]$/)",
-                "$j": { ".validate": "$j.matches(/^([0-9]|1[0-3])$/) && ((($j === '0' || $j === '2') && newData.isString() && newData.val().length <= 20) || ($j !== '0' && $j !== '2' && newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000))" }
+                "$j": { ".validate": "$j.matches(/^([0-9]|1[0-4])$/) && ((($j === '0' || $j === '2') && newData.isString() && newData.val().length <= 20) || ($j !== '0' && $j !== '2' && newData.isNumber() && newData.val() >= 0 && newData.val() <= 100000))" }
               }
             },
             "$other": { ".validate": false }

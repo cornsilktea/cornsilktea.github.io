@@ -2,7 +2,7 @@ const fs = require("fs"), vm = require("vm"), path = require("path");
 const root = path.join(__dirname, "..");
 const files = ["match-kit.js", "account-match-kit.js", "account-stats.js", "24.turbo-lap-stats.js", "25.fps-survival-stats.js", "31.zombie-outbreak-stats.js", "31.zombie-versus.js", "31.zombie-missions.js", "38.snow-account.js", "38.snow-versus.js", "39.balloon-account.js", "39.balloon-versus.js", "patch-notes.js", "teambattle-stats-repair.js", "account-stats-repair.js"];
 const names = ["AccountNumbers", "AccountRates", "AccountMatchKey", "AccountKeyLedger", "AccountForfeit", "AccountShape", "AccountRecentHeadCodec", "RecentMatchRing", "AccountLoginNotice", "RecentBlockList", "AccountGameProfile", "AccountMatchStore",
-  "TeamBattleRates", "AccountMvpJudge", "TeamBattlePlan", "TeamBattleCodec", "TeamBattleRing", "AccountStatsMath", "AccountStatsTable", "ClassStatsSummary", "TeamBattleProfile", "AccountStatsStore",
+  "TeamBattleRates", "TeamBattleSkillShare", "AccountMvpJudge", "TeamBattlePlan", "TeamBattleCodec", "TeamBattleRing", "AccountStatsMath", "AccountStatsTable", "ClassStatsSummary", "TeamBattleProfile", "AccountStatsStore",
   "TurboLapPlan", "TurboLapCodec", "TurboLapStatsMath", "TurboLapProfile", "TurboLapStatsView", "FpsPlan", "FpsCodec", "FpsStatsMath", "FpsProfile", "FpsStatsView",
   "ZombiePlan", "ZombieCodec", "ZombieStatsMath", "ZombieProfile", "ZombieStatsView", "ZombieRandomTallyMath", "ZombieRoleTallyMath", "ZombieOriginRotation", "ZombieVersusCards", "ZombieVersusLineup", "ZombieMissionSites", "ZombieMissionCatalog", "ZombieMissionProgress", "SnAccountPlan", "SnAccountCodec", "SnAccountMath", "SnAccountProfile", "SnAccountView", "SnReportBuilder", "SnVersusCards",
   "WbAccountPlan", "WbAccountCodec", "WbAccountMath", "WbAccountProfile", "WbAccountView", "WbReportBuilder", "WbRandomTallyMath", "WbVersusCards", "WbVersusLineupBuilder",
@@ -593,6 +593,17 @@ const pendingChecks = (async () => {
   check("평균 환산점수 규칙: 옛 화면(점수 없이 쓰기)도 받음", ok(old, next));
   check("평균 환산점수 규칙: 이어 쓰면 scn +1, 음수 점수도 받음", ok(Object.assign({}, next, { scn: 1, sc: 900 }), Object.assign({}, next, { n: 6, bg: 4, scn: 2, sc: -150 })));
   check("평균 환산점수 규칙: scn 을 2 올리거나 판 수보다 크게 하면 거부", !ok(Object.assign({}, next, { scn: 1, sc: 900 }), Object.assign({}, next, { n: 6, bg: 4, scn: 3, sc: 900 })) && !ok(undefined, { n: 1, w: 0, bg: 1, bw: 0, rg: 0, rw: 0, m: 0, kn: 1, k: 0, d: 0, a: 0, dmg: 0, hl: 0, bl: 0, st: 0, sl: 0, scn: 2, sc: 1 }));
+  check("스킬 비율 규칙: skn 은 그대로이거나 +1, 판 수를 넘으면 거부", ok(old, Object.assign({}, next, { skn: 1, sk: 300, skb: 900 })) && ok(old, Object.assign({}, next, { skn: 0, sk: 0, skb: 0 })) && !ok(old, Object.assign({}, next, { skn: 2, sk: 1, skb: 1 })) && !ok(old, Object.assign({}, next, { skn: 6, sk: 1, skb: 1 })));
+  {
+    const first = K.AccountStatsMath.applyChar(K.AccountStatsMath.emptyChar(), line("나", 0, "knight", { dmg: 1000, skillDmg: 400 }), { win: true, side: 0, mvp: false });
+    const second = K.AccountStatsMath.applyChar(first, line("나", 0, "knight", { dmg: 500, skillDmg: 100 }), { win: true, side: 0, mvp: false });
+    const unknown = K.AccountStatsMath.applyChar(second, line("나", 0, "knight", { dmg: 700 }), { win: true, side: 0, mvp: false });
+    check("스킬 비율: 평균을 쌓고, 모르는 옛 판은 건너뜀", second.skn === 2 && second.sk === 250 && second.skb === 750 && unknown.n === 3 && unknown.skn === 2 && unknown.sk === 250 && unknown.skb === 750, unknown);
+    const encoded = K.TeamBattleCodec.encodeLine(line("나", 0, "knight", { skillDmg: 12.6 }));
+    const oldLine = K.TeamBattleCodec.encodeLine(line("나", 0, "knight"));
+    check("스킬 비율: 값 배열 15번째 왕복, 옛 줄은 값 없음", encoded.length === 15 && K.TeamBattleCodec.decodeLine(encoded).skillDmg === 13 && oldLine.length === 14 && K.TeamBattleCodec.decodeLine(oldLine).skillDmg === undefined);
+    check("스킬 비율: 칸 글자", K.TeamBattleSkillShare.cellHtml(800, 300, 800) === "<td><b>800</b><small>(38%)</small></td>" && K.TeamBattleSkillShare.cellHtml(800, 0, 0) === "<td>800</td>" && K.TeamBattleSkillShare.label(9, 8) === "(100%)");
+  }
   check("평균 환산점수 규칙: sc 만 있거나 범위 밖이면 거부", !ok(old, Object.assign({}, next, { sc: 50 })) && !ok(old, Object.assign({}, next, { scn: 1, sc: 200000 })));
 })();
 const gameChecks = (async () => {

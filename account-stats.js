@@ -7,7 +7,8 @@
        g 유효한 판 수 · w 승 · l 패 · bg/bw 블루 판·승 · rg/rw 레드 판·승 · m MVP 수
        c/<캐릭터> = { n 판, w 승, bg, bw, rg, rw, m MVP 횟수, kn 킬·데스·어시스트 평균 분모,
                       k·d·a 평균 킬·데스·어시스트, dmg·hl·bl 평균 피해·회복·막은 피해, st·sl 평균 기절·둔화(초),
-                      scn·sc 평균 환산점수의 판 수·평균(2026-10-28 추가 — 그 전 판은 없어서 n 과 따로 센다) }
+                      scn·sc 평균 환산점수의 판 수·평균(2026-10-28 추가 — 그 전 판은 없어서 n 과 따로 센다),
+                      skn·sk·skb 스킬 비율을 센 판 수·그 판들의 평균 스킬 피해·평균 전체 피해(2026-11-04 추가, 비율은 sk ÷ skb) }
        ids = 최근에 올린 경기 열쇠(같은 판을 두 번 올리지 않게, 최근 AccountKeyLedger.KEEP 개만)
      users/<uid>/recent/teambattle/<0~19>  최근 매치 20칸(값 배열, TeamBattleCodec) — 칸 이름 규칙으로도 20판을 넘지 못한다
      classStats/<학년-반|none>/<uid> { n 이름, g, w, m }  교사 화면 반별 승률 순위용 요약(교사만 읽음)
@@ -76,13 +77,14 @@ class TeamBattleCodec {
         });
     }
     static encodeLine(line) {
-        return [
+        const values = [
             String(line.name || "").slice(0, TeamBattleCodec.NAME_MAX), line.team === 1 ? 1 : 0, line.char,
             AccountNumbers.count(line.kills), AccountNumbers.count(line.deaths), AccountNumbers.count(line.assists),
             Math.max(0, AccountNumbers.whole(line.dmg)), Math.max(0, AccountNumbers.whole(line.heal)), Math.max(0, AccountNumbers.whole(line.blocked)),
             Math.max(0, AccountNumbers.oneDecimal(line.stun)), Math.max(0, AccountNumbers.oneDecimal(line.slow)),
             line.left ? 1 : 0, line.ai ? 1 : 0, Math.max(0, AccountNumbers.twoDecimals(line.slowWeight))
         ];
+        return line.skillDmg == null ? values : values.concat(Math.max(0, AccountNumbers.whole(line.skillDmg)));
     }
     static decode(raw) {
         const head = AccountRecentHeadCodec.decode(raw, TeamBattleCodec.VERSION);
@@ -115,7 +117,8 @@ class TeamBattleCodec {
         return {
             name: String(item[0] == null ? "" : item[0]), team: number(1) === 1 ? 1 : 0, char: String(item[2]),
             kills: number(3), deaths: number(4), assists: number(5), dmg: number(6), heal: number(7), blocked: number(8),
-            stun: number(9), slow: number(10), left: number(11) === 1, ai: number(12) === 1, slowWeight: number(13)
+            stun: number(9), slow: number(10), left: number(11) === 1, ai: number(12) === 1, slowWeight: number(13),
+            skillDmg: item.length > TeamBattleCodec.FIELDS ? number(TeamBattleCodec.FIELDS) : undefined
         };
     }
 }
@@ -132,7 +135,7 @@ class AccountStatsMath {
         return { g: 0, w: 0, l: 0, bg: 0, bw: 0, rg: 0, rw: 0, m: 0 };
     }
     static emptyChar() {
-        return { n: 0, w: 0, bg: 0, bw: 0, rg: 0, rw: 0, m: 0, kn: 0, k: 0, d: 0, a: 0, dmg: 0, hl: 0, bl: 0, st: 0, sl: 0, scn: 0, sc: 0 };
+        return { n: 0, w: 0, bg: 0, bw: 0, rg: 0, rw: 0, m: 0, kn: 0, k: 0, d: 0, a: 0, dmg: 0, hl: 0, bl: 0, st: 0, sl: 0, scn: 0, sc: 0, skn: 0, sk: 0, skb: 0 };
     }
     static normalize(raw) {
         const node = AccountStatsMath.empty();
@@ -182,6 +185,8 @@ class AccountStatsMath {
         const blue = outcome.side === 0;
         const n = before.n;
         const kn = before.kn;
+        const skillKnown = line.skillDmg != null;
+        const dealt = Math.max(0, Number(line.dmg) || 0);
         return {
             n: n + 1,
             w: before.w + (outcome.win ? 1 : 0),
@@ -200,7 +205,10 @@ class AccountStatsMath {
             st: AccountNumbers.runningAverage(before.st, n, Math.max(0, Number(line.stun) || 0)),
             sl: AccountNumbers.runningAverage(before.sl, n, Math.max(0, Number(line.slow) || 0)),
             scn: before.scn + 1,
-            sc: AccountNumbers.runningAverage(before.sc, before.scn, TeamBattleScore.of(line))
+            sc: AccountNumbers.runningAverage(before.sc, before.scn, TeamBattleScore.of(line)),
+            skn: before.skn + (skillKnown ? 1 : 0),
+            sk: skillKnown ? AccountNumbers.runningAverage(before.sk, before.skn, Math.max(0, Number(line.skillDmg) || 0)) : before.sk,
+            skb: skillKnown ? AccountNumbers.runningAverage(before.skb, before.skn, dealt) : before.skb
         };
     }
 }
@@ -214,10 +222,20 @@ class AccountStatsTable {
             rows[id] = {
                 picks: c.n, wins: c.w, draws: 0, mvpCount: c.m, scPicks: c.scn, mvpScore: c.sc,
                 kills: c.k, deaths: c.d, assist: c.a, kdPicks: c.kn, asPicks: c.kn, ccPicks: c.n,
-                dmg: c.dmg, heal: c.hl, block: c.bl, stun: c.st, slow: c.sl
+                dmg: c.dmg, heal: c.hl, block: c.bl, stun: c.st, slow: c.sl, skill: c.sk, skillBase: c.skb
             };
         });
         return rows;
+    }
+}
+class TeamBattleSkillShare {
+    static label(skill, base) {
+        const total = Number(base) || 0;
+        return total > 0 ? "(" + Math.min(100, Math.round((Number(skill) || 0) / total * 100)) + "%)" : "";
+    }
+    static cellHtml(value, skill, base) {
+        const label = TeamBattleSkillShare.label(skill, base);
+        return label ? "<td><b>" + value + "</b><small>" + label + "</small></td>" : "<td>" + value + "</td>";
     }
 }
 class TeamBattleMyStatsTable {
@@ -247,7 +265,7 @@ class TeamBattleMyStatsTable {
         return "<td><b>" + (wins / picks * 100).toFixed(1) + "%</b><small>(" + wins + " / " + picks + ")</small></td>"
             + "<td><b>" + mvps + "</b><small>(" + mvps + " / " + picks + "판)</small></td>"
             + TeamBattleMyStatsTable.kdaCell(row)
-            + "<td>" + Math.round(Number(row.dmg) || 0) + "</td>"
+            + TeamBattleSkillShare.cellHtml(Math.round(Number(row.dmg) || 0), row.skill, row.skillBase)
             + "<td>" + (char.heals ? Math.round(Number(row.heal) || 0) : "-") + "</td>"
             + "<td>" + (blockedKnown && char.blocks ? Math.round(Number(row.block) || 0) : "-") + "</td>"
             + "<td>" + (blockedKnown ? (Number(row.stun) || 0).toFixed(1) + "초" : "-") + "</td>"
@@ -266,7 +284,7 @@ class TeamBattleMyStatsTable {
 }
 TeamBattleMyStatsTable.COLUMNS = [
     ["승률", "승리 수 / 판 수"], ["MVP", "MVP 횟수 / 판 수"], ["KDA", "(킬 + 어시스트) / 데스"],
-    ["평균 피해량", ""], ["평균 회복량", ""], ["평균 막은 피해", ""], ["평균 기절", ""], ["평균 둔화", ""], ["평균 MVP 점수", ""]
+    ["평균 피해량", "(스킬 비율)"], ["평균 회복량", ""], ["평균 막은 피해", ""], ["평균 기절", ""], ["평균 둔화", ""], ["평균 MVP 점수", ""]
 ];
 TeamBattleMyStatsTable.COLUMN_COUNT = TeamBattleMyStatsTable.COLUMNS.length + 1;
 TeamBattleMyStatsTable.EMPTY = "아직 집계된 경기가 없어요.";

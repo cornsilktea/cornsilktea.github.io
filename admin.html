@@ -676,7 +676,7 @@
      30번은 StudentStatsWindow(account-stats.js), 나머지는 각 게임 통계 모듈의 Profile·View + AccountStatsDialog(StudentAccountWindow).
      통계가 있는 새 게임을 만들면 그 게임의 통계 .js 를 여기 한 줄 더하고 ClassRankPanel.GAMES 에 account 를 넘긴다. -->
 <script charset="utf-8" src="account-match-kit.js?v=20261104a"></script>
-<script charset="utf-8" src="account-stats.js?v=20261104b"></script>
+<script charset="utf-8" src="account-stats.js?v=20261104c"></script>
 <script charset="utf-8" src="teambattle-stats-repair.js?v=20261103a"></script>
 <script charset="utf-8" src="patch-notes.js?v=20261029b"></script>
 <script charset="utf-8" src="30.team-formation.js?v=20261102b"></script>
@@ -2018,7 +2018,7 @@ async function showStats(g) {
     }
     const table = el("table");
     const head = el("tr");
-    [["직업"], ["승률", "승리 수 / 픽 수"], ["밴픽률", "(밴 + 픽) / 게임 수"], ["KDA", "(킬 + 어시스트) / 데스"], ["평균 피해량"], ["평균 회복량"], ["평균 막은 피해"], ["평균 기절"], ["평균 둔화"], ["평균 MVP 점수"]].forEach((col) => {
+    [["직업"], ["승률", "승리 수 / 픽 수"], ["밴픽률", "(밴 + 픽) / 게임 수"], ["KDA", "(킬 + 어시스트) / 데스"], ["평균 피해량", "(스킬 비율)"], ["평균 회복량"], ["평균 막은 피해"], ["평균 기절"], ["평균 둔화"], ["평균 MVP 점수"]].forEach((col) => {
       const th = el("th", null, col[0]);
       if (col[1]) th.appendChild(el("small", null, col[1]));
       head.appendChild(th);
@@ -2060,7 +2060,14 @@ async function showStats(g) {
       } else kdTd.textContent = "-";
       tr.appendChild(kdTd);
       /* 1판 평균. 회복 스킬이 있는 직업(heal: true)만 회복량을 보이고 나머지는 "-" */
-      tr.appendChild(el("td", null, picks ? String(Math.round(d.dmg || 0)) : "-"));
+      /* 스킬 비율은 v4 패치부터 모은 값이라 그 전 패치는 숫자만 나온다 */
+      const dmgTd = el("td");
+      const skillShare = picks ? TeamBattleSkillShare.label(d.skill, d.skillBase) : "";
+      if (skillShare) {
+        dmgTd.appendChild(el("b", null, String(Math.round(d.dmg || 0))));
+        dmgTd.appendChild(el("small", null, skillShare));
+      } else dmgTd.textContent = picks ? String(Math.round(d.dmg || 0)) : "-";
+      tr.appendChild(dmgTd);
       tr.appendChild(el("td", null, picks && role.heal ? String(Math.round(d.heal || 0)) : "-"));
       /* 기절·둔화는 적에게 새로 걸어 늘어난 시간(초)의 1판 평균 */
       const ccPicks = d.ccPicks || 0;
@@ -2077,6 +2084,7 @@ async function showStats(g) {
      "시간 종료 때 킬 수가 같으면 무승부입니다(레드·블루 승리 어느 쪽에도 세지 않음).",
      "게임 수는 모든 직업이 같습니다(한 판마다 모든 직업 +1). 선택 수는 그 판에 고른 6명의 직업만 오릅니다.",
      "한 경기에서 같은 캐릭터는 1명만 고를 수 있으므로 밴픽률은 그 직업이 밴되거나 나온 판의 비율입니다.",
+     "스킬 비율은 입힌 피해 중 기본 공격이 아닌 피해(스킬·패시브·소환수·설치물)의 비율이며 v4 패치부터 셉니다.",
      "평균 MVP 점수는 결과 화면의 환산 점수(처치 +100, 어시스트 +50, 입힌 피해·회복·막은 피해 1당 +1, 기절 1초 +60, 둔화 1초 × 둔화율 +40, 쓰러짐 −100)를 판마다 평균 낸 값이며 이 항목이 추가된 뒤의 경기만으로 셉니다.",
      "막은 피해·기절·둔화·킬·데스·어시스트·밴은 이 항목이 추가된 뒤의 경기만으로 셉니다.",
      "어시스트: 내가 피해나 해로운 효과(기절·둔화·넉백·끌어당김)를 준 적이 5초 안에 쓰러지거나, 내가 회복·은신(눈보라)을 준 아군이 5초 안에 적을 처치하면 1회(처치한 사람은 제외, 한 처치에 1번만)."].forEach((t) => notes.appendChild(el("li", null, t)));
