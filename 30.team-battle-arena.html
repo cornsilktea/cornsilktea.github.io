@@ -2839,7 +2839,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   class BlacksmithType extends CharacterType {
     static MELEE = { color: 0xFFB45A, spark: "#FFB45A" };
-    static MODEL = { file: "Engineer", portraitPlant: true, right: "hammer_A", hide: ["Engineer_Backpack"],
+    static MODEL = { file: "Engineer", portraitGripShift: [0, -0.25, 0], right: "hammer_A", hide: ["Engineer_Backpack"],
                   recolor: [[0, 1, 1, "#3A2416", "#17100A"], [1, 0, 1, "#7A4E2D", "#3E2412"], [1, 3, 1, "#5A5F66", "#2E3136"], [0, 5, 1, "#F08A3A", "#9A3E14"],
                             [1, 7, 1, "#4B413A", "#231D19"], [0, 7, 1, "#5C4636", "#2B2018"], [2, 1, 1, "#E8742A", "#8F3A0E"], [2, 7, 1, "#E8742A", "#8F3A0E"], [3, 0, 1, "#E8742A", "#8F3A0E"]] };
     static ULT = {
@@ -8011,6 +8011,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         var mix = new THREE.AnimationMixer(m); mix.clipAction(services.charTypes.of(c).clips.Idle_A).play(); mix.update(0.3);
         m.updateMatrixWorld(true);
         if (services.charTypes.modelOf(c).portraitPlant) { if (services.charTypes.modelOf(c).plantShrink) m.getObjectByName("mainhand").scale.multiplyScalar(services.charTypes.modelOf(c).plantShrink); services.models.plantHeldUpright(m, services.charTypes.modelOf(c)); services.models.shrinkTallHeld(m, services.charTypes.modelOf(c)); }
+        if (services.charTypes.modelOf(c).portraitGripShift) m.getObjectByName("mainhand").position.fromArray(services.charTypes.modelOf(c).portraitGripShift);
         services.charTypes.of(c).dressPortrait(m);
         return { c: c, m: m, box: new THREE.Box3().setFromObject(m) };
       });
