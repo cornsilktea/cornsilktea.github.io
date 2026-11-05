@@ -4286,6 +4286,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     static EDGE_WIDTH = 3;
     static SHAPE = [[-150, 0, 0, 0, 0], [-116, 0.05, 0.06, 0, 0.08], [-84, 0.15, 0.04, 0, 0.2], [-58, 0.32, 0.02, 0, 0.36], [-36, 0.56, 0.05, 0, 0.56], [-18, 0.8, 0.2, 0, 0.78], [-4, 0.96, 0.55, 0.25, 0.94], [8, 1.03, 0.92, 0.65, 1],
                     [17, 1, 1, 1, 0.98], [21, 0.86, 1, 1.15, 0.86], [15, 0.72, 0.7, 0.75, 0.42], [7, 0.62, 0.3, 0.35, 0.22], [3, 0.46, 0.18, 0.1, 0.26], [6, 0.28, 0.42, 0, 0.42], [14, 0.12, 0.88, 0, 0.72], [28, 0, 1, 0, 0.9]];
+    static HIDDEN = /[?&]nowave(&|$)/.test(location.search);
     static SHARED = null;
     static LANE_GLSL = `
       uniform float uReach[${TsunamiView.SLOTS}]; uniform float uTime;
@@ -4458,7 +4459,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       vis.slam = uniforms;
     }
     warmSample() { var vis = this.buildVis(), lanes = [600, 600, 300, 600, 600, 600]; this.placeEdges(vis, lanes, 0); this.paint(vis, { lanes: lanes }, 500, 500); return vis.group; }
-    add(d) { this.services.field.tsunamis.push({ d: d, vis: null, departed: false }); }
+    add(d) { if (TsunamiView.HIDDEN) return; this.services.field.tsunamis.push({ d: d, vis: null, departed: false }); }
     drop(item) { if (!item.vis) return; this.services.stage.scene.remove(item.vis.group); this.free.push(item.vis); item.vis = null; }
     lifeMs() { return MarinaType.WAVE.travel + GameTime.gameMs(TsunamiView.WET_SEC) + 100; }
     step(t) { var view = this, services = this.services, life = this.lifeMs();
