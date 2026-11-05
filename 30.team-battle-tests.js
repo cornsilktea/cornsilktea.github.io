@@ -2729,9 +2729,9 @@ class ResultCollector {
     });
   });
 
-  run(INPUTG, "조이스틱 이동: 가운데 8px 이하는 무시, 거리에 비례해 빨라지고 반지름 이상이면 최고 속도, 파랑은 뒤집히는가", function (done) {
+  run(INPUTG, "조이스틱 이동: 가운데 8px 미만은 무시, 조금만 밀어도 그 방향 최고 속도, 파랑은 뒤집히는가", function (done) {
     var bad = [], speed = api.CHARS.ranger.speed, y = OPEN_Y.forest, R = api.joyRadius();
-    [["빨강 가운데", "red", 5, 0, 0], ["빨강 반", "red", R / 2, 0, 0.5], ["빨강 최대", "red", R * 2, 0, 1], ["파랑 최대", "blue", R * 2, 0, -1], ["빨강 아래", "red", 0, R, 1]].forEach(function (c) {
+    [["빨강 가운데", "red", 5, 0, 0], ["빨강 살짝", "red", 10, 0, 1], ["빨강 반", "red", R / 2, 0, 1], ["빨강 최대", "red", R * 2, 0, 1], ["파랑 최대", "blue", R * 2, 0, -1], ["빨강 아래", "red", 0, R, 1]].forEach(function (c) {
       withMe([meEntry("ranger", c[1], 600, y)], function (W, me) {
         var joy = api.joy;
         joy.id = 1; joy.ox = 100; joy.oy = 100; joy.x = 100 + c[2]; joy.y = 100 + c[3];
@@ -2739,7 +2739,7 @@ class ResultCollector {
         if (Math.abs(along - want) > 3 || (c[4] === 0 && me.mv)) bad.push(c[0] + ": " + Math.round(along) + " (기대 " + want + ")");
       });
     });
-    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "반지름 " + R + " 기준 비례 속도, 가운데 무시, 파랑 반전");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "조금만 밀어도 최고 속도, 가운데 무시, 파랑 반전");
   });
 
   run(INPUTG, "벽을 향해 계속 걸어도 벽을 뚫지 않고, 기절 중에는 키를 눌러도 못 움직이는가", function (done) {

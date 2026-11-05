@@ -7686,13 +7686,14 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     onJoyMove(e) { var services = this.services; if (e.pointerId === services.input.joy.id) { services.input.joy.x = e.clientX; services.input.joy.y = e.clientY; } }
     onJoyEnd(e) { var services = this.services; if (e.pointerId === services.input.joy.id) services.input.joy.id = null; }
+    static JOY_DEAD_PX = 8;
     readMove() { var services = this.services;
       var held = services.input.keys, joy = services.input.joy;
       var kx = (held.right ? 1 : 0) - (held.left ? 1 : 0), ky = (held.down ? 1 : 0) - (held.up ? 1 : 0), vx, vy;
       if (joy.id === null && !kx && !ky) return false;
       if (joy.id !== null) {
         var dx = joy.x - joy.ox, dy = joy.y - joy.oy, d = MathKit.hyp(dx, dy);
-        var m = d < 8 ? 0 : Math.min(1, d / services.input.joyR);
+        var m = d < InputController.JOY_DEAD_PX ? 0 : 1;
         vx = d ? dx / d * m : 0; vy = d ? dy / d * m : 0;
       } else { var kd = MathKit.hyp(kx, ky); vx = kx / kd; vy = ky / kd; }
       if (services.input.flip()) { vx = -vx; vy = -vy; }
@@ -12338,7 +12339,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class PerfProbe {
-    static BUILD = "lag15";
+    static BUILD = "lag16";
     static PATH = "perfDiag/teambattle/";
     static RTT_KEEP = 50;
     static RECORDS = !Environment.SILENT_RUN;
