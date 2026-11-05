@@ -7201,6 +7201,55 @@ class GiantTests {
       if (api.FIELD.hitmanSlashes.length) bad.push("그림이 끝나지 않음");
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "돌진·회전베기 그림과 피해 " + (H.dashDmg + H.dmg));
     });
+    run(G, "수문장 창벽 그림: 판정 반경 끝에 창벽 폭발이 나오고, 기본 공격은 예전 부채꼴을 유지하며 피해가 그대로인가", function (done) {
+      var bad = [], y = self.kit.OPEN_Y.forest, W, gd, foe;
+      api.MATCH.stateByKey = {};
+      W = self.kit.world("forest", [{ id: "gd", team: "blue", char: "guardian", x: 300, y: y, gauge: api.GAUGE_MAX }, { id: "foe", team: "red", char: "guardian", x: 400, y: y }]);
+      gd = W.ent("gd"); foe = W.ent("foe");
+      api.FIELD.impactBlasts.length = 0; api.MATCH.melee = {};
+      api.useUlt(gd, 0); W.frame(FRAME);
+      var wall = api.FIELD.impactBlasts[0];
+      if (!wall || wall.constructor.name !== "GuardianWallBlast" || wall.r <= ULT.gdR) bad.push("창벽 폭발 " + (wall && wall.r));
+      if (Object.keys(api.MATCH.melee).length) bad.push("예전 원 그림이 남음");
+      if (foe.hp !== foe.maxHp - ULT.gdDmg) bad.push("피해 " + (foe.maxHp - foe.hp));
+      W.step(1500);
+      if (api.FIELD.impactBlasts.length) bad.push("창벽 그림이 끝나지 않음");
+      api.fireBasic(gd, 0); W.frame(FRAME);
+      if (!Object.keys(api.MATCH.melee).length) bad.push("기본 공격 부채꼴이 사라짐");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "창벽 반경 " + (wall && wall.r) + ", 피해 " + ULT.gdDmg);
+    });
+    run(G, "저격수 그림: 기본 공격은 총구 빛과 적중 표시, 스킬은 궤적과 적중 폭발이 나오고 피해가 그대로인가", function (done) {
+      var bad = [], y = self.kit.OPEN_Y.forest, W, sn, foe, C = api.CHARS.sniper;
+      api.MATCH.stateByKey = {};
+      W = self.kit.world("forest", [{ id: "sn", team: "blue", char: "sniper", x: 200, y: y, gauge: api.GAUGE_MAX }, { id: "foe", team: "red", char: "guardian", x: 420, y: y }]);
+      sn = W.ent("sn"); foe = W.ent("foe");
+      api.FIELD.sniperMarks.length = 0; api.FIELD.impactBlasts.length = 0;
+      api.fireBasic(sn, 0); W.frame(FRAME);
+      if (api.FIELD.sniperMarks.length !== 1) bad.push("기본 공격 총구 빛 " + api.FIELD.sniperMarks.length);
+      W.step(450);
+      if (foe.hp !== foe.maxHp - C.dmg) bad.push("기본 공격 피해 " + (foe.maxHp - foe.hp));
+      W.step(1500);
+      if (api.FIELD.sniperMarks.length) bad.push("기본 공격 그림이 끝나지 않음");
+      var before = foe.hp;
+      api.useUlt(sn, 0); W.frame(FRAME);
+      var lane = api.FIELD.sniperMarks.filter(function (m) { return m.p; })[0];
+      if (!lane) bad.push("스킬 궤적이 안 생김");
+      W.step(500);
+      if (before - foe.hp !== ULT.pnDmg) bad.push("스킬 피해 " + (before - foe.hp));
+      if (!api.FIELD.impactBlasts.length) bad.push("스킬 적중 폭발이 안 생김");
+      W.step(2000);
+      if (api.FIELD.sniperMarks.length || api.FIELD.impactBlasts.length) bad.push("스킬 그림이 끝나지 않음");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "기본 " + C.dmg + ", 스킬 " + ULT.pnDmg);
+    });
+    run(G, "공격·스킬 버튼: 흐림 그림자·둥근 자르기·배경 흐림이 없고 값은 transform 으로만 바뀌는가", function (done) {
+      var bad = [], ult = document.getElementById("btnUlt"), atk = document.getElementById("btnAtk"), top = document.getElementById("hudTop");
+      if (document.querySelector(".meterClip")) bad.push("둥근 자르기 층이 남음");
+      [ult, atk].forEach(function (b) { if (getComputedStyle(b).boxShadow !== "none") bad.push(b.id + " 그림자"); });
+      if (getComputedStyle(ult, "::after").content !== "none") bad.push("빛 층이 남음");
+      if ((getComputedStyle(top).backdropFilter || "none") !== "none") bad.push("위쪽 HUD 배경 흐림");
+      if (ult.firstChild.className !== "fill" || atk.firstChild.className !== "cd") bad.push("게이지 칸 위치");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "버튼·위쪽 HUD 모두 가벼운 층만 사용");
+    });
     run(G, "화염술사 메테오 그림: " + ULT.mbDelay + "ms 뒤 떨어지는 순간 범위 폭발로 바뀌는가", function (done) {
       var bad = [], y = self.kit.OPEN_Y.forest, W, mage;
       api.MATCH.stateByKey = {};

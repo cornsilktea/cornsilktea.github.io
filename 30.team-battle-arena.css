@@ -221,7 +221,7 @@
   #glLostNote { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 60; width: calc(100% - 32px); max-width: 460px; padding: 18px 20px; border-radius: 12px; background: rgba(16,24,19,.92); border-top: 3px solid #D97B4F; color: #fff; font-weight: 700; line-height: 1.6; text-align: center; }
   #ov { pointer-events: none; }
   #hudTop { position: absolute; top: 0; left: 50%; transform: translateX(-50%); display: flex; align-items: stretch; pointer-events: none; white-space: nowrap;
-            background: rgba(14,20,17,.8); color: #F4F1E8; border: 1px solid rgba(255,255,255,.16); border-top: 0; border-radius: 0 0 12px 12px; padding: 2px 4px 5px; box-shadow: 0 6px 18px rgba(0,0,0,.3); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+            background: rgba(14,20,17,.8); color: #F4F1E8; border: 1px solid rgba(255,255,255,.16); border-top: 0; border-radius: 0 0 12px 12px; padding: 2px 4px 5px; box-shadow: 0 6px 18px rgba(0,0,0,.3); }
   .hdSide { display: flex; flex-direction: column; justify-content: center; padding: 0 10px; text-align: center; font-size: 12px; font-weight: 800; line-height: 1.15; min-width: 64px; }
   .hdSide b { font-size: 20px; font-variant-numeric: tabular-nums; }
   .hdSide.b { color: #6FA8FF; }
@@ -292,20 +292,16 @@
   .pcBox .dfCard { cursor: pointer; }
 
   .actBtn { position: absolute; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-direction: column; font-weight: 800; color: #fff; touch-action: none; -webkit-user-select: none; user-select: none; }
-  .meterClip { position: absolute; inset: 0; border-radius: 50%; overflow: hidden; pointer-events: none; }
-  #btnAtk { right: 26px; bottom: 44px; width: 112px; height: 112px; background: radial-gradient(circle at 50% 32%, rgba(78,128,96,.96), rgba(22,38,28,.96)); border: 4px solid rgba(255,255,255,.88); box-shadow: 0 6px 18px rgba(0,0,0,.35); font-size: 19px; line-height: 1.1; text-shadow: 0 1px 2px rgba(0,0,0,.6); }
+  #btnAtk { right: 26px; bottom: 44px; width: 112px; height: 112px; background: #2F4A39; border: 4px solid rgba(255,255,255,.88); font-size: 19px; line-height: 1.1; text-shadow: 0 1px 0 rgba(0,0,0,.6); }
   #btnAtk .ic { display: block; font-style: normal; font-size: 30px; }
-  #btnAtk .cd { position: absolute; inset: 0; transform-origin: 50% 100%; transform: scaleY(0); will-change: transform; background: rgba(0,0,0,.35); pointer-events: none; }
+  #btnAtk .cd { position: absolute; inset: 0; border-radius: 50%; transform: scale(0); will-change: transform; background: rgba(0,0,0,.45); pointer-events: none; }
   #btnAtk span, #btnUlt span { position: relative; pointer-events: none; }
-  #btnUlt { right: 150px; bottom: 50px; width: 86px; height: 86px; background: radial-gradient(circle at 50% 32%, rgba(70,74,72,.9), rgba(24,28,26,.9)); border: 4px solid rgba(255,255,255,.6); box-shadow: 0 5px 14px rgba(0,0,0,.35); font-size: 16px; text-shadow: 0 1px 2px rgba(0,0,0,.6); }
-  #btnUlt .fill { position: absolute; inset: 0; transform-origin: 50% 100%; transform: scaleY(0); will-change: transform; background: rgba(242,194,48,.75); pointer-events: none; }
-  #btnUlt.ready { background: rgba(229,57,53,.9); border-color: #FFE08A; box-shadow: 0 0 6px 2px rgba(255,120,80,.6); }
-  #btnUlt::after { content: ""; position: absolute; inset: -4px; border-radius: 50%; box-shadow: 0 0 22px 8px rgba(255,90,60,.95); pointer-events: none; will-change: opacity; opacity: 0; }
-  #btnUlt.ready::after { animation: glow 0.9s ease-in-out infinite alternate; }
-  #btnUlt.ready .fill { background: rgba(229,57,53,0); }
+  #btnUlt { right: 150px; bottom: 50px; width: 86px; height: 86px; background: #2E3230; border: 4px solid rgba(255,255,255,.6); font-size: 16px; text-shadow: 0 1px 0 rgba(0,0,0,.6); }
+  #btnUlt .fill { position: absolute; inset: 0; border-radius: 50%; transform: scale(0); will-change: transform; background: #B8922A; pointer-events: none; }
+  #btnUlt .readyFace { position: absolute; inset: -4px; border-radius: 50%; background: #E53935; border: 4px solid #FFE08A; opacity: 0; will-change: opacity; pointer-events: none; }
+  #btnUlt.ready .readyFace { opacity: 1; }
   #btnUlt.act { border-color: #F9B8DA; }
-  #btnUlt.act .fill { background: rgba(240,107,181,.85); }
-  @keyframes glow { from { opacity: 0; } to { opacity: 1; } }
+  #btnUlt.act .fill { background: #C2558F; }
   #deadMsg { position: absolute; left: 50%; bottom: 30%; transform: translateX(-50%); background: rgba(27,43,32,.82); color: #fff; font-size: 20px; font-weight: 800; padding: 10px 20px; border-radius: 8px; pointer-events: none; white-space: nowrap; }
   #protBadge { position: absolute; left: 50%; bottom: 30%; transform: translateX(-50%); background: rgba(47,125,79,.9); color: #fff; font-size: 17px; font-weight: 800; padding: 6px 14px; border-radius: 10px; pointer-events: none; white-space: nowrap; }
   .boardWrap { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 0 0 16px; }

@@ -28,6 +28,7 @@
 **HTML HUD**
 - 프레임마다 바뀌는 칸은 `transform`·`opacity` 만 쓴다. `height`·`width` 를 바꾸지 않는다(30번 `ActionButtonMeter`). 값이 바뀔 때만 쓴다.
 - `box-shadow`·`filter`·`color` 를 애니메이션하지 않는다. 빛나는 효과는 그림자를 고정한 가상 요소의 `opacity` 로 한다.
+- 게임 화면 위 HUD 에 `backdrop-filter`·큰 흐림 그림자를 쓰지 않는다. 움직이는 칸을 `overflow: hidden` 둥근 틀로 자르지 말고, 원 자체를 `scale` 로 키운다(30번 공격·스킬 버튼).
 - 애니메이션을 다시 시작하려고 `void el.offsetWidth` 를 쓰지 않는다. `el.animate(...)` 를 쓴다.
 
 **화면 채우기(GPU)**
