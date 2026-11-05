@@ -10788,15 +10788,14 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   class SniperLane extends ShaderMark {
     static WIDTH = 44;
-    static BASIC_WIDTH = 18;
     static FADE_SEC = 0.4;
     constructor(p, scale) { super(p.d.createdAt); this.p = p; this.endSec = p.life / scale / 1000; this.stopped = false; }
     get partName() { return "lane"; }
     get lifeSec() { return this.endSec + SniperLane.FADE_SEC; }
     place(vis) { var p = this.p, u = vis.uniforms, T = SniperShotShaders.TONES;
       vis.group.position.set(p.d.x, 3, p.d.y); vis.group.rotation.y = -Math.atan2(p.dy, p.dx);
-      vis.lane.scale.set(p.dist, 1, p.d.isSkill ? SniperLane.WIDTH : SniperLane.BASIC_WIDTH); u.uLen.value = p.dist;
-      u.uDeep.value.set(p.d.isSkill ? T.deep : Palette.C_FX[p.d.team]); u.uBlade.value.set(p.d.isSkill ? T.blade : Palette.C_FX[p.d.team]); u.uCore.value.set(T.core);
+      vis.lane.scale.set(p.dist, 1, SniperLane.WIDTH); u.uLen.value = p.dist;
+      u.uDeep.value.set(T.deep); u.uBlade.value.set(T.blade); u.uCore.value.set(T.core);
       this.travelSec = this.endSec;
     }
     paint(vis, sec) {
@@ -10830,7 +10829,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     flash(x, y, angle, spec, hex, at) { return this.add(new SniperFlash(x, y, angle, spec.size, hex, spec.sec, at)); }
     launched(p) { var services = this.services, d = p.d, angle = Math.atan2(p.dy, p.dx), skill = d.isSkill, spec = skill ? SniperShotView.MUZZLE_SKILL : SniperShotView.MUZZLE;
       this.flash(d.x, d.y, angle, spec, skill ? SniperShotShaders.TONES.blade : Palette.C_FX[d.team], d.createdAt);
-      this.add(new SniperLane(p, services.clock.scale));
+      if (skill) this.add(new SniperLane(p, services.clock.scale));
     }
     hit(d, x, y, far) { var services = this.services, now = services.clock.now(), angle = Math.atan2(d.vy, d.vx), spec = far || d.isSkill ? SniperShotView.HIT_FAR : SniperShotView.HIT;
       this.flash(x, y, angle, spec, d.isSkill ? SniperShotShaders.TONES.blade : far ? SniperShotShaders.TONES.far : Palette.C_FX[d.team], now);
@@ -12339,7 +12338,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class PerfProbe {
-    static BUILD = "lag12";
+    static BUILD = "lag13";
     static PATH = "perfDiag/teambattle/";
     static RTT_KEEP = 50;
     static RECORDS = !Environment.SILENT_RUN;
@@ -12772,7 +12771,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var hitmen = this.castersByTeam("hitman"), hitmanCount = hitmen.blue + hitmen.red;
       var snipers = this.castersByTeam("sniper"), sniperCount = snipers.blue + snipers.red, guardians = this.castersByTeam("guardian"), guardianCount = guardians.blue + guardians.red;
       services.hitmanSlashView.prefill(hitmanCount * 3);
-      services.sniperShots.prefill(sniperCount * 4);
+      services.sniperShots.prefill(sniperCount * 3);
       services.meteorFall.prefill(mageCount);
       services.galeView.prefill(giantCount);
       services.impactBlasts.prefill(mageCount + smiths.blue + smiths.red + giantCount * 2 + hitmanCount + sniperCount + guardianCount);

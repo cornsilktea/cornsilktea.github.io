@@ -7225,7 +7225,7 @@ class GiantTests {
       sn = W.ent("sn"); foe = W.ent("foe");
       api.FIELD.sniperMarks.length = 0; api.FIELD.impactBlasts.length = 0;
       api.fireBasic(sn, 0); W.frame(FRAME);
-      if (api.FIELD.sniperMarks.length !== 2) bad.push("기본 공격 총구 빛·궤적 " + api.FIELD.sniperMarks.length);
+      if (api.FIELD.sniperMarks.length !== 1) bad.push("기본 공격 총구 빛만 나와야 함 " + api.FIELD.sniperMarks.length);
       W.step(450);
       if (foe.hp !== foe.maxHp - C.dmg) bad.push("기본 공격 피해 " + (foe.maxHp - foe.hp));
       W.step(1500);
