@@ -5898,35 +5898,35 @@ class BannerBearerTests {
       if (self.lost(gi) !== 52) bad.push("거신 곱연산 " + self.lost(gi));
       self.verdict(done, bad, "80·78·26·52");
     });
-    run(G, "주는 피해: 100 → 110, 공격자가 반경 밖이면 100, 해골 병사는 그대로, 틱 피해 적용", function (done) {
+    run(G, "주는 피해: 100 → 120, 공격자가 반경 밖이면 100, 해골 병사는 그대로, 틱 피해 적용", function (done) {
       var bad = [], W = self.squad([{ id: "al", team: "blue", char: "knight", x: 320, slot: 2 }, { id: "far", team: "blue", char: "guardian", x: 300 + ULT.bnR + 5, slot: 3 }, { id: "foe", x: 500, slot: 1 }, { id: "ne", char: "necro", x: 560, slot: 2 }]), foe = W.ent("foe"), ne = W.ent("ne");
       self.stance(W);
       api.damage(foe, 100, "al", false, "x");
-      if (self.lost(foe) !== 110) bad.push("안쪽 " + self.lost(foe));
+      if (self.lost(foe) !== 120) bad.push("안쪽 " + self.lost(foe));
       foe.hp = foe.maxHp; api.damage(foe, 100, "far", false, "x");
       if (self.lost(foe) !== 100) bad.push("바깥 " + self.lost(foe));
       foe.hp = foe.maxHp; foe.burnUntil = W.t() + 2000; foe.burnNext = W.t() + 1; foe.burnOwner = "al"; W.frame(5);
       var tick = Math.round(foe.maxHp * api.CHARS.mage.burn.maxHpRate);
-      if (self.lost(foe) !== Math.round(tick * 1.1)) bad.push("화상 틱 " + self.lost(foe) + " 기대 " + Math.round(tick * 1.1));
+      if (self.lost(foe) !== Math.round(tick * 1.2)) bad.push("화상 틱 " + self.lost(foe) + " 기대 " + Math.round(tick * 1.2));
       foe.burnUntil = 0;
       ne.gauge = api.GAUGE_MAX; api.useUlt(ne, 0); W.step(ULT.smRiseMs + 50);
       var m = ne.minions[0];
       if (!m) bad.push("해골 병사 없음");
       else { var hp = m.hp; api.damage(m, 10, "al", false, "x"); if (hp - m.hp !== 10) bad.push("해골 병사 " + (hp - m.hp)); }
-      self.verdict(done, bad, "110·100·틱·해골 병사");
+      self.verdict(done, bad, "120·100·틱·해골 병사");
     });
-    run(G, "주는 피해 합연산: 광전사 광폭화 1.6 + 0.1 = 1.7배, 저격수 먼 거리 1.5 + 0.1 = 1.6배이고 자기 몫은 공격자 기록에 남는가", function (done) {
+    run(G, "주는 피해 합연산: 광전사 광폭화 1.6 + 0.2 = 1.8배, 저격수 먼 거리 1.5 + 0.2 = 1.7배이고 자기 몫은 공격자 기록에 남는가", function (done) {
       var bad = [], W = self.squad([{ id: "wa", team: "blue", char: "warrior", x: 320, slot: 2 }, { id: "foe", x: 380, slot: 1 }]), wa = W.ent("wa"), foe = W.ent("foe");
       self.stance(W);
       wa.buffUntil = W.t() + 1000; api.fireBasic(wa, 0);
-      var want = Math.round(api.CHARS.warrior.dmg * 1.7);
+      var want = Math.round(api.CHARS.warrior.dmg * 1.8);
       if (self.lost(foe) !== want) bad.push("광전사 " + self.lost(foe) + " 기대 " + want);
-      if (wa.dmg !== want - (want - Math.round(want * 1.6 / 1.7))) bad.push("광전사 기록 " + wa.dmg);
+      if (wa.dmg !== want - (want - Math.round(want * 1.6 / 1.8))) bad.push("광전사 기록 " + wa.dmg);
       var W2 = self.squad([{ id: "sn", team: "blue", char: "sniper", x: 100, slot: 2 }, { id: "foe", x: 100 + api.CHARS.sniper.farDist + 40, slot: 1 }]), sn = W2.ent("sn"), foe2 = W2.ent("foe");
       self.stance(W2);
       W2.ent("bn").x = 150;
       api.fireBasic(sn, 0); W2.step(1200);
-      var want2 = Math.round(api.CHARS.sniper.dmg * 1.6);
+      var want2 = Math.round(api.CHARS.sniper.dmg * 1.7);
       if (self.lost(foe2) !== want2) bad.push("저격수 " + self.lost(foe2) + " 기대 " + want2);
       self.verdict(done, bad, "광전사 " + want + " · 저격수 " + want2);
     });
@@ -5939,16 +5939,16 @@ class BannerBearerTests {
       api.damage(foe, 100, "al", false, "x");
       if (al.dmg !== 100) bad.push("공격자 " + al.dmg);
       low.hp = 50; api.damage(low, 100, "al", false, "x");
-      if (al.dmg !== 145) bad.push("넘친 피해 공격자 " + al.dmg);
+      if (al.dmg !== 142) bad.push("넘친 피해 공격자 " + al.dmg);
       api.damage(al, 100, "foe", false, "x");
       if (al.blocked !== 2) bad.push("기사 막은 피해 " + al.blocked);
       al.hp = 10; var blockedBefore = al.blocked;
       api.damage(al, 5, "foe", false, "x");
       al.hp = al.maxHp;
       W.step(ULT.bnDur + 50);
-      if (B.dmg !== 15) bad.push("선봉장 추가 피해 " + B.dmg);
+      if (B.dmg !== 28) bad.push("선봉장 추가 피해 " + B.dmg);
       if (B.blocked !== 21) bad.push("선봉장 막은 피해 " + B.blocked);
-      self.verdict(done, bad, "공격자 145 · 선봉장 피해 +15 · 막은 피해 +21");
+      self.verdict(done, bad, "공격자 142 · 선봉장 피해 +28 · 막은 피해 +21");
     });
   }
   registerLedger() {
@@ -5988,8 +5988,8 @@ class BannerBearerTests {
       api.onEnded();
       cap.updates.length = 0;
       cap.pushes.filter(function (p) { return p.path === "hits/" + me; }).forEach(function (p, i) { api.onHit({ key: "end" + i, val: function () { return p.v; }, ref: { parent: { key: me }, remove: function () {} } }); });
-      if (B.dmg !== 10 || B.blocked !== 20) bad.push("선봉장 기록 " + B.dmg + "·" + B.blocked);
-      if (Math.abs(api.mvpScore(B) - scoreBefore - 30) > 1e-6) bad.push("MVP 점수 차이 " + (api.mvpScore(B) - scoreBefore));
+      if (B.dmg !== 20 || B.blocked !== 20) bad.push("선봉장 기록 " + B.dmg + "·" + B.blocked);
+      if (Math.abs(api.mvpScore(B) - scoreBefore - 40) > 1e-6) bad.push("MVP 점수 차이 " + (api.mvpScore(B) - scoreBefore));
       if (!cap.updates.length) bad.push("상태를 보내지 않음");
       if (cap.sets.some(function (x) { return x.path === "done/" + me; })) bad.push("켜진 판인데 도착 기록을 바로 씀");
       var W2 = self.scene([{ id: me, team: "blue", char: "bearer", x: 300, slot: 1 }, { id: "foe", x: 500, slot: 1 }]), cap2 = kit.recordRef(W2), B2 = W2.ent(me);
@@ -6030,7 +6030,7 @@ class BannerBearerTests {
     });
     run(G, "카드: 설명 숫자가 값과 맞고 표에 undefined·NaN 이 없는가", function (done) {
       var bad = [], u = api.ultDesc("bearer"), p = api.passiveDesc("bearer"), b = api.basicDesc("bearer"), C = api.CHARS.bearer;
-      if (u !== "8초간 반경 " + ULT.bnR + " 안의 아군과 자신은 받는 피해 20% 감소, 주는 피해 10% 증가") bad.push(u);
+      if (u !== "8초간 반경 " + ULT.bnR + " 안의 아군과 자신은 받는 피해 20% 감소, 주는 피해 20% 증가") bad.push(u);
       if (p !== "반경 " + ULT.bnMarchR + " 안의 아군과 자신은 이동속도 40 증가") bad.push(p);
       if (b.indexOf(String(C.range)) < 0 || b.indexOf(String(C.width)) < 0 || b.indexOf(String(C.dmg)) < 0) bad.push(b);
       if (/undefined|NaN/.test(u + p + b)) bad.push("글자 오류");

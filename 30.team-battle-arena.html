@@ -3531,7 +3531,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       hkWind: GameTime.gameMs(0.25), hkRange: 650, hkSpeed: GameTime.gameSpeed(1000), hkPr: 8, hkDmg: 45, hkAfterStunMs: GameTime.gameMs(0.5), hkPullSpeed: GameTime.gameSpeed(800),
       hkPassiveGauge: 1, hkBreakDist: 40, hkBotMinPull: 80
     };
-    static STATS = { name: "사슬 망령", role: "fighter", icon: "⛓️", hp: 400, speed: GameTime.gameSpeed(150), cd: GameTime.gameMs(1.5), dmg: 28, range: 300, width: 100, windup: GameTime.gameMs(0.25), ultName: "사슬 갈고리", ultAim: true };
+    static STATS = { name: "사슬 망령", role: "fighter", icon: "⛓️", hp: 430, speed: GameTime.gameSpeed(150), cd: GameTime.gameMs(1.5), dmg: 28, range: 300, width: 100, windup: GameTime.gameMs(0.25), ultName: "사슬 갈고리", ultAim: true };
     static CHOP_FROM_SEC = 0.3;
     static CHOP_IMPACT_SEC = 0.62;
     static STAB_PEAK_SEC = 0.48;
@@ -3591,7 +3591,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
                 rightRecolor: [[2, 7, 1, "#FFF0B0", "#EDB73F"], [2, 4, 1, "#FFF0B0", "#E0A83A"], [1, 6, 1, "#E8B44A", "#A9741F"], [3, 0, 1, "#FFF0B0", "#EDB73F"]],
                 recolor: [[0, 3, 1, "#25386E", "#121C3D"], [1, 0, 1, "#25386E", "#121C3D"], [2, 2, 1, "#25386E", "#121C3D"], [1, 1, 1, "#FFE08A", "#C8892A"], [1, 2, 2, "#E8EDF2", "#8F9AA6"]] };
     static ULT = {
-      bnDur: GameTime.gameMs(8), bnR: 350, bnDef: 0.8, bnAtk: 1.1, bnMarchR: 350, bnMarchSpeed: GameTime.gameSpeed(40), bnBotFoeR: 500, bnRaiseMs: GameTime.gameMs(0.6)
+      bnDur: GameTime.gameMs(8), bnR: 350, bnDef: 0.8, bnAtk: 1.2, bnMarchR: 350, bnMarchSpeed: GameTime.gameSpeed(40), bnBotFoeR: 500, bnRaiseMs: GameTime.gameMs(0.6)
     };
     static STATS = { name: "선봉장", role: "fighter", icon: "🚩", hp: 400, speed: GameTime.gameSpeed(140), cd: GameTime.gameMs(1.5), dmg: 28, range: 160, width: 90, ultName: "전투태세", blocks: true };
     static BOT_LEASH = 240;
@@ -3753,7 +3753,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   class MarinaType extends MagicShooterType {
     static MELEE = { color: 0x2FA8B8, spark: "#2FA8B8" };
-    static MODEL = { file: "Mage", portraitPlant: true, rightBuilt: "trident", rightScale: 1.2, rightRot: [0.4, -0.2, 0.95], hide: ["Mage_Hat"],
+    static MODEL = { file: "Mage", portraitPlant: true, plantAtHand: true, rightBuilt: "trident", rightScale: 1.2, rightRot: [0.4, -0.2, 0.95], hide: ["Mage_Hat"],
                 recolor: [[1, 0, 1, "#1C7F8C", "#0F4A5C"], [1, 1, 1, "#173A63", "#0B1F3C"], [1, 2, 1, "#38B6C8", "#1B6F86"], [2, 1, 1, "#173A63", "#0B1F3C"], [0, 5, 1, "#38B6C8", "#1B6F86"]] };
     static ULT = {
       mrFlyMs: GameTime.gameMs(0.3), mrHeal: 10, mrChainR: 300, mrDmg: 20, mrKb: 150, mrStunMs: GameTime.gameMs(0.5), mrWaveHeal: 10, mrLanes: 6, mrLen: 600,
@@ -4021,10 +4021,15 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     static LOWER_PART = 0.75;
     static HOLD_SEC = 0.12;
     static BACK_SEC = 0.22;
+    static CARRY_ROT = [0.4, -0.2, 0.75];
+    static CARRY_SHIFT = 0.15;
+    static CARRY_FROM_SPEED = 15;
+    static CARRY_FULL_SPEED = 95;
     static setupOf(v, held) {
       if (v.tridentSlam) return v.tridentSlam;
       var R = TridentSlamPose.SLAM_ROT, slam = new THREE.Quaternion().setFromEuler(new THREE.Euler(R[0], R[1], R[2]));
-      v.tridentSlam = { held: held, rest: held.quaternion.clone(), slam: slam, slide: new THREE.Vector3(0, -TridentSlamPose.SLIDE, 0).applyQuaternion(slam) };
+      var C = TridentSlamPose.CARRY_ROT;
+      v.tridentSlam = { held: held, rest: held.quaternion.clone(), carry: new THREE.Quaternion().setFromEuler(new THREE.Euler(C[0], C[1], C[2])), slam: slam, slide: new THREE.Vector3(0, -TridentSlamPose.SLIDE, 0).applyQuaternion(slam) };
       return v.tridentSlam;
     }
     static weightAt(E, t) { var P = TridentSlamPose, wind = MarinaType.ULT.mrWindMs, into = (t - E.ultUntil + wind) / wind;
@@ -4035,9 +4040,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     static apply(v, E, t) {
       var held = v.tridentSlam ? v.tridentSlam.held : v.root.getObjectByName("mainhand");
       if (!held) return;
-      var S = TridentSlamPose.setupOf(v, held), k = E.alive ? TridentSlamPose.weightAt(E, t) : 0;
-      held.quaternion.slerpQuaternions(S.rest, S.slam, k);
+      var P = TridentSlamPose, S = P.setupOf(v, held), k = E.alive ? P.weightAt(E, t) : 0;
+      var carry = MathKit.clamp((v.speed - P.CARRY_FROM_SPEED) / (P.CARRY_FULL_SPEED - P.CARRY_FROM_SPEED), 0, 1) * (1 - k);
+      held.quaternion.slerpQuaternions(S.rest, S.carry, carry).slerp(S.slam, k);
       held.position.copy(S.slide).multiplyScalar(k);
+      held.position.z += P.CARRY_SHIFT * carry;
     }
   }
   class MarinaStreamView {
@@ -7841,6 +7848,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     static PONYTAIL = { x: 0, y: 0.62, z: -0.6, tieR: 0.12, tailLen: 0.8, tailTop: 0.13, tailTip: 0.03, tilt: 0.45 };
     static PLANT_OUTWARD = 0.25;
     static PLANT_FORWARD = 0.18;
+    static GRIP_OUTWARD = 0.1;
+    static GRIP_FORWARD = 0.05;
     static PLANT_MAX_K = 1.5;
     constructor(services) { this.services = services; this.tmpV = new THREE.Vector3(); this.yUp = new THREE.Vector3(0, 1, 0); this.kit = { ready: false, chars: {}, weapons: {}, clips: {}, largeClips: {}, props: {}, muzzle: {} }; }
     glslVec3(v) { return "vec3(" + v.x.toFixed(4) + ", " + v.y.toFixed(4) + ", " + v.z.toFixed(4) + ")"; }
@@ -7963,14 +7972,14 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       });
       return box.getSize(new THREE.Vector3()).y;
     }
-    shrinkTallHeld(m, extraTurn, tilt) { var services = this.services;
+    shrinkTallHeld(m, extraTurn, tilt, atHand) { var services = this.services;
       var held = m.getObjectByName("mainhand"); if (!held) return;
       var limit = services.models.bodyHeight(m) * ModelKit.PLANT_MAX_K, length = new THREE.Box3().setFromObject(held).getSize(new THREE.Vector3()).y;
       if (length <= limit) return;
       held.scale.multiplyScalar(limit / length);
-      services.models.plantHeldUpright(m, extraTurn, tilt);
+      services.models.plantHeldUpright(m, extraTurn, tilt, atHand);
     }
-    plantHeldUpright(m, extraTurn, tilt) { var services = this.services;
+    plantHeldUpright(m, extraTurn, tilt, atHand) { var services = this.services;
       var held = m.getObjectByName("mainhand"); if (!held) return;
       held.position.set(0, 0, 0);
       var handTurn = new THREE.Quaternion(), bodyTurn = new THREE.Quaternion(), foot = new THREE.Vector3();
@@ -7979,6 +7988,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (extraTurn) held.quaternion.multiply(new THREE.Quaternion().setFromAxisAngle(services.models.yUp, extraTurn));
       if (tilt) held.quaternion.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), tilt));
       m.updateMatrixWorld(true);
+      if (atHand) { var gripAt = held.getWorldPosition(foot).add(new THREE.Vector3(-ModelKit.GRIP_OUTWARD, 0, ModelKit.GRIP_FORWARD).applyQuaternion(bodyTurn)); held.parent.worldToLocal(gripAt); held.position.copy(gripAt); m.updateMatrixWorld(true); return; }
       var lowest = new THREE.Box3().setFromObject(held).min.y - m.position.y;
       var outward = new THREE.Vector3(-ModelKit.PLANT_OUTWARD, 0, ModelKit.PLANT_FORWARD).applyQuaternion(bodyTurn);
       held.getWorldPosition(foot); foot.y -= lowest; foot.add(outward); held.parent.worldToLocal(foot); held.position.copy(foot);
@@ -7998,7 +8008,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         m.rotation.y = -0.45;
         var mix = new THREE.AnimationMixer(m); mix.clipAction(services.charTypes.of(c).clips.Idle_A).play(); mix.update(0.3);
         m.updateMatrixWorld(true);
-        if (services.charTypes.modelOf(c).portraitPlant) { services.models.plantHeldUpright(m, services.charTypes.modelOf(c).plantTurn, services.charTypes.modelOf(c).plantTilt); services.models.shrinkTallHeld(m, services.charTypes.modelOf(c).plantTurn, services.charTypes.modelOf(c).plantTilt); }
+        if (services.charTypes.modelOf(c).portraitPlant) { services.models.plantHeldUpright(m, services.charTypes.modelOf(c).plantTurn, services.charTypes.modelOf(c).plantTilt, services.charTypes.modelOf(c).plantAtHand); services.models.shrinkTallHeld(m, services.charTypes.modelOf(c).plantTurn, services.charTypes.modelOf(c).plantTilt, services.charTypes.modelOf(c).plantAtHand); }
         services.charTypes.of(c).dressPortrait(m);
         return { c: c, m: m, box: new THREE.Box3().setFromObject(m) };
       });
