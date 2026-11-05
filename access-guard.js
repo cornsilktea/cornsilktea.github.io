@@ -265,6 +265,23 @@
           meter.style.cssText += ";top:auto;right:auto;bottom:calc(8px + env(safe-area-inset-bottom, 0px));left:50%;transform:translateX(-50%);height:32px;padding:0 10px;font:600 13px/32px monospace";
         }
       };
+      /* 주소에 반 표시(?c=…)와 &fps 말고 다른 것이 붙어 있으면(&ov=1 같은 실험 값) 프레임 칸 왼쪽에 "&반&fps&ov=1" 꼴로 보여 줍니다. */
+      var testedTail = (function () {
+        var m = /^\?c=([^&]*)(.*)$/.exec(location.search), rest = m ? m[2] : location.search.replace(/^\?/, "&");
+        var extra = rest.split("&").filter(function (part) { return part && !/^fps(=|$)/.test(part); });
+        return extra.length ? (m ? "&" + m[1] : "") + rest : "";
+      })();
+      var tailLabel = null;
+      var placeTail = function () {
+        if (!testedTail) return;
+        if (!tailLabel) { tailLabel = document.createElement("div"); document.body.appendChild(tailLabel); }
+        tailLabel.style.cssText = meter.style.cssText;
+        tailLabel.textContent = testedTail;
+        var rect = meter.getBoundingClientRect();
+        tailLabel.style.left = "auto";
+        tailLabel.style.transform = "none";
+        tailLabel.style.right = (window.innerWidth - rect.left + 6) + "px";
+      };
       var frames = 0, worst = 0, last = performance.now(), windowStart = last;
       var tick = function (now) {
         var gap = now - last;
@@ -276,6 +293,7 @@
           meter.textContent = "FPS " + fps + " · 최저 " + Math.round(1000 / worst);   /* · 최저 */
           placeMeter();
           meter.style.color = fps >= 50 ? "#7CFC9A" : fps >= 30 ? "#FFE27A" : "#FF7A7A";
+          placeTail();
           frames = 0; worst = 0; windowStart = now;
         }
         requestAnimationFrame(tick);
