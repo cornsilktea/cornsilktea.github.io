@@ -3753,18 +3753,19 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   class MarinaType extends MagicShooterType {
     static MELEE = { color: 0x2FA8B8, spark: "#2FA8B8" };
-    static MODEL = { file: "Mage", portraitPlant: true, rightBuilt: "trident", rightScale: 1.2, rightTilt: Math.PI / 2, hide: ["Mage_Hat"],
+    static MODEL = { file: "Mage", portraitPlant: true, rightBuilt: "trident", rightScale: 1.2, rightRot: [0.4, -0.2, 0.95], hide: ["Mage_Hat"],
                 recolor: [[1, 0, 1, "#1C7F8C", "#0F4A5C"], [1, 1, 1, "#173A63", "#0B1F3C"], [1, 2, 1, "#38B6C8", "#1B6F86"], [2, 1, 1, "#173A63", "#0B1F3C"], [0, 5, 1, "#38B6C8", "#1B6F86"]] };
     static ULT = {
-      mrFlyMs: GameTime.gameMs(0.3), mrHeal: 10, mrChainR: 300, mrDmg: 40, mrKb: 150, mrStunMs: GameTime.gameMs(0.5), mrWaveHeal: 20, mrLanes: 5, mrLen: 600,
-      mrBotPushR: 150, mrBotMinFoes: 2, mrBotAllyHp: 0.5, mrCastPoseMs: GameTime.gameMs(0.6)
+      mrFlyMs: GameTime.gameMs(0.3), mrHeal: 10, mrChainR: 300, mrDmg: 20, mrKb: 150, mrStunMs: GameTime.gameMs(0.5), mrWaveHeal: 20, mrLanes: 5, mrLen: 600,
+      mrBotPushR: 150, mrBotMinFoes: 2, mrBotAllyHp: 0.5, mrWindMs: GameTime.gameMs(0.5)
     };
-    static STATS = { name: "마리나", role: "caster", icon: "🌊", hp: 115, speed: GameTime.gameSpeed(170), cd: GameTime.gameMs(1.3), dmg: 10, range: 380, noAim: true, ultName: "해일", ultAim: true, heals: true };
-    static WAVE = { travel: GameTime.gameMs(1.5), life: GameTime.gameMs(1.5) + 300 };
+    static STATS = { name: "마리나", role: "caster", icon: "🌊", hp: 115, speed: GameTime.gameSpeed(170), cd: GameTime.gameMs(1.4), dmg: 10, range: 380, noAim: true, ultName: "해일", ultAim: true, heals: true };
+    static WAVE = { travel: GameTime.gameMs(4.5), life: GameTime.gameMs(4.5) + 300 };
     get showsHealRange() { return true; }
     get startsSkillTimer() { return false; }
     get hasSkillClip() { return true; }
-    cannotAttack(E, t) { return !this.services.marinaStreams.firstTarget(E, t); }
+    isRooted(E, t) { return E.ultUntil > t; }
+    cannotAttack(E, t) { return this.isRooted(E, t) || !this.services.marinaStreams.firstTarget(E, t); }
     overrideBasic(E, ang, reach, t) { this.services.marinaStreams.fire(E, t); return true; }
     botAct(B, target, enemies, t) { return this.services.marinaBot.act(B, target, enemies, t); }
     botUltRange() { return MarinaType.ULT.mrLen; }
@@ -3774,24 +3775,24 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.aimGuide.showAimLanes(services.tsunamiLanes.plan(E.x, E.y, E.angle));
       return true;
     }
-    playSkillClip(v, E, t) { var services = this.services; services.fighterMotion.playOnce(v, "Ranged_Magic_Summon", services.models.kit.clips.Ranged_Magic_Summon.duration * 1000 / MarinaType.ULT.mrCastPoseMs / services.clock.scale, t); }
-    statDamageText(c) { var services = this.services, heal = services.skilltext.num(MarinaType.ULT.mrHeal); return services.skilltext.num(c.dmg) + "(회복 " + heal + "+" + heal + ")"; }
+    playSkillClip(v, E, t) { var services = this.services; services.fighterMotion.playOnce(v, "Ranged_Magic_Summon", services.models.kit.clips.Ranged_Magic_Summon.duration * 1000 / MarinaType.ULT.mrWindMs / services.clock.scale, t); }
+    statDamageText(c) { var services = this.services, heal = services.skilltext.num(MarinaType.ULT.mrHeal); return services.skilltext.num(c.dmg) + "(" + heal + ")"; }
     cast(E, ang, reach, t) { var services = this.services, u = MarinaType.ULT;
       var x = MathKit.r1(E.x), y = MathKit.r1(E.y), angle = TsunamiLanes.exactAngle(ang);
-      E.ultUntil = t + u.mrCastPoseMs;
+      E.ultUntil = t + u.mrWindMs;
       E.pending = null;
       services.session.room.ref.child("meleeHits").push({ team: E.team, owner: E.id, x: x, y: y, angle: angle, len: u.mrLen, width: u.mrLanes * ArenaSize.TILE, lanes: services.tsunamiLanes.plan(x, y, angle),
-                                        dmg: u.mrDmg, u: 1, heal: u.mrWaveHeal, kb: u.mrKb, kbAlong: 1, fx: { stunMs: u.mrStunMs }, wave: 1, createdAt: t });
+                                        dmg: u.mrDmg, u: 1, heal: u.mrWaveHeal, kb: u.mrKb, kbAlong: 1, fx: { stunMs: u.mrStunMs }, wave: 1, createdAt: t + u.mrWindMs });
       services.vision.revealBriefly(E.id, t);
     }
     ultDesc() { var services = this.services, u = MarinaType.ULT;
-      return "앞으로 폭 " + u.mrLanes + "칸, 길이 " + u.mrLen / ArenaSize.TILE + "칸의 해일을 보내 맞은 적에게 " + u.mrDmg + "의 피해, " + u.mrKb + " 밀어냄, " + services.skilltext.secs(u.mrStunMs) + " 기절, 맞은 아군은 " + u.mrWaveHeal + " 회복. 벽 블록을 만난 칸은 거기서 멈추고 나머지는 계속 진행";
+      return services.skilltext.secs(u.mrWindMs) + " 뒤 폭 " + u.mrLanes + "칸의 해일을 보내 적에게 " + u.mrDmg + "의 피해·밀어냄·" + services.skilltext.secs(u.mrStunMs) + " 기절, 아군은 " + u.mrWaveHeal + " 회복";
     }
     passiveDesc() { var c = this.data, u = MarinaType.ULT;
-      return "조준 없이 반경 " + c.range + " 안에서 체력 비율이 가장 낮은 아군의 체력 " + u.mrHeal + " 회복(반경 안 아군이 모두 가득 차 있으면 가장 가까운 적에게 " + c.dmg + "의 피해). 닿은 뒤 그 대상에서 반경 " + u.mrChainR + " 안에 체력이 깎인 아군이나 적이 있으면 가장 가까운 쪽에 물줄기가 튀어 아군은 " + u.mrHeal + " 회복, 적은 " + c.dmg + "의 피해";
+      return "가장 다친 아군을 " + u.mrHeal + " 회복(다친 아군이 없으면 가까운 적에게 " + c.dmg + "의 피해). 물줄기는 근처 대상에게 한 번 더 튄다";
     }
     basicDesc() { var c = this.data, u = MarinaType.ULT;
-      return "반경 " + c.range + " 안에서 체력 비율이 가장 낮은 아군 1명의 체력 " + u.mrHeal + " 회복(아군이 모두 가득 차 있으면 가장 가까운 적에게 " + c.dmg + "의 피해)";
+      return "가장 다친 아군을 " + u.mrHeal + " 회복(다친 아군이 없으면 가까운 적에게 " + c.dmg + "의 피해)";
     }
   }
   class TsunamiLanes {
@@ -3944,8 +3945,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class TridentProp {
-    static LENGTH = 2.6;
-    static GRIP = 0.55;
+    static LENGTH = 1.73;
+    static GRIP = 0.25;
+    static TIP_Y = TridentProp.LENGTH - TridentProp.GRIP + 0.59;
     static SHAFT_COLOR = 0x1F4E8C;
     static BLADE_COLOR = 0x38B6E8;
     static JEWEL_COLOR = 0xCDEFFF;
@@ -3965,27 +3967,190 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return g;
     }
   }
+  class WaterNoise {
+    static SIZE = 256;
+    static TEX = null;
+    static hash(x, y) { var h = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return h - Math.floor(h); }
+    static ease(k) { return k * k * (3 - 2 * k); }
+    static valueAt(u, v, periodU, periodV) {
+      var x = u * periodU, y = v * periodV, ix = Math.floor(x), iy = Math.floor(y), kx = WaterNoise.ease(x - ix), ky = WaterNoise.ease(y - iy);
+      function corner(a, b) { return WaterNoise.hash((a % periodU + periodU) % periodU + periodU * 7, (b % periodV + periodV) % periodV + periodV * 13); }
+      var top = corner(ix, iy) * (1 - kx) + corner(ix + 1, iy) * kx, low = corner(ix, iy + 1) * (1 - kx) + corner(ix + 1, iy + 1) * kx;
+      return top * (1 - ky) + low * ky;
+    }
+    static cloud(u, v) { return WaterNoise.valueAt(u, v, 6, 6) * 0.5 + WaterNoise.valueAt(u, v, 12, 12) * 0.3 + WaterNoise.valueAt(u, v, 24, 24) * 0.2; }
+    static lace(u, v, cells) {
+      var x = (u + 0.05 * (WaterNoise.valueAt(u, v, 5, 5) - 0.5)) * cells, y = (v + 0.05 * (WaterNoise.valueAt(v, u, 5, 5) - 0.5)) * cells, ix = Math.floor(x), iy = Math.floor(y), near = 9, second = 9;
+      for (var a = -1; a <= 1; a++) for (var b = -1; b <= 1; b++) {
+        var cx = ix + a, cy = iy + b, wx = (cx % cells + cells) % cells, wy = (cy % cells + cells) % cells;
+        var dx = cx + WaterNoise.hash(wx + 31, wy + 57) - x, dy = cy + WaterNoise.hash(wx + 91, wy + 13) - y, d = Math.sqrt(dx * dx + dy * dy);
+        if (d < near) { second = near; near = d; } else if (d < second) second = d;
+      }
+      return Math.pow(1 - Math.min(1, (second - near) / 0.5), 2) * (0.25 + 0.95 * WaterNoise.valueAt(u, v, 10, 10));
+    }
+    static texture() {
+      if (WaterNoise.TEX) return WaterNoise.TEX;
+      var S = WaterNoise.SIZE, data = new Uint8Array(S * S * 4);
+      for (var y = 0; y < S; y++) for (var x = 0; x < S; x++) {
+        var u = x / S, v = y / S, i = (y * S + x) * 4;
+        data[i] = WaterNoise.cloud(u, v) * 255;
+        data[i + 1] = WaterNoise.lace(u, v, 9) * 255;
+        data[i + 2] = (WaterNoise.valueAt(u, v, 28, 3) * 0.7 + WaterNoise.valueAt(u, v, 56, 5) * 0.3) * 255;
+        data[i + 3] = 255;
+      }
+      var tex = new THREE.DataTexture(data, S, S, THREE.RGBAFormat);
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      tex.magFilter = THREE.LinearFilter; tex.minFilter = THREE.LinearMipmapLinearFilter; tex.generateMipmaps = true;
+      tex.needsUpdate = true;
+      WaterNoise.TEX = tex;
+      return tex;
+    }
+    static softMaterial(uniforms, vertexShader, fragmentShader, side) {
+      return new THREE.ShaderMaterial({ uniforms: uniforms, vertexShader: vertexShader, fragmentShader: fragmentShader, transparent: true, depthWrite: false, side: side || THREE.FrontSide });
+    }
+    static pixelScale(services) { return services.cameraRig.renderer.domElement.height * 0.5; }
+  }
   class MarinaStreamView {
-    static SPLASH_SEC = 0.2;
-    static SEGMENTS = 9;
-    static DROPS = 7;
+    static SPLASH_SEC = 0.35;
+    static ROWS = 26;
+    static RING = 7;
+    static STRAND_RING = 4;
+    static TRAIL_DROPS = 22;
+    static SPLASH_DROPS = 26;
     static HAND_Y = 58;
     static BODY_Y = 42;
-    static WAVE_AMP = 13;
-    static WAVE_COUNT = 3;
-    static ARC = 16;
-    static GLOW_COLOR = 0x35C6D6;
-    static CORE_COLOR = 0xC8F7FF;
-    static HIT_DROP = 0x1E5FC8;
-    static DROP_GEO = null;
-    constructor(services) { this.services = services; this.free = []; this.place = new THREE.Object3D(); this.up = new THREE.Vector3(0, 1, 0); this.dir = new THREE.Vector3(); }
-    static dropGeo() { return MarinaStreamView.DROP_GEO || (MarinaStreamView.DROP_GEO = new THREE.TetrahedronGeometry(1)); }
-    buildVis() { var services = this.services, m = services.models, g = new THREE.Group(), n = MarinaStreamView.SEGMENTS;
-      var vis = { group: g, glow: new THREE.InstancedMesh(services.geo.boltSeg, m.glowMat("mrStreamGlow", MarinaStreamView.GLOW_COLOR, 0.7), n), core: new THREE.InstancedMesh(services.geo.boltSeg, m.basicMat("mrStreamCore", MarinaStreamView.CORE_COLOR, 0.95), n),
-                  head: new THREE.Mesh(services.geo.ball, m.basicMat("mrStreamCore", MarinaStreamView.CORE_COLOR, 0.95)), drops: new THREE.InstancedMesh(MarinaStreamView.dropGeo(), m.basicMat("mrHealDrop", Palette.HEAL_SPARK, 1), MarinaStreamView.DROPS) };
-      [vis.glow, vis.core, vis.drops].forEach(function (mesh) { mesh.frustumCulled = false; g.add(mesh); });
-      g.add(vis.head);
+    static HEAL_TONES = { deep: "#0FA3A8", mid: "#6FF0DC", foam: "#F3FFFC" };
+    static HIT_TONES = { deep: "#1648B8", mid: "#3FA6F2", foam: "#E8F6FF" };
+    static GEO = null;
+    static PATH_GLSL = `
+      uniform vec3 uFrom; uniform vec3 uTo; uniform float uTime;
+      vec3 pathAt(float u) {
+        vec3 gap = uTo - uFrom, base = uFrom + gap * u;
+        float reach = length(gap.xz), bend = sin(u * 3.14159);
+        vec3 side = normalize(vec3(-gap.z, 0.0, gap.x) + vec3(0.0001, 0.0, 0.0));
+        base.y += min(26.0, reach * 0.16) * bend;
+        base += side * min(16.0, reach * 0.08) * sin(u * 6.5 - uTime * 6.0 + 0.8) * bend;
+        return base;
+      }`;
+    static BODY_VERTEX = MarinaStreamView.PATH_GLSL + `
+      uniform float uTail; uniform float uHead;
+      varying float vU; varying float vTheta; varying float vRim; varying float vTip; varying float vStrand;
+      void main() {
+        float v = position.x, theta = position.y, strand = position.z, u = uTail + (uHead - uTail) * v;
+        vec3 center = pathAt(u), along = normalize(pathAt(u + 0.015) - pathAt(u - 0.015) + vec3(0.00001));
+        vec3 side = normalize(cross(along, vec3(0.0, 1.0, 0.0)) + vec3(0.00001)), lift = cross(side, along);
+        float close = smoothstep(0.0, 0.1, v) * sqrt(clamp((1.0 - v) / 0.07, 0.0, 1.0));
+        float show = step(0.015, uHead - uTail);
+        vec3 ring = side * cos(theta) + lift * sin(theta), spot;
+        if (strand < 0.5) {
+          float swell = 1.0 + 0.22 * sin(u * 17.0 - uTime * 19.0);
+          spot = center + ring * 9.5 * (0.5 + 0.5 * v + 0.5 * v * v * v) * swell * close * show;
+        } else {
+          float turn = u * 15.0 - uTime * 13.0 + (strand - 1.0) * 3.14159;
+          spot = center + (side * cos(turn) + lift * sin(turn)) * 12.5 * close * show + ring * 1.3 * close * show;
+        }
+        vec4 eye = modelViewMatrix * vec4(spot, 1.0);
+        vec3 normalEye = normalize(normalMatrix * ring);
+        vRim = 1.0 - abs(dot(normalEye, normalize(-eye.xyz)));
+        vU = u; vTheta = theta; vTip = v; vStrand = strand;
+        gl_Position = projectionMatrix * eye;
+      }`;
+    static BODY_FRAGMENT = `
+      uniform sampler2D uTex; uniform vec3 uDeep; uniform vec3 uMid; uniform vec3 uFoam; uniform float uTime; uniform float uLen;
+      varying float vU; varying float vTheta; varying float vRim; varying float vTip; varying float vStrand;
+      void main() {
+        vec2 flow = vec2(vTheta / 6.2832, vU * uLen / 62.0 - uTime * 2.1);
+        vec4 grain = texture2D(uTex, flow), fine = texture2D(uTex, flow * vec2(2.0, 2.3) + vec2(0.37, uTime * 0.6));
+        vec3 color; float alpha;
+        if (vStrand < 0.5) {
+          float foam = smoothstep(0.5, 0.82, grain.g * 0.62 + fine.b * 0.42 + vTip * vTip * 0.22);
+          color = mix(uDeep, uMid, clamp(grain.r * 1.25 + vRim * 0.35 - 0.12, 0.0, 1.0));
+          color = mix(color, uFoam, foam * 0.92);
+          alpha = 0.58 + vRim * 0.26 + foam * 0.32;
+        } else {
+          color = mix(uMid, uFoam, 0.72 + fine.r * 0.28);
+          alpha = 0.55 + grain.r * 0.42;
+        }
+        gl_FragColor = vec4(color, clamp(alpha, 0.0, 0.98));
+        #include <colorspace_fragment>
+      }`;
+    static DROP_VERTEX = MarinaStreamView.PATH_GLSL + `
+      uniform float uTail; uniform float uHead; uniform float uSplash; uniform float uPixelScale;
+      varying float vFade;
+      void main() {
+        float seed = position.x, other = position.y, size, fade;
+        vec3 spot;
+        if (position.z < 0.5) {
+          float age = fract(other + uTime * 2.4), u = uTail + (uHead - uTail) * seed;
+          float spin = seed * 37.0 + age * 3.0;
+          spot = pathAt(u) + vec3(cos(spin), 0.35 + age * 0.3, sin(spin)) * (5.0 + age * 12.0) - vec3(0.0, age * age * 30.0, 0.0);
+          fade = (1.0 - age) * step(0.03, uHead - uTail);
+          size = (2.0 + 3.0 * other) * (1.0 - age * 0.55);
+        } else {
+          float k = uSplash, turn = seed * 6.2832 + k * 1.4, far = (12.0 + 40.0 * other) * k;
+          spot = uTo + vec3(cos(turn) * far, (24.0 + 58.0 * other) * k - 78.0 * k * k, sin(turn) * far);
+          fade = step(0.001, k) * (1.0 - k);
+          size = (3.0 + 4.5 * seed) * (1.0 - k * 0.45);
+        }
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(spot, 1.0);
+        gl_PointSize = fade > 0.0 ? size * uPixelScale * projectionMatrix[1][1] / gl_Position.w : 0.0;
+        vFade = fade;
+      }`;
+    static DROP_FRAGMENT = `
+      uniform vec3 uMid; uniform vec3 uFoam; varying float vFade;
+      void main() {
+        float d = length(gl_PointCoord - 0.5);
+        gl_FragColor = vec4(mix(uFoam, uMid, smoothstep(0.05, 0.42, d)), smoothstep(0.5, 0.28, d) * min(1.0, vFade * 1.6));
+        #include <colorspace_fragment>
+      }`;
+    static RIPPLE_VERTEX = `
+      varying vec2 vPlace;
+      void main() { vPlace = uv * 2.0 - 1.0; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
+    static RIPPLE_FRAGMENT = `
+      uniform sampler2D uTex; uniform vec3 uMid; uniform vec3 uFoam; uniform float uSplash; varying vec2 vPlace;
+      void main() {
+        float d = length(vPlace), turn = atan(vPlace.y, vPlace.x) / 6.2832;
+        float rough = texture2D(uTex, vec2(turn * 3.0, d * 0.5 - uSplash * 0.5)).g;
+        float front = 0.25 + uSplash * 0.68, band = smoothstep(0.17, 0.02, abs(d - front - (rough - 0.5) * 0.07));
+        float inner = smoothstep(front, 0.0, d) * 0.26;
+        gl_FragColor = vec4(mix(uMid, uFoam, band * 0.8), (band * 0.85 + inner) * (1.0 - uSplash) * step(0.001, uSplash));
+        #include <colorspace_fragment>
+      }`;
+    constructor(services) { this.services = services; this.free = []; this.tip = new THREE.Vector3(); }
+    static addTube(pos, idx, rows, ring, strand) {
+      var base = pos.length / 3;
+      for (var r = 0; r <= rows; r++) for (var s = 0; s <= ring; s++) pos.push(r / rows, s / ring * Math.PI * 2, strand);
+      for (var a = 0; a < rows; a++) for (var b = 0; b < ring; b++) {
+        var p = base + a * (ring + 1) + b, q = p + ring + 1;
+        idx.push(p, p + 1, q, p + 1, q + 1, q);
+      }
+    }
+    static shared() {
+      if (MarinaStreamView.GEO) return MarinaStreamView.GEO;
+      var pos = [], idx = [], V = MarinaStreamView, seeds = [], total = V.TRAIL_DROPS + V.SPLASH_DROPS;
+      V.addTube(pos, idx, V.ROWS, V.RING, 0);
+      V.addTube(pos, idx, V.ROWS, V.STRAND_RING, 1);
+      V.addTube(pos, idx, V.ROWS, V.STRAND_RING, 2);
+      var body = new THREE.BufferGeometry();
+      body.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); body.setIndex(idx);
+      for (var i = 0; i < total; i++) seeds.push(WaterNoise.hash(i + 11, 3), WaterNoise.hash(i + 29, 7), i < V.TRAIL_DROPS ? 0 : 1);
+      var drops = new THREE.BufferGeometry();
+      drops.setAttribute("position", new THREE.Float32BufferAttribute(seeds, 3));
+      var ripple = new THREE.PlaneGeometry(1, 1); ripple.rotateX(-Math.PI / 2);
+      MarinaStreamView.GEO = { body: body, drops: drops, ripple: ripple };
+      return MarinaStreamView.GEO;
+    }
+    buildVis() { var V = MarinaStreamView, S = V.shared(), group = new THREE.Group();
+      var uniforms = { uTex: { value: WaterNoise.texture() }, uFrom: { value: new THREE.Vector3() }, uTo: { value: new THREE.Vector3(1, 0, 0) }, uTime: { value: 0 }, uTail: { value: 0 }, uHead: { value: 1 }, uLen: { value: 100 }, uSplash: { value: 0 }, uPixelScale: { value: 400 },
+                       uDeep: { value: new THREE.Color() }, uMid: { value: new THREE.Color() }, uFoam: { value: new THREE.Color() } };
+      var vis = { group: group, uniforms: uniforms, body: new THREE.Mesh(S.body, WaterNoise.softMaterial(uniforms, V.BODY_VERTEX, V.BODY_FRAGMENT, THREE.DoubleSide)), drops: new THREE.Points(S.drops, WaterNoise.softMaterial(uniforms, V.DROP_VERTEX, V.DROP_FRAGMENT)), ripple: new THREE.Mesh(S.ripple, WaterNoise.softMaterial(uniforms, V.RIPPLE_VERTEX, V.RIPPLE_FRAGMENT)) };
+      vis.ripple.position.y = 2; vis.ripple.scale.set(112, 1, 112);
+      [vis.ripple, vis.body, vis.drops].forEach(function (part, i) { part.frustumCulled = false; part.renderOrder = 4 + i; group.add(part); });
+      this.paint(vis, "heal");
       return vis;
+    }
+    paint(vis, kind) { var tones = kind === "heal" ? MarinaStreamView.HEAL_TONES : MarinaStreamView.HIT_TONES, u = vis.uniforms;
+      u.uDeep.value.set(tones.deep); u.uMid.value.set(tones.mid); u.uFoam.value.set(tones.foam);
     }
     acquire() { var vis = this.free.pop() || this.buildVis(); this.services.stage.scene.add(vis.group); return vis; }
     drop(s) { if (!s.vis) return; this.services.stage.scene.remove(s.vis.group); this.free.push(s.vis); s.vis = null; }
@@ -3995,153 +4160,222 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var U = services.marinaStreams.unit(id);
       return U ? { x: U.x, z: U.y, shown: true } : null;
     }
-    setSeg(mesh, i, ax, ay, az, bx, by, bz, width) {
-      var d = this.dir.set(ax - bx, ay - by, az - bz), len = d.length(), p = this.place;
-      p.position.set(bx, by, bz);
-      if (len > 0.01) { p.quaternion.setFromUnitVectors(this.up, d.normalize()); p.scale.set(width, len, width); } else p.scale.setScalar(0);
-      p.updateMatrix();
-      mesh.setMatrixAt(i, p.matrix);
+    tridentTip(id) { var v = this.services.fighterView.fighters[id], held = v && v.root.visible ? v.root.getObjectByName("mainhand") : null;
+      return held ? held.localToWorld(this.tip.set(0, TridentProp.TIP_Y, 0)) : null;
     }
-    placeRibbon(vis, from, to, tail, head, nowMs) {
-      var n = MarinaStreamView.SEGMENTS, dx = to.x - from.x, dz = to.z - from.z, dist = Math.hypot(dx, dz) || 1, nx = -dz / dist, nz = dx / dist;
-      function at(u, out) {
-        var wob = MarinaStreamView.WAVE_AMP * Math.sin(u * Math.PI * MarinaStreamView.WAVE_COUNT - nowMs / 70) * Math.sin(u * Math.PI);
-        out.x = from.x + dx * u + nx * wob; out.z = from.z + dz * u + nz * wob;
-        out.y = from.y + (MarinaStreamView.BODY_Y - from.y) * u + MarinaStreamView.ARC * Math.sin(u * Math.PI);
-      }
-      var a = {}, b = {};
-      at(tail, a);
-      for (var i = 0; i < n; i++) {
-        at(tail + (head - tail) * (i + 1) / n, b);
-        this.setSeg(vis.glow, i, a.x, a.y, a.z, b.x, b.y, b.z, 4.5);
-        this.setSeg(vis.core, i, a.x, a.y, a.z, b.x, b.y, b.z, 1.6);
-        a.x = b.x; a.y = b.y; a.z = b.z;
-      }
-      vis.glow.instanceMatrix.needsUpdate = vis.core.instanceMatrix.needsUpdate = true;
-      vis.head.position.set(b.x, b.y, b.z);
-      vis.head.scale.setScalar(head - tail > 0.02 ? 5 : 0);
-    }
-    placeDrops(vis, spot, k) {
-      var p = this.place, n = MarinaStreamView.DROPS;
-      for (var i = 0; i < n; i++) {
-        var a = i / n * Math.PI * 2 + 0.6, far = 38 * k * (0.7 + 0.3 * ((i * 0.618) % 1));
-        p.position.set(spot.x + Math.cos(a) * far, MarinaStreamView.BODY_Y + 54 * k - 62 * k * k, spot.z + Math.sin(a) * far);
-        p.quaternion.identity(); p.scale.setScalar(k >= 1 ? 0 : 3.6 * (1 - k));
-        p.updateMatrix();
-        vis.drops.setMatrixAt(i, p.matrix);
-      }
-      vis.drops.instanceMatrix.needsUpdate = true;
+    sourceSpot(e, to) {
+      if (e.step === 2) { var prev = this.bodySpot(e.from); return { x: prev ? prev.x : e.sx, y: MarinaStreamView.BODY_Y, z: prev ? prev.z : e.sy }; }
+      var tip = this.tridentTip(e.owner);
+      if (tip) return tip;
+      var body = this.bodySpot(e.owner) || to;
+      return { x: body.x, y: MarinaStreamView.HAND_Y, z: body.z };
     }
     renderOne(s, t, nowMs) { var services = this.services, e = s.e, age = t - e.createdAt, fly = services.marinaStreams.landMs, to = this.bodySpot(e.tgt);
       if (!to || age < 0 || s.fizzled) { if (s.vis) s.vis.group.visible = false; return; }
-      if (!s.vis) {
-        s.vis = this.acquire();
-        s.vis.drops.material = services.models.basicMat(e.kind === "heal" ? "mrHealDrop" : "mrHitDrop", e.kind === "heal" ? Palette.HEAL_SPARK : MarinaStreamView.HIT_DROP, 1);
-        var src = e.step === 2 ? { x: e.sx, z: e.sy, shown: true } : this.bodySpot(e.owner) || to;
-        s.from = { x: src.x, y: e.step === 2 ? MarinaStreamView.BODY_Y : MarinaStreamView.HAND_Y, z: src.z };
-      }
+      if (!s.vis) { s.vis = this.acquire(); this.paint(s.vis, e.kind); }
       s.vis.group.visible = to.shown;
-      var head = MathKit.clamp(age / fly, 0, 1), after = (age - fly) / GameTime.gameMs(MarinaStreamView.SPLASH_SEC), tail = after > 0 ? Math.min(1, after) : Math.max(0, (head - 0.6) / 0.4) * 0.6;
-      this.placeRibbon(s.vis, s.from, to, tail, head, nowMs);
-      this.placeDrops(s.vis, to, MathKit.clamp(after, 0, 1));
-      s.vis.drops.visible = after >= 0;
+      var u = s.vis.uniforms, from = this.sourceSpot(e, to), head = MathKit.clamp(age / fly, 0, 1), after = MathKit.clamp((age - fly) / GameTime.gameMs(MarinaStreamView.SPLASH_SEC), 0, 1);
+      u.uFrom.value.set(from.x, from.y, from.z); u.uTo.value.set(to.x, MarinaStreamView.BODY_Y, to.z);
+      u.uTime.value = (nowMs % 100000) / 1000;
+      u.uLen.value = u.uFrom.value.distanceTo(u.uTo.value);
+      u.uHead.value = head; u.uTail.value = after > 0 ? Math.min(1, after * 1.6) : Math.max(0, (head - 0.75) / 0.25) * 0.08;
+      u.uSplash.value = after;
+      u.uPixelScale.value = WaterNoise.pixelScale(services);
+      s.vis.ripple.position.x = to.x; s.vis.ripple.position.z = to.z;
     }
     render(t, nowMs) { var view = this; this.services.field.streams.forEach(function (s) { view.renderOne(s, t, nowMs); }); }
   }
   class TsunamiView {
-    static WALL_HEIGHT = 70;
-    static FADE_END_SEC = 0.25;
-    static FADE_WALL_SEC = 0.3;
-    static WET_SEC = 0.8;
-    static SPRAY_PER_LANE = 8;
+    static WALL_HEIGHT = 92;
+    static CREST_SETBACK = 12;
+    static FADE_END_SEC = 0.45;
+    static FADE_WALL_SEC = 0.35;
+    static BURST_SEC = 0.75;
+    static RISE_SEC = 0.3;
+    static WIND_RISE = 0.62;
+    static WET_SEC = 1;
+    static COLUMNS = 6;
+    static SHEET_ROWS = 8;
+    static SHEET_COLUMNS = 4;
+    static SPRAY_PER_LANE = 15;
     static SIDES = 6;
-    static WALL_TOP = "#2FA8B8";
-    static WALL_FOOT = "#1B6F86";
-    static WALL_ALPHA = 0.55;
-    static FOAM = "#E9FBFF";
-    static FOAM_ALPHA = 0.9;
-    static WET_COLOR = 0x2FA8B8;
-    static WET_ALPHA = 0.26;
-    static STAIN_LEN = 18;
+    static TONES = { deep: "#07395F", body: "#127FAE", light: "#58DDDC", foam: "#F4FDFF" };
     static EDGE_WIDTH = 3;
-    static BACK_PROFILE = [[-36, 0], [-25, 0.46], [-11, 0.86], [2, 1], [9, 0.93], [1, 0.7], [-3, 0.34], [7, 0]];
-    static FOAM_PROFILE = [[-8, 0.94], [2, 1.05], [11, 0.97], [3, 0.78]];
+    static SHAPE = [[-150, 0, 0, 0, 0], [-116, 0.05, 0.06, 0, 0.08], [-84, 0.15, 0.04, 0, 0.2], [-58, 0.32, 0.02, 0, 0.36], [-36, 0.56, 0.05, 0, 0.56], [-18, 0.8, 0.2, 0, 0.78], [-4, 0.96, 0.55, 0.25, 0.94], [8, 1.03, 0.92, 0.65, 1],
+                    [17, 1, 1, 1, 0.98], [21, 0.86, 1, 1.15, 0.86], [15, 0.72, 0.7, 0.75, 0.42], [7, 0.62, 0.3, 0.35, 0.22], [3, 0.46, 0.18, 0.1, 0.26], [6, 0.28, 0.42, 0, 0.42], [14, 0.12, 0.88, 0, 0.72], [28, 0, 1, 0, 0.9]];
     static SHARED = null;
+    static LANE_GLSL = `
+      uniform float uReach[7]; uniform float uTime;
+      float shoulderOf(int i, float f, float width) {
+        float left = mix(1.0, smoothstep(0.0, width, f), clamp(abs(uReach[i] - uReach[i - 1]) / 24.0, 0.0, 1.0));
+        float right = mix(1.0, smoothstep(0.0, width, 1.0 - f), clamp(abs(uReach[i] - uReach[i + 1]) / 24.0, 0.0, 1.0));
+        return left * right;
+      }`;
+    static WALL_VERTEX = TsunamiView.LANE_GLSL + `
+      attribute float aFoam; attribute float aLip; attribute float aTone;
+      uniform float uLift[7];
+      varying float vFoam; varying float vTone; varying float vHeight; varying float vAlong; varying float vSide; varying float vLane;
+      void main() {
+        float lane = floor(position.z), f = position.z - lane, shape = position.x;
+        int i = int(lane) + 1;
+        float reach = uReach[i], lift = uLift[i], shoulder = shoulderOf(i, f, 0.42), side = (position.z - 2.5) * TILE;
+        float roll = sin(side * 0.041 + uTime * 1.5) * 0.6 + sin(side * 0.097 - uTime * 2.4 + 1.7) * 0.4;
+        float backScale = shape < 0.0 ? clamp(reach / 150.0, 0.12, 1.0) : 1.0;
+        float curl = aLip * (8.0 + 7.0 * sin(side * 0.06 + uTime * 2.8));
+        float along = max(reach - SETBACK + shape * backScale + curl + roll * 10.0 * smoothstep(-60.0, -20.0, shape), -8.0);
+        float swell = sin(along * 0.11 - uTime * 5.0 + side * 0.03) * 2.2 * (1.0 - smoothstep(0.1, 0.5, position.y));
+        float height = (position.y * WALL * (1.0 + 0.24 * roll) + swell * step(0.001, position.y)) * lift * shoulder;
+        vFoam = aFoam; vTone = aTone; vHeight = position.y; vAlong = along; vSide = side; vLane = lift * shoulder;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(along, height, side, 1.0);
+      }`;
+    static WALL_FRAGMENT = `
+      uniform sampler2D uTex; uniform float uTime; uniform vec3 uDeep; uniform vec3 uBody; uniform vec3 uLight; uniform vec3 uFoam;
+      varying float vFoam; varying float vTone; varying float vHeight; varying float vAlong; varying float vSide; varying float vLane;
+      void main() {
+        vec4 slow = texture2D(uTex, vec2(vSide / 260.0, vAlong / 260.0 - uTime * 0.14));
+        vec4 run = texture2D(uTex, vec2(vSide / 170.0 + slow.r * 0.1, vHeight * 0.8 + vAlong / 460.0 - uTime * 0.55));
+        vec4 lace = texture2D(uTex, vec2(vSide / 150.0 + slow.r * 0.16, vAlong / 150.0 + vHeight * 0.5 - uTime * 0.38));
+        float tone = clamp(vTone + (slow.r - 0.5) * 0.4 + (run.b - 0.5) * 0.3, 0.0, 1.0);
+        vec3 color = mix(uDeep, uBody, smoothstep(0.0, 0.48, tone));
+        color = mix(color, uLight, smoothstep(0.5, 1.0, tone));
+        float swell = smoothstep(0.72, 1.0, sin(vAlong * 0.085 + slow.r * 7.0 - uTime * 4.2)) * (1.0 - smoothstep(0.55, 0.9, vHeight));
+        color = mix(color, uLight, swell * 0.5);
+        float streak = smoothstep(0.62, 0.9, run.b) * smoothstep(0.1, 0.5, vHeight) * (1.0 - vFoam);
+        color = mix(color, uFoam, streak * 0.4);
+        float wisps = smoothstep(0.42, 0.72, lace.g + slow.r * 0.25) * smoothstep(0.08, 0.55, vFoam);
+        float cap = smoothstep(0.62, 0.95, vFoam) * smoothstep(0.34, 0.62, slow.r * 0.7 + run.r * 0.5 + vFoam * 0.2);
+        float foam = max(wisps, cap);
+        color = mix(color, uFoam, foam);
+        float alpha = mix(0.34, 0.84, smoothstep(0.02, 0.6, vHeight));
+        alpha = mix(alpha, 0.98, foam) * smoothstep(0.0, 0.04, vHeight + vFoam * 0.1);
+        gl_FragColor = vec4(color, alpha * smoothstep(0.0, 0.12, vLane));
+        #include <colorspace_fragment>
+      }`;
+    static SHEET_VERTEX = TsunamiView.LANE_GLSL + `
+      uniform float uWet[7];
+      varying float vWet; varying float vBehind; varying float vAlong; varying float vSide; varying float vEdge;
+      void main() {
+        float lane = floor(position.z), f = position.z - lane;
+        int i = int(lane) + 1;
+        float reach = uReach[i], along = position.x * (reach + 10.0), side = (position.z - 2.5) * TILE;
+        vWet = uWet[i]; vBehind = reach + 10.0 - along; vAlong = along; vSide = side; vEdge = shoulderOf(i, f, 0.2);
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(along, 1.6, side, 1.0);
+      }`;
+    static SHEET_FRAGMENT = `
+      uniform sampler2D uTex; uniform float uTime; uniform vec3 uBody; uniform vec3 uLight; uniform vec3 uFoam;
+      varying float vWet; varying float vBehind; varying float vAlong; varying float vSide; varying float vEdge;
+      void main() {
+        vec4 slow = texture2D(uTex, vec2(vSide / 210.0, vAlong / 210.0 - uTime * 0.2));
+        vec4 lace = texture2D(uTex, vec2(vSide / 135.0 + slow.r * 0.16, vAlong / 135.0 - uTime * 0.3));
+        float near = smoothstep(170.0, 0.0, vBehind), line = 0.74 - near * 0.3;
+        float foam = smoothstep(line, line + 0.28, lace.g + slow.r * 0.22) * mix(0.55, 1.0, near);
+        vec3 color = mix(mix(uBody, uLight, slow.r * 0.7), uFoam, foam);
+        float rim = smoothstep(0.0, 13.0, vBehind - slow.r * 9.0);
+        float alpha = (mix(0.3, 0.68, near) + foam * 0.42) * rim * vWet * vEdge;
+        gl_FragColor = vec4(color, min(alpha, 0.95));
+        #include <colorspace_fragment>
+      }`;
+    static SPRAY_VERTEX = TsunamiView.LANE_GLSL + `
+      uniform float uLift[7]; uniform float uBurst[7]; uniform float uPixelScale;
+      varying float vFade;
+      void main() {
+        float lane = floor(position.z), seed = position.x, other = position.y;
+        int i = int(lane) + 1;
+        float lift = uLift[i], burst = uBurst[i], reach = uReach[i];
+        float age = fract(other + uTime * (0.5 + 0.55 * seed)), side = (position.z - 2.5) * TILE + sin(seed * 41.0) * age * 12.0;
+        float along = reach - SETBACK + 10.0 + (seed - 0.72) * age * 44.0, height = WALL * lift * (0.68 + age * (0.5 + 0.42 * other)) - age * age * WALL * 0.62 * lift;
+        float fade = (1.0 - age) * min(1.0, age * 7.0) * smoothstep(0.03, 0.2, lift);
+        float size = (3.5 + 8.5 * seed) * (0.55 + 0.75 * age);
+        if (burst > 0.0) {
+          float k = fract(other * 7.0) * 0.35 + burst * 0.65;
+          along = reach - 6.0 - k * (12.0 + 34.0 * seed);
+          height = 10.0 + k * (116.0 + 88.0 * other) - k * k * 110.0;
+          fade = (1.0 - burst) * smoothstep(0.0, 0.08, burst);
+          size = (6.0 + 10.0 * seed) * (0.7 + k);
+        }
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(along, max(height, 1.0), side, 1.0);
+        gl_PointSize = fade > 0.0 ? size * uPixelScale * projectionMatrix[1][1] / gl_Position.w : 0.0;
+        vFade = fade;
+      }`;
+    static SPRAY_FRAGMENT = `
+      uniform vec3 uFoam; varying float vFade;
+      void main() {
+        float d = length(gl_PointCoord - 0.5);
+        gl_FragColor = vec4(uFoam, smoothstep(0.5, 0.12, d) * vFade * 0.82);
+        #include <colorspace_fragment>
+      }`;
     constructor(services) { this.services = services; this.free = []; this.place = new THREE.Object3D(); }
-    static addBand(pos, col, uv, idx, profile, colorAt, alpha, vRepeat) {
-      var widths = [-0.5, 0, 0.5], base = pos.length / 3;
-      profile.forEach(function (p, i) {
-        var tone = colorAt(p[1]);
-        widths.forEach(function (z, j) {
-          pos.push(p[0] + Math.sin(z * Math.PI * 2) * 3, p[1], z);
-          col.push(tone.r, tone.g, tone.b, alpha);
-          uv.push(j / 2, i / (profile.length - 1) * vRepeat);
-        });
-      });
-      for (var i = 0; i < profile.length - 1; i++) for (var j = 0; j < 2; j++) {
-        var a = base + i * 3 + j, b = a + 1, c = a + 3, d = a + 4;
-        idx.push(a, b, c, b, d, c);
-      }
-    }
     static wallGeometry() {
-      var pos = [], col = [], uv = [], idx = [], top = new THREE.Color(TsunamiView.WALL_TOP), foot = new THREE.Color(TsunamiView.WALL_FOOT), foam = new THREE.Color(TsunamiView.FOAM);
-      TsunamiView.addBand(pos, col, uv, idx, TsunamiView.BACK_PROFILE, function (h) { return foot.clone().lerp(top, Math.min(1, h)); }, TsunamiView.WALL_ALPHA, 2);
-      TsunamiView.addBand(pos, col, uv, idx, TsunamiView.FOAM_PROFILE, function () { return foam; }, TsunamiView.FOAM_ALPHA, 0);
+      var pos = [], foam = [], lip = [], tone = [], idx = [], rows = TsunamiView.SHAPE, cols = TsunamiView.COLUMNS, lanes = MarinaType.ULT.mrLanes;
+      for (var lane = 0; lane < lanes; lane++) {
+        var base = pos.length / 3;
+        rows.forEach(function (row) {
+          for (var c = 0; c <= cols; c++) { pos.push(row[0], row[1], lane + c / cols * 0.999); foam.push(row[2]); lip.push(row[3]); tone.push(row[4]); }
+        });
+        for (var r = 0; r < rows.length - 1; r++) for (var j = 0; j < cols; j++) {
+          var a = base + r * (cols + 1) + j, b = a + cols + 1;
+          idx.push(a, b, a + 1, a + 1, b, b + 1);
+        }
+      }
       var g = new THREE.BufferGeometry();
       g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
-      g.setAttribute("color", new THREE.Float32BufferAttribute(col, 4));
-      g.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
+      g.setAttribute("aFoam", new THREE.Float32BufferAttribute(foam, 1));
+      g.setAttribute("aLip", new THREE.Float32BufferAttribute(lip, 1));
+      g.setAttribute("aTone", new THREE.Float32BufferAttribute(tone, 1));
       g.setIndex(idx);
       return g;
     }
-    static stripeTexture() {
-      var cv = document.createElement("canvas"); cv.width = 32; cv.height = 256;
-      var c = cv.getContext("2d");
-      c.fillStyle = "#FFFFFF"; c.fillRect(0, 0, 32, 256);
-      c.fillStyle = "rgba(190,235,245,0.55)";
-      for (var i = 0; i < 6; i++) c.fillRect(0, 14 + i * 42, 32, 5);
-      var tex = new THREE.CanvasTexture(cv); tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-      return tex;
+    static sheetGeometry() {
+      var pos = [], idx = [], rows = TsunamiView.SHEET_ROWS, cols = TsunamiView.SHEET_COLUMNS;
+      for (var lane = 0; lane < MarinaType.ULT.mrLanes; lane++) {
+        var base = pos.length / 3;
+        for (var r = 0; r <= rows; r++) for (var c = 0; c <= cols; c++) pos.push(r / rows, 0, lane + c / cols * 0.999);
+        for (var a = 0; a < rows; a++) for (var j = 0; j < cols; j++) {
+          var p = base + a * (cols + 1) + j, q = p + cols + 1;
+          idx.push(p, q, p + 1, p + 1, q, q + 1);
+        }
+      }
+      var g = new THREE.BufferGeometry();
+      g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx);
+      return g;
     }
-    static fadingMaterial(params) {
-      var mat = new THREE.MeshBasicMaterial(params);
-      mat.onBeforeCompile = function (shader) {
-        shader.vertexShader = "attribute float laneAlpha;\nvarying float vLaneAlpha;\n" + shader.vertexShader.replace("#include <begin_vertex>", "#include <begin_vertex>\nvLaneAlpha = laneAlpha;");
-        shader.fragmentShader = "varying float vLaneAlpha;\n" + shader.fragmentShader.replace("#include <dithering_fragment>", "#include <dithering_fragment>\ngl_FragColor.a *= vLaneAlpha;");
-      };
-      mat.customProgramCacheKey = function () { return "tsunami-lane-alpha"; };
-      return mat;
+    static sprayGeometry() {
+      var seeds = [], per = TsunamiView.SPRAY_PER_LANE;
+      for (var lane = 0; lane < MarinaType.ULT.mrLanes; lane++) for (var i = 0; i < per; i++) seeds.push(WaterNoise.hash(i + lane * 19, 5), WaterNoise.hash(i + lane * 23, 17), lane + (i + 0.5) / per * 0.999);
+      var g = new THREE.BufferGeometry();
+      g.setAttribute("position", new THREE.Float32BufferAttribute(seeds, 3));
+      return g;
     }
     static shared() {
       if (TsunamiView.SHARED) return TsunamiView.SHARED;
-      var stripes = TsunamiView.stripeTexture(), flat = new THREE.PlaneGeometry(1, 1); flat.rotateX(-Math.PI / 2);
-      TsunamiView.SHARED = { stripes: stripes, flat: flat, wall: TsunamiView.wallGeometry(), spray: new THREE.TetrahedronGeometry(1),
-        wallMat: TsunamiView.fadingMaterial({ map: stripes, vertexColors: true, transparent: true, depthWrite: false, side: THREE.DoubleSide }),
-        wetMat: TsunamiView.fadingMaterial({ color: TsunamiView.WET_COLOR, transparent: true, depthWrite: false }),
-        sprayMat: new THREE.MeshBasicMaterial({ color: new THREE.Color(TsunamiView.FOAM), transparent: true, opacity: 0.9, depthWrite: false }) };
+      var flat = new THREE.PlaneGeometry(1, 1); flat.rotateX(-Math.PI / 2);
+      TsunamiView.SHARED = { flat: flat, wall: TsunamiView.wallGeometry(), sheet: TsunamiView.sheetGeometry(), spray: TsunamiView.sprayGeometry() };
       return TsunamiView.SHARED;
     }
-    fadingMesh(geo, mat, count) {
-      var g = geo.clone(), alpha = new THREE.InstancedBufferAttribute(new Float32Array(count).fill(1), 1);
-      g.setAttribute("laneAlpha", alpha);
-      var mesh = new THREE.InstancedMesh(g, mat, count); mesh.frustumCulled = false; mesh.laneAlpha = alpha;
-      return mesh;
+    static shaderOf(uniforms, vertex, fragment, side) {
+      var mat = WaterNoise.softMaterial(uniforms, vertex, fragment, side);
+      mat.defines = { TILE: ArenaSize.TILE.toFixed(1), WALL: TsunamiView.WALL_HEIGHT.toFixed(1), SETBACK: TsunamiView.CREST_SETBACK.toFixed(1) };
+      return mat;
     }
-    buildVis() { var S = TsunamiView.shared(), n = MarinaType.ULT.mrLanes, group = new THREE.Group();
-      var vis = { group: group, wall: this.fadingMesh(S.wall, S.wallMat, n), wet: this.fadingMesh(S.flat, S.wetMat, n * 2), edge: new THREE.InstancedMesh(S.flat, new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false }), n + TsunamiView.SIDES), spray: new THREE.InstancedMesh(S.spray, S.sprayMat, n * TsunamiView.SPRAY_PER_LANE) };
-      [vis.wet, vis.edge, vis.spray, vis.wall].forEach(function (mesh) { mesh.frustumCulled = false; group.add(mesh); });
-      vis.wet.position.y = 1.4; vis.edge.position.y = 2.2; vis.spray.position.y = 0;
+    buildVis() { var V = TsunamiView, S = V.shared(), n = MarinaType.ULT.mrLanes, group = new THREE.Group(), T = V.TONES;
+      var uniforms = { uTex: { value: WaterNoise.texture() }, uTime: { value: 0 }, uPixelScale: { value: 400 }, uReach: { value: new Float32Array(n + 2) }, uLift: { value: new Float32Array(n + 2) }, uWet: { value: new Float32Array(n + 2) }, uBurst: { value: new Float32Array(n + 2) },
+                       uDeep: { value: new THREE.Color(T.deep) }, uBody: { value: new THREE.Color(T.body) }, uLight: { value: new THREE.Color(T.light) }, uFoam: { value: new THREE.Color(T.foam) } };
+      var vis = { group: group, uniforms: uniforms, sheet: new THREE.Mesh(S.sheet, V.shaderOf(uniforms, V.SHEET_VERTEX, V.SHEET_FRAGMENT)), wall: new THREE.Mesh(S.wall, V.shaderOf(uniforms, V.WALL_VERTEX, V.WALL_FRAGMENT, THREE.DoubleSide)), spray: new THREE.Points(S.spray, V.shaderOf(uniforms, V.SPRAY_VERTEX, V.SPRAY_FRAGMENT)),
+                  edge: new THREE.InstancedMesh(S.flat, new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false }), n + V.SIDES) };
+      [vis.sheet, vis.edge, vis.wall, vis.spray].forEach(function (part, i) { part.frustumCulled = false; part.renderOrder = 4 + i; group.add(part); });
+      vis.edge.position.y = 2.2;
       return vis;
     }
-    warmSample() { var vis = this.buildVis(); this.setEdges(vis, [600, 600, 300, 600, 600], "blue"); return vis.group; }
-    add(d) { var services = this.services;
-      services.field.tsunamis.push({ d: d, vis: null });
-      if (services.targets.hear(d)) services.sound.sfx("boom");
-    }
+    warmSample() { var vis = this.buildVis(); this.setEdges(vis, [600, 600, 300, 600, 600], "blue"); this.paint(vis, { lanes: [600, 600, 300, 600, 600] }, 500, 500); return vis.group; }
+    add(d) { this.services.field.tsunamis.push({ d: d, vis: null, departed: false }); }
     drop(item) { if (!item.vis) return; this.services.stage.scene.remove(item.vis.group); this.free.push(item.vis); item.vis = null; }
     lifeMs() { return MarinaType.WAVE.travel + GameTime.gameMs(TsunamiView.WET_SEC) + 100; }
     step(t) { var view = this, services = this.services, life = this.lifeMs();
       services.field.tsunamis = services.field.tsunamis.filter(function (item) {
+        if (!item.departed && t >= item.d.createdAt) {
+          item.departed = true;
+          if (services.targets.hear(item.d)) services.sound.sfx("boom");
+        }
         if (t < item.d.createdAt + life) return true;
         view.drop(item);
         return false;
@@ -4166,34 +4400,27 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.stage.scene.add(vis.group);
       return vis;
     }
-    placeLane(vis, i, len, age, nowMs) { var p = this.place, u = MarinaType.ULT, travel = MarinaType.WAVE.travel, off = TsunamiLanes.laneOffset(i), S = TsunamiView.SPRAY_PER_LANE;
-      var endAge = travel * len / u.mrLen, stopped = len > 0 && len < u.mrLen, fade = GameTime.gameMs(stopped ? TsunamiView.FADE_WALL_SEC : TsunamiView.FADE_END_SEC);
-      var reach = Math.min(len, u.mrLen * age / travel), gone = len > 0 ? MathKit.clamp((age - endAge) / fade, 0, 1) : 1, rise = Math.min(1, 0.55 + age / GameTime.gameMs(0.2)), wetAlpha = len > 0 ? MathKit.clamp(1 - (age - endAge) / GameTime.gameMs(TsunamiView.WET_SEC), 0, 1) : 0;
-      p.position.set(reach, 0, off); p.quaternion.identity();
-      p.scale.set(gone >= 1 ? 0 : 1, gone >= 1 ? 0 : TsunamiView.WALL_HEIGHT * rise * (1 - gone) * (1 + 0.04 * Math.sin(nowMs / 120 + i * 1.7)), ArenaSize.TILE);
-      p.updateMatrix(); vis.wall.setMatrixAt(i, p.matrix); vis.wall.laneAlpha.setX(i, 1 - gone);
-      this.setFlat(vis.wet, i, reach / 2, off, reach, ArenaSize.TILE); vis.wet.laneAlpha.setX(i, wetAlpha * TsunamiView.WET_ALPHA);
-      this.setFlat(vis.wet, i + u.mrLanes, reach + TsunamiView.STAIN_LEN / 2, off, gone >= 1 ? 0 : TsunamiView.STAIN_LEN, ArenaSize.TILE); vis.wet.laneAlpha.setX(i + u.mrLanes, (1 - gone) * TsunamiView.WET_ALPHA * 1.2);
-      var sprayK = stopped && age >= endAge ? (age - endAge) / fade : 1;
-      for (var j = 0; j < S; j++) {
-        var seed = (i * S + j) * 0.618 % 1, lean = (j / (S - 1) - 0.5) * ArenaSize.TILE * 0.9;
-        p.position.set(len - 3 - sprayK * 26 * seed, 16 + sprayK * (70 + 48 * seed) - sprayK * sprayK * 62, off + lean);
-        p.quaternion.identity(); p.scale.setScalar(sprayK >= 1 ? 0 : 5 * (1 - sprayK * 0.6));
-        p.updateMatrix(); vis.spray.setMatrixAt(i * S + j, p.matrix);
-      }
+    riseAt(age) { var V = TsunamiView, wind = MarinaType.ULT.mrWindMs;
+      return age < 0 ? V.WIND_RISE * MathKit.clamp(1 + age / wind, 0, 1) : Math.min(1, V.WIND_RISE + (1 - V.WIND_RISE) * age / GameTime.gameMs(V.RISE_SEC));
     }
-    render(t, nowMs) { var view = this, services = this.services, list = services.field.tsunamis;
-      if (!list.length) return;
-      TsunamiView.shared().stripes.offset.y = -nowMs / 900;
-      list.forEach(function (item) {
-        var age = t - item.d.createdAt;
-        if (age < 0) return;
+    paintLane(vis, i, len, age, rise) { var V = TsunamiView, u = MarinaType.ULT, travel = MarinaType.WAVE.travel, slot = i + 1, shared = vis.uniforms;
+      var endAge = travel * len / u.mrLen, stopped = len > 0 && len < u.mrLen, gone = len > 0 ? MathKit.clamp((age - endAge) / GameTime.gameMs(stopped ? V.FADE_WALL_SEC : V.FADE_END_SEC), 0, 1) : 1;
+      shared.uReach.value[slot] = Math.min(len, u.mrLen * Math.max(0, age) / travel);
+      shared.uLift.value[slot] = len > 0 ? rise * (1 - gone) : 0;
+      shared.uWet.value[slot] = len > 0 ? MathKit.clamp(1 - (age - endAge) / GameTime.gameMs(V.WET_SEC), 0, 1) : 0;
+      shared.uBurst.value[slot] = stopped && age >= endAge ? Math.min(1, (age - endAge) / GameTime.gameMs(V.BURST_SEC)) : 0;
+    }
+    paint(vis, d, age, nowMs) { var view = this, shared = vis.uniforms, n = d.lanes.length, rise = this.riseAt(age);
+      d.lanes.forEach(function (len, i) { view.paintLane(vis, i, len, age, rise); });
+      shared.uReach.value[0] = shared.uReach.value[n + 1] = -1000;
+      shared.uTime.value = (nowMs % 100000) / 1000;
+      shared.uPixelScale.value = WaterNoise.pixelScale(this.services);
+      vis.edge.material.opacity = 0.85 * MathKit.clamp(1 + age / MarinaType.ULT.mrWindMs, 0, 1) * (1 - MathKit.clamp((age - MarinaType.WAVE.travel) / GameTime.gameMs(TsunamiView.WET_SEC), 0, 1));
+    }
+    render(t, nowMs) { var view = this;
+      this.services.field.tsunamis.forEach(function (item) {
         if (!item.vis) item.vis = view.acquire(item);
-        var vis = item.vis, u = MarinaType.ULT, stop = MathKit.clamp((age - MarinaType.WAVE.travel) / GameTime.gameMs(TsunamiView.WET_SEC), 0, 1);
-        item.d.lanes.forEach(function (len, i) { view.placeLane(vis, i, len, age, nowMs); });
-        vis.edge.material.opacity = 0.85 * (1 - stop);
-        [vis.wall, vis.wet, vis.spray].forEach(function (mesh) { mesh.instanceMatrix.needsUpdate = true; });
-        vis.wall.laneAlpha.needsUpdate = vis.wet.laneAlpha.needsUpdate = true;
+        view.paint(item.vis, item.d, t - item.d.createdAt, nowMs);
       });
     }
   }
@@ -6224,7 +6451,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (d.slam && !d.dmg) services.status.afflict(T, d.fx, d.owner);
       else services.damage.damage(T, d.dmg, d.owner, (d.m || !d.u) && d.createdAt + (d.mi || 0) / 1000, d.hammer ? d.createdAt : (d.u || d.m || d.countsAsSkill ? "skill" : null), d.fx, d.m ? NecroType.ULT.smGauge : null, !!d.m, d.ownRate ? { base: d.ownBase, rate: d.ownRate } : null);
       if (services.session.players[d.owner]) services.charTypes.of(services.session.players[d.owner].characterType).afterStrike(T, d);
-      if (d.kb && T.alive && !(d.kbAlong && T.minion)) {
+      if (d.kb && T.alive) {
         var dd = MathKit.hyp(dx, dy) || 1, kbAt = services.clock.now(), shoveEnd = T.shove ? T.shove.at + GuardianType.ULT.gdKbMs : 0;
         if (!T.minion) { services.status.creditCC(d.owner, Math.max(0, kbAt + GuardianType.ULT.gdKbMs - Math.max(T.stunUntil || 0, shoveEnd, kbAt)), 0, 0); services.damage.noteHurt(T, d.owner, kbAt); }
         T.shove = { ux: d.kbAlong ? Math.cos(d.angle) : dx / dd, uy: d.kbAlong ? Math.sin(d.angle) : dy / dd, dist: d.kb, at: services.clock.now(), done: 0 };
@@ -6263,6 +6490,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     stepWaves(t) { var services = this.services;
       services.field.waves = services.field.waves.filter(function (w) {
         var d = w.d, travelMs = services.charTypes.waveOf(w.who).travel, front = services.melee.waveFront(d, t, travelMs);
+        if (t < d.createdAt) return true;
         services.targets.fightersAndMinions().forEach(function (T) {
           if (!services.melee.reachedBy(T, d, front) || w.sparked.indexOf(T) >= 0) return;
           w.sparked.push(T); services.melee.strikeSpark(T, d, w.who);
@@ -7641,7 +7869,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
           if (spec.recolor) services.modelStyle.recolorSkin(m, spec.recolor);
           if (spec.wear) services.modelStyle.wearPart(m, services.models.kit.chars[spec.wear.from], spec.wear.part);
           if (spec.right || spec.rightBuilt) {
-            var held = spec.rightBuilt ? TridentProp.build() : services.models.kit.weapons[spec.right].clone(); held.name = "mainhand"; if (spec.rightRecolor) services.modelStyle.recolorProp(held, spec.rightRecolor); if (spec.rightScale) held.scale.setScalar(spec.rightScale); if (spec.rightTurn) held.rotation.y = spec.rightTurn; if (spec.rightTilt) held.rotation.z = spec.rightTilt;
+            var held = spec.rightBuilt ? TridentProp.build() : services.models.kit.weapons[spec.right].clone(); held.name = "mainhand"; if (spec.rightRecolor) services.modelStyle.recolorProp(held, spec.rightRecolor); if (spec.rightScale) held.scale.setScalar(spec.rightScale); if (spec.rightTurn) held.rotation.y = spec.rightTurn; if (spec.rightTilt) held.rotation.z = spec.rightTilt; if (spec.rightRot) held.rotation.set(spec.rightRot[0], spec.rightRot[1], spec.rightRot[2]);
             if (spec.muzzle) { var muzzle = new THREE.Object3D(); muzzle.name = "muzzle"; muzzle.position.fromArray(spec.muzzle); held.add(muzzle); }
             m.getObjectByName("handslotr").add(held);
           }

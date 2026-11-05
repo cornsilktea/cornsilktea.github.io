@@ -6072,10 +6072,10 @@ class MarinaTests {
   hurt(E, rate) { E.hp = E.maxHp * rate; return E; }
   lost(E) { return E.maxHp - E.hp; }
   streams(W, step) { return W.log.filter(function (p) { return p.path === "effects" && p.v.type === "marina" && (!step || p.v.step === step); }).map(function (p) { return p.v; }); }
-  waveTime(along) { return along / (this.api.ULT.mrLen + this.api.BODY_R) * this.api.CHAR_TYPES.of("marina").constructor.WAVE.travel; }
+  waveTime(along) { return this.api.ULT.mrWindMs + along / (this.api.ULT.mrLen + this.api.BODY_R) * this.api.CHAR_TYPES.of("marina").constructor.WAVE.travel; }
   castDown(W) { var M = W.ent("mr"); M.gauge = this.api.GAUGE_MAX; this.api.useUlt(M, Math.PI / 2); return M; }
   castRight(W) { var M = W.ent("mr"); M.gauge = this.api.GAUGE_MAX; this.api.useUlt(M, 0); return M; }
-  finishWave(W) { W.step(this.api.CHAR_TYPES.of("marina").constructor.WAVE.travel + 100); }
+  finishWave(W) { W.step(this.api.ULT.mrWindMs + this.api.CHAR_TYPES.of("marina").constructor.WAVE.travel + 100); }
   minionsOf(W, necroId, spots) { var api = this.api, N = W.ent(necroId);
     N.gauge = api.GAUGE_MAX; api.useUlt(N, Math.PI / 2);
     W.step(api.ULT.smRiseMs + 100);
@@ -6379,7 +6379,7 @@ class MarinaTests {
       if (M.skillUntil > W.t()) bad.push("스킬 타이머가 켜짐");
       W.step(self.waveTime(300 - 40));
       if (self.lost(f)) bad.push("선이 닿기 전에 피해");
-      W.step(self.waveTime(40) + 30);
+      W.step(self.waveTime(40) - ULT.mrWindMs + 30);
       if (self.lost(f) !== ULT.mrDmg) bad.push("피해 " + self.lost(f));
       var stunLeft = f.stunUntil - W.t();
       if (!(stunLeft > 0 && stunLeft <= ULT.mrStunMs)) bad.push("기절 " + stunLeft);
@@ -6392,15 +6392,32 @@ class MarinaTests {
       if (M.gauge !== 0) bad.push("스킬 적중으로 게이지가 오름 " + M.gauge);
       self.verdict(done, bad, ULT.mrDmg + " 피해, 진행 방향 " + ULT.mrKb + " 밀림");
     });
-    run(G, "해일 판정: 맞아도 칸이 멈추지 않아 뒤의 적·해골 병사도 맞고, 해골은 피해만 받으며, 칸 둘에 걸쳐도 한 번만 맞는가", function (done) {
+    run(G, "해일 출발: 시전 뒤 " + ULT.mrWindMs + "ms 동안 멈춰 서고 앞의 적도 안 맞으며, 준비 중 앞으로 들어온 적은 맞는가", function (done) {
+      var bad = [], W = self.squad([self.foe("near", 0, 40), self.foe("behind", 0, -200)]), M = self.castDown(W), x = M.x, y = M.y;
+      if (api.speedOf(M) !== 0) bad.push("시전 중 이동 속도 " + api.speedOf(M));
+      M.cdUntil = 0; var shots = self.streams(W).length; api.fireBasic(M, 0);
+      if (self.streams(W).length !== shots) bad.push("시전 중 기본 공격이 나감");
+      W.step(ULT.mrWindMs - 50);
+      if (self.lost(W.ent("near"))) bad.push("출발 전에 맞음");
+      if (M.x !== x || M.y !== y) bad.push("시전 중 움직임");
+      W.ent("behind").y = MarinaTests.Y + 400;
+      W.step(100);
+      if (api.speedOf(M) === 0) bad.push("출발 뒤에도 묶임");
+      self.finishWave(W);
+      if (self.lost(W.ent("near")) !== ULT.mrDmg) bad.push("앞의 적 피해 " + self.lost(W.ent("near")));
+      if (self.lost(W.ent("behind")) !== ULT.mrDmg) bad.push("준비 중 앞으로 들어온 적 피해 " + self.lost(W.ent("behind")));
+      self.verdict(done, bad, "0.5초 뒤 출발");
+    });
+    run(G, "해일 판정: 맞아도 칸이 멈추지 않아 뒤의 적·해골 병사도 맞고, 해골은 피해와 밀림만 받으며, 칸 둘에 걸쳐도 한 번만 맞는가", function (done) {
       var bad = [], W = self.squad([self.foe("front", 0, 150), self.foe("back", 0, 400), self.foe("edge", 25, 200), self.foe("nc", 0, 2000, { char: "necro" })]);
       var minions = self.minionsOf(W, "nc", [[MarinaTests.X, MarinaTests.Y + 300]]), m = minions[0];
       minions.forEach(function (o, i) { if (i) o.alive = false; });
+      var minionY = m.y;
       self.castDown(W);
       self.finishWave(W);
       ["front", "back", "edge"].forEach(function (id) { if (self.lost(W.ent(id)) !== ULT.mrDmg) bad.push(id + " " + self.lost(W.ent(id))); });
       if (m.maxHp - m.hp !== Math.min(m.maxHp, ULT.mrDmg)) bad.push("해골 피해 " + (m.maxHp - m.hp));
-      if (m.shove) bad.push("해골이 밀림");
+      if (Math.abs(m.y - minionY) < ULT.mrKb * 0.5) bad.push("해골이 안 밀림 " + (m.y - minionY));
       if (m.isStunned(W.t())) bad.push("해골이 기절");
       self.verdict(done, bad, "칸이 멈추지 않고 한 번씩만 맞음");
     });
@@ -6477,11 +6494,11 @@ class MarinaTests {
     var self = this, api = this.api, run = this.kit.run, G = MarinaTests.GROUP, ULT = api.ULT, C = api.CHARS.marina, Mind = api.MARINA_BOT;
     run(G, "카드: 설명 숫자가 값과 맞고, 스킬 이름·통계표 평균 피해·직업군·통계 표시가 맞는가", function (done) {
       var bad = [], ult = api.ultDesc("marina"), pas = api.passiveDesc("marina"), basic = api.basicDesc("marina"), table = api.statTable("marina");
-      [ULT.mrDmg + "의 피해", ULT.mrKb + " 밀어냄", api.secs(ULT.mrStunMs) + " 기절", ULT.mrWaveHeal + " 회복", "폭 " + ULT.mrLanes + "칸", "길이 " + ULT.mrLen / api.TILE + "칸"].forEach(function (w) { if (ult.indexOf(w) < 0) bad.push("스킬 설명에 없음: " + w); });
-      ["반경 " + C.range, "체력 " + ULT.mrHeal + " 회복", C.dmg + "의 피해", "반경 " + ULT.mrChainR].forEach(function (w) { if (pas.indexOf(w) < 0) bad.push("패시브 설명에 없음: " + w); });
+      [api.secs(ULT.mrWindMs) + " 뒤", ULT.mrDmg + "의 피해", "밀어냄", api.secs(ULT.mrStunMs) + " 기절", ULT.mrWaveHeal + " 회복", "폭 " + ULT.mrLanes + "칸"].forEach(function (w) { if (ult.indexOf(w) < 0) bad.push("스킬 설명에 없음: " + w); });
+      [ULT.mrHeal + " 회복", C.dmg + "의 피해", "한 번 더"].forEach(function (w) { if (pas.indexOf(w) < 0) bad.push("패시브 설명에 없음: " + w); });
       if (/\.$/.test(ult) || /\.$/.test(pas)) bad.push("마침표로 끝남");
       if ((ult + pas + basic).indexOf("undefined") >= 0 || (ult + pas + basic).indexOf("NaN") >= 0) bad.push("값이 비어 있음");
-      if (table.indexOf(C.dmg + "(회복 " + ULT.mrHeal + "+" + ULT.mrHeal + ")") < 0) bad.push("통계표 평균 피해");
+      if (table.indexOf(C.dmg + "(" + ULT.mrHeal + ")") < 0) bad.push("통계표 평균 피해");
       if (C.role !== "caster" || !C.heals || !C.noAim || !C.ultAim) bad.push("표시값");
       if (C.width || C.arc) bad.push("근접으로 분류됨");
       self.verdict(done, bad, "설명 숫자 확인");
