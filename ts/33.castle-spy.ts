@@ -985,8 +985,8 @@ class InputController {
       const strength = Math.min(1, length / InputController.JOYSTICK_RADIUS);
       if (strength < InputController.DEAD_ZONE) this.joystickX = this.joystickZ = 0;
       else {
-        this.joystickX = (deltaX / length) * strength;
-        this.joystickZ = (deltaY / length) * strength;
+        this.joystickX = deltaX / length;
+        this.joystickZ = deltaY / length;
       }
     });
     const end = (event: PointerEvent) => {

@@ -307,8 +307,8 @@ class TouchSurface extends ControlSurface {
       if (strength < TouchSurface.DEAD_ZONE) {
         this.stickX = this.stickZ = 0;
       } else {
-        this.stickX = dx / length * strength;
-        this.stickZ = dy / length * strength;
+        this.stickX = dx / length;
+        this.stickZ = dy / length;
       }
     });
     const end = (event: PointerEvent) => {

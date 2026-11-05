@@ -2211,14 +2211,14 @@ function controlPlayer(dt, t, fire) {
   let mx = 0, mz = 0;
   if (keys.KeyW) { mx += fx; mz += fz; } if (keys.KeyS) { mx -= fx; mz -= fz; }
   if (keys.KeyD) { mx += rx; mz += rz; } if (keys.KeyA) { mx -= rx; mz -= rz; }
-  let ml = Math.hypot(mx, mz), stickSpeed = 1;
+  let ml = Math.hypot(mx, mz);
   if (ml === 0 && (TOUCH.moveX || TOUCH.moveY)) {
     mx = fx * -TOUCH.moveY + rx * TOUCH.moveX; mz = fz * -TOUCH.moveY + rz * TOUCH.moveX;
-    ml = Math.hypot(mx, mz); stickSpeed = Math.min(1, ml);
+    ml = Math.hypot(mx, mz);
   }
   if (ml > 0) {
-    slide(P, mx / ml * PC.moveSpeed * stickSpeed * dt, mz / ml * PC.moveSpeed * stickSpeed * dt, PC.radius);
-    const stepFrom = P.walk || 0; P.walk = stepFrom + dt * 9 * stickSpeed;
+    slide(P, mx / ml * PC.moveSpeed * dt, mz / ml * PC.moveSpeed * dt, PC.radius);
+    const stepFrom = P.walk || 0; P.walk = stepFrom + dt * 9;
     if (stepLanded(stepFrom, P.walk)) SFX.footstep(undefined, OWN_STEP_VOLUME);
   }
   keepGunInsideWalls(P, x0, z0, yaw0, PC.radius);

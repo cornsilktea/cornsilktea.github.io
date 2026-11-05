@@ -3851,12 +3851,12 @@ function updateLocalPlayer(dt, t, nowMs) {
       av.face = Math.atan2(round.dashDir.x, round.dashDir.z);
       if (progress >= 1) { round.dashDir = null; round.forceNet = true; }
     } else {
-      let mf = (pressed.w ? 1 : 0) - (pressed.s ? 1 : 0), ms = (pressed.d ? 1 : 0) - (pressed.a ? 1 : 0), stickSpeed = 1;
-      if (!mf && !ms && (TOUCH.moveX || TOUCH.moveY)) { mf = -TOUCH.moveY; ms = TOUCH.moveX; stickSpeed = Math.min(1, Math.hypot(mf, ms)); }
+      let mf = (pressed.w ? 1 : 0) - (pressed.s ? 1 : 0), ms = (pressed.d ? 1 : 0) - (pressed.a ? 1 : 0);
+      if (!mf && !ms && (TOUCH.moveX || TOUCH.moveY)) { mf = -TOUCH.moveY; ms = TOUCH.moveX; }
       if (mf || ms) {
         const len = Math.hypot(mf, ms);
         const wx = (fx * mf + rx * ms) / len, wz = (fz * mf + rz * ms) / len;
-        const speed = (zombie ? ZOMBIE_SPEED * (rush ? RUSH_SPEED_MULT : 1) : HUMAN_SPEED) * stickSpeed;
+        const speed = zombie ? ZOMBIE_SPEED * (rush ? RUSH_SPEED_MULT : 1) : HUMAN_SPEED;
         moveWithCollision(me, wx * speed * dt, wz * speed * dt);
         const backward = mf < 0;
         const targetFace = backward ? Math.atan2(-wx, -wz) : Math.atan2(wx, wz);

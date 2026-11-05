@@ -59,21 +59,16 @@ class FrJoystick {
         if (event.pointerId !== this.pointer)
             return;
         const c = this.center();
-        let dx = event.clientX - c.x, dz = event.clientY - c.z;
-        const length = Math.hypot(dx, dz);
-        if (length > FrJoystick.RADIUS) {
-            dx = (dx / length) * FrJoystick.RADIUS;
-            dz = (dz / length) * FrJoystick.RADIUS;
-        }
-        this.knob.style.transform = "translate(" + dx + "px," + dz + "px)";
-        const strength = Math.min(1, length / FrJoystick.RADIUS);
-        if (strength < FrJoystick.DEAD_ZONE) {
+        const dx = event.clientX - c.x, dz = event.clientY - c.z;
+        const length = Math.hypot(dx, dz), reach = Math.min(length, FrJoystick.RADIUS), unitX = dx / Math.max(1, length), unitZ = dz / Math.max(1, length);
+        this.knob.style.transform = "translate(" + unitX * reach + "px," + unitZ * reach + "px)";
+        if (length / FrJoystick.RADIUS < FrJoystick.DEAD_ZONE) {
             this.x = 0;
             this.z = 0;
             return;
         }
-        this.x = (dx / Math.max(1, length)) * strength;
-        this.z = (dz / Math.max(1, length)) * strength;
+        this.x = unitX;
+        this.z = unitZ;
     }
     end(event) {
         if (event.pointerId !== this.pointer)

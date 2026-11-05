@@ -102,8 +102,7 @@ class SnJoystick {
     if (this.pointer === null) return null;
     const d = Math.hypot(this.dx, this.dy);
     if (d < SnJoystick.DEAD) return { x: 0, z: 0 };
-    const m = Math.min(1, d / this.radius());
-    return { x: this.dx / d * m, z: this.dy / d * m };
+    return { x: this.dx / d, z: this.dy / d };
   }
 }
 
