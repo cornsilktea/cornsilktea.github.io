@@ -3460,7 +3460,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
                   recolor: [[1, 0, 2, "#2E2038", "#0A060F"], [1, 2, 1, "#C58BFF", "#6A2BC4"], [2, 1, 1, "#C58BFF", "#6A2BC4"], [0, 5, 1, "#C58BFF", "#6A2BC4"]],
                   leftRecolor: [[1, 2, 1, "#C58BFF", "#6A2BC4"], [2, 1, 1, "#C58BFF", "#6A2BC4"]] };
     static ULT = {
-      sfMin: 60, sfDelay: GameTime.gameMs(0.6 / 1.3), sfR: 85, sfStunEvery: 4, sfStunMs: GameTime.gameMs(1), agCast: 400, agMin: 60, agDur: GameTime.gameMs(3),
+      sfMin: 60, sfDelay: GameTime.gameMs(0.6 / 1.3), sfR: 100, sfStunEvery: 4, sfStunMs: GameTime.gameMs(1), agCast: 400, agMin: 60, agDur: GameTime.gameMs(3),
       agR: 350, agPull: 260, agGap: 70, agBoomDmg: 25
     };
     static STATS = { name: "점성술사", role: "caster", icon: "🌠", hp: 115, speed: GameTime.gameSpeed(170), cd: GameTime.gameMs(1.4), dmg: 15, range: 380, ultName: "가르강튀아", ultAim: true };
@@ -3692,7 +3692,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     stanceBearer(t) { var B = this.bearer(t); return this.stanceOn(B, t) ? B : null; }
     inStance(E, B) { return MathKit.hyp(E.x - B.x, E.y - B.y) <= BannerBearerType.ULT.bnR; }
     speedBonusFor(E, t) {
-      if (E.minion) return 0;
       var B = this.bearer(t);
       if (!B || !B.alive || B.team !== E.team || MathKit.hyp(E.x - B.x, E.y - B.y) > BannerBearerType.ULT.bnMarchR) return 0;
       return BannerBearerType.ULT.bnMarchSpeed;
@@ -3700,11 +3699,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     alliesInStance(B) { var services = this.services, self = this;
       return services.targets.fighters().filter(function (o) { return o && o !== B && o.alive && o.team === B.team && self.inStance(o, B); });
     }
-    dealtBoost(T, amount, owner, own, t) { var services = this.services;
+    dealtBoost(T, amount, owner, own, t, minionSpot) { var services = this.services;
       var B = this.stanceBearer(t);
       if (!B || !(amount > 0) || T.team === B.team) return null;
       var A = services.targets.ent(owner);
-      if (!A || !A.alive || A.team !== B.team || !this.inStance(A, B)) return null;
+      if (!A || A.team !== B.team || (!minionSpot && !A.alive) || !this.inStance(minionSpot || A, B)) return null;
       var base = own ? own.base : amount, rate = own ? own.rate : 1, added = BannerBearerType.ULT.bnAtk - 1;
       return { amount: Math.round(base * (rate + added)), keep: rate / (rate + added), bearerId: B.id };
     }
@@ -4981,7 +4980,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     walkMinion(m, dx, dy, d, dt, t) { var services = this.services;
       var mx = dx / d, my = dy / d;
       if (m.detour > t) { var rx = -my * m.detourDir; my = mx * m.detourDir; mx = rx; }
-      var ox = m.x, oy = m.y, step = NecroType.ULT.smSpeed * dt;
+      var ox = m.x, oy = m.y, step = (NecroType.ULT.smSpeed + services.bannerAura.speedBonusFor(m, t)) * dt;
       m.x += mx * step; m.y += my * step; services.physics.resolve(m);
       var moved = MathKit.hyp(m.x - ox, m.y - oy);
       if (moved < step * 0.3) { m.stuck += dt; if (m.stuck > 0.4) { m.detour = t + 600; m.detourDir = Math.random() < 0.5 ? -1 : 1; m.stuck = 0; } }
@@ -6224,6 +6223,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     damageMinion(M, amount, owner, basic, ultKey, gaugeGain) { var services = this.services;
       if (!services.minions.minionReady(M)) return;
+      amount = services.bannerAura.takenGuard(M, amount, services.clock.now());
       var dm = Math.min(amount, M.hp);
       M.hp -= dm;
       var summoner = services.targets.ent(M.owner);
@@ -6232,10 +6232,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.damage.pushHit(owner, dm, basic, ultKey, false, gaugeGain, true);
       services.match.game.forceNet = true;
     }
-    damage(T, amount, owner, basic, ultKey, fx, gaugeGain, noHurtGauge, ownBonus, skillCredit) { var services = this.services;
+    damage(T, amount, owner, basic, ultKey, fx, gaugeGain, noHurtGauge, ownBonus, skillCredit, minionSpot) { var services = this.services;
       if (T.minion) { services.damage.damageMinion(T, amount, owner, basic, ultKey, gaugeGain); return; }
       if (T.isProtected()) return;
-      var t = services.clock.now(), boost = services.bannerAura.dealtBoost(T, amount, owner, ownBonus, t), C = services.charTypes.statsOf(T.char);
+      var t = services.clock.now(), boost = services.bannerAura.dealtBoost(T, amount, owner, ownBonus, t, minionSpot), C = services.charTypes.statsOf(T.char);
       if (boost) amount = boost.amount;
       var unguarded = amount;
       if (T.shield && amount > 0) { amount = 0; T.shield = false; services.fxView.spark(T.x, T.y, Palette.SHIELD_SPARK, 1.5); }
@@ -6577,7 +6577,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     strikeSpark(T, d, who) { var services = this.services;
       if (!T || !T.alive || !services.melee.inStrike(T, d)) return;
       var ally = T.team === d.team;
-      if (ally && (!d.heal || T.minion || T.id === d.owner)) return;
+      if (ally && (!d.heal || T.id === d.owner)) return;
       if (!ally && d.kb && !T.minion) T.knockedAt = Date.now();
       if (!services.match.me || services.match.me.team === T.team || services.vision.visibleTo(T, services.match.me)) services.fxView.spark(T.x, T.y, ally ? Palette.HEAL_SPARK : (services.charTypes.of(who).meleeSpark || "#FFFFFF"), services.charTypes.of(who).heavyStrikeSpark || d.u ? 1.5 : 1);
     }
@@ -6586,7 +6586,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var dx = T.x - d.x, dy = T.y - d.y;
       if (T.isProtected()) return;
       if (d.slam && !d.dmg) services.status.afflict(T, d.fx, d.owner);
-      else services.damage.damage(T, d.dmg, d.owner, (d.m || !d.u) && d.createdAt + (d.mi || 0) / 1000, d.hammer ? d.createdAt : (d.u || d.m || d.countsAsSkill ? "skill" : null), d.fx, d.m ? NecroType.ULT.smGauge : null, !!d.m, d.ownRate ? { base: d.ownBase, rate: d.ownRate } : null);
+      else services.damage.damage(T, d.dmg, d.owner, (d.m || !d.u) && d.createdAt + (d.mi || 0) / 1000, d.hammer ? d.createdAt : (d.u || d.m || d.countsAsSkill ? "skill" : null), d.fx, d.m ? NecroType.ULT.smGauge : null, !!d.m, d.ownRate ? { base: d.ownBase, rate: d.ownRate } : null, undefined, d.m ? { x: d.x, y: d.y } : null);
       if (services.session.players[d.owner]) services.charTypes.of(services.session.players[d.owner].characterType).afterStrike(T, d);
       if (d.kb && T.alive) {
         var dd = MathKit.hyp(dx, dy) || 1, kbAt = services.clock.now(), shoveEnd = T.shove ? T.shove.at + GuardianType.ULT.gdKbMs : 0;
@@ -6596,11 +6596,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       }
     }
     strikeHeal(T, d) { var services = this.services;
-      if (!d.heal || T.team !== d.team || T.minion || T.id === d.owner || !T.alive || !services.melee.inStrike(T, d)) return;
+      if (!d.heal || T.team !== d.team || T.id === d.owner || !T.alive || !services.melee.inStrike(T, d)) return;
+      if (T.minion && !services.minions.minionReady(T)) return;
       var healed = services.status.healAmount(T, d.heal, services.clock.now());
       if (healed <= 0) return;
       T.hp += healed;
-      services.damage.noteHelp(T, d.owner, services.clock.now());
+      if (!T.minion) services.damage.noteHelp(T, d.owner, services.clock.now());
       services.session.room.ref.child("hits/" + d.owner).push({ d: 0, b: 0, t: services.clock.now(), hl: healed });
       services.match.game.forceNet = true;
       if (T === services.match.me) services.sound.sfx("heal");
@@ -10676,7 +10677,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         else { v.body.rotation.set(0, v.yaw, M.alive ? 0 : Math.PI / 2); v.body.position.y = M.alive ? 0 : 17; }
         services.fighterMotion.animateMinion(v, M, t, dt);
         v.mats.forEach(function (m) { m.opacity = alpha; });
-        var glow = M.flashUntil > nowMs ? 0x999999 : (t < M.rise ? 0x2A1044 : 0x000000);
+        var glow = M.flashUntil > nowMs ? 0x999999 : (t < M.rise ? 0x2A1044 : services.bannerAura.stanceGlow(M, t));
         v.glowMats.forEach(function (m) { m.emissive.setHex(glow); });
         v.ring.visible = M.alive;
         v.durRing.update((t - M.born) / NecroType.ULT.smDur, nowMs);

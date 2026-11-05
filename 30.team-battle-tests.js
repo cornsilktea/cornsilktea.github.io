@@ -5824,12 +5824,32 @@ class BannerBearerTests {
       if (Math.abs(api.speedOf(near) - (api.CHARS.knight.speed + plus)) > 1e-6) bad.push("안쪽 아군 " + api.speedOf(near));
       if (Math.abs(api.speedOf(far) - api.CHARS.guardian.speed) > 1e-6) bad.push("바깥 아군 " + api.speedOf(far));
       if (Math.abs(api.speedOf(foe) - api.CHARS.knight.speed) > 1e-6) bad.push("상대 " + api.speedOf(foe));
-      if (api.BANNER_AURA.speedBonusFor({ minion: true, team: "blue", x: 300, y: BannerBearerTests.Y }, W.t())) bad.push("해골 병사에게 적용");
+      if (Math.abs(api.BANNER_AURA.speedBonusFor({ minion: true, team: "blue", x: 300, y: BannerBearerTests.Y }, W.t()) - plus) > 1e-6) bad.push("해골 병사에게 안 됨");
       api.afflict(near, { slowMs: 5000, slowMul: 0.5 }, "foe");
       if (Math.abs(api.speedOf(near) - (api.CHARS.knight.speed + plus) * 0.5) > 1e-6) bad.push("둔화 " + api.speedOf(near));
       B.alive = false;
       if (Math.abs(api.speedOf(far) - api.CHARS.guardian.speed) > 1e-6 || api.BANNER_AURA.speedBonusFor(near, W.t())) bad.push("쓰러진 뒤에도 남음");
       self.verdict(done, bad, "실제 이동속도 +" + Math.round(plus * api.timeScale()));
+    });
+    run(G, "해골 병사: 반경 안이면 진군으로 빨라지고, 전투태세의 받는 피해 감소와 주는 피해 증가를 해골 위치로 받는가", function (done) {
+      var bad = [], W = self.squad([{ id: "nc", team: "blue", char: "necro", x: 320, slot: 2 }, { id: "foe", team: "red", char: "knight", x: 700 }]), N = W.ent("nc"), foe = W.ent("foe"), far = ULT.bnR + 100;
+      N.gauge = api.GAUGE_MAX; api.useUlt(N, 0);
+      W.step(api.ULT.smRiseMs + 100);
+      var m = N.minions[0]; m.x = 340; m.y = BannerBearerTests.Y; m.cdUntil = Infinity;
+      N.minions.forEach(function (o, i) { if (i) o.alive = false; });
+      var plus = api.BANNER_AURA.speedBonusFor(m, W.t());
+      if (Math.abs(plus - ULT.bnMarchSpeed) > 1e-6) bad.push("진군 " + plus);
+      if (api.BANNER_AURA.speedBonusFor({ minion: true, team: "blue", x: 300 + far, y: BannerBearerTests.Y }, W.t())) bad.push("반경 밖 해골이 빨라짐");
+      self.stance(W);
+      var hp = m.hp;
+      api.damage(m, 50, "foe", false, "skill");
+      if (hp - m.hp !== Math.round(50 * ULT.bnDef)) bad.push("받는 피해 " + (hp - m.hp));
+      var near = api.BANNER_AURA.dealtBoost(foe, 10, "nc", null, W.t(), { x: m.x, y: m.y });
+      if (!near || near.amount !== Math.round(10 * ULT.bnAtk)) bad.push("주는 피해 " + (near && near.amount));
+      N.x = 300 + far;
+      if (!api.BANNER_AURA.dealtBoost(foe, 10, "nc", null, W.t(), { x: m.x, y: m.y })) bad.push("네크로가 멀면 해골도 안 오름");
+      if (api.BANNER_AURA.dealtBoost(foe, 10, "nc", null, W.t(), { x: 300 + far, y: BannerBearerTests.Y })) bad.push("반경 밖 해골이 오름");
+      self.verdict(done, bad, "진군·받는 피해·주는 피해 모두 해골 위치로 적용");
     });
     run(G, "패시브: 연습에서 캐릭터를 바꾸거나 선봉장이 나가면 선봉장을 다시 찾는가", function (done) {
       var bad = [], W = self.squad([{ id: "al", team: "blue", char: "knight", x: 320, slot: 2 }]), al = W.ent("al"), players = api.MATCH.bots;
@@ -6468,6 +6488,17 @@ class MarinaTests {
       if (Math.abs(m.y - minionY) < ULT.mrKb * 0.5) bad.push("해골이 안 밀림 " + (m.y - minionY));
       if (m.isStunned(W.t())) bad.push("해골이 기절");
       self.verdict(done, bad, "칸이 멈추지 않고 한 번씩만 맞음");
+    });
+    run(G, "해일 회복: 지나가는 아군 해골 병사는 회복하고, 올라오는 중인 해골은 회복하지 않는가", function (done) {
+      var bad = [], W = self.squad([self.foe("nc", 0, 250, { char: "necro", team: "blue" })]);
+      var minions = self.minionsOf(W, "nc", [[MarinaTests.X, MarinaTests.Y + 200], [MarinaTests.X, MarinaTests.Y + 300]]), m = minions[0], rising = minions[1];
+      m.hp = m.maxHp - 50; rising.hp = rising.maxHp - 50; rising.rise = W.t() + 100000;
+      self.castDown(W);
+      self.finishWave(W);
+      if (m.maxHp - m.hp !== 50 - ULT.mrWaveHeal) bad.push("해골 회복 " + (50 - (m.maxHp - m.hp)));
+      if (m.isStunned(W.t())) bad.push("아군 해골이 기절");
+      if (rising.maxHp - rising.hp !== 50) bad.push("올라오는 해골이 회복");
+      self.verdict(done, bad, "아군 해골 체력 " + ULT.mrWaveHeal + " 회복");
     });
     run(G, "해일 판정: 선이 오기 전에 옆으로 피하면 안 맞고, 지나간 뒤 들어와도 안 맞고, 보호 중이면 면역이고, 칼날 폭풍·요한계시록이 끊기고, 기절해도 진행되는가", function (done) {
       var bad = [], W = self.squad([self.foe("dodge", 0, 400), self.foe("late", 200, 100), self.foe("safe", 0, 100)]), late = W.ent("late"), dodge = W.ent("dodge");
