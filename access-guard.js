@@ -256,11 +256,11 @@
         "pointer-events:none"
       ].join(";");
       document.body.appendChild(meter);
-      /* 방 코드 칸(#hudRoomCode, 30번)이 화면에 있으면 그 왼쪽에 작게 붙이고, 없으면 아래 가운데에 둡니다. */
+      /* data-fps-beside 가 붙은 칸(30번 블루 팀 점수)이 화면에 있으면 그 왼쪽에 붙이고, 없으면 아래 가운데에 둡니다. */
       var placeMeter = function () {
-        var tag = document.getElementById("hudRoomCode"), rect = tag ? tag.getBoundingClientRect() : null;
+        var tag = document.querySelector("[data-fps-beside]"), rect = tag ? tag.getBoundingClientRect() : null;
         if (rect && rect.width > 0) {
-          meter.style.cssText += ";bottom:auto;left:auto;transform:none;height:" + rect.height + "px;padding:0 8px;font:600 11px/" + rect.height + "px monospace;top:" + rect.top + "px;right:" + (window.innerWidth - rect.left + 6) + "px";
+          meter.style.cssText += ";bottom:auto;left:auto;transform:none;height:24px;padding:0 8px;font:600 12px/24px monospace;top:" + (rect.top + (rect.height - 24) / 2) + "px;right:" + (window.innerWidth - rect.left + 6) + "px";
         } else {
           meter.style.cssText += ";top:auto;right:auto;bottom:calc(8px + env(safe-area-inset-bottom, 0px));left:50%;transform:translateX(-50%);height:32px;padding:0 10px;font:600 13px/32px monospace";
         }
