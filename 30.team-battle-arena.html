@@ -386,6 +386,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     stormView;
     gargantua;
     galeView;
+    meteorFall;
+    impactBlasts;
     starfallView;
     aimGuide;
     fxView;
@@ -2306,11 +2308,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       this.bursts = []; this.pools = []; this.poolHit = {}; this.lunges = []; this.waves = [];
       this.holes = []; this.storms = []; this.revs = []; this.graces = []; this.domains = [];
       this.curses = {}; this.bladeSpins = []; this.turrets = []; this.groves = []; this.shells = []; this.gales = []; this.stars = [];
-      this.hooks = []; this.hookFlights = []; this.slams = []; this.hammerStrikes = []; this.streams = []; this.tsunamis = [];
+      this.hooks = []; this.hookFlights = []; this.slams = []; this.hammerStrikes = []; this.streams = []; this.tsunamis = []; this.impactBlasts = [];
     }
     dropOwnedBy(ownerId) { var services = this.services;
       var field = this, owned = function (item) { return (item.e || item.d).owner === ownerId; };
-      [["bursts", services.effectView, "dropBurstVis"], ["pools", services.poolView, "dropPoolVis"], ["lunges", services.effectView, "dropLungeVis"], ["holes", services.poolView, "dropHoleVis"],
+      [["bursts", services.meteorFall, "drop"], ["pools", services.poolView, "dropPoolVis"], ["lunges", services.effectView, "dropLungeVis"], ["holes", services.poolView, "dropHoleVis"],
        ["storms", services.stormView, "dropStormVis"], ["revs", services.revGraceView, "dropRevVis"], ["graces", services.revGraceView, "dropGraceVis"], ["domains", services.domainView, "dropDomainVis"],
        ["turrets", services.turrets, "dropVis"], ["groves", services.groves, "dropVis"], ["shells", services.turrets, "dropShellVis"], ["gales", services.galeView, "drop"], ["stars", services.starfallView, "drop"], ["hooks", services.hookView, "dropHook"], ["hookFlights", services.hookView, "dropFlight"], ["slams", services.hookView, "dropSlam"], ["hammerStrikes", services.hammerStrikes, "drop"], ["streams", services.marinaStreamView, "drop"], ["tsunamis", services.tsunamiView, "drop"]
       ].forEach(function (row) {
@@ -2325,7 +2327,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       this.curses = {};
     }
     dropAllVis() { var services = this.services;
-      this.bursts.forEach(services.effectView.dropBurstVis.bind(services.effectView)); this.pools.forEach(services.poolView.dropPoolVis.bind(services.effectView)); this.lunges.forEach(services.effectView.dropLungeVis.bind(services.effectView)); this.holes.forEach(services.poolView.dropHoleVis.bind(services.effectView));
+      this.bursts.forEach(services.meteorFall.drop.bind(services.meteorFall)); this.pools.forEach(services.poolView.dropPoolVis.bind(services.effectView)); this.lunges.forEach(services.effectView.dropLungeVis.bind(services.effectView)); this.holes.forEach(services.poolView.dropHoleVis.bind(services.effectView));
       this.storms.forEach(services.stormView.dropStormVis.bind(services.effectView)); this.revs.forEach(services.revGraceView.dropRevVis.bind(services.effectView)); this.graces.forEach(services.revGraceView.dropGraceVis.bind(services.effectView)); this.domains.forEach(services.domainView.dropDomainVis.bind(services.effectView));
       this.turrets.forEach(services.turrets.dropVis.bind(services.turrets)); this.groves.forEach(services.groves.dropVis.bind(services.groves));
       this.shells.forEach(services.turrets.dropShellVis.bind(services.turrets));
@@ -2337,6 +2339,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       this.hammerStrikes.forEach(services.hammerStrikes.drop.bind(services.hammerStrikes));
       this.streams.forEach(services.marinaStreamView.drop.bind(services.marinaStreamView));
       this.tsunamis.forEach(services.tsunamiView.drop.bind(services.tsunamiView));
+      this.impactBlasts.forEach(services.impactBlasts.drop.bind(services.impactBlasts));
     }
     renderLingering(t, nowMs, dt) { var services = this.services;
       this.pools.forEach(function (pl) { services.poolView.renderPool(pl, t, nowMs); });
@@ -2353,6 +2356,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.hammerStrikes.render(t);
       services.marinaStreamView.render(t, nowMs);
       services.tsunamiView.render(t, nowMs);
+      services.impactBlasts.render(t, nowMs);
     }
   }
 
@@ -5702,10 +5706,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
           if (!T.alive || MathKit.hyp(T.x - e.x, T.y - e.y) > e.r + T.hitR) return;
           if (T.team !== e.team) { var hit = services.fieldFx.meteorHitAt(MathKit.hyp(T.x - e.x, T.y - e.y), e.r); services.damage.damage(T, hit.dmg, e.owner, false, e.createdAt, { stunMs: hit.stunMs }); }
         });
-        services.fxView.boom(e.x, e.y, e.r, e.team);
-        if (services.cameraRig.pix >= Environment.PIX_START) { services.fxView.smoke(e.x, e.y, 0x8A6A52); services.fxView.spark(e.x, e.y, "#FFB45A", 2.2); }
+        services.impactBlasts.meteor(e);
         if (!services.match.me || MathKit.hyp(e.x - services.match.me.x, e.y - services.match.me.y) < 700) services.sound.sfx("boom");
-        services.effectView.dropBurstVis(b);
+        services.meteorFall.drop(b);
         return false;
       });
     }
@@ -6539,7 +6542,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     lineReach(x, y, ang, len) { var services = this.services; return Math.min(len, services.physics.rayObst(x, y, Math.cos(ang), Math.sin(ang), 2) + ArenaSize.BODY_R); }
     onMelee(key, d) { var services = this.services;
       if (!d) return;
-      if (!services.match.game || services.match.handled[key]) { if (!d.wind) services.match.melee[key] = { d: d, at: Date.now() }; return; }
+      if (!services.match.game || services.match.handled[key]) { if (!d.wind && !services.melee.hasOwnBlast(d)) services.match.melee[key] = { d: d, at: Date.now() }; return; }
       services.match.handled[key] = 1;
       if (services.clock.now() - d.createdAt > (d.wind || 0) + 1500) return;
       if (d.wind) { services.field.lunges.push({ key: key, d: d, vis: null }); return; }
@@ -6606,6 +6609,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.match.game.forceNet = true;
       if (T === services.match.me) services.sound.sfx("heal");
     }
+    hasOwnBlast(d) { return !!(d.hammer || d.mace); }
     meleeStrike(key, d) { var services = this.services;
       var who = services.session.players[d.owner] ? services.session.players[d.owner].characterType : "";
       if (services.charTypes.waveOf(who) && d.len) {
@@ -6614,11 +6618,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         services.field.waves.push({ d: d, who: who, sparked: [], struck: [] });
         return;
       }
-      services.match.melee[key] = { d: d, at: Date.now() };
+      if (!services.melee.hasOwnBlast(d)) services.match.melee[key] = { d: d, at: Date.now() };
       services.charTypes.of(who).onStrikeShown(d);
       if (d.u && services.targets.hear(d)) services.sound.sfx("boom");
-      if (d.slam) services.fxView.boom(d.x, d.y, d.radius + ArenaSize.BODY_R, d.team);
-      if (d.hammer) services.boltFx.thunder(d.x, d.y);
+      if (d.slam && !services.melee.hasOwnBlast(d)) services.fxView.boom(d.x, d.y, d.radius + ArenaSize.BODY_R, d.team);
+      if (d.hammer) services.impactBlasts.thunder(d);
+      if (d.mace) services.impactBlasts.mace(d);
       if (d.zap) services.boltFx.zapBarrier(d.x, d.y, d.radius + ArenaSize.BODY_R);
       services.targets.fightersAndMinions().forEach(function (T) { services.melee.strikeSpark(T, d, who); });
       services.targets.localTargets().forEach(function (T) { services.melee.strikeHit(T, d); services.melee.strikeHeal(T, d); });
@@ -9430,7 +9435,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       g.userData.fill.opacity = 0.35 * (1 - f);
     }
     makeMeleeVis(d) { var services = this.services;
-      if (d.stab && !d.mace) return services.effectView.makeStabVis(d);
+      if (d.stab) return services.effectView.makeStabVis(d);
       var g = new THREE.Group(), who = services.session.players[d.owner] ? services.session.players[d.owner].characterType : "", col = d.zap ? Palette.ZAP_GLOW : d.u ? 0xFF6A3D : (services.charTypes.of(who).meleeColor || 0xFFFFFF);
       var fillM = services.fxMats.acquire("basic", { color: col, transparent: true, opacity: 0.2, depthWrite: false });
       var darkWave = services.charTypes.of(who).hasDarkWave && !d.u;
@@ -9471,40 +9476,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     dropLungeVis(l) { var services = this.services; if (!l.vis) return; services.stage.scene.remove(l.vis); services.fxMats.release(l.vis.userData.mat); l.vis = null; }
     releaseMeleeVis(g) { var services = this.services; services.stage.scene.remove(g); services.fxMats.release(g.userData.fill); services.fxMats.release(g.userData.edge); }
     dropMelee(k) { var services = this.services; var g = services.effectView.melees[k]; if (!g) return; services.effectView.releaseMeleeVis(g); delete services.effectView.melees[k]; }
-    placeMeteor(vis, k, nowMs) { var services = this.services;
-      vis.userData.meteor.visible = services.cameraRig.pix >= Environment.PIX_START;
-      if (!vis.userData.meteor.visible) return;
-      var fall = k * k, lift = MeteorLook.TOP * (1 - fall) + MeteorLook.R;
-      vis.userData.meteor.position.set(MeteorLook.DIR.x / MeteorLook.DIR.y * (lift - MeteorLook.R), lift, MeteorLook.DIR.z / MeteorLook.DIR.y * (lift - MeteorLook.R));
-      vis.userData.rock.rotation.set(nowMs / 170, nowMs / 230, 0);
-    }
-    makeBurstVis(e) { var services = this.services;
-      var g = new THREE.Group(), col = 0xE8300E;
-      var baseMat = services.fxMats.acquire("basic", { color: col, transparent: true, opacity: 0.18, depthWrite: false });
-      var fillMat = services.fxMats.acquire("basic", { color: col, transparent: true, opacity: 0.35, depthWrite: false });
-      var edgeMat = services.fxMats.acquire("basic", { color: Palette.C_FX[e.team], transparent: true, opacity: 0.8, depthWrite: false });
-      var base = services.arenaView.flatMesh(services.geo.disc, baseMat); base.scale.setScalar(e.r); base.position.y = 2;
-      var fill = services.arenaView.flatMesh(services.geo.disc, fillMat); fill.scale.setScalar(0.01); fill.position.y = 2.2;
-      var edge = services.arenaView.flatMesh(services.geo.ringFx, edgeMat); edge.scale.setScalar(e.r); edge.position.y = 2.4;
-      g.add(base); g.add(fill); g.add(edge);
-      var rockMat = services.fxMats.acquire("lambert", { color: 0x3A2A22, emissive: 0x2A0A02, flatShading: true });
-      var fireMat = services.fxMats.acquire("basic", { color: 0xFF5A14, transparent: true, opacity: 0.45, depthWrite: false, side: THREE.BackSide });
-      var tailMat = services.fxMats.acquire("basic", { color: 0xFF7A2A, transparent: true, opacity: 0.45, depthWrite: false });
-      var meteor = new THREE.Group();
-      var rock = new THREE.Mesh(services.geo.meteorRock, rockMat); rock.scale.setScalar(MeteorLook.R);
-      var fire = new THREE.Mesh(services.geo.ball, fireMat); fire.scale.setScalar(MeteorLook.R * 1.25); fire.position.copy(MeteorLook.DIR).multiplyScalar(MeteorLook.R * 0.45);
-      var tail = new THREE.Mesh(services.geo.meteorTail, tailMat); tail.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), MeteorLook.DIR); tail.scale.set(MeteorLook.R * 1.1, MeteorLook.TAIL, MeteorLook.R * 1.1);
-      meteor.add(tail); meteor.add(fire); meteor.add(rock);
-      g.add(meteor);
-      g.position.set(e.x, 0, e.y);
-      g.userData = { fill: fill, edge: edge, meteor: meteor, rock: rock, mats: [baseMat, fillMat, edgeMat, rockMat, fireMat, tailMat] };
-      services.stage.scene.add(g);
-      return g;
-    }
-    dropBurstVis(b) { var services = this.services;
-      if (!b.vis) return;
-      services.stage.scene.remove(b.vis); b.vis.userData.mats.forEach(function (m) { services.fxMats.release(m); }); b.vis = null;
-    }
     stormGrain() {
       if (this.stormGrainTex) return this.stormGrainTex;
       var size = EffectView.GRAIN_SIZE, cells = new Uint8Array(size * size);
@@ -9945,77 +9916,524 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       ud.haloMat.opacity = 0.85 + 0.15 * Math.sin(nowMs / 90);
     }
   }
-  class GolemGaleView {
-    static EYE_COLOR = 0x78FFFF;
-    static RISE_MS = 400;
-    static FALL_MS = 400;
-    static LAYERS = [[14, 0.55, 0.75, 1.4], [48, 0.7, 0.7, -1.9], [82, 0.85, 0.6, 2.4], [116, 1, 0.5, -2.9]];
-    constructor(services) { this.services = services; this.cache = null; }
-    paint(size, draw) {
-      var cv = document.createElement("canvas"); cv.width = cv.height = size;
-      draw(cv.getContext("2d"), size);
-      var tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
-      return tex;
-    }
-    paintFloor(g, s) {
-      var c = s / 2, glow = g.createRadialGradient(c, c, 0, c, c, c);
-      glow.addColorStop(0, "rgba(120,255,255,0.45)"); glow.addColorStop(0.55, "rgba(42,168,216,0.3)"); glow.addColorStop(1, "rgba(42,168,216,0)");
-      g.fillStyle = glow; g.fillRect(0, 0, s, s);
-      g.translate(c, c);
-      for (var arm = 0; arm < 4; arm++) {
-        g.save(); g.rotate(arm * Math.PI / 2);
-        g.beginPath();
-        for (var k = 0; k <= 50; k++) { var u = k / 50, r = u * c * 0.95, a = u * 2.2; if (k) g.lineTo(Math.cos(a) * r, Math.sin(a) * r); else g.moveTo(0, 0); }
-        g.strokeStyle = "rgba(160,255,255,0.55)"; g.lineWidth = 7; g.stroke();
-        g.strokeStyle = "rgba(255,255,255,0.7)"; g.lineWidth = 2; g.stroke();
-        g.restore();
-      }
-    }
-    paintWind(g, s) {
-      var c = s / 2, seed = 11;
-      function rnd() { seed = (seed * 16807) % 2147483647; return seed / 2147483647; }
-      for (var i = 0; i < 90; i++) {
-        var r = (0.58 + rnd() * 0.38) * c, a0 = rnd() * Math.PI * 2, span = 0.3 + rnd() * 1.2;
-        g.strokeStyle = rnd() < 0.5 ? "rgba(140,245,255," + (0.45 + rnd() * 0.5) + ")" : "rgba(40,190,255," + (0.4 + rnd() * 0.4) + ")";
-        g.lineWidth = 1 + rnd() * 3;
-        g.beginPath(); g.arc(c, c, r, a0, a0 + span); g.stroke();
-      }
-      var fade = g.createRadialGradient(c, c, c * 0.5, c, c, c);
-      fade.addColorStop(0, "rgba(0,0,0,0)"); fade.addColorStop(0.2, "rgba(0,0,0,1)"); fade.addColorStop(0.8, "rgba(0,0,0,1)"); fade.addColorStop(1, "rgba(0,0,0,0)");
-      g.globalCompositeOperation = "destination-in"; g.fillStyle = fade; g.fillRect(0, 0, s, s);
-    }
-    textures() {
-      if (!this.cache) this.cache = { floor: this.paint(256, this.paintFloor), wind: this.paint(256, this.paintWind) };
-      return this.cache;
-    }
-    make(e) { var services = this.services;
-      var tx = this.textures(), g = new THREE.Group(), mats = [], G = GolemGaleView;
-      function mat(opts) { var m = new THREE.MeshBasicMaterial(Object.assign({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }, opts)); mats.push(m); return m; }
-      var floor = services.arenaView.flatMesh(services.geo.disc, mat({ map: tx.floor, opacity: 0.85 })); floor.scale.setScalar(e.r); floor.position.y = 1.8; g.add(floor);
-      var edgeMat = mat({ color: G.EYE_COLOR, opacity: 0.8 });
-      var edge = services.arenaView.flatMesh(services.geo.ringFx, edgeMat); edge.scale.setScalar(e.r); edge.position.y = 2.2; g.add(edge);
-      var rings = G.LAYERS.map(function (layer) {
-        var m = mat({ map: tx.wind, opacity: layer[2] }), ring = services.arenaView.flatMesh(services.geo.disc, m);
-        ring.scale.setScalar(e.r * layer[1]); ring.position.y = layer[0]; ring.userData.spin = layer[3]; ring.userData.baseOpacity = layer[2]; g.add(ring);
-        return ring;
-      });
-      g.userData = { mats: mats, floor: floor, edgeMat: edgeMat, rings: rings };
-      services.stage.scene.add(g);
+  class SeededPoints {
+    static geometry(count, salt) {
+      var seeds = [];
+      for (var i = 0; i < count; i++) seeds.push(WaterNoise.hash(i + salt, 3), WaterNoise.hash(i + salt * 2, 7), WaterNoise.hash(i + salt * 3, 11));
+      var g = new THREE.BufferGeometry();
+      g.setAttribute("position", new THREE.Float32BufferAttribute(seeds, 3));
       return g;
     }
-    drop(h) { var services = this.services; if (!h.vis) return; services.stage.scene.remove(h.vis); h.vis.userData.mats.forEach(function (m) { m.dispose(); }); h.vis = null; }
+    static parts(uniforms, vertex, fragment, geometry, order) {
+      var points = new THREE.Points(geometry, WaterNoise.softMaterial(uniforms, vertex, fragment));
+      points.frustumCulled = false; points.renderOrder = order;
+      return points;
+    }
+  }
+  class GolemGaleView {
+    static RISE_MS = 400;
+    static FALL_MS = 400;
+    static RINGS = 8;
+    static SPOKES = 56;
+    static WALL_HEIGHT = 74;
+    static WALL_ROWS = 3;
+    static FLECKS = 42;
+    static TONES = { deep: 0x1E7FB8, light: 0xBDF6FF, fleck: 0xE6FBFF };
+    static SHARED = null;
+    static FLOOR_VERTEX = `
+      uniform float uR; varying vec2 vPolar;
+      void main() {
+        vPolar = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position * uR, 1.0);
+      }`;
+    static FLOOR_FRAGMENT = `
+      uniform sampler2D uTex; uniform float uTime; uniform float uShow; uniform float uRise; uniform vec3 uDeep; uniform vec3 uLight; varying vec2 vPolar;
+      void main() {
+        float r = vPolar.y, around = vPolar.x;
+        float big = texture2D(uTex, vec2(around * 2.0 + r * 1.1 - uTime * 0.28, r * 0.5)).r;
+        float fine = texture2D(uTex, vec2(around * 3.0 + r * 1.7 - uTime * 0.55, r * 0.7 - uTime * 0.08)).b;
+        float streak = smoothstep(0.52, 0.8, fine * 0.72 + big * 0.5);
+        float eye = smoothstep(0.03, 0.3, r), rim = smoothstep(1.0, 0.93, r);
+        float ring = smoothstep(0.022, 0.0, abs(r - 0.965));
+        float shock = smoothstep(0.08, 0.0, abs(r - uRise)) * (1.0 - uRise);
+        vec3 color = mix(uDeep, uLight, max(streak, max(ring, shock)));
+        float alpha = (0.09 + streak * 0.5) * eye * rim + ring * 0.72 + shock * 0.8;
+        gl_FragColor = vec4(color, min(alpha, 0.92) * uShow);
+        #include <colorspace_fragment>
+      }`;
+    static WALL_VERTEX = `
+      uniform float uR; uniform float uHeight; varying vec2 vWall;
+      void main() {
+        vWall = uv;
+        float flare = uR * (1.0 + uv.y * 0.07);
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position.x * flare, position.y * uHeight, position.z * flare, 1.0);
+      }`;
+    static WALL_FRAGMENT = `
+      uniform sampler2D uTex; uniform float uTime; uniform float uShow; uniform vec3 uDeep; uniform vec3 uLight; varying vec2 vWall;
+      void main() {
+        float streak = smoothstep(0.42, 0.78, texture2D(uTex, vec2(vWall.x * 3.0 - uTime * 0.7, vWall.y * 0.55 - uTime * 0.2)).b);
+        float fade = (1.0 - vWall.y) * (1.0 - vWall.y) * smoothstep(0.0, 0.08, vWall.y);
+        gl_FragColor = vec4(mix(uDeep, uLight, streak), (0.1 + streak * 0.62) * fade * uShow);
+        #include <colorspace_fragment>
+      }`;
+    static FLECK_VERTEX = `
+      uniform float uR; uniform float uTime; uniform float uPixelScale; uniform float uHeight; uniform float uShow; varying float vFade;
+      void main() {
+        float a = position.x * 6.2832 + uTime * (1.3 + position.y * 1.5);
+        float age = fract(uTime * (0.35 + position.z * 0.35) + position.y);
+        float reach = uR * (0.3 + 0.66 * position.z) * (1.0 - age * 0.12);
+        vec3 p = vec3(cos(a) * reach, 5.0 + age * uHeight * (0.45 + position.y * 0.8), sin(a) * reach);
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+        gl_PointSize = (2.5 + 4.5 * position.y) * uPixelScale * projectionMatrix[1][1] / gl_Position.w;
+        vFade = uShow * min(1.0, age * 6.0) * (1.0 - age);
+      }`;
+    static FLECK_FRAGMENT = `
+      uniform vec3 uFleck; varying float vFade;
+      void main() {
+        gl_FragColor = vec4(uFleck, smoothstep(0.5, 0.15, length(gl_PointCoord - 0.5)) * vFade);
+        #include <colorspace_fragment>
+      }`;
+    static polarGrid(rows, build) {
+      var pos = [], uv = [], idx = [], cols = GolemGaleView.SPOKES;
+      for (var i = 0; i <= rows; i++) for (var j = 0; j <= cols; j++) {
+        var around = j / cols, along = i / rows, a = around * Math.PI * 2;
+        build(pos, Math.cos(a), Math.sin(a), along);
+        uv.push(around, along);
+        if (i < rows && j < cols) { var p = i * (cols + 1) + j; idx.push(p, p + cols + 1, p + 1, p + 1, p + cols + 1, p + cols + 2); }
+      }
+      var g = new THREE.BufferGeometry();
+      g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+      g.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
+      g.setIndex(idx);
+      return g;
+    }
+    static shared() {
+      var G = GolemGaleView;
+      return G.SHARED || (G.SHARED = {
+        floor: G.polarGrid(G.RINGS, function (pos, c, s, along) { pos.push(c * along, 0, s * along); }),
+        wall: G.polarGrid(G.WALL_ROWS, function (pos, c, s, along) { pos.push(c, along, s); }),
+        flecks: SeededPoints.geometry(G.FLECKS, 41)
+      });
+    }
+    constructor(services) { this.services = services; this.free = []; }
+    buildVis() { var G = GolemGaleView, S = G.shared(), group = new THREE.Group();
+      var uniforms = { uTex: { value: WaterNoise.texture() }, uTime: { value: 0 }, uShow: { value: 0 }, uRise: { value: 0 }, uR: { value: 150 }, uHeight: { value: G.WALL_HEIGHT }, uPixelScale: { value: 400 },
+                       uDeep: { value: new THREE.Color(G.TONES.deep) }, uLight: { value: new THREE.Color(G.TONES.light) }, uFleck: { value: new THREE.Color(G.TONES.fleck) } };
+      var floor = new THREE.Mesh(S.floor, WaterNoise.softMaterial(uniforms, G.FLOOR_VERTEX, G.FLOOR_FRAGMENT, THREE.DoubleSide));
+      var wall = new THREE.Mesh(S.wall, WaterNoise.softMaterial(uniforms, G.WALL_VERTEX, G.WALL_FRAGMENT, THREE.DoubleSide));
+      var flecks = SeededPoints.parts(uniforms, G.FLECK_VERTEX, G.FLECK_FRAGMENT, S.flecks, 6);
+      floor.position.y = 1.8; floor.frustumCulled = wall.frustumCulled = false; floor.renderOrder = 4; wall.renderOrder = 5;
+      group.add(floor); group.add(wall); group.add(flecks);
+      return { group: group, uniforms: uniforms };
+    }
+    warmSample() { var vis = this.buildVis(); vis.uniforms.uShow.value = 1; return vis.group; }
+    prefill(count) { while (this.free.length < count) this.free.push(this.buildVis()); }
+    spareRoots() { return this.free.map(function (vis) { vis.group.position.set(ShaderWarmup.PROBE_SPOT, 0, ShaderWarmup.PROBE_SPOT); return vis.group; }); }
+    drop(h) { var services = this.services; if (!h.vis) return; services.stage.scene.remove(h.vis.group); this.free.push(h.vis); h.vis = null; }
     render(h, t, nowMs) { var services = this.services;
       var e = h.e, G = GolemGaleView, end = e.createdAt + e.dur;
-      if (!h.vis) h.vis = this.make(e);
-      var ud = h.vis.userData, rise = MathKit.clamp((t - e.createdAt) / G.RISE_MS, 0.001, 1), fall = MathKit.clamp((end - t) / G.FALL_MS, 0, 1), k = Math.min(rise * rise * (3 - 2 * rise), fall);
-      var shown = services.fighterView.fighters[e.owner], center = services.fieldFx.holeCenter(e), spin = nowMs / 1000;
-      h.vis.position.set(shown ? shown.root.position.x : center.x, 0, shown ? shown.root.position.z : center.y);
-      h.vis.scale.setScalar(Math.max(0.001, k));
-      ud.floor.rotation.z = spin * 1.3;
-      ud.edgeMat.opacity = 0.6 + 0.25 * Math.sin(nowMs / 120);
-      ud.rings.forEach(function (ring, i) {
-        ring.rotation.z = spin * ring.userData.spin;
-        ring.material.opacity = ring.userData.baseOpacity * (0.8 + 0.2 * Math.sin(nowMs / 160 + i * 1.7));
+      if (!h.vis) { h.vis = this.free.pop() || this.buildVis(); h.vis.uniforms.uR.value = e.r; services.stage.scene.add(h.vis.group); }
+      var u = h.vis.uniforms, rise = MathKit.clamp((t - e.createdAt) / G.RISE_MS, 0.001, 1), fall = MathKit.clamp((end - t) / G.FALL_MS, 0, 1), k = Math.min(rise * rise * (3 - 2 * rise), fall);
+      var shown = services.fighterView.fighters[e.owner], center = services.fieldFx.holeCenter(e);
+      h.vis.group.position.set(shown ? shown.root.position.x : center.x, 0, shown ? shown.root.position.z : center.y);
+      h.vis.group.scale.setScalar(Math.max(0.001, k));
+      u.uShow.value = k; u.uRise.value = rise; u.uTime.value = (nowMs % 100000) / 1000; u.uPixelScale.value = WaterNoise.pixelScale(services);
+    }
+  }
+  class MeteorFallView {
+    static ROCK_DETAIL = 2;
+    static SPARKS = 26;
+    static TONES = { deep: 0xC2260A, hot: 0xFFB24A, rock: 0x241712, crack: 0xFF7A1E, fireHot: 0xFFF2BE, fire: 0xFF6A12, tail: 0xB8240A, spark: 0xFFC766 };
+    static SHARED = null;
+    static ZONE_VERTEX = `
+      uniform float uR; varying vec2 vP;
+      void main() {
+        vP = position.xz;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position.x * uR, 0.0, position.z * uR, 1.0);
+      }`;
+    static ZONE_FRAGMENT = `
+      uniform sampler2D uTex; uniform float uR; uniform float uK; uniform float uTime; uniform float uPulse; uniform vec3 uDeep; uniform vec3 uHot; uniform vec3 uTeam; varying vec2 vP;
+      void main() {
+        float r = length(vP);
+        if (r > 1.0) discard;
+        vec4 slow = texture2D(uTex, vP * uR / 430.0 + vec2(uTime * 0.03, -uTime * 0.05));
+        vec4 lace = texture2D(uTex, vP * uR / 270.0 - vec2(uTime * 0.05, uTime * 0.02));
+        float fill = smoothstep(uK + 0.03, uK - 0.05, r + (slow.r - 0.5) * 0.16 * uK);
+        float ember = smoothstep(0.56, 0.84, lace.g + slow.r * 0.14) * fill;
+        float core = uK * uK * uK * smoothstep(0.65, 0.0, r);
+        float rim = smoothstep(0.965, 0.985, r);
+        vec3 color = mix(mix(uDeep, uHot, min(1.0, ember + core)), uTeam, rim);
+        float alpha = max(0.15 + fill * 0.26 + ember * 0.44 + core * 0.5, rim * uPulse);
+        gl_FragColor = vec4(color, alpha);
+        #include <colorspace_fragment>
+      }`;
+    static ROCK_VERTEX = `
+      varying vec3 vStone; varying float vLit;
+      void main() {
+        vStone = position;
+        vLit = 0.42 + 0.58 * max(0.0, dot(normal, normalize(vec3(0.2, -1.0, 0.1))));
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }`;
+    static ROCK_FRAGMENT = `
+      uniform sampler2D uTex; uniform vec3 uRock; uniform vec3 uCrack; varying vec3 vStone; varying float vLit;
+      void main() {
+        float seam = smoothstep(0.34, 0.66, texture2D(uTex, vStone.xz * 0.22 + vStone.y * 0.13).g);
+        gl_FragColor = vec4(mix(uRock * (0.55 + vLit), uCrack, seam), 1.0);
+        #include <colorspace_fragment>
+      }`;
+    static COMET_VERTEX = `
+      varying vec2 vUv; varying float vFacing;
+      void main() {
+        vUv = uv;
+        vec4 view = modelViewMatrix * vec4(position, 1.0);
+        vFacing = abs(dot(normalize(normalMatrix * normal), normalize(-view.xyz)));
+        gl_Position = projectionMatrix * view;
+      }`;
+    static COMET_FRAGMENT = `
+      uniform sampler2D uTex; uniform float uTime; uniform vec3 uFireHot; uniform vec3 uFire; uniform vec3 uTail; varying vec2 vUv; varying float vFacing;
+      void main() {
+        float along = vUv.y;
+        float big = texture2D(uTex, vec2(vUv.x * 2.0, along * 1.4 - uTime * 2.1)).r;
+        float fine = texture2D(uTex, vec2(vUv.x * 4.0 + big * 0.2, along * 3.2 - uTime * 3.4)).r;
+        float flame = big * 0.6 + fine * 0.5 + 0.55 - along * 1.05;
+        float body = smoothstep(0.34, 0.62, flame) * smoothstep(0.02, 0.32, vFacing);
+        float heat = clamp(flame + vFacing * 0.28 - 0.42, 0.0, 1.0);
+        vec3 color = mix(mix(uTail, uFire, smoothstep(0.0, 0.32, heat)), uFireHot, smoothstep(0.52, 0.98, heat));
+        gl_FragColor = vec4(color, body * 0.94);
+        #include <colorspace_fragment>
+      }`;
+    static SPARK_VERTEX = `
+      uniform float uTime; uniform float uPixelScale; uniform vec3 uDir; varying float vFade;
+      void main() {
+        float age = fract(position.x + uTime * (1.0 + position.y * 0.8));
+        float a = position.z * 6.2832;
+        vec3 side = vec3(cos(a), 0.0, sin(a)) * (18.0 + 38.0 * position.y + age * 26.0);
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(uDir * (20.0 + age * (150.0 + 170.0 * position.z)) + side, 1.0);
+        gl_PointSize = (3.5 + 6.5 * position.y) * (1.0 - age * 0.6) * uPixelScale * projectionMatrix[1][1] / gl_Position.w;
+        vFade = (1.0 - age) * min(1.0, age * 9.0);
+      }`;
+    static SPARK_FRAGMENT = `
+      uniform vec3 uSpark; varying float vFade;
+      void main() {
+        gl_FragColor = vec4(uSpark, smoothstep(0.5, 0.1, length(gl_PointCoord - 0.5)) * vFade);
+        #include <colorspace_fragment>
+      }`;
+    static cometGeometry() { var L = MeteorLook, points = [], head = L.R * 1.36;
+      for (var i = 0; i <= 5; i++) { var a = -Math.PI / 2 + i / 5 * Math.PI / 2; points.push(new THREE.Vector2(Math.max(0.01, Math.cos(a) * head), Math.sin(a) * head)); }
+      for (var j = 1; j <= 14; j++) { var u = j / 14; points.push(new THREE.Vector2(Math.max(0.01, head * Math.pow(1 - u, 1.35)), u * (L.TAIL + L.R))); }
+      return new THREE.LatheGeometry(points, 16);
+    }
+    static rockGeometry() {
+      var g = new THREE.IcosahedronGeometry(MeteorLook.R, MeteorFallView.ROCK_DETAIL), pos = g.attributes.position;
+      for (var i = 0; i < pos.count; i++) {
+        var x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i), key = Math.round(x) * 3 + Math.round(y) * 5 + Math.round(z) * 7, bump = 0.82 + 0.3 * WaterNoise.hash(key, 21);
+        pos.setXYZ(i, x * bump, y * bump, z * bump);
+      }
+      g.computeVertexNormals();
+      return g;
+    }
+    static shared() {
+      var M = MeteorFallView;
+      if (M.SHARED) return M.SHARED;
+      var flat = new THREE.PlaneGeometry(2, 2); flat.rotateX(-Math.PI / 2);
+      return M.SHARED = { flat: flat, comet: M.cometGeometry(), rock: M.rockGeometry(), sparks: SeededPoints.geometry(M.SPARKS, 67) };
+    }
+    constructor(services) { this.services = services; this.free = []; }
+    buildVis() { var M = MeteorFallView, S = M.shared(), T = M.TONES, group = new THREE.Group(), meteor = new THREE.Group();
+      var color = function (hex) { return { value: new THREE.Color(hex) }; };
+      var uniforms = { uTex: { value: WaterNoise.texture() }, uR: { value: 100 }, uK: { value: 0 }, uTime: { value: 0 }, uPulse: { value: 0.8 }, uPixelScale: { value: 400 }, uDir: { value: MeteorLook.DIR },
+                       uDeep: color(T.deep), uHot: color(T.hot), uTeam: color(0xFFFFFF), uRock: color(T.rock), uCrack: color(T.crack), uFireHot: color(T.fireHot), uFire: color(T.fire), uTail: color(T.tail), uSpark: color(T.spark) };
+      var zone = new THREE.Mesh(S.flat, WaterNoise.softMaterial(uniforms, M.ZONE_VERTEX, M.ZONE_FRAGMENT));
+      zone.position.y = 2.2; zone.frustumCulled = false; zone.renderOrder = 2;
+      var rockMat = new THREE.ShaderMaterial({ uniforms: uniforms, vertexShader: M.ROCK_VERTEX, fragmentShader: M.ROCK_FRAGMENT });
+      var rock = new THREE.Mesh(S.rock, rockMat); rock.frustumCulled = false;
+      var comet = new THREE.Mesh(S.comet, WaterNoise.softMaterial(uniforms, M.COMET_VERTEX, M.COMET_FRAGMENT, THREE.DoubleSide));
+      comet.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), MeteorLook.DIR); comet.frustumCulled = false; comet.renderOrder = 7;
+      var sparks = SeededPoints.parts(uniforms, M.SPARK_VERTEX, M.SPARK_FRAGMENT, S.sparks, 8);
+      meteor.add(rock); meteor.add(comet); meteor.add(sparks);
+      group.add(zone); group.add(meteor);
+      return { group: group, meteor: meteor, rock: rock, sparks: sparks, uniforms: uniforms };
+    }
+    warmSample() { var vis = this.buildVis(); this.paint(vis, 0.5, 500); return vis.group; }
+    prefill(count) { while (this.free.length < count) this.free.push(this.buildVis()); }
+    spareRoots() { return this.free.map(function (vis) { vis.group.position.set(ShaderWarmup.PROBE_SPOT, 0, ShaderWarmup.PROBE_SPOT); return vis.group; }); }
+    drop(b) { var services = this.services; if (!b.vis) return; services.stage.scene.remove(b.vis.group); this.free.push(b.vis); b.vis = null; }
+    paint(vis, k, nowMs) { var L = MeteorLook, u = vis.uniforms, lift = L.TOP * (1 - k * k) + L.R;
+      u.uK.value = k; u.uTime.value = (nowMs % 100000) / 1000; u.uPulse.value = 0.55 + 0.4 * Math.sin(nowMs / 60); u.uPixelScale.value = WaterNoise.pixelScale(this.services);
+      vis.meteor.position.set(L.DIR.x / L.DIR.y * (lift - L.R), lift, L.DIR.z / L.DIR.y * (lift - L.R));
+      vis.rock.rotation.set(nowMs / 170, nowMs / 230, 0);
+      vis.sparks.visible = this.services.cameraRig.pix >= Environment.PIX_START;
+    }
+    render(b, t, nowMs) { var services = this.services, e = b.e;
+      if (!b.vis) {
+        b.vis = this.free.pop() || this.buildVis();
+        b.vis.uniforms.uR.value = e.r; b.vis.uniforms.uTeam.value.set(Palette.C_FX[e.team]);
+        b.vis.group.position.set(e.x, 0, e.y);
+        services.stage.scene.add(b.vis.group);
+      }
+      this.paint(b.vis, MathKit.clamp((t - e.createdAt) / e.delay, 0, 1), nowMs);
+    }
+  }
+  class BlastShaders {
+    static GROUND_VERTEX = `
+      uniform float uR; varying vec2 vP;
+      void main() {
+        vP = position.xz;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position.x * uR, 0.0, position.z * uR, 1.0);
+      }`;
+    static GROUND_FRAGMENT = `
+      uniform sampler2D uTex; uniform float uR; uniform float uFront; uniform float uBand; uniform float uFlash; uniform float uChar; uniform float uCrack; uniform float uEdge; uniform float uSeed;
+      uniform vec3 uHot; uniform vec3 uMid; uniform vec3 uScorch; uniform vec3 uTeam; varying vec2 vP;
+      void main() {
+        float r = length(vP);
+        if (r > 1.0) discard;
+        vec2 spot = vP * uR / 520.0 + uSeed;
+        vec4 cloud = texture2D(uTex, spot);
+        vec4 lace = texture2D(uTex, spot * 1.3 + cloud.rg * 0.05);
+        float edge = uFront * (1.0 + (cloud.r - 0.5) * 0.34);
+        float inside = smoothstep(edge + 0.02, edge - 0.06, r);
+        float band = smoothstep(0.15, 0.0, abs(r - edge)) * uBand;
+        float crack = smoothstep(0.5, 0.8, lace.g) * inside * uCrack;
+        float core = uFlash * smoothstep(0.72, 0.0, r);
+        float rim = smoothstep(0.965, 0.985, r) * uEdge;
+        vec3 color = mix(mix(uScorch, uMid, min(1.0, crack * 1.4)), uHot, min(1.0, band + core));
+        float soft = smoothstep(1.0, 0.8, r + (cloud.r - 0.5) * 0.2);
+        float alpha = max(inside * uChar * (0.5 + 0.42 * cloud.r) * soft, max(crack, max(band, core)));
+        gl_FragColor = vec4(mix(color, uTeam, rim), max(alpha, rim));
+        #include <colorspace_fragment>
+      }`;
+    static PUFF_VERTEX = `
+      uniform float uR; uniform float uAge; uniform float uPixelScale; uniform float uSpread; uniform float uPuffLife; uniform float uPuffSize; uniform float uLift; varying float vK; varying float vSeed;
+      void main() {
+        float a = position.x * 6.2832, reach = sqrt(position.y);
+        float k = clamp((uAge - reach * uSpread - position.z * 0.05) / (uPuffLife * (0.75 + 0.5 * position.z)), -0.01, 1.0);
+        float grow = 1.0 - (1.0 - max(k, 0.0)) * (1.0 - max(k, 0.0));
+        float out_ = reach * uR * (0.82 + 0.16 * grow);
+        vec3 p = vec3(cos(a) * out_, 8.0 + grow * uLift * (0.45 + position.z), sin(a) * out_);
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+        gl_PointSize = k > 0.0 && k < 1.0 ? uPuffSize * (0.5 + 0.8 * grow) * (0.8 + 0.4 * position.z) * uPixelScale * projectionMatrix[1][1] / gl_Position.w : 0.0;
+        vK = k; vSeed = position.x;
+      }`;
+    static PUFF_FRAGMENT = `
+      uniform sampler2D uTex; uniform vec3 uFireHot; uniform vec3 uFire; uniform vec3 uSmoke; varying float vK; varying float vSeed;
+      void main() {
+        if (vK <= 0.0) discard;
+        vec2 q = gl_PointCoord - 0.5;
+        float d = length(q);
+        if (d > 0.5) discard;
+        float n = texture2D(uTex, q * 0.34 + vSeed + vK * 0.08).r;
+        float heat = clamp(1.05 - vK * 1.75 + (n - 0.5) * 0.9 - d * 0.5, 0.0, 1.0);
+        vec3 color = mix(mix(uSmoke, uFire, smoothstep(0.0, 0.42, heat)), uFireHot, smoothstep(0.5, 0.95, heat));
+        float body = smoothstep(0.5, 0.26, d + (n - 0.5) * 0.3);
+        gl_FragColor = vec4(color, body * min(1.0, vK * 16.0) * (1.0 - vK * vK) * 0.92);
+        #include <colorspace_fragment>
+      }`;
+    static CHIP_VERTEX = `
+      uniform float uR; uniform float uAge; uniform float uPixelScale; uniform float uSpread; uniform float uChipSpeed; varying float vFade; varying float vEmber;
+      void main() {
+        float a = position.x * 6.2832, reach = sqrt(position.y) * 0.8, ember = step(0.5, position.z);
+        float e = max(0.0, uAge - reach * uSpread);
+        float lift = uChipSpeed * (0.9 + 1.5 * fract(position.z * 13.7)), y = 3.0 + lift * e - 450.0 * e * e, flight = y > 2.0 ? e : lift / 450.0;
+        float out_ = reach * uR + uChipSpeed * (0.35 + 0.8 * fract(position.z * 7.3)) * flight;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(cos(a) * out_, max(y, 2.0), sin(a) * out_, 1.0);
+        gl_PointSize = (ember > 0.5 ? 4.0 + 4.0 * position.y : 7.0 + 8.0 * position.y) * uPixelScale * projectionMatrix[1][1] / gl_Position.w;
+        vFade = step(0.001, e) * clamp(1.0 - e / (ember > 0.5 ? 0.5 : 0.95), 0.0, 1.0); vEmber = ember;
+      }`;
+    static CHIP_FRAGMENT = `
+      uniform vec3 uChip; uniform vec3 uEmber; varying float vFade; varying float vEmber;
+      void main() {
+        vec2 q = abs(gl_PointCoord - 0.5);
+        if (q.x + q.y > 0.5 || vFade <= 0.0) discard;
+        gl_FragColor = vec4(mix(uChip, uEmber, vEmber), min(1.0, vFade * 3.0));
+        #include <colorspace_fragment>
+      }`;
+    static BOLT_VERTEX = `
+      varying vec2 vUv;
+      void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
+    static BOLT_FRAGMENT = `
+      uniform sampler2D uTex; uniform float uPower; uniform float uGrow; uniform float uFlicker; uniform vec3 uGlow; uniform vec3 uCore; varying vec2 vUv;
+      float lineOf(float d, float width) { return width / (d + width); }
+      void main() {
+        float y = vUv.y, x = vUv.x - 0.5;
+        if (y < 1.0 - uGrow) discard;
+        float wide = texture2D(uTex, vec2(y * 0.5 + uFlicker, uFlicker * 0.37)).b - 0.5;
+        float tight = texture2D(uTex, vec2(y * 1.4 + uFlicker * 1.7, uFlicker * 0.61)).b - 0.5;
+        float path = (wide * 0.36 + tight * 0.11) * smoothstep(0.0, 0.2, y);
+        float main = abs(x - path);
+        float leftFork = max(0.0, (0.66 - y) / 0.3), rightFork = max(0.0, (0.42 - y) / 0.26);
+        float forkA = y < 0.66 && y > 0.36 ? abs(x - path + leftFork * leftFork * 0.2 + tight * 0.06) : 1.0;
+        float forkB = y < 0.42 && y > 0.16 ? abs(x - path - rightFork * rightFork * 0.16 - wide * 0.05) : 1.0;
+        float core = smoothstep(0.016, 0.004, main) + smoothstep(0.007, 0.002, min(forkA, forkB)) * 0.8;
+        float glow = lineOf(main, 0.016) * 0.75 + lineOf(min(forkA, forkB), 0.006) * 0.28;
+        float fade = smoothstep(0.5, 0.32, abs(x));
+        gl_FragColor = vec4((uGlow * glow + uCore * core) * fade * uPower, 1.0);
+        #include <colorspace_fragment>
+      }`;
+    static GOUGE_VERTEX = `
+      uniform float uGougeLen; varying vec2 vP;
+      void main() {
+        vP = vec2(position.x, position.z);
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }`;
+    static GOUGE_FRAGMENT = `
+      uniform sampler2D uTex; uniform float uGougeLen; uniform float uGougeReach; uniform float uGougeFade; uniform float uSeed; uniform vec3 uMid; uniform vec3 uScorch; varying vec2 vP;
+      void main() {
+        if (vP.x > uGougeReach) discard;
+        float n = texture2D(uTex, vec2(vP.x * uGougeLen / 170.0 + uSeed, vP.y * 0.2 + uSeed)).r - 0.5;
+        float half_ = mix(0.08, 0.42, vP.x) * smoothstep(0.0, 0.12, vP.x), d = abs(vP.y - n * 0.22 * smoothstep(0.0, 0.3, vP.x));
+        float line = smoothstep(half_, half_ * 0.25, d);
+        gl_FragColor = vec4(mix(uScorch, uMid, line * line), line * uGougeFade * 0.9);
+        #include <colorspace_fragment>
+      }`;
+  }
+  class ImpactBlast {
+    static LIFE_SEC = 1;
+    static FRONT_SEC = 0.25;
+    static SPREAD = 0.15;
+    static PUFF_LIFE = 0.7;
+    static PUFF_SIZE = 100;
+    static LIFT = 90;
+    static PUFFS = 24;
+    static CHIPS = 36;
+    static CHIP_SPEED = 190;
+    static EDGE = 0.85;
+    static TONES = {};
+    constructor(x, y, r, team, at) { this.x = x; this.y = y; this.r = r; this.team = team; this.at = at; this.vis = null; }
+    dress(vis, lite) { var C = this.constructor, u = vis.uniforms, T = C.TONES;
+      vis.group.position.set(this.x, 0, this.y);
+      u.uR.value = this.r; u.uSeed.value = WaterNoise.hash(this.at % 997, this.x % 97);
+      u.uSpread.value = C.SPREAD; u.uPuffLife.value = C.PUFF_LIFE; u.uPuffSize.value = C.PUFF_SIZE; u.uLift.value = C.LIFT; u.uChipSpeed.value = C.CHIP_SPEED;
+      u.uHot.value.set(T.hot); u.uMid.value.set(T.mid); u.uScorch.value.set(T.scorch); u.uFireHot.value.set(T.fireHot); u.uFire.value.set(T.fire); u.uSmoke.value.set(T.smoke); u.uChip.value.set(T.chip); u.uEmber.value.set(T.ember);
+      u.uTeam.value.set(Palette.C_FX[this.team] || 0xFFFFFF);
+      vis.puffs.geometry.setDrawRange(0, lite ? Math.ceil(C.PUFFS / 2) : C.PUFFS);
+      vis.chips.geometry.setDrawRange(0, C.CHIPS);
+      vis.chips.visible = !lite;
+      vis.bolt.visible = vis.gouge.visible = false;
+    }
+    paint(vis, sec, nowMs) { var C = this.constructor, u = vis.uniforms, f = Math.min(1, sec / C.FRONT_SEC), life = C.LIFE_SEC;
+      u.uAge.value = sec;
+      u.uFront.value = 1 - (1 - f) * (1 - f) * (1 - f);
+      u.uBand.value = MathKit.clamp(1 - (sec - C.FRONT_SEC) / 0.12, 0, 1);
+      u.uFlash.value = MathKit.clamp(1 - sec / 0.16, 0, 1);
+      u.uCrack.value = MathKit.clamp(1 - (sec - life * 0.25) / (life * 0.6), 0, 1);
+      u.uChar.value = 0.85 * MathKit.clamp((life - sec) / (life * 0.4), 0, 1);
+      u.uEdge.value = C.EDGE * MathKit.clamp(1 - sec / (life * 0.7), 0, 1);
+    }
+  }
+  class MeteorBlast extends ImpactBlast {
+    static LIFE_SEC = 1.15;
+    static FRONT_SEC = 0.24;
+    static SPREAD = 0.12;
+    static PUFF_LIFE = 0.72;
+    static PUFF_SIZE = 112;
+    static LIFT = 130;
+    static PUFFS = 26;
+    static CHIPS = 40;
+    static CHIP_SPEED = 230;
+    static TONES = { hot: 0xFFF0BC, mid: 0xFF661A, scorch: 0x1C110C, fireHot: 0xFFF3C0, fire: 0xFF6410, smoke: 0x2B2420, chip: 0x2A1C15, ember: 0xFFA52E };
+  }
+  class ThunderBlast extends ImpactBlast {
+    static LIFE_SEC = 0.95;
+    static FRONT_SEC = 0.36;
+    static SPREAD = 0.3;
+    static PUFF_LIFE = 0.62;
+    static PUFF_SIZE = 114;
+    static LIFT = 96;
+    static PUFFS = 26;
+    static CHIPS = 34;
+    static CHIP_SPEED = 210;
+    static BOLT_SEC = 0.42;
+    static FLICKER_SEC = 0.055;
+    static TONES = { hot: 0xEFF8FF, mid: 0x62BEFF, scorch: 0x12161E, fireHot: 0xF4FBFF, fire: 0x5AAEF5, smoke: 0x333B48, chip: 0x2B2B30, ember: 0xFFE45C };
+    dress(vis, lite) { super.dress(vis, lite); vis.bolt.visible = true; }
+    paint(vis, sec, nowMs) { super.paint(vis, sec, nowMs); var u = vis.uniforms, T = ThunderBlast;
+      u.uGrow.value = Math.min(1, sec / 0.04);
+      u.uFlicker.value = Math.floor(sec / T.FLICKER_SEC) * 0.137 + u.uSeed.value;
+      u.uPower.value = sec >= T.BOLT_SEC ? 0 : (1 - sec / T.BOLT_SEC) * (Math.floor(sec / T.FLICKER_SEC) % 3 === 1 ? 0.45 : 1) + 0.15;
+      vis.bolt.visible = sec < T.BOLT_SEC;
+    }
+  }
+  class MaceBlast extends ImpactBlast {
+    static LIFE_SEC = 0.55;
+    static FRONT_SEC = 0.1;
+    static SPREAD = 0.04;
+    static PUFF_LIFE = 0.42;
+    static PUFF_SIZE = 44;
+    static LIFT = 34;
+    static PUFFS = 8;
+    static CHIPS = 14;
+    static CHIP_SPEED = 130;
+    static EDGE = 0;
+    static R = 72;
+    static GOUGE_WIDTH = 58;
+    static TONES = { hot: 0xFFE3B4, mid: 0xFF8C38, scorch: 0x241A13, fireHot: 0xFFE7BC, fire: 0xC9A77E, smoke: 0x6B5C4D, chip: 0x483C33, ember: 0xFFC060 };
+    static spotOf(services, d) {
+      var V = services.fighterView.fighters[d.tgt] || services.fighterView.minions[d.tgt], T = services.targets.ent(d.tgt);
+      if (V) return { x: V.root.position.x, y: V.root.position.z };
+      return T ? { x: T.x, y: T.y } : { x: d.x + Math.cos(d.angle) * d.radius / 2, y: d.y + Math.sin(d.angle) * d.radius / 2 };
+    }
+    constructor(services, d) { var spot = MaceBlast.spotOf(services, d); super(spot.x, spot.y, MaceBlast.R, d.team, d.createdAt); this.fromX = d.x; this.fromY = d.y; }
+    dress(vis, lite) { super.dress(vis, lite);
+      var dx = this.fromX - this.x, dy = this.fromY - this.y, len = MathKit.hyp(dx, dy);
+      vis.gouge.visible = len > 1;
+      vis.gouge.position.set(dx, 2.8, dy); vis.gouge.rotation.y = Math.atan2(dy, -dx); vis.gouge.scale.set(len, 1, MaceBlast.GOUGE_WIDTH);
+      vis.uniforms.uGougeLen.value = len;
+    }
+    paint(vis, sec, nowMs) { super.paint(vis, sec, nowMs); var u = vis.uniforms, C = MaceBlast;
+      u.uGougeReach.value = Math.min(1, sec / 0.05);
+      u.uGougeFade.value = MathKit.clamp((C.LIFE_SEC - sec) / (C.LIFE_SEC * 0.6), 0, 1);
+    }
+  }
+  class ImpactBlastView {
+    static SHARED = null;
+    static BOLT_WIDTH = 230;
+    static BOLT_HEIGHT = 480;
+    static shared() {
+      if (ImpactBlastView.SHARED) return ImpactBlastView.SHARED;
+      var flat = new THREE.PlaneGeometry(2, 2); flat.rotateX(-Math.PI / 2);
+      var bolt = new THREE.PlaneGeometry(1, 1); bolt.translate(0, 0.5, 0);
+      var strip = new THREE.PlaneGeometry(1, 1); strip.rotateX(-Math.PI / 2); strip.translate(0.5, 0, 0);
+      return ImpactBlastView.SHARED = { flat: flat, bolt: bolt, strip: strip };
+    }
+    constructor(services) { this.services = services; this.free = []; }
+    buildVis() { var S = BlastShaders, G = ImpactBlastView.shared(), group = new THREE.Group();
+      var number = function (v) { return { value: v }; }, color = function (hex) { return { value: new THREE.Color(hex) }; };
+      var u = { uTex: number(WaterNoise.texture()), uPixelScale: number(400), uR: number(100), uAge: number(0), uSeed: number(0), uFront: number(0), uBand: number(0), uFlash: number(0), uChar: number(0), uCrack: number(0), uEdge: number(0),
+                uSpread: number(0), uPuffLife: number(1), uPuffSize: number(1), uLift: number(0), uChipSpeed: number(0), uPower: number(0), uGrow: number(1), uFlicker: number(0), uGougeLen: number(1), uGougeReach: number(1), uGougeFade: number(0),
+                uHot: color(0xFFFFFF), uMid: color(0xFFFFFF), uScorch: color(0), uTeam: color(0xFFFFFF), uFireHot: color(0xFFFFFF), uFire: color(0xFFFFFF), uSmoke: color(0), uChip: color(0), uEmber: color(0xFFFFFF), uGlow: color(0x6FC4FF), uCore: color(0xFFFFFF) };
+      var ground = new THREE.Mesh(G.flat, WaterNoise.softMaterial(u, S.GROUND_VERTEX, S.GROUND_FRAGMENT));
+      ground.position.y = 2.6; ground.renderOrder = 3; ground.frustumCulled = false;
+      var gouge = new THREE.Mesh(G.strip, WaterNoise.softMaterial(u, S.GOUGE_VERTEX, S.GOUGE_FRAGMENT));
+      gouge.renderOrder = 3; gouge.frustumCulled = false;
+      var boltMat = WaterNoise.softMaterial(u, S.BOLT_VERTEX, S.BOLT_FRAGMENT, THREE.DoubleSide); boltMat.blending = THREE.AdditiveBlending;
+      var bolt = new THREE.Mesh(G.bolt, boltMat);
+      bolt.scale.set(ImpactBlastView.BOLT_WIDTH, ImpactBlastView.BOLT_HEIGHT, 1); bolt.renderOrder = 10; bolt.frustumCulled = false;
+      var puffs = SeededPoints.parts(u, S.PUFF_VERTEX, S.PUFF_FRAGMENT, SeededPoints.geometry(MeteorBlast.PUFFS, 83), 8);
+      var chips = SeededPoints.parts(u, S.CHIP_VERTEX, S.CHIP_FRAGMENT, SeededPoints.geometry(MeteorBlast.CHIPS, 101), 9);
+      [ground, gouge, puffs, chips, bolt].forEach(function (part) { group.add(part); });
+      return { group: group, uniforms: u, puffs: puffs, chips: chips, bolt: bolt, gouge: gouge };
+    }
+    warmSample() { var vis = this.buildVis(), blast = new ThunderBlast(0, 0, 60, "blue", 0); blast.dress(vis, false); blast.paint(vis, 0.1, 0); vis.gouge.visible = true; return vis.group; }
+    prefill(count) { while (this.free.length < count) this.free.push(this.buildVis()); }
+    spareRoots() { return this.free.map(function (vis) { vis.group.position.set(ShaderWarmup.PROBE_SPOT, 0, ShaderWarmup.PROBE_SPOT); return vis.group; }); }
+    add(blast) { this.services.field.impactBlasts.push(blast); return blast; }
+    meteor(e) { return this.add(new MeteorBlast(e.x, e.y, e.r, e.team, e.createdAt + e.delay)); }
+    thunder(d) { return this.add(new ThunderBlast(d.x, d.y, d.radius + ArenaSize.BODY_R, d.team, d.createdAt)); }
+    mace(d) { return this.add(new MaceBlast(this.services, d)); }
+    drop(blast) { if (!blast.vis) return; this.services.stage.scene.remove(blast.vis.group); this.free.push(blast.vis); blast.vis = null; }
+    step(t) { var view = this, scale = this.services.clock.scale;
+      this.services.field.impactBlasts = this.services.field.impactBlasts.filter(function (blast) {
+        if (t < blast.at + blast.constructor.LIFE_SEC * 1000 * scale) return true;
+        view.drop(blast);
+        return false;
+      });
+    }
+    render(t, nowMs) { var view = this, services = this.services, lite = services.cameraRig.pix < Environment.PIX_START, pixelScale = WaterNoise.pixelScale(services);
+      services.field.impactBlasts.forEach(function (blast) {
+        var sec = Math.max(0, t - blast.at) / services.clock.scale / 1000;
+        if (!blast.vis) { blast.vis = view.free.pop() || view.buildVis(); blast.dress(blast.vis, lite); services.stage.scene.add(blast.vis.group); }
+        blast.vis.uniforms.uPixelScale.value = pixelScale;
+        blast.paint(blast.vis, sec, nowMs);
       });
     }
   }
@@ -10277,10 +10695,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     static MIN_BATCH = 8;
     static SEG_POSE = { matrix: new THREE.Matrix4(), dir: new THREE.Vector3(), turn: new THREE.Quaternion(), scale: new THREE.Vector3() };
     constructor(services) { this.services = services; this.freeBatches = {}; }
-    thunder(x, y) { var services = this.services;
-      if (services.cameraRig.pix < Environment.PIX_START) return;
-      services.match.fx.push({ k: "bolt", x: x, y: y, t: Date.now(), life: 380 });
-    }
     bloodBolt(x, y) { var services = this.services; services.match.fx.push({ k: "bolt", x: x, y: y, t: Date.now(), life: 360, glow: 0xE0101E, core: 0xFFC2C2, flash: 50 }); }
     openBatch(g, layers, capacity) { var services = this.services, bolt = this;
       var bucket = Math.max(BoltFx.MIN_BATCH, Math.pow(2, Math.ceil(Math.log2(capacity))));
@@ -10736,13 +11150,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       });
       Object.keys(services.effectView.melees || {}).forEach(function (k) { if (!services.match.melee[k]) services.effectView.dropMelee(k); });
 
-      services.field.bursts.forEach(function (b) {
-        if (!b.vis) b.vis = services.effectView.makeBurstVis(b.e);
-        var k = MathKit.clamp((t - b.e.createdAt) / b.e.delay, 0, 1);
-        b.vis.userData.fill.scale.setScalar(Math.max(0.01, k) * b.e.r);
-        b.vis.userData.edge.material.opacity = 0.55 + 0.4 * Math.sin(nowMs / 60);
-        services.effectView.placeMeteor(b.vis, k, nowMs);
-      });
+      services.field.bursts.forEach(function (b) { services.meteorFall.render(b, t, nowMs); });
       services.field.renderLingering(t, nowMs, dt);
       services.fighterAuras.renderClericRange();
       services.revGraceView.renderGraces(t, nowMs);
@@ -11528,7 +11936,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class PerfProbe {
-    static BUILD = "lag8";
+    static BUILD = "lag9";
     static PATH = "perfDiag/teambattle/";
     static RTT_KEEP = 50;
     static RECORDS = !Environment.SILENT_RUN;
@@ -11862,7 +12270,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         function () { return services.effectView.makeMeleeVis({ x: P, y: P, angle: 0, len: 120, width: 40, owner: "", u: 1 }); },
         function () { var g = services.effectView.makeStabVis({}); g.visible = true; return g; },
         function () { return services.effectView.makeLungeVis({ x: P, y: P, angle: 0, len: 120, width: 40 }); },
-        function () { return services.effectView.makeBurstVis(e); },
+        function () { return services.meteorFall.warmSample(); },
+        function () { return services.impactBlasts.warmSample(); },
         function () { return services.poolView.makePoolVis(e); },
         function () { return services.poolView.makeHoleVis(e); },
         function () { return services.poolView.makeBottleVis(); },
@@ -11872,7 +12281,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         function () { return services.revGraceView.makeSkyBeam(EffectView.REV_FOE_COLOR, true); },
         function () { return services.stormView.makeStormVis(e); },
         function () { return services.gargantua.make(Object.assign({}, e, { ga: true })); },
-        function () { return services.galeView.make(e); },
+        function () { return services.galeView.warmSample(); },
         function () { return services.starfallView.make(e); },
         function () { return services.starfallView.make(Object.assign({}, e, { stun: true })); },
         function () { return services.hookView.warmSample(); },
@@ -11937,6 +12346,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     prefillPooledViews() { var services = this.services;
       if (!services.cameraRig.renderer || !services.models.kit.ready) return;
       var necros = this.castersByTeam("necro"), engineers = this.castersByTeam("engineer"), druids = this.castersByTeam("druid"), clerics = this.castersByTeam("cleric");
+      var mages = this.castersByTeam("mage"), smiths = this.castersByTeam("blacksmith"), giants = this.castersByTeam("giant"), giantCount = giants.blue + giants.red, mageCount = mages.blue + mages.red;
+      services.meteorFall.prefill(mageCount);
+      services.galeView.prefill(giantCount);
+      services.impactBlasts.prefill(mageCount + smiths.blue + smiths.red + giantCount * 2);
       if (clerics.blue + clerics.red) services.revGraceView.prefillBeams(RevGraceView.MAX_BEAMS);
       ["blue", "red"].forEach(function (team) {
         services.fighterView.prefillMinions(team, necros[team] * NecroType.ULT.smMax);
@@ -11945,7 +12358,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (services.models.kit.propsReady) services.groves.prefill(druids.blue + druids.red);
     }
     warmObjects() { var services = this.services;
-      return (this.kept || []).concat(services.fighterView.spareMinionRoots(), services.turrets.spareRoots(), services.groves.spare, services.revGraceView.spareBeamRoots());
+      return (this.kept || []).concat(services.fighterView.spareMinionRoots(), services.turrets.spareRoots(), services.groves.spare, services.revGraceView.spareBeamRoots(), services.meteorFall.spareRoots(), services.galeView.spareRoots(), services.impactBlasts.spareRoots());
     }
   }
   class FramePhaseMeter {
@@ -12049,6 +12462,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.hammerStrikes.step(t);
       services.marinaStreams.step(t);
       services.tsunamiView.step(t);
+      services.impactBlasts.step(t);
       services.bannerLedger.step(t);
       services.world.pruneLocal(t);
     }
@@ -12508,6 +12922,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.stormView = new StormView(services);
       services.gargantua = new GargantuaView(services);
       services.galeView = new GolemGaleView(services);
+      services.meteorFall = new MeteorFallView(services);
+      services.impactBlasts = new ImpactBlastView(services);
       services.starfallView = new StarfallView(services);
       services.aimGuide = new AimGuide(services);
       services.fxView = new FxView(services);

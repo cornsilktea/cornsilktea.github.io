@@ -7128,6 +7128,60 @@ class GiantTests {
       if (self.lost(W, "in") > ULT.gjTickDmg * Math.ceil(ULT.gjDur / tick)) bad.push("폭풍 틱이 너무 많음 " + self.lost(W, "in"));
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "틱마다 " + ULT.gjTickDmg + ", 밖 0, 따라다님");
     });
+    run(G, "거신 철퇴 그림: 넓은 원 대신 맞은 적 자리에만 작은 충격 그림이 나오고, 끝나면 그림을 재사용하는가", function (done) {
+      var bad = [], W = self.giantWorld([{ id: "n1", x: 700 }]), gi = W.ent("gi"), n1 = W.ent("n1");
+      self.jump(W, 0, 250);
+      W.step(ULT.gjTransformMs);
+      api.FIELD.gales.length = 0; api.FIELD.impactBlasts.length = 0;
+      n1.x = gi.x + 120; n1.y = gi.y; gi.cdUntil = 0; api.MATCH.melee = {};
+      api.fireBasic(gi, 0); W.frame(FRAME);
+      var blast = api.FIELD.impactBlasts[0];
+      if (api.FIELD.impactBlasts.length !== 1) bad.push("충격 그림 " + api.FIELD.impactBlasts.length + "개");
+      else if (Math.hypot(blast.x - n1.x, blast.y - n1.y) > 3) bad.push("맞은 적 자리가 아님");
+      else if (blast.r >= ULT.gjMaceRange / 2) bad.push("그림이 넓음 " + blast.r);
+      if (Object.keys(api.MATCH.melee).length) bad.push("예전 원 그림이 남음");
+      W.step(1500);
+      if (api.FIELD.impactBlasts.length) bad.push("그림이 끝나지 않음");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "철퇴 그림 반경 " + (blast && blast.r) + ", 맞은 적 자리");
+    });
+    run(G, "대장장이 내려찍기 그림: 착지점에 번개와 폭발 하나가 공격 범위만큼 나오고 판정은 그대로인가", function (done) {
+      var bad = [], y = self.kit.OPEN_Y.forest, W, bs, foe;
+      api.MATCH.stateByKey = {};
+      W = self.kit.world("forest", [{ id: "bs", team: "blue", char: "blacksmith", x: 200, y: y, gauge: api.GAUGE_MAX }, { id: "foe", team: "red", char: "guardian", x: 400 + ULT.bsR - 40, y: y }]);
+      bs = W.ent("bs"); foe = W.ent("foe");
+      api.FIELD.impactBlasts.length = 0; api.MATCH.melee = {};
+      api.useUlt(bs, 0, 200);
+      for (var ms = 0; ms < 3000 && !api.FIELD.impactBlasts.length; ms += FRAME) W.frame(FRAME);
+      var blast = api.FIELD.impactBlasts[0];
+      if (!blast) bad.push("폭발이 안 생김");
+      else {
+        if (Math.hypot(blast.x - bs.x, blast.y - bs.y) > 3) bad.push("착지점이 아님");
+        if (blast.r !== ULT.bsR + api.BODY_R) bad.push("반경 " + blast.r);
+        if (blast.constructor.name !== "ThunderBlast") bad.push("종류 " + blast.constructor.name);
+      }
+      if (Object.keys(api.MATCH.melee).length) bad.push("예전 원 그림이 남음");
+      if (foe.hp !== foe.maxHp - ULT.bsDmg) bad.push("범위 안 적 피해 " + (foe.maxHp - foe.hp));
+      W.step(1500);
+      if (api.FIELD.impactBlasts.length) bad.push("그림이 끝나지 않음");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "반경 " + (blast && blast.r) + ", 피해 " + ULT.bsDmg);
+    });
+    run(G, "화염술사 메테오 그림: " + ULT.mbDelay + "ms 뒤 떨어지는 순간 범위 폭발로 바뀌는가", function (done) {
+      var bad = [], y = self.kit.OPEN_Y.forest, W, mage;
+      api.MATCH.stateByKey = {};
+      W = self.kit.world("forest", [{ id: "mg", team: "blue", char: "mage", x: 200, y: y, gauge: api.GAUGE_MAX }, { id: "foe", team: "red", char: "guardian", x: 500, y: y }]);
+      mage = W.ent("mg");
+      api.FIELD.impactBlasts.length = 0;
+      api.useUlt(mage, 0, 300); W.frame(FRAME);
+      if (api.FIELD.bursts.length !== 1) bad.push("떨어지는 메테오 " + api.FIELD.bursts.length + "개");
+      if (api.FIELD.impactBlasts.length) bad.push("땅에 닿기 전에 폭발");
+      W.step(ULT.mbDelay + 100);
+      var blast = api.FIELD.impactBlasts[0];
+      if (api.FIELD.bursts.length) bad.push("메테오가 남음");
+      if (!blast || blast.r !== ULT.mbR) bad.push("폭발 반경 " + (blast && blast.r));
+      W.step(2000);
+      if (api.FIELD.impactBlasts.length) bad.push("폭발 그림이 끝나지 않음");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "낙하 뒤 반경 " + ULT.mbR + " 폭발");
+    });
     run(G, "거신 철퇴: 변신 중 기본 공격이 반경 " + ULT.gjMaceRange + " 안의 가장 가까운 적 1명에게만 " + ULT.gjMaceDmg + "의 피해를 주고 기절은 없는가", function (done) {
       var bad = [], W = self.giantWorld([{ id: "n1", x: 700 }, { id: "n2", x: 740, dy: 20 }, { id: "far", x: 760, dy: 60 }]), gi = W.ent("gi"), n1 = W.ent("n1"), n2 = W.ent("n2"), far = W.ent("far");
       self.jump(W, 0, 250);
