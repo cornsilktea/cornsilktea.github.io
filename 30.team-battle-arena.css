@@ -265,6 +265,7 @@
   #btnLeaveGame { position: absolute; top: 8px; right: 8px; height: 34px; padding: 0 12px; font-size: 14px; font-weight: 800; border-radius: 6px; border: 1px solid rgba(255,138,138,.6); background: rgba(14,20,17,.8); color: #FF9A9A; }
   #practiceBar { position: absolute; top: 8px; right: 8px; display: flex; gap: 6px; pointer-events: auto; }
   #practiceBar button { height: 34px; padding: 0 12px; font-size: 14px; font-weight: 800; border-radius: 6px; border: 1px solid rgba(255,255,255,.28); border-bottom: 2px solid #D97B4F; background: rgba(14,20,17,.82); color: #F4F1E8; white-space: nowrap; }
+  #btnPracGauge { touch-action: none; -webkit-tap-highlight-color: transparent; }
   #practiceBar #btnPracExit { border-color: rgba(255,138,138,.6); color: #FF9A9A; }
   #scrGame.practice #hudMe { top: 48px; }
   #practiceInfo { position: absolute; top: 8px; left: 8px; width: 200px; max-height: calc(100% - 200px); overflow: hidden; padding: 6px 8px; border-radius: 8px; pointer-events: none;

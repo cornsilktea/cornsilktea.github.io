@@ -26,7 +26,7 @@
   "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
 } }
 </script>
-<link rel="stylesheet" href="30.team-battle-arena.css?v=20261105d">
+<link rel="stylesheet" href="30.team-battle-arena.css?v=20261105e">
 </head>
 <body>
 <canvas id="cv"></canvas>
@@ -2759,11 +2759,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     projectileMesh(g, d) { var services = this.services;
       var big = d.isSkill ? SniperType.ULT.pnScale : 1, boltCol = d.isSkill ? 0xFFB347 : Palette.C_FX[d.team];
       if (services.models.kit.weapons.arrow_crossbow) {
-        var bolt = services.models.kit.weapons.arrow_crossbow.clone(); bolt.rotation.y = Math.PI / 2; bolt.scale.setScalar(34 * big); g.add(bolt);
+        var bolt = services.models.kit.weapons.arrow_crossbow.clone(); bolt.rotation.y = Math.PI / 2; bolt.scale.setScalar((d.isSkill ? 34 : 46) * big); g.add(bolt);
       } else {
         var boltShaft = new THREE.Mesh(services.geo.shaft, services.models.basicMat("shaft", 0xEADFC4, 1)); boltShaft.scale.setScalar(big); g.add(boltShaft);
       }
-      g.add(SniperShotShaders.tailMesh(boltCol, d.isSkill ? 300 : 160, d.isSkill ? 40 : 12));
+      g.add(SniperShotShaders.tailMesh(boltCol, d.isSkill ? 300 : 240, d.isSkill ? 40 : 22));
     }
     onShotLaunched(p) { this.services.sniperShots.launched(p); }
     onShotHitShown(d, T) { var services = this.services; services.sniperShots.hit(d, T.x, T.y, services.projectiles.damageBonusSum(d, T) > 0); }
@@ -3152,6 +3152,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     };
     static STATS = { name: "수문장", role: "fighter", icon: "🏰", hp: 460, speed: GameTime.gameSpeed(150), cd: GameTime.gameMs(1.5), dmg: 25, range: 140, arc: Math.PI * 130 / 180,
                 fx: { slowMs: GameTime.gameMs(1.5), slowMul: 0.7 }, ultName: "창벽" };
+    static SWING_CLIP = "Melee_2H_Attack_Spinning";
+    static SWING_MS = 400;
     botUltRange() { return GuardianType.ULT.gdR; }
     drawsOwnStrike(d) { return !!d.slam; }
     onStrikeShown(d) { if (d.slam) this.services.impactBlasts.guardianWall(d); }
@@ -3170,7 +3172,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return "기본 공격에 맞은 적은 " + services.skilltext.secs(c.fx.slowMs) + "간 " + services.skilltext.slowPct(c.fx.slowMul);
     }
     attackClip(v, E, t) {
-      return E.ultUntil > E.atkAt ? ["Melee_1H_Attack_Chop", 1.4] : ["Melee_1H_Attack_Slice_Horizontal", 1.5];
+      return E.ultUntil > E.atkAt ? [GuardianType.SWING_CLIP, this.services.models.kit.clips[GuardianType.SWING_CLIP].duration * 1000 / GuardianType.SWING_MS] : ["Melee_1H_Attack_Slice_Horizontal", 1.5];
     }
   }
   class FrostType extends MagicShooterType {
@@ -10300,10 +10302,25 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         gl_FragColor = vec4((uGlow * glow + uCore * core) * fade * uPower, 1.0);
         #include <colorspace_fragment>
       }`;
-    static SPEAR_VERTEX = `
-      attribute vec3 aBase; attribute float aShade; uniform float uR; uniform float uSpearRise; varying float vY; varying float vShade;
+    static SWEEP_FRAGMENT = `
+      uniform sampler2D uTex; uniform float uSweep; uniform float uSweepStart; uniform float uSweepDir; uniform float uSweepFade; uniform float uSeed; uniform vec3 uHot; uniform vec3 uMid; uniform vec3 uTeam; varying vec2 vP;
       void main() {
-        float rise = clamp(uSpearRise * 1.5 - aBase.z * 0.5, 0.0, 1.0), tall = (36.0 + 28.0 * aBase.z) * rise, out_ = uR + 0.22 * tall * position.y;
+        float r = length(vP);
+        if (r > 1.0 || r < 0.18) discard;
+        float around = fract((atan(vP.y, vP.x) / 6.2832 - uSweepStart) * uSweepDir), behind = uSweep - around;
+        if (behind < 0.0) discard;
+        float trail = max(0.0, 1.0 - behind / 0.5), band = smoothstep(0.3, 0.62, r);
+        float grain = texture2D(uTex, vec2(r * 2.6 + uSeed, around * 3.0)).b;
+        float blade = smoothstep(0.035, 0.0, behind) * band;
+        vec3 color = mix(mix(uTeam, uMid, trail), uHot, max(blade, trail * trail * trail));
+        gl_FragColor = vec4(color, max(trail * trail * band * (0.45 + 0.55 * smoothstep(0.35, 0.7, grain)) * 0.75, blade) * uSweepFade);
+        #include <colorspace_fragment>
+      }`;
+    static SPEAR_VERTEX = `
+      attribute vec3 aBase; attribute float aShade; uniform float uR; uniform float uSpearRise; uniform float uSweep; uniform float uSweepStart; uniform float uSweepDir; varying float vY; varying float vShade;
+      void main() {
+        float around = fract((atan(aBase.y, aBase.x) / 6.2832 - uSweepStart) * uSweepDir);
+        float rise = smoothstep(0.0, 0.1, uSweep - around) * uSpearRise, tall = (36.0 + 28.0 * aBase.z) * rise, out_ = uR + 0.22 * tall * position.y;
         vec3 p = vec3(aBase.x * out_ + position.x * rise, tall * position.y, aBase.y * out_ + position.z * rise);
         gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
         vY = position.y; vShade = aShade;
@@ -10356,7 +10373,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       vis.puffs.geometry.setDrawRange(0, lite ? Math.ceil(C.PUFFS / 2) : C.PUFFS);
       vis.chips.geometry.setDrawRange(0, C.CHIPS);
       vis.chips.visible = !lite;
-      vis.bolt.visible = vis.gouge.visible = vis.spears.visible = false;
+      vis.bolt.visible = vis.gouge.visible = vis.spears.visible = vis.sweep.visible = false;
     }
     paint(vis, sec, nowMs) { var C = this.constructor, u = vis.uniforms, f = Math.min(1, sec / C.FRONT_SEC), life = C.LIFE_SEC;
       u.uAge.value = sec;
@@ -10433,7 +10450,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class GuardianWallBlast extends ImpactBlast {
-    static LIFE_SEC = 0.9;
+    static LIFE_SEC = 0.85;
     static FRONT_SEC = 0.14;
     static SPREAD = 0.05;
     static PUFF_LIFE = 0.5;
@@ -10445,11 +10462,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     static EDGE = 1;
     static RIM_START = 0.955;
     static PUFF_INNER = 0.78;
-    static SPEARS = 40;
-    static SPEAR_HALF = 6;
-    static RISE_SEC = 0.09;
+    static SPEARS = 12;
+    static SPEAR_HALF = 7;
+    static SWEEP_SEC = 0.5;
+    static SWEEP_LEAD_TURN = 0.05;
     static FADE_SEC = 0.3;
-    static SCORCH_DIM = 0.32;
     static TONES = { hot: 0xF2FFF6, mid: 0x8FD9A8, scorch: 0x1E3A2A, fireHot: 0xF4FFF8, fire: 0xA9C8B2, smoke: 0x6E7A70, chip: 0x6C746C, ember: 0xBDEFCC };
     static spearGeometry() { var C = GuardianWallBlast, w = C.SPEAR_HALF, corners = [[w, 0], [0, w], [-w, 0], [0, -w]], shades = [1, 0.72, 0.5, 0.8], pos = [], base = [], shade = [];
       for (var i = 0; i < C.SPEARS; i++) {
@@ -10466,11 +10483,17 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       g.setAttribute("aShade", new THREE.Float32BufferAttribute(shade, 1));
       return g;
     }
-    dress(vis, lite) { super.dress(vis, lite); vis.spears.visible = true; }
+    constructor(x, y, r, team, at, angle) { super(x, y, r, team, at); this.angle = angle; }
+    dress(vis, lite) { super.dress(vis, lite); var u = vis.uniforms;
+      vis.spears.visible = vis.sweep.visible = true;
+      u.uSweepStart.value = this.angle / (Math.PI * 2) + GuardianWallBlast.SWEEP_LEAD_TURN;
+    }
     paint(vis, sec, nowMs) { super.paint(vis, sec, nowMs); var u = vis.uniforms, C = GuardianWallBlast, closing = MathKit.clamp((C.LIFE_SEC - sec) / C.FADE_SEC, 0, 1);
-      u.uChar.value *= C.SCORCH_DIM;
+      u.uChar.value = u.uCrack.value = u.uBand.value = u.uFlash.value = 0;
       u.uEdge.value = C.EDGE * closing;
-      u.uSpearRise.value = Math.min(Math.min(1, sec / C.RISE_SEC), closing);
+      u.uSweep.value = sec / C.SWEEP_SEC;
+      u.uSweepFade.value = closing;
+      u.uSpearRise.value = closing;
     }
   }
   class ImpactBlastView {
@@ -10487,7 +10510,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     constructor(services) { this.services = services; this.free = []; }
     buildVis() { var S = BlastShaders, G = ImpactBlastView.shared(), group = new THREE.Group();
       var number = function (v) { return { value: v }; }, color = function (hex) { return { value: new THREE.Color(hex) }; };
-      var u = { uTex: number(WaterNoise.texture()), uPixelScale: number(400), uR: number(100), uAge: number(0), uSeed: number(0), uFront: number(0), uBand: number(0), uFlash: number(0), uChar: number(0), uCrack: number(0), uEdge: number(0), uRimStart: number(ImpactBlast.RIM_START), uInner: number(0), uSpearRise: number(1),
+      var u = { uTex: number(WaterNoise.texture()), uPixelScale: number(400), uR: number(100), uAge: number(0), uSeed: number(0), uFront: number(0), uBand: number(0), uFlash: number(0), uChar: number(0), uCrack: number(0), uEdge: number(0), uRimStart: number(ImpactBlast.RIM_START), uInner: number(0), uSpearRise: number(1), uSweep: number(0.5), uSweepStart: number(0), uSweepDir: number(1), uSweepFade: number(1),
                 uSpread: number(0), uPuffLife: number(1), uPuffSize: number(1), uLift: number(0), uChipSpeed: number(0), uPower: number(0), uGrow: number(1), uFlicker: number(0), uGougeLen: number(1), uGougeReach: number(1), uGougeFade: number(0),
                 uHot: color(0xFFFFFF), uMid: color(0xFFFFFF), uScorch: color(0), uTeam: color(0xFFFFFF), uFireHot: color(0xFFFFFF), uFire: color(0xFFFFFF), uSmoke: color(0), uChip: color(0), uEmber: color(0xFFFFFF), uGlow: color(0x6FC4FF), uCore: color(0xFFFFFF) };
       var ground = new THREE.Mesh(G.flat, WaterNoise.softMaterial(u, S.GROUND_VERTEX, S.GROUND_FRAGMENT));
@@ -10501,17 +10524,19 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var chips = SeededPoints.parts(u, S.CHIP_VERTEX, S.CHIP_FRAGMENT, SeededPoints.geometry(MeteorBlast.CHIPS, 101), 9);
       var spears = new THREE.Mesh(G.spears, WaterNoise.softMaterial(u, S.SPEAR_VERTEX, S.SPEAR_FRAGMENT));
       spears.renderOrder = 7; spears.frustumCulled = false;
-      [ground, gouge, puffs, chips, bolt, spears].forEach(function (part) { group.add(part); });
-      return { group: group, uniforms: u, puffs: puffs, chips: chips, bolt: bolt, gouge: gouge, spears: spears };
+      var sweep = new THREE.Mesh(G.flat, WaterNoise.softMaterial(u, S.GROUND_VERTEX, S.SWEEP_FRAGMENT));
+      sweep.position.y = 3; sweep.renderOrder = 4; sweep.frustumCulled = false;
+      [ground, gouge, puffs, chips, bolt, spears, sweep].forEach(function (part) { group.add(part); });
+      return { group: group, uniforms: u, puffs: puffs, chips: chips, bolt: bolt, gouge: gouge, spears: spears, sweep: sweep };
     }
-    warmSample() { var vis = this.buildVis(), blast = new ThunderBlast(0, 0, 60, "blue", 0); blast.dress(vis, false); blast.paint(vis, 0.1, 0); vis.gouge.visible = vis.spears.visible = true; return vis.group; }
+    warmSample() { var vis = this.buildVis(), blast = new ThunderBlast(0, 0, 60, "blue", 0); blast.dress(vis, false); blast.paint(vis, 0.1, 0); vis.gouge.visible = vis.spears.visible = vis.sweep.visible = true; return vis.group; }
     prefill(count) { while (this.free.length < count) this.free.push(this.buildVis()); }
     spareRoots() { return this.free.map(function (vis) { vis.group.position.set(ShaderWarmup.PROBE_SPOT, 0, ShaderWarmup.PROBE_SPOT); return vis.group; }); }
     add(blast) { this.services.field.impactBlasts.push(blast); return blast; }
     meteor(e) { return this.add(new MeteorBlast(e.x, e.y, e.r, e.team, e.createdAt + e.delay)); }
     thunder(d) { return this.add(new ThunderBlast(d.x, d.y, d.radius + ArenaSize.BODY_R, d.team, d.createdAt)); }
     mace(d) { return this.add(new MaceBlast(this.services, d)); }
-    guardianWall(d) { return this.add(new GuardianWallBlast(d.x, d.y, d.radius + ArenaSize.BODY_R, d.team, d.createdAt)); }
+    guardianWall(d) { return this.add(new GuardianWallBlast(d.x, d.y, d.radius + ArenaSize.BODY_R, d.team, d.createdAt, d.angle)); }
     drop(blast) { if (!blast.vis) return; this.services.stage.scene.remove(blast.vis.group); this.free.push(blast.vis); blast.vis = null; }
     step(t) { var view = this, scale = this.services.clock.scale;
       this.services.field.impactBlasts = this.services.field.impactBlasts.filter(function (blast) {
@@ -10763,14 +10788,15 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   class SniperLane extends ShaderMark {
     static WIDTH = 44;
+    static BASIC_WIDTH = 18;
     static FADE_SEC = 0.4;
     constructor(p, scale) { super(p.d.createdAt); this.p = p; this.endSec = p.life / scale / 1000; this.stopped = false; }
     get partName() { return "lane"; }
     get lifeSec() { return this.endSec + SniperLane.FADE_SEC; }
     place(vis) { var p = this.p, u = vis.uniforms, T = SniperShotShaders.TONES;
       vis.group.position.set(p.d.x, 3, p.d.y); vis.group.rotation.y = -Math.atan2(p.dy, p.dx);
-      vis.lane.scale.set(p.dist, 1, SniperLane.WIDTH); u.uLen.value = p.dist;
-      u.uDeep.value.set(T.deep); u.uBlade.value.set(T.blade); u.uCore.value.set(T.core);
+      vis.lane.scale.set(p.dist, 1, p.d.isSkill ? SniperLane.WIDTH : SniperLane.BASIC_WIDTH); u.uLen.value = p.dist;
+      u.uDeep.value.set(p.d.isSkill ? T.deep : Palette.C_FX[p.d.team]); u.uBlade.value.set(p.d.isSkill ? T.blade : Palette.C_FX[p.d.team]); u.uCore.value.set(T.core);
       this.travelSec = this.endSec;
     }
     paint(vis, sec) {
@@ -10804,7 +10830,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     flash(x, y, angle, spec, hex, at) { return this.add(new SniperFlash(x, y, angle, spec.size, hex, spec.sec, at)); }
     launched(p) { var services = this.services, d = p.d, angle = Math.atan2(p.dy, p.dx), skill = d.isSkill, spec = skill ? SniperShotView.MUZZLE_SKILL : SniperShotView.MUZZLE;
       this.flash(d.x, d.y, angle, spec, skill ? SniperShotShaders.TONES.blade : Palette.C_FX[d.team], d.createdAt);
-      if (skill) this.add(new SniperLane(p, services.clock.scale));
+      this.add(new SniperLane(p, services.clock.scale));
     }
     hit(d, x, y, far) { var services = this.services, now = services.clock.now(), angle = Math.atan2(d.vy, d.vx), spec = far || d.isSkill ? SniperShotView.HIT_FAR : SniperShotView.HIT;
       this.flash(x, y, angle, spec, d.isSkill ? SniperShotShaders.TONES.blade : far ? SniperShotShaders.TONES.far : Palette.C_FX[d.team], now);
@@ -12313,7 +12339,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class PerfProbe {
-    static BUILD = "lag11";
+    static BUILD = "lag12";
     static PATH = "perfDiag/teambattle/";
     static RTT_KEEP = 50;
     static RECORDS = !Environment.SILENT_RUN;
@@ -12746,7 +12772,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var hitmen = this.castersByTeam("hitman"), hitmanCount = hitmen.blue + hitmen.red;
       var snipers = this.castersByTeam("sniper"), sniperCount = snipers.blue + snipers.red, guardians = this.castersByTeam("guardian"), guardianCount = guardians.blue + guardians.red;
       services.hitmanSlashView.prefill(hitmanCount * 3);
-      services.sniperShots.prefill(sniperCount * 3);
+      services.sniperShots.prefill(sniperCount * 4);
       services.meteorFall.prefill(mageCount);
       services.galeView.prefill(giantCount);
       services.impactBlasts.prefill(mageCount + smiths.blue + smiths.red + giantCount * 2 + hitmanCount + sniperCount + guardianCount);
@@ -13466,6 +13492,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     bind() { var services = this.services;
     Dom.$("btnPracChar").onclick = function () { services.practice.openPracticeChars(); };
     Dom.$("btnPracGauge").onclick = function () { services.practice.fillPracticeGauge(); };
+    Dom.$("btnPracGauge").addEventListener("touchstart", function (e) { if (e.cancelable) e.preventDefault(); services.practice.fillPracticeGauge(); }, { passive: false });
     Dom.$("btnPracExit").onclick = function () { services.practice.leavePractice(); };
     Dom.$("btnPcClose").onclick = function () { Dom.show(Dom.$("pcModal"), false); };
     Dom.$("pcModal").addEventListener("click", function (e) { if (e.target === Dom.$("pcModal")) Dom.show(Dom.$("pcModal"), false); });

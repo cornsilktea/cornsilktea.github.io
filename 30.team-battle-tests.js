@@ -7201,7 +7201,7 @@ class GiantTests {
       if (api.FIELD.hitmanSlashes.length) bad.push("그림이 끝나지 않음");
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "돌진·회전베기 그림과 피해 " + (H.dashDmg + H.dmg));
     });
-    run(G, "수문장 창벽 그림: 판정 반경 끝에 창벽 폭발이 나오고, 기본 공격은 예전 부채꼴을 유지하며 피해가 그대로인가", function (done) {
+    run(G, "수문장 창벽 그림: 판정 반경으로 창을 휘두르는 그림이 나오고, 기본 공격은 예전 부채꼴을 유지하며 피해가 그대로인가", function (done) {
       var bad = [], y = self.kit.OPEN_Y.forest, W, gd, foe;
       api.MATCH.stateByKey = {};
       W = self.kit.world("forest", [{ id: "gd", team: "blue", char: "guardian", x: 300, y: y, gauge: api.GAUGE_MAX }, { id: "foe", team: "red", char: "guardian", x: 400, y: y }]);
@@ -7225,14 +7225,14 @@ class GiantTests {
       sn = W.ent("sn"); foe = W.ent("foe");
       api.FIELD.sniperMarks.length = 0; api.FIELD.impactBlasts.length = 0;
       api.fireBasic(sn, 0); W.frame(FRAME);
-      if (api.FIELD.sniperMarks.length !== 1) bad.push("기본 공격 총구 빛 " + api.FIELD.sniperMarks.length);
+      if (api.FIELD.sniperMarks.length !== 2) bad.push("기본 공격 총구 빛·궤적 " + api.FIELD.sniperMarks.length);
       W.step(450);
       if (foe.hp !== foe.maxHp - C.dmg) bad.push("기본 공격 피해 " + (foe.maxHp - foe.hp));
       W.step(1500);
       if (api.FIELD.sniperMarks.length) bad.push("기본 공격 그림이 끝나지 않음");
       var before = foe.hp;
       api.useUlt(sn, 0); W.frame(FRAME);
-      var lane = api.FIELD.sniperMarks.filter(function (m) { return m.p; })[0];
+      var lane = api.FIELD.sniperMarks.filter(function (m) { return m.p && m.p.d.isSkill; })[0];
       if (!lane) bad.push("스킬 궤적이 안 생김");
       W.step(500);
       if (before - foe.hp !== ULT.pnDmg) bad.push("스킬 피해 " + (before - foe.hp));
@@ -7248,6 +7248,7 @@ class GiantTests {
       if (getComputedStyle(ult, "::after").content !== "none") bad.push("빛 층이 남음");
       if ((getComputedStyle(top).backdropFilter || "none") !== "none") bad.push("위쪽 HUD 배경 흐림");
       if (ult.firstChild.className !== "fill" || atk.firstChild.className !== "cd") bad.push("게이지 칸 위치");
+      if (getComputedStyle(document.getElementById("btnPracGauge")).touchAction !== "none") bad.push("게이지 채우기 버튼 터치 처리");
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "버튼·위쪽 HUD 모두 가벼운 층만 사용");
     });
     run(G, "화염술사 메테오 그림: " + ULT.mbDelay + "ms 뒤 떨어지는 순간 범위 폭발로 바뀌는가", function (done) {
