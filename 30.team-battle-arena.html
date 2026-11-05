@@ -10238,18 +10238,24 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     static OVERLAY_FORCED = (function () { var m = /[?&]ov=([0-9.]+)/.exec(location.search); return m ? Math.min(3, Math.max(0.5, parseFloat(m[1]))) : 0; })();
     static OVERLAY_START = CameraRig.OVERLAY_FORCED || (Environment.TOUCH ? 1.5 : 2);
     static OVERLAY_MIN = 1;
+    static OVERLAY_TOUCH_MAX_PIXELS = 700000;
+    static OVERLAY_TOUCH_FLOOR = 0.7;
     constructor(services) { this.services = services;
       this.tmpV = new THREE.Vector3();
       this.w = 0; this.h = 0; this.dpr = 1; this.pix = Environment.PIX_START; this.overlayCap = CameraRig.OVERLAY_START; this.renderer = null;
       this.view = { pitchPlay: 0.92, pitchSpec: 1.12, dist: 1400, look: new THREE.Vector3(ArenaSize.MW / 2, 0, ArenaSize.MH / 2), fitKey: "", snap: true, halfW: 0 };
     }
     resize() { var services = this.services;
-      services.cameraRig.dpr = Math.min(services.cameraRig.overlayCap, window.devicePixelRatio || 1);
       services.cameraRig.w = window.innerWidth; services.cameraRig.h = window.innerHeight;
+      services.cameraRig.dpr = Math.min(services.cameraRig.overlayCap, window.devicePixelRatio || 1, services.cameraRig.overlayAreaCap());
       Canvases.overlay.width = Math.round(services.cameraRig.w * services.cameraRig.dpr); Canvases.overlay.height = Math.round(services.cameraRig.h * services.cameraRig.dpr);
       if (services.cameraRig.renderer) { services.cameraRig.renderer.setPixelRatio(services.cameraRig.pix); services.cameraRig.renderer.setSize(services.cameraRig.w, services.cameraRig.h, false); }
       services.stage.camera.aspect = services.cameraRig.w / Math.max(1, services.cameraRig.h); services.stage.camera.updateProjectionMatrix();
       services.cameraRig.view.fitKey = "";
+    }
+    overlayAreaCap() { var rig = this.services.cameraRig;
+      if (!Environment.TOUCH || CameraRig.OVERLAY_FORCED) return Infinity;
+      return Math.max(CameraRig.OVERLAY_TOUCH_FLOOR, Math.sqrt(CameraRig.OVERLAY_TOUCH_MAX_PIXELS / Math.max(1, rig.w * rig.h)));
     }
     bindResize() { var services = this.services; window.addEventListener("resize", function () { services.cameraRig.resize(); }); }
     camBasis(fl) { return fl ? { fx: 0, fz: 1 } : { fx: 0, fz: -1 }; }
