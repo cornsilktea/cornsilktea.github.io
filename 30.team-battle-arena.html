@@ -26,7 +26,7 @@
   "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
 } }
 </script>
-<link rel="stylesheet" href="30.team-battle-arena.css?v=20261104j">
+<link rel="stylesheet" href="30.team-battle-arena.css?v=20261105a">
 </head>
 <body>
 <canvas id="cv"></canvas>
@@ -193,8 +193,8 @@
   <div id="specL" class="specPanel blue" hidden></div>
   <div id="specR" class="specPanel red" hidden></div>
   <div id="specCode" hidden></div>
-  <div id="btnUlt" class="actBtn"><div class="fill"></div><span>스킬</span></div>
-  <div id="btnAtk" class="actBtn"><div class="cd"></div><span>공격</span></div>
+  <div id="btnUlt" class="actBtn"><div class="meterClip"><div class="fill"></div></div><span>스킬</span></div>
+  <div id="btnAtk" class="actBtn"><div class="meterClip"><div class="cd"></div></div><span>공격</span></div>
   <div id="deadMsg" hidden></div>
   <div id="protBadge" hidden></div>
   <div id="countOv" hidden><div id="countNum">3</div></div>
@@ -396,6 +396,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     resultBoard;
     hud;
     hudBars;
+    overlaySprites;
     stage;
     geo;
     matlib;
@@ -2584,13 +2585,14 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     launchHandOf(model) { return model.getObjectByName("handslotl"); }
     earlyPose(E, t) { return E.ultUntil > t ? ["Ranged_Bow_Release", 4.5] : null; }
     get startsSkillTimer() { return false; }
+    cannotAttack(E, t) { return !!E.burst; }
     cast(E, ang, reach, t) { var services = this.services;
       E.angle = ang; E.burst = { until: t + (RangerType.ULT.mkCount - 1) * RangerType.ULT.mkGap };
       E.ultUntil = t + RangerType.ULT.mkCount * RangerType.ULT.mkGap + 200;
       services.projectiles.emitShots(E, ang, true);
     }
     ultDesc() {
-      return RangerType.ULT.mkDmg + "의 피해를 주는 화살 " + RangerType.ULT.mkCount + "발 연사. 적중마다 게이지 " + RangerType.ULT.mkRefund + " 회복";
+      return RangerType.ULT.mkDmg + "의 피해를 주는 화살 " + RangerType.ULT.mkCount + "발 연사. 적중마다 게이지 " + RangerType.ULT.mkRefund + " 회복, 연사 중 기본 공격 불가";
     }
     passiveDesc() { var services = this.services;
       var c = this.data;
@@ -5920,9 +5922,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     static MODEL_YAW = Math.PI / 2;
     static RISE_MS = 260;
     static TIMER_R = 36;
-    static MUZZLE_HEIGHT = 34;
+    static MUZZLE_HEIGHT = 39;
+    static MUZZLE_FORWARD = 24;
     static TARGET_HEIGHT = 34;
-    constructor(services) { this.services = services; this.rangeRing = null; }
+    constructor(services) { this.services = services; this.rangeRing = null; this.spare = { blue: [], red: [] }; }
     isOwnerLocal(owner) { var services = this.services;
       var A = services.targets.ent(owner);
       return !!A && (A === services.match.me || (services.session.isHost() && !!services.match.bots[owner]));
@@ -5953,14 +5956,18 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       });
       return best;
     }
+    muzzleToward(e, T) {
+      var dist = MathKit.hyp(T.x - e.x, T.y - e.y), reach = Math.min(TurretSystem.MUZZLE_FORWARD, dist), k = dist > 0 ? reach / dist : 0;
+      return { x: Math.round(e.x + (T.x - e.x) * k), y: Math.round(e.y + (T.y - e.y) * k) };
+    }
     fire(s, t) { var services = this.services;
       var e = s.e, T = services.turrets.pickTarget(s, t);
       if (!T) { s.nextShot = t + EngineerType.ULT.trScanMs; return; }
       s.shotN++;
       var heavy = s.shotN % EngineerType.ULT.trHeavyEvery === 0;
       s.nextShot = t + EngineerType.ULT.trCd;
-      var fly = Math.max(40, Math.round(MathKit.hyp(T.x - e.x, T.y - e.y) / EngineerType.ULT.trShellSpeed * 1000));
-      services.session.room.ref.child("effects").push({ type: "tshot", team: e.team, owner: e.owner, x: e.x, y: e.y, tx: Math.round(T.x), ty: Math.round(T.y), fly: fly, tgt: T.id, heavy: heavy ? 1 : 0,
+      var muzzle = services.turrets.muzzleToward(e, T), fly = Math.max(40, Math.round(MathKit.hyp(T.x - muzzle.x, T.y - muzzle.y) / EngineerType.ULT.trShellSpeed * 1000));
+      services.session.room.ref.child("effects").push({ type: "tshot", team: e.team, owner: e.owner, x: e.x, y: e.y, mx: muzzle.x, my: muzzle.y, tx: Math.round(T.x), ty: Math.round(T.y), fly: fly, tgt: T.id, heavy: heavy ? 1 : 0,
                                        dmg: heavy ? EngineerType.ULT.trHeavyDmg : EngineerType.ULT.trDmg, stun: heavy ? EngineerType.ULT.trStunMs : 0, createdAt: t });
     }
     step(t) { var services = this.services;
@@ -5988,9 +5995,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     makeShellVis(s) { var services = this.services;
       var e = s.e, g = new THREE.Group(), r = e.heavy ? 8 : 5;
+      g.userData.r = r;
       var core = new THREE.Mesh(services.geo.ball, services.models.glowMat(e.heavy ? "shell-heavy" : "shell-light", e.heavy ? 0xFF7A2A : 0xFFD866, 0.95)); core.scale.setScalar(r); g.add(core);
-      var tail = new THREE.Mesh(services.geo.trail, services.models.glowMat("trail-shell", 0xFFC46A, 0.4)); tail.position.x = -r * 2.4; tail.scale.set(r * 4, r * 0.5, r * 0.5); g.add(tail);
-      g.rotation.y = -Math.atan2(e.ty - e.y, e.tx - e.x);
+      var tail = new THREE.Mesh(services.geo.trail, services.models.glowMat("trail-shell", 0xFFC46A, 0.4)); tail.scale.set(0.01, r * 0.5, r * 0.5); g.add(tail); g.userData.tail = tail;
+      g.rotation.y = -Math.atan2(e.ty - e.my, e.tx - e.mx);
       services.stage.scene.add(g);
       return g;
     }
@@ -6002,7 +6010,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (!s.shown) return;
       var e = s.e, k = MathKit.clamp((t - e.createdAt) / e.fly, 0, 1);
       if (!s.vis) s.vis = services.turrets.makeShellVis(s);
-      s.vis.position.set(e.x + (e.tx - e.x) * k, TurretSystem.MUZZLE_HEIGHT + (TurretSystem.TARGET_HEIGHT - TurretSystem.MUZZLE_HEIGHT) * k, e.y + (e.ty - e.y) * k);
+      s.vis.position.set(e.mx + (e.tx - e.mx) * k, TurretSystem.MUZZLE_HEIGHT + (TurretSystem.TARGET_HEIGHT - TurretSystem.MUZZLE_HEIGHT) * k, e.my + (e.ty - e.my) * k);
+      var r = s.vis.userData.r, tailLen = Math.max(0.01, Math.min(r * 4, k * MathKit.hyp(e.tx - e.mx, e.ty - e.my)));
+      s.vis.userData.tail.scale.x = tailLen; s.vis.userData.tail.position.x = -r * 0.4 - tailLen / 2;
     }
     findTurret(e) { var services = this.services;
       for (var i = 0; i < services.field.turrets.length; i++) { var s = services.field.turrets[i]; if (s.e.owner === e.owner && s.e.x === e.x && s.e.y === e.y && !s.cut) return s; }
@@ -6012,36 +6022,49 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var t = services.clock.now();
       if (t - e.createdAt > 1500) return;
       var A = services.targets.ent(e.tgt) || services.minions.allMinions().filter(function (m) { return m.id === e.tgt; })[0], turret = services.turrets.findTurret(e);
+      if (e.mx == null) { e.mx = e.x; e.my = e.y; }
       if (A) {
-        if (turret) { turret.aim = Math.atan2(A.y - e.y, A.x - e.x); turret.kickAt = Date.now(); }
+        if (turret) { turret.aim = Math.atan2(e.ty - e.y, e.tx - e.x); turret.kickAt = Date.now(); if (turret.vis) turret.vis.userData.yaw = -turret.aim + TurretSystem.MODEL_YAW; }
         if (services.match.me && MathKit.hyp(e.x - services.match.me.x, e.y - services.match.me.y) < 700) services.sound.sfx(e.heavy ? "boom" : "shoot");
         var shown = !services.match.me || services.match.me.team === A.team || A.minion || services.vision.visibleTo(A, services.match.me, t);
         services.field.shells.push({ e: e, vis: null, shown: shown });
       }
     }
     ringGeo() { var services = this.services; return services.turrets.rangeRing || (services.turrets.rangeRing = new THREE.RingGeometry(0.985, 1, 72)); }
-    makeVis(s) { var services = this.services;
-      var e = s.e, g = new THREE.Group(), mats = [], model = new THREE.Group();
-      var rangeMat = new THREE.MeshBasicMaterial({ color: Palette.C_FX[e.team], transparent: true, opacity: 0.3, depthWrite: false });
-      var baseMat = new THREE.MeshBasicMaterial({ color: Palette.C_FX[e.team], transparent: true, opacity: 0.6, depthWrite: false });
-      mats.push(rangeMat, baseMat);
-      var rangeEdge = services.arenaView.flatMesh(services.turrets.ringGeo(), rangeMat); rangeEdge.scale.setScalar(e.r); rangeEdge.position.y = 1.4; g.add(rangeEdge);
+    buildVis(team) { var services = this.services;
+      var g = new THREE.Group(), model = new THREE.Group();
+      var rangeMat = new THREE.MeshBasicMaterial({ color: Palette.C_FX[team], transparent: true, opacity: 0.3, depthWrite: false });
+      var baseMat = new THREE.MeshBasicMaterial({ color: Palette.C_FX[team], transparent: true, opacity: 0.6, depthWrite: false });
+      var rangeEdge = services.arenaView.flatMesh(services.turrets.ringGeo(), rangeMat); rangeEdge.position.y = 1.4; g.add(rangeEdge);
       var base = services.arenaView.flatMesh(services.geo.ring, baseMat); base.position.y = 1.6; g.add(base);
-      var timer = new DurationRing(services, g, Palette.C_FX[e.team], TurretSystem.TIMER_R);
+      var timer = new DurationRing(services, g, Palette.C_FX[team], TurretSystem.TIMER_R);
       var tpl = services.models.kit.props.turret;
       if (tpl) {
         var box = services.props.propSize(tpl), k = TurretSystem.MODEL_HEIGHT / box.getSize(new THREE.Vector3()).y, body = tpl.clone();
         body.scale.setScalar(k); body.position.y = -box.min.y * k; model.add(body);
       }
       g.add(model);
+      g.userData = { model: model, rangeEdge: rangeEdge, rangeMat: rangeMat, baseMat: baseMat, timer: timer, yaw: 0, team: team };
+      return g;
+    }
+    prefill(team, count) {
+      for (var n = this.spare[team].length; n < count; n++) this.spare[team].push(this.buildVis(team));
+    }
+    spareRoots() { return this.spare.blue.concat(this.spare.red); }
+    makeVis(s) { var services = this.services;
+      var e = s.e, g = this.spare[e.team].pop() || this.buildVis(e.team);
+      g.userData.rangeEdge.scale.setScalar(e.r);
+      g.userData.yaw = 0;
       g.position.set(e.x, 0, e.y);
-      g.userData = { mats: mats, model: model, rangeMat: rangeMat, baseMat: baseMat, timer: timer, yaw: 0 };
       services.stage.scene.add(g);
       return g;
     }
     dropVis(s) { var services = this.services;
       if (!s.vis) return;
-      services.stage.scene.remove(s.vis); s.vis.userData.mats.forEach(function (m) { m.dispose(); }); s.vis.userData.timer.dispose(); s.vis = null;
+      services.stage.scene.remove(s.vis);
+      if (s.vis.userData.model.children.length) this.spare[s.vis.userData.team].push(s.vis);
+      else { s.vis.userData.rangeMat.dispose(); s.vis.userData.baseMat.dispose(); s.vis.userData.timer.dispose(); }
+      s.vis = null;
     }
     render(s, t, nowMs) { var services = this.services;
       var e = s.e;
@@ -6057,7 +6080,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   class GroveSystem {
     static TILES_PER_SIDE = 6;
     static ID_BASE = 100000;
-    constructor(services) { this.services = services; this.rangeRing = null; this.nextId = GroveSystem.ID_BASE; }
+    constructor(services) { this.services = services; this.rangeRing = null; this.nextId = GroveSystem.ID_BASE; this.spare = []; }
     isActive(s, t) { return !s.cut && t >= s.e.createdAt && t < s.e.createdAt + s.e.dur; }
     covers(s, x, y) { return Math.max(Math.abs(x - s.e.x), Math.abs(y - s.e.y)) <= s.e.r; }
     snapToTiles(spot) {
@@ -6090,29 +6113,39 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         return true;
       });
     }
-    makeVis(s) { var services = this.services;
-      var e = s.e, g = new THREE.Group(), mats = [], bushMats = [], hedge = new THREE.Group();
-      var tpl = services.models.kit.props.bushBig, seed = e.x * 7 + e.y * 13, side = GroveSystem.TILES_PER_SIDE;
+    bushLayout(tpl) {
+      var side = GroveSystem.TILES_PER_SIDE, list = [];
+      for (var i = 0; i < side * side; i++) {
+        var col = i % side, row = Math.floor(i / side), jitter = ((i * 0.37 + i * i * 0.13) % 1) - 0.5, size = ArenaSize.TILE * (1.35 + 0.15 * (jitter + 0.5));
+        list.push({ w: size, h: 60 + 12 * (jitter + 0.5), d: size, x: (col - (side - 1) / 2) * ArenaSize.TILE + jitter * 8, z: (row - (side - 1) / 2) * ArenaSize.TILE - jitter * 8, yaw: i * 2.1 });
+      }
+      return list;
+    }
+    buildVis() { var services = this.services;
+      var g = new THREE.Group(), hedge = new THREE.Group(), tpl = services.models.kit.props.bushBig, mat = null;
       if (tpl) {
-        for (var i = 0; i < side * side; i++) {
-          var col = i % side, row = Math.floor(i / side), jitter = ((seed + i * 0.37) % 1) - 0.5, size = ArenaSize.TILE * (1.35 + 0.15 * (jitter + 0.5));
-          var prop = services.props.fitProp(tpl, size, 60 + 12 * (jitter + 0.5), size, (col - (side - 1) / 2) * ArenaSize.TILE + jitter * 8, (row - (side - 1) / 2) * ArenaSize.TILE - jitter * 8, i * 2.1);
-          prop.traverse(function (o) {
-            if (!o.isMesh) return;
-            o.material = o.material.clone(); o.material.transparent = true; mats.push(o.material); bushMats.push(o.material);
-          });
-          hedge.add(prop);
-        }
+        mat = tpl.getObjectByProperty("isMesh", true).material.clone(); mat.transparent = true;
+        hedge.add(services.props.instancedProp(tpl, this.bushLayout(tpl), mat));
       }
       g.add(hedge);
-      g.position.set(e.x, 0, e.y);
-      g.userData = { mats: mats, bushMats: bushMats, hedge: hedge, fade: 1 };
+      g.userData = { bushMat: mat, hedge: hedge, fade: 1 };
+      return g;
+    }
+    prefill(count) {
+      for (var n = this.spare.length; n < count; n++) this.spare.push(this.buildVis());
+    }
+    makeVis(s) { var services = this.services;
+      var g = this.spare.pop() || this.buildVis();
+      g.userData.fade = 1;
+      g.position.set(s.e.x, 0, s.e.y);
       services.stage.scene.add(g);
       return g;
     }
     dropVis(s) { var services = this.services;
       if (!s.vis) return;
-      services.stage.scene.remove(s.vis); s.vis.userData.mats.forEach(function (m) { m.dispose(); }); s.vis = null;
+      services.stage.scene.remove(s.vis);
+      if (s.vis.userData.bushMat) this.spare.push(s.vis);
+      s.vis = null;
     }
     render(s, t, nowMs) { var services = this.services;
       var e = s.e;
@@ -6123,7 +6156,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         var E = services.targets.ent(id); return E && E.alive && services.groves.covers(s, E.x, E.y);
       });
       ud.fade += ((occupied ? 0.42 : 1) - ud.fade) * 0.2;
-      ud.bushMats.forEach(function (m) { m.opacity = ud.fade; });
+      if (ud.bushMat) ud.bushMat.opacity = ud.fade;
     }
   }
   class VineTrail {
@@ -6146,30 +6179,35 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       VineTrail.tinted.set(tpl, cached);
       return cached;
     }
+    static POSE = { matrix: new THREE.Matrix4(), blade: new THREE.Matrix4(), pos: new THREE.Vector3(), scale: new THREE.Vector3(), turn: new THREE.Quaternion(), euler: new THREE.Euler(0, 0, 0, "YXZ") };
     static build(services, g, rawTpl) {
-      var blades = [], tpl = rawTpl && VineTrail.tintedTemplate(rawTpl);
-      if (tpl) {
-        var box = services.props.propSize(tpl), k = VineTrail.HEIGHT / box.getSize(new THREE.Vector3()).y;
-        for (var i = 0; i < VineTrail.SEGMENTS; i++) {
-          var blade = tpl.clone(), holder = new THREE.Group();
-          var taper = 1.15 - i * 0.04;
-          blade.scale.set(k * taper * VineTrail.THICKNESS, k * taper, k * taper * VineTrail.THICKNESS); blade.position.y = -box.min.y * k * taper;
-          holder.add(blade);
-          holder.position.set(-6 - i * VineTrail.SPACING, -ModelTuning.PROJ_Y, ((i * 37) % 7 - 3) * 1.4);
-          holder.userData.yaw = i * 1.9;
-          g.add(holder); blades.push(holder);
-        }
-      } else {
+      var tpl = rawTpl && VineTrail.tintedTemplate(rawTpl);
+      if (!tpl) {
         var tail = new THREE.Mesh(services.geo.trail, services.models.glowMat("trail-thorn", 0x7FD14A, 0.4)); tail.position.x = -20; tail.scale.set(38, 2.6, 2.6); g.add(tail);
+        g.userData.vine = null;
+        return;
       }
-      g.userData.vine = blades;
+      var src = tpl.getObjectByProperty("isMesh", true), box = services.props.propSize(tpl), k = VineTrail.HEIGHT / box.getSize(new THREE.Vector3()).y, blades = [];
+      var mesh = new THREE.InstancedMesh(src.geometry, src.material, VineTrail.SEGMENTS);
+      mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage); mesh.frustumCulled = false;
+      for (var i = 0; i < VineTrail.SEGMENTS; i++) {
+        var taper = k * (1.15 - i * 0.04);
+        blades.push({ x: -6 - i * VineTrail.SPACING, z: ((i * 37) % 7 - 3) * 1.4, yaw: i * 1.9,
+                      fixed: new THREE.Matrix4().makeScale(taper * VineTrail.THICKNESS, taper, taper * VineTrail.THICKNESS).setPosition(0, -box.min.y * taper, 0) });
+      }
+      g.add(mesh);
+      g.userData.vine = { mesh: mesh, blades: blades };
     }
     static animate(g, travelled, nowMs) {
-      g.userData.vine.forEach(function (holder, i) {
+      var vine = g.userData.vine, P = VineTrail.POSE;
+      vine.blades.forEach(function (b, i) {
         var grow = MathKit.clamp((travelled - i * VineTrail.SPACING) / VineTrail.GROW_LEN, 0.02, 1);
-        holder.scale.set(1, grow, 1);
-        holder.rotation.set(Math.sin(nowMs / 110 + i) * 0.35, holder.userData.yaw, -0.55 + Math.sin(nowMs / 95 + i * 0.8) * 0.3, "YXZ");
+        P.euler.set(Math.sin(nowMs / 110 + i) * 0.35, b.yaw, -0.55 + Math.sin(nowMs / 95 + i * 0.8) * 0.3);
+        P.turn.setFromEuler(P.euler);
+        P.pos.set(b.x, -ModelTuning.PROJ_Y, b.z); P.scale.set(1, grow, 1);
+        vine.mesh.setMatrixAt(i, P.matrix.compose(P.pos, P.turn, P.scale).multiply(b.fixed));
       });
+      vine.mesh.instanceMatrix.needsUpdate = true;
     }
   }
   class DamageResolver {
@@ -7548,6 +7586,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
                          frostStacks: 0, frostStackAt: 0, lastStandUsed: false, rallyUsed: false, shield: !!services.charTypes.statsOf(c).respawnShield });
       E.maxHp = services.charTypes.statsOf(E.char).hp; E.hp = E.maxHp;
       services.practice.clearSkillsOf(old.id);
+      services.shaderWarmup.matchStarting();
       services.bannerAura.forget();
       services.match.me = E; services.match.lastHp[services.session.myId] = E.hp;
       services.input.aim.id = null;
@@ -8325,7 +8364,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     static CLERIC_BOOK_AHEAD = 30;
     static CLERIC_BOOK_RISE_MS = 350;
     static MINION_TIMER_R = 28;
-    constructor(services) { this.services = services; this.clericRange = null; this.fighters = {}; this.minions = {}; }
+    constructor(services) { this.services = services; this.clericRange = null; this.fighters = {}; this.minions = {}; this.spareMinions = { blue: [], red: [] }; }
     makeVis(E, parent) { var services = this.services;
       var root = new THREE.Group(), body = new THREE.Group();
       var v = { root: root, body: body, team: E.team, char: E.char, yaw: -E.angle, mats: [], glowMats: [], kit: false,
@@ -8386,15 +8425,38 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     dropMinionVis(id, vanish) { var services = this.services;
       var v = services.fighterView.minions[id]; if (!v) return;
       if (vanish && v.alive && v.root.visible) services.fxView.smoke(v.x, v.y);
-      v.durRing.dispose(); v.root.parent.remove(v.root); v.mats.forEach(function (m) { m.dispose(); }); delete services.fighterView.minions[id];
+      if (v.root.parent) v.root.parent.remove(v.root);
+      if (v.kit) this.spareMinions[v.team].push(v);
+      else { v.durRing.dispose(); v.mats.forEach(function (m) { m.dispose(); }); }
+      delete services.fighterView.minions[id];
       delete services.match.lastHp[id];
     }
-    makeMinionVis(M) { var services = this.services;
+    buildMinionVis(M) { var services = this.services;
       var v = services.fighterView.makeVis(Object.assign(new Unit(services), { id: M.key, team: M.team, char: "minion", angle: M.angle, atkAt: M.atkAt, ultUntil: 0, alive: true, x: M.x, y: M.y }));
       v.body.scale.setScalar(ModelKit.MINION_MODEL.scale); v.ring.scale.setScalar(0.8);
       v.durRing = new DurationRing(services, v.root, Palette.C_FX[M.team], FighterView.MINION_TIMER_R);
       return v;
     }
+    reviveSpareMinion(v, M) { var services = this.services;
+      if (v.mixer) v.mixer.stopAllAction();
+      Object.assign(v, { atkSeen: M.atkAt, ultSeen: 0, combo: 0, cur: null, curName: "", once: null, speed: 0, px: M.x, py: M.y, dead: false, yaw: -M.angle });
+      services.stage.scene.add(v.root);
+      return v;
+    }
+    makeMinionVis(M) {
+      var spare = this.spareMinions[M.team] && this.spareMinions[M.team].pop();
+      return spare ? this.reviveSpareMinion(spare, M) : this.buildMinionVis(M);
+    }
+    prefillMinions(team, count) {
+      var spare = this.spareMinions[team];
+      while (spare.length < count) {
+        var v = this.buildMinionVis({ key: "minionSpare", team: team, angle: 0, atkAt: 0, x: ShaderWarmup.PROBE_SPOT, y: ShaderWarmup.PROBE_SPOT });
+        v.root.position.set(ShaderWarmup.PROBE_SPOT, 0, ShaderWarmup.PROBE_SPOT);
+        if (v.root.parent) v.root.parent.remove(v.root);
+        spare.push(v);
+      }
+    }
+    spareMinionRoots() { var spare = this.spareMinions; return spare.blue.concat(spare.red).map(function (v) { return v.root; }); }
     dropVis(id) { var services = this.services; var v = services.fighterView.fighters[id]; if (!v) return; v.root.parent.remove(v.root); v.mats.forEach(function (m) { m.dispose(); }); if (v.curse) v.curse.userData.mats.forEach(function (m) { m.dispose(); }); if (v.chainRig) v.chainRig.dispose(); delete services.fighterView.fighters[id]; }
   }
   class FighterMotion {
@@ -9251,6 +9313,21 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       links.mesh.count = n; links.mesh.instanceMatrix.needsUpdate = true;
     }
   }
+  class ProjectileVisPool {
+    static MAX_SPARE = 24;
+    constructor(services) { this.services = services; this.free = {}; }
+    keyOf(d) { return [d.ownerCharacterType, d.team, d.isSkill ? 1 : 0, this.services.models.kit.ready ? 1 : 0, this.services.models.kit.propsReady ? 1 : 0].join("|"); }
+    takeOrBuild(d) { var services = this.services;
+      var key = this.keyOf(d), spare = this.free[key], g = spare && spare.pop();
+      if (!g) { g = new THREE.Group(); services.charTypes.of(d.ownerCharacterType).projectileMesh(g, d); g.userData.poolKey = key; }
+      g.userData.from = null;
+      return g;
+    }
+    give(g) {
+      var spare = this.free[g.userData.poolKey] || (this.free[g.userData.poolKey] = []);
+      if (spare.length < ProjectileVisPool.MAX_SPARE) spare.push(g);
+    }
+  }
   class EffectView {
     static STORM_VERT = [
       "varying vec2 vW;",
@@ -9261,11 +9338,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       "}"].join("\n");
     static STORM_FRAG = [
       "uniform vec2 center; uniform float radius; uniform float time; uniform float fade; uniform vec3 teamCol;",
-      "uniform sampler2D mask; uniform vec4 maskRect;",
+      "uniform sampler2D mask; uniform sampler2D grain; uniform vec4 maskRect;",
       "varying vec2 vW;",
       "float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }",
-      "float noise(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);",
-      "  return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), f.x), mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x), f.y); }",
+      "float noise(vec2 p) { return texture2D(grain, p / 64.0).r; }",
       "void main() {",
       "  vec2 d = vW - center; float r = length(d) / radius;",
       "  if (r > 1.0) discard;",
@@ -9300,14 +9376,14 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     static CLOUD_LANES = [-1, 0.4, -0.4, 1, 0];
     static POOL_OPACITY = { fill: 0.34, edge: 0.85, team: 0.7, bub: 0.8 };
     static STORM_FLAKES = 18;
+    static GRAIN_SIZE = 64;
     static SKY_BEAM_H = 460;
     static SKY_BEAM_DROP_MS = 300;
     static REV_ALLY_COLOR = 0xFFD84A;
     static REV_FOE_COLOR = 0x8C8A86;
-    constructor(services) { this.services = services; this.stabFrom = new THREE.Vector3(); this.stabTo = new THREE.Vector3(); this.stabDir = new THREE.Vector3(); this.stabAxis = new THREE.Vector3(1, 0, 0); this.tmpV = new THREE.Vector3(); this.yUp = new THREE.Vector3(0, 1, 0); this.skyBeamFade = (function () {     var cv = document.createElement("canvas"); cv.width = 4; cv.height = 64;     var g = cv.getContext("2d"), grad = g.createLinearGradient(0, 0, 0, 64);     grad.addColorStop(0, "rgba(255,255,255,0)"); grad.addColorStop(0.55, "rgba(255,255,255,0.75)"); grad.addColorStop(1, "rgba(255,255,255,1)");     g.fillStyle = grad; g.fillRect(0, 0, 4, 64);     return new THREE.CanvasTexture(cv); })(); this.stormMaskCache = { tex: null, arena: "" }; this.projectiles = {}; this.melees = {}; }
+    constructor(services) { this.services = services; this.projPool = new ProjectileVisPool(services); this.stabFrom = new THREE.Vector3(); this.stabTo = new THREE.Vector3(); this.stabDir = new THREE.Vector3(); this.stabAxis = new THREE.Vector3(1, 0, 0); this.tmpV = new THREE.Vector3(); this.yUp = new THREE.Vector3(0, 1, 0); this.skyBeamFade = (function () {     var cv = document.createElement("canvas"); cv.width = 4; cv.height = 64;     var g = cv.getContext("2d"), grad = g.createLinearGradient(0, 0, 0, 64);     grad.addColorStop(0, "rgba(255,255,255,0)"); grad.addColorStop(0.55, "rgba(255,255,255,0.75)"); grad.addColorStop(1, "rgba(255,255,255,1)");     g.fillStyle = grad; g.fillRect(0, 0, 4, 64);     return new THREE.CanvasTexture(cv); })(); this.stormMaskCache = { tex: null, arena: "" }; this.projectiles = {}; this.melees = {}; }
     makeProjVis(p) { var services = this.services;
-      var d = p.d, g = new THREE.Group();
-      services.charTypes.of(d.ownerCharacterType).projectileMesh(g, d);
+      var d = p.d, g = services.effectView.projPool.takeOrBuild(d);
       var shooter = services.fighterView.fighters[d.owner];
       if (shooter && shooter.launchHand && shooter.root.visible) {
         var aimed = services.models.kit.muzzle[d.ownerCharacterType];
@@ -9323,7 +9399,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.stage.scene.add(g);
       return g;
     }
-    dropProjVis(id) { var services = this.services; var g = services.effectView.projectiles[id]; if (!g) return; services.stage.scene.remove(g); delete services.effectView.projectiles[id]; }
+    dropProjVis(id) { var services = this.services; var g = services.effectView.projectiles[id]; if (!g) return; services.stage.scene.remove(g); services.effectView.projPool.give(g); delete services.effectView.projectiles[id]; }
     makeStabVis(d) { var services = this.services;
       var g = new THREE.Group();
       var coreM = services.fxMats.acquire("basic", { color: 0xFF2A2A, transparent: true, opacity: 0.95, depthTest: false, depthWrite: false });
@@ -9426,6 +9502,18 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     dropBurstVis(b) { var services = this.services;
       if (!b.vis) return;
       services.stage.scene.remove(b.vis); b.vis.userData.mats.forEach(function (m) { services.fxMats.release(m); }); b.vis = null;
+    }
+    stormGrain() {
+      if (this.stormGrainTex) return this.stormGrainTex;
+      var size = EffectView.GRAIN_SIZE, cells = new Uint8Array(size * size);
+      for (var i = 0; i < cells.length; i++) {
+        var v = Math.sin(((i % size) * 127.1 + Math.floor(i / size) * 311.7)) * 43758.5453;
+        cells[i] = Math.floor((v - Math.floor(v)) * 256);
+      }
+      var tex = new THREE.DataTexture(cells, size, size, THREE.RedFormat, THREE.UnsignedByteType);
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.magFilter = tex.minFilter = THREE.LinearFilter; tex.needsUpdate = true;
+      this.stormGrainTex = tex;
+      return tex;
     }
     stormMask() { var services = this.services;
       if (services.effectView.stormMaskCache.arena === services.arenaMap.id && services.effectView.stormMaskCache.tex) return services.effectView.stormMaskCache.tex;
@@ -9607,8 +9695,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     makeSkyBeam(color, ash) { var services = this.services;
       var g = new THREE.Group();
       var blend = ash ? THREE.NormalBlending : THREE.AdditiveBlending;
-      var mat = new THREE.MeshBasicMaterial({ color: color, map: services.effectView.skyBeamFade, transparent: true, opacity: 0.5, depthWrite: false, side: THREE.DoubleSide, blending: blend });
-      var core = new THREE.MeshBasicMaterial({ color: ash ? 0xB8B6B0 : 0xFFF6CC, map: services.effectView.skyBeamFade, transparent: true, opacity: 0.6, depthWrite: false, side: THREE.DoubleSide, blending: blend });
+      var mat = new THREE.MeshBasicMaterial({ color: color, map: services.effectView.skyBeamFade, transparent: true, opacity: 0.5, depthWrite: false, blending: blend });
+      var core = new THREE.MeshBasicMaterial({ color: ash ? 0xB8B6B0 : 0xFFF6CC, map: services.effectView.skyBeamFade, transparent: true, opacity: 0.6, depthWrite: false, blending: blend });
       var padMat = new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.5, depthWrite: false, blending: blend });
       var outer = new THREE.Mesh(services.geo.skyBeam, mat); outer.scale.set(26, EffectView.SKY_BEAM_H, 26); g.add(outer);
       var inner = new THREE.Mesh(services.geo.skyBeam, core); inner.scale.set(9, EffectView.SKY_BEAM_H, 9); g.add(inner);
@@ -9625,8 +9713,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       ud.outer.scale.y = ud.inner.scale.y = len;
       ud.pad.position.y = 1.5 - (EffectView.SKY_BEAM_H - len);
       ud.pad.visible = drop >= 1;
-      ud.mats[0].opacity = (0.4 + 0.08 * Math.sin(nowMs / 110)) * fade;
-      ud.mats[1].opacity = 0.65 * fade;
+      ud.mats[0].opacity = (0.62 + 0.1 * Math.sin(nowMs / 110)) * fade;
+      ud.mats[1].opacity = 0.9 * fade;
       ud.mats[2].opacity = 0.35 * fade;
     }
     renderRev(r, t, nowMs) { var services = this.services;
@@ -9657,32 +9745,32 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class StormView {
+    static FLAKE_MATRIX = new THREE.Matrix4();
     constructor(services) { this.services = services; }
     makeStormVis(e) { var services = this.services;
       var g = new THREE.Group();
       var floorMat = new THREE.ShaderMaterial({
         uniforms: { center: { value: new THREE.Vector2(e.x, e.y) }, radius: { value: e.r }, time: { value: 0 }, fade: { value: 0 },
-                    teamCol: { value: new THREE.Color(Palette.C_FX[e.team]) }, mask: { value: services.effectView.stormMask() },
+                    teamCol: { value: new THREE.Color(Palette.C_FX[e.team]) }, mask: { value: services.effectView.stormMask() }, grain: { value: services.effectView.stormGrain() },
                     maskRect: { value: new THREE.Vector4(ArenaSize.MAP_X0, ArenaSize.MAP_Y0, services.arenaMap.cols * ArenaSize.TILE, services.arenaMap.rowCount * ArenaSize.TILE) } },
         vertexShader: EffectView.STORM_VERT, fragmentShader: EffectView.STORM_FRAG, transparent: true, depthWrite: false
       });
       var floor = services.arenaView.flatMesh(services.geo.stormPlane, floorMat); floor.scale.set(e.r * 2, e.r * 2, 1); floor.position.y = 1; floor.renderOrder = -1;
       g.add(floor);
       var flakeMat = new THREE.MeshBasicMaterial({ color: 0xFFFFFF, transparent: true, opacity: 0.9, depthWrite: false });
-      var flakes = new THREE.Group(), flakeList = [];
+      var flakes = new THREE.InstancedMesh(services.geo.ball, flakeMat, EffectView.STORM_FLAKES), flakeList = [];
+      flakes.instanceMatrix.setUsage(THREE.DynamicDrawUsage); flakes.frustumCulled = false;
       for (var j = 0; j < EffectView.STORM_FLAKES; j++) {
-        var f = new THREE.Mesh(services.geo.ball, flakeMat), rr = e.r * (0.12 + 0.82 * ((j * 0.618) % 1)), a = j * 2.4;
-        f.scale.setScalar(3 + (j % 3));
-        f.position.set(Math.cos(a) * rr, 8, Math.sin(a) * rr);
-        flakes.add(f);
-        flakeList.push({ m: f, ph: j * 0.37 });
+        var rr = e.r * (0.12 + 0.82 * ((j * 0.618) % 1)), a = j * 2.4;
+        flakeList.push({ x: Math.cos(a) * rr, z: Math.sin(a) * rr, size: 3 + (j % 3), ph: j * 0.37 });
       }
       g.add(flakes);
       g.userData = { mats: [floorMat, flakeMat], floor: floorMat, flakeMat: flakeMat, flakes: flakes, flakeList: flakeList };
+      g.userData.dropInstances = flakes;
       services.stage.scene.add(g);
       return g;
     }
-    dropStormVis(s) { var services = this.services; if (!s.vis) return; services.stage.scene.remove(s.vis); s.vis.userData.mats.forEach(function (m) { m.dispose(); }); s.vis = null; }
+    dropStormVis(s) { var services = this.services; if (!s.vis) return; services.stage.scene.remove(s.vis); s.vis.userData.mats.forEach(function (m) { m.dispose(); }); s.vis.userData.dropInstances.dispose(); s.vis = null; }
     renderStorm(s, t, dt) { var services = this.services;
       var e = s.e, start = e.createdAt + e.delay, end = start + e.dur;
       if (t < start || t >= end) return;
@@ -9695,7 +9783,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       ud.floor.uniforms.time.value = (t - start) / 1000;
       ud.floor.uniforms.fade.value = fade;
       ud.flakes.rotation.y -= dt * 1.2;
-      ud.flakeList.forEach(function (f) { f.m.position.y = 6 + 14 * ((t / 900 + f.ph) % 1); });
+      ud.flakeList.forEach(function (f, i) {
+        ud.flakes.setMatrixAt(i, StormView.FLAKE_MATRIX.makeScale(f.size, f.size, f.size).setPosition(f.x, 6 + 14 * ((t / 900 + f.ph) % 1), f.z));
+      });
+      ud.flakes.instanceMatrix.needsUpdate = true;
       ud.flakeMat.opacity = 0.9 * fade;
     }
   }
@@ -10058,7 +10149,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       ud.arcs = [];
       for (var i = 0; i < FxView.STORM_ARCS; i++) {
         var arc = new THREE.Group(), top = 70 + Math.random() * 20;
-        services.boltFx.zigzagPath(arc, new THREE.Vector3(FxView.STORM_R - 6, top, 0), new THREE.Vector3(FxView.STORM_R + 18, 4, 0), FxView.STORM_ARC_SEGS, 30, layers);
+        services.boltFx.closeBatch(services.boltFx.zigzagPath(services.boltFx.openBatch(arc, layers, FxView.STORM_ARC_SEGS), new THREE.Vector3(FxView.STORM_R - 6, top, 0), new THREE.Vector3(FxView.STORM_R + 18, 4, 0), FxView.STORM_ARC_SEGS, 30));
         g.add(arc); ud.arcs.push(arc);
       }
       g.visible = false;
@@ -10092,6 +10183,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.stage.scene.remove(f.mesh);
       (f.mesh.userData.mats || [f.mesh.material]).forEach(function (m) { services.fxMats.release(m); });
       if (f.mesh.userData.flashMat) services.fxMats.release(f.mesh.userData.flashMat);
+      if (f.mesh.userData.boltBatch) services.boltFx.releaseBatch(f.mesh.userData.boltBatch);
       f.mesh = null;
     }
     bladeZoneMesh(f) { var services = this.services;
@@ -10160,33 +10252,56 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class BoltFx {
-    constructor(services) { this.services = services; }
+    static MIN_BATCH = 8;
+    static SEG_POSE = { matrix: new THREE.Matrix4(), dir: new THREE.Vector3(), turn: new THREE.Quaternion(), scale: new THREE.Vector3() };
+    constructor(services) { this.services = services; this.freeBatches = {}; }
     thunder(x, y) { var services = this.services;
       if (services.cameraRig.pix < Environment.PIX_START) return;
       services.match.fx.push({ k: "bolt", x: x, y: y, t: Date.now(), life: 380 });
     }
     bloodBolt(x, y) { var services = this.services; services.match.fx.push({ k: "bolt", x: x, y: y, t: Date.now(), life: 360, glow: 0xE0101E, core: 0xFFC2C2, flash: 50 }); }
-    addBoltSeg(g, from, to, layers) { var services = this.services;
-      var dir = new THREE.Vector3().subVectors(from, to), len = dir.length();
+    openBatch(g, layers, capacity) { var services = this.services, bolt = this;
+      var bucket = Math.max(BoltFx.MIN_BATCH, Math.pow(2, Math.ceil(Math.log2(capacity))));
+      var meshes = layers.map(function (layer) {
+        var spare = bolt.freeBatches[bucket] && bolt.freeBatches[bucket].pop(), mesh = spare || new THREE.InstancedMesh(services.geo.boltSeg, layer[0], bucket);
+        if (!spare) { mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage); mesh.frustumCulled = false; mesh.userData.bucket = bucket; }
+        mesh.material = layer[0]; mesh.count = 0;
+        g.add(mesh);
+        return mesh;
+      });
+      return { g: g, layers: layers, meshes: meshes };
+    }
+    closeBatch(batch) { batch.meshes.forEach(function (m) { m.instanceMatrix.needsUpdate = true; }); return batch; }
+    releaseBatch(batch) { var bolt = this;
+      batch.meshes.forEach(function (m) {
+        batch.g.remove(m);
+        (bolt.freeBatches[m.userData.bucket] = bolt.freeBatches[m.userData.bucket] || []).push(m);
+      });
+    }
+    addBoltSeg(batch, from, to) { var P = BoltFx.SEG_POSE;
+      P.dir.subVectors(from, to);
+      var len = P.dir.length();
       if (len < 0.01) return;
-      dir.normalize();
-      layers.forEach(function (layer) {
-        var seg = new THREE.Mesh(services.geo.boltSeg, layer[0]);
-        seg.position.copy(to); seg.quaternion.setFromUnitVectors(FxView.BOLT_UP, dir); seg.scale.set(layer[1], len, layer[1]);
-        g.add(seg);
+      P.dir.normalize();
+      P.turn.setFromUnitVectors(FxView.BOLT_UP, P.dir);
+      batch.layers.forEach(function (layer, i) {
+        var mesh = batch.meshes[i];
+        P.scale.set(layer[1], len, layer[1]);
+        mesh.setMatrixAt(mesh.count++, P.matrix.compose(to, P.turn, P.scale));
       });
     }
     boltMesh(f) { var services = this.services;
       var g = new THREE.Group();
       var glow = services.fxMats.acquire("basic", { color: f.glow || 0x8FC8FF, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
       var core = services.fxMats.acquire("basic", { color: f.core || 0xFFFFFF, transparent: true, depthWrite: false });
-      var prev = new THREE.Vector3(0, FxView.BOLT_TOP, 0);
+      var prev = new THREE.Vector3(0, FxView.BOLT_TOP, 0), batch = services.boltFx.openBatch(g, [[glow, 7], [core, 2.2]], FxView.BOLT_SEGS);
       for (var i = 1; i <= FxView.BOLT_SEGS; i++) {
         var ground = i === FxView.BOLT_SEGS, ny = FxView.BOLT_TOP * (1 - i / FxView.BOLT_SEGS);
         var next = new THREE.Vector3(ground ? 0 : (Math.random() - 0.5) * FxView.BOLT_JITTER, ny, ground ? 0 : (Math.random() - 0.5) * FxView.BOLT_JITTER);
-        services.boltFx.addBoltSeg(g, prev, next, [[glow, 7], [core, 2.2]]);
+        services.boltFx.addBoltSeg(batch, prev, next);
         prev = next;
       }
+      g.userData.boltBatch = services.boltFx.closeBatch(batch);
       var flashMat = services.fxMats.acquire("basic", { color: f.glow || 0x8FC8FF, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
       var flash = services.arenaView.flatMesh(services.geo.disc, flashMat); flash.scale.setScalar(f.flash || BlacksmithType.ULT.bsR * 0.55); flash.position.y = 2.6; g.add(flash);
       g.position.set(f.x, 0, f.y);
@@ -10205,23 +10320,26 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       for (var i = 0; i <= StormbowType.ULT.ocRingPts; i++) { var a = i / StormbowType.ULT.ocRingPts * Math.PI * 2; pts.push([x + Math.cos(a) * r, y + Math.sin(a) * r]); }
       services.match.fx.push({ k: "chain", pts: pts, over: 1, segs: FxView.BARRIER_SEGS, t: Date.now(), life: FxView.CHAIN_LIFE });
     }
-    zigzagPath(g, a, b, segs, jitter, layers) { var services = this.services;
+    zigzagPath(batch, a, b, segs, jitter) { var services = this.services;
       var dx = b.x - a.x, dz = b.z - a.z, L = Math.hypot(dx, dz) || 1, nx = -dz / L, nz = dx / L, prev = a.clone();
       for (var i = 1; i <= segs; i++) {
         var k = i / segs, off = i === segs ? 0 : (Math.random() - 0.5) * jitter;
         var next = new THREE.Vector3(a.x + dx * k + nx * off, a.y + (b.y - a.y) * k + (Math.random() - 0.5) * jitter * 0.5 * (i === segs ? 0 : 1), a.z + dz * k + nz * off);
-        services.boltFx.addBoltSeg(g, prev, next, layers);
+        services.boltFx.addBoltSeg(batch, prev, next);
         prev = next;
       }
+      return batch;
     }
     chainMesh(f) { var services = this.services;
       var g = new THREE.Group();
       var glow = services.fxMats.acquire("basic", { color: f.over ? Palette.ZAP_OVER_GLOW : Palette.ZAP_GLOW, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
       var core = services.fxMats.acquire("basic", { color: Palette.ZAP_CORE, transparent: true, depthWrite: false });
+      var segs = f.segs || FxView.CHAIN_SEGS, batch = services.boltFx.openBatch(g, [[glow, 12], [core, 3.4]], (f.pts.length - 1) * segs);
       for (var i = 1; i < f.pts.length; i++) {
         var a = new THREE.Vector3(f.pts[i - 1][0], FxView.CHAIN_Y, f.pts[i - 1][1]), b = new THREE.Vector3(f.pts[i][0], FxView.CHAIN_Y, f.pts[i][1]);
-        services.boltFx.zigzagPath(g, a, b, f.segs || FxView.CHAIN_SEGS, FxView.CHAIN_JITTER, [[glow, 12], [core, 3.4]]);
+        services.boltFx.zigzagPath(batch, a, b, segs, FxView.CHAIN_JITTER);
       }
+      g.userData.boltBatch = services.boltFx.closeBatch(batch);
       g.userData.mats = [glow, core];
       services.stage.scene.add(g);
       return g;
@@ -10888,6 +11006,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   class Hud2D {
     static FONT = '"Nanum Gothic", "Malgun Gothic", sans-serif';
+    static MAX_FLOAT_TEXTS = 12;
     static STALL_MS = 250;
     static FINAL_COUNT_MS = 10000;
     constructor(services) { this.services = services; this.tmpV = new THREE.Vector3(); this.lastCountSec = 0; this.labels = []; }
@@ -10919,16 +11038,16 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       Canvases.overlayCtx.setTransform(services.cameraRig.dpr, 0, 0, services.cameraRig.dpr, 0, 0);
       Canvases.overlayCtx.clearRect(0, 0, services.cameraRig.w, services.cameraRig.h);
       services.hud.labels.forEach(function (L) { if (L.minion) services.hudBars.drawMinionBar(L.e, L.alpha, L.ally); else services.hudBars.drawBars(L.e, L.alpha, L.ally); });
-      services.match.fx.forEach(function (f) {
-        if (f.k !== "txt") return;
-        var k = (nowMs - f.t) / f.life, p = services.hud.toScreen(f.x, CameraRig.HEAD_Y, f.y); if (!p) return;
-        var y = p.y - 34 - k * 30;
-        Canvases.overlayCtx.save(); Canvases.overlayCtx.globalAlpha = 1 - k;
-        Canvases.overlayCtx.font = "800 20px " + Hud2D.FONT; Canvases.overlayCtx.textAlign = "center";
-        Canvases.overlayCtx.lineWidth = 4; Canvases.overlayCtx.strokeStyle = "rgba(14,20,17,.85)";
-        Canvases.overlayCtx.strokeText(f.s, p.x, y); Canvases.overlayCtx.fillStyle = f.c; Canvases.overlayCtx.fillText(f.s, p.x, y);
-        Canvases.overlayCtx.restore();
-      });
+      var floats = 0;
+      for (var i = services.match.fx.length - 1; i >= 0 && floats < Hud2D.MAX_FLOAT_TEXTS; i--) {
+        var f = services.match.fx[i];
+        if (f.k !== "txt") continue;
+        floats++;
+        var k = (nowMs - f.t) / f.life, p = services.hud.toScreen(f.x, CameraRig.HEAD_Y, f.y); if (!p) continue;
+        Canvases.overlayCtx.globalAlpha = Math.max(0, 1 - k);
+        services.overlaySprites.drawOutlinedText(f.s, 20, 4, f.c, p.x, p.y - 34 - k * 30, "alphabetic");
+      }
+      Canvases.overlayCtx.globalAlpha = 1;
       services.hud.drawJoystick();
     }
     specPanelW() { var services = this.services; return services.cameraRig.w > 900 ? 300 : 150; }
@@ -11013,10 +11132,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (services.match.me) {
         Dom.setHtml(Dom.$("btnAtk").lastChild, '<i class="ic">' + services.charTypes.statsOf(services.match.me.char).icon + "</i>공격");
         var cdLeft = Math.max(0, services.match.me.cdUntil - t) / (services.match.me.cdDur || services.charTypes.statsOf(services.match.me.char).cd);
-        Dom.$("btnAtk").firstChild.style.height = Math.round(cdLeft * 100) + "%";
+        ActionButtonMeter.paint(Dom.$("btnAtk").firstChild.firstChild, cdLeft);
         var full = services.match.me.gauge >= MatchRules.GAUGE_MAX, act = services.match.me.hasSkillActive(t);
         Dom.$("btnUlt").className = "actBtn" + (act ? " act" : (full && !services.match.me.burst ? " ready" : ""));
-        Dom.$("btnUlt").firstChild.style.height = Math.round((act ? services.match.me.skillLeft(t) : MathKit.clamp(services.match.me.gauge / MatchRules.GAUGE_MAX, 0, 1)) * 100) + "%";
+        ActionButtonMeter.paint(Dom.$("btnUlt").firstChild.firstChild, act ? services.match.me.skillLeft(t) : MathKit.clamp(services.match.me.gauge / MatchRules.GAUGE_MAX, 0, 1));
         Dom.setHtml(Dom.$("btnUlt").lastChild, act ? services.charTypes.statsOf(services.match.me.char).ultName + "<br>" + Math.ceil((services.match.me.skillUntil - t) / services.clock.scale / 1000) + "초"
                                            : (full ? "스킬!" : "스킬<br>" + Math.floor(services.match.me.gauge) + "/10"));
       }
@@ -11049,6 +11168,64 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       } else { Dom.show(Dom.$("endOv"), false); Dom.show(Dom.$("scoreHelpModal"), false); }
     }
   }
+  class ActionButtonMeter {
+    static paint(el, ratio) {
+      var step = Math.round(ratio * 100);
+      if (el._meterStep === step) return;
+      el._meterStep = step;
+      el.style.transform = "scaleY(" + step / 100 + ")";
+    }
+  }
+  class OverlayTextSprites {
+    static MAX_SPRITES = 120;
+    static PAD = 3;
+    static OUTLINE = "rgba(14,20,17,.85)";
+    constructor(services) { this.services = services;
+      this.sprites = new Map();
+      this.measureCtx = document.createElement("canvas").getContext("2d");
+      var self = this;
+      if (document.fonts && document.fonts.addEventListener) document.fonts.addEventListener("loadingdone", function () { self.sprites.clear(); });
+    }
+    fontOf(size) { return "800 " + size + "px " + Hud2D.FONT; }
+    textWidth(text, size) { this.measureCtx.font = this.fontOf(size); return this.measureCtx.measureText(text).width; }
+    remember(key, w, h, anchorY, paint) {
+      var dpr = this.services.cameraRig.dpr, cv = document.createElement("canvas");
+      cv.width = Math.ceil(w * dpr); cv.height = Math.ceil(h * dpr);
+      var ctx = cv.getContext("2d"); ctx.scale(dpr, dpr); paint(ctx);
+      if (this.sprites.size >= OverlayTextSprites.MAX_SPRITES) this.sprites.delete(this.sprites.keys().next().value);
+      var sprite = { cv: cv, w: w, h: h, anchorY: anchorY };
+      this.sprites.set(key, sprite);
+      return sprite;
+    }
+    place(sprite, x, y) {
+      var dpr = this.services.cameraRig.dpr;
+      Canvases.overlayCtx.drawImage(sprite.cv, Math.round((x - sprite.w / 2) * dpr) / dpr, Math.round((y - sprite.anchorY) * dpr) / dpr, sprite.w, sprite.h);
+    }
+    drawOutlinedText(text, size, stroke, color, x, y, baseline) {
+      var key = this.services.cameraRig.dpr + "|t|" + size + "|" + stroke + "|" + color + "|" + baseline + "|" + text, sprite = this.sprites.get(key), sprites = this;
+      if (!sprite) {
+        var pad = OverlayTextSprites.PAD + stroke, w = this.textWidth(text, size) + pad * 2, h = size * 1.5 + pad * 2, anchorY = baseline === "middle" ? h / 2 : pad + size * 1.15;
+        sprite = this.remember(key, w, h, anchorY, function (ctx) {
+          ctx.font = sprites.fontOf(size); ctx.textAlign = "center"; ctx.textBaseline = baseline; ctx.lineWidth = stroke; ctx.strokeStyle = OverlayTextSprites.OUTLINE;
+          ctx.strokeText(text, w / 2, anchorY); ctx.fillStyle = color; ctx.fillText(text, w / 2, anchorY);
+        });
+      }
+      this.place(sprite, x, y);
+    }
+    drawNameTag(name, teamCss, mine, x, y) {
+      var key = this.services.cameraRig.dpr + "|n|" + teamCss + "|" + (mine ? 1 : 0) + "|" + name, sprite = this.sprites.get(key), sprites = this;
+      if (!sprite) {
+        var tagW = Math.max(40, this.textWidth(name, 13) + 16), pad = OverlayTextSprites.PAD, w = tagW + pad * 2, h = 18 + pad * 2;
+        sprite = this.remember(key, w, h, h / 2, function (ctx) {
+          ctx.beginPath(); ctx.roundRect(pad, pad, tagW, 18, 9);
+          ctx.fillStyle = teamCss; ctx.fill();
+          ctx.lineWidth = mine ? 3 : 1.5; ctx.strokeStyle = mine ? MeMarker.CSS : "rgba(255,255,255,.55)"; ctx.stroke();
+          ctx.font = sprites.fontOf(13); ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillStyle = "#FFFFFF"; ctx.fillText(name, w / 2, h / 2 + 1);
+        });
+      }
+      this.place(sprite, x, y);
+    }
+  }
   class HudBars {
     constructor(services) { this.services = services; }
     drawMinionBar(M, alpha, ally) { var services = this.services;
@@ -11064,21 +11241,15 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     drawStatus(E, x, y) { var services = this.services;
       var t = services.clock.now(), label = E.isStunned(t) ? "💫 기절" : (E.isSlowed(t) ? "느려짐" : "");
       if (!label) return;
-      Canvases.overlayCtx.font = "800 13px " + Hud2D.FONT; Canvases.overlayCtx.textAlign = "center"; Canvases.overlayCtx.textBaseline = "middle";
-      Canvases.overlayCtx.lineWidth = 3; Canvases.overlayCtx.strokeStyle = "rgba(14,20,17,.85)";
-      Canvases.overlayCtx.strokeText(label, x, y); Canvases.overlayCtx.fillStyle = E.isStunned(t) ? "#FFE066" : "#8CD3FF"; Canvases.overlayCtx.fillText(label, x, y);
+      services.overlaySprites.drawOutlinedText(label, 13, 3, E.isStunned(t) ? "#FFE066" : "#8CD3FF", x, y, "middle");
     }
     drawBars(E, alpha, ally) { var services = this.services;
       var p = services.hud.toScreen(E.x, services.charTypes.of(E.char).headY, E.y); if (!p) return;
       var bw = 62, bh = 7, x0 = p.x - bw / 2, top = p.y - 4, ratio = MathKit.clamp(E.hp / E.maxHp, 0, 1);
       Canvases.overlayCtx.save(); Canvases.overlayCtx.globalAlpha = alpha;
       services.hudBars.drawStatus(E, p.x, top - (E === services.match.me ? 52 : 33));
-      Canvases.overlayCtx.font = "800 13px " + Hud2D.FONT; Canvases.overlayCtx.textAlign = "center"; Canvases.overlayCtx.textBaseline = "middle";
-      var mine = E === services.match.me, teamCss = E.team === "blue" ? "#2F6FD6" : "#D6453D";
-      var name = E.nickname || "", tw = Math.max(40, Canvases.overlayCtx.measureText(name).width + 16), ny = top - 13;
-      Canvases.overlayCtx.fillStyle = teamCss; services.hud.pill(p.x - tw / 2, ny - 9, tw, 18, 9); Canvases.overlayCtx.fill();
-      Canvases.overlayCtx.lineWidth = mine ? 3 : 1.5; Canvases.overlayCtx.strokeStyle = mine ? MeMarker.CSS : "rgba(255,255,255,.55)"; Canvases.overlayCtx.stroke();
-      Canvases.overlayCtx.fillStyle = "#FFFFFF"; Canvases.overlayCtx.fillText(name, p.x, ny + 1);
+      var mine = E === services.match.me, teamCss = E.team === "blue" ? "#2F6FD6" : "#D6453D", ny = top - 13;
+      services.overlaySprites.drawNameTag(E.nickname || "", teamCss, mine, p.x, ny);
       if (mine) services.hudBars.drawMeArrow(p.x, ny - 14);
       var frameH = bh + 4 + (ally ? 7 : 0);
       Canvases.overlayCtx.fillStyle = "rgba(10,14,12,.85)"; services.hud.pill(x0 - 2, top - 2, bw + 4, frameH, 3); Canvases.overlayCtx.fill();
@@ -11330,7 +11501,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class PerfProbe {
-    static BUILD = "lag6";
+    static BUILD = "lag7";
     static PATH = "perfDiag/teambattle/";
     static RTT_KEEP = 50;
     static RECORDS = !Environment.SILENT_RUN;
@@ -11642,7 +11813,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   class ShaderWarmup {
     static PROBE_SPOT = -9000;
-    constructor(services) { this.services = services; this.minionWarmed = false; this.effectsWarmed = false; }
+    constructor(services) { this.services = services; this.effectsWarmed = false; }
     sampleShots() { var services = this.services, P = ShaderWarmup.PROBE_SPOT;
       return services.charTypes.list.map(function (c) {
         var g = new THREE.Group();
@@ -11682,7 +11853,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         function () { return BannerBearerRig.warmSample(services); },
         function () { return services.marinaStreamView.warmSample(); },
         function () { return services.tsunamiView.warmSample(); }
-      ];
+      ].concat(this.sharedGeometryMakers());
       return makers.map(function (make) {
         try {
           var obj = make();
@@ -11693,6 +11864,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         } catch (err) { return null; }
       }).filter(Boolean);
     }
+    sharedGeometryMakers() { var services = this.services, P = ShaderWarmup.PROBE_SPOT;
+      return Object.keys(services.geo).filter(function (k) { return services.geo[k] && services.geo[k].isBufferGeometry; }).map(function (k) {
+        return function () { var m = new THREE.Mesh(services.geo[k], services.models.basicMat("warmGeometry", 0xFFFFFF, 1)); m.position.y = P; return m; };
+      });
+    }
     warmEffects() { var services = this.services;
       if (this.effectsWarmed || !services.cameraRig.renderer) return;
       this.effectsWarmed = true;
@@ -11702,27 +11878,46 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (renderer.compileAsync) renderer.compileAsync(services.stage.scene, services.stage.camera).then(cleanUp, cleanUp);
       else { renderer.compile(services.stage.scene, services.stage.camera); cleanUp(); }
     }
-    warmHiddenForms() { var services = this.services;
+    revealEverythingIn(root, shown) {
+      root.traverse(function (o) { if (!o.visible) { o.visible = true; shown.push(o); } });
+    }
+    placeWarmObjects(objects, shown) { var services = this.services, warmup = this;
+      objects.forEach(function (obj) {
+        services.stage.scene.add(obj);
+        warmup.revealEverythingIn(obj, shown);
+        obj.traverse(function (o) { o.frustumCulled = false; });
+      });
+    }
+    warmHiddenForms() { var services = this.services, warmup = this;
       if (!this.formsPending || !services.cameraRig.renderer) return;
       var views = Object.keys(services.fighterView.fighters || {}).map(function (id) { return services.fighterView.fighters[id]; });
       if (!views.length) return;
       this.formsPending = false;
-      var shown = [];
-      views.forEach(function (v) { Object.keys(v.forms || {}).forEach(function (k) { var m = v.forms[k].model; if (!m.visible) { m.visible = true; shown.push(m); } }); });
-      if (!shown.length) return;
-      services.cameraRig.renderer.compile(services.stage.scene, services.stage.camera);
-      shown.forEach(function (m) { m.visible = false; });
+      var shown = [], camera = services.stage.camera, scene = services.stage.scene, renderer = services.cameraRig.renderer;
+      views.forEach(function (v) { warmup.revealEverythingIn(v.root, shown); });
+      var objects = this.warmObjects();
+      this.placeWarmObjects(objects, shown);
+      renderer.render(scene, camera);
+      shown.forEach(function (o) { o.visible = false; });
+      objects.forEach(function (obj) { if (obj.parent) obj.parent.remove(obj); });
+      renderer.render(scene, camera);
     }
-    matchStarting() { this.formsPending = true; this.warmMinionIfNeeded(); }
-    warmMinionIfNeeded() { var services = this.services;
-      if (this.minionWarmed || !services.cameraRig.renderer || !services.models.kit.ready) return;
-      var necroInMatch = Object.keys(services.session.players).some(function (id) { return services.session.players[id].characterType === "necro"; });
-      if (!necroInMatch) return;
-      this.minionWarmed = true;
-      var probe = services.fighterView.makeMinionVis({ key: "shaderWarmup", team: "blue", angle: 0, atkAt: 0, x: ShaderWarmup.PROBE_SPOT, y: ShaderWarmup.PROBE_SPOT });
-      probe.root.position.set(ShaderWarmup.PROBE_SPOT, 0, ShaderWarmup.PROBE_SPOT);
-      services.cameraRig.renderer.render(services.stage.scene, services.stage.camera);
-      probe.root.parent.remove(probe.root); this.minionProbe = probe;
+    matchStarting() { this.formsPending = true; this.prefillPooledViews(); }
+    castersByTeam(charId) { var services = this.services, players = services.session.players || {}, count = { blue: 0, red: 0 };
+      Object.keys(players).forEach(function (id) { var p = players[id]; if (p && p.characterType === charId && count[p.team] !== undefined) count[p.team]++; });
+      return count;
+    }
+    prefillPooledViews() { var services = this.services;
+      if (!services.cameraRig.renderer || !services.models.kit.ready) return;
+      var necros = this.castersByTeam("necro"), engineers = this.castersByTeam("engineer"), druids = this.castersByTeam("druid");
+      ["blue", "red"].forEach(function (team) {
+        services.fighterView.prefillMinions(team, necros[team] * NecroType.ULT.smMax);
+        if (services.models.kit.propsReady) services.turrets.prefill(team, engineers[team] * EngineerType.ULT.trMax);
+      });
+      if (services.models.kit.propsReady) services.groves.prefill(druids.blue + druids.red);
+    }
+    warmObjects() { var services = this.services;
+      return (this.kept || []).concat(services.fighterView.spareMinionRoots(), services.turrets.spareRoots(), services.groves.spare);
     }
   }
   class FramePhaseMeter {
@@ -11881,7 +12076,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     markReady() { window.TEAM_BATTLE_READY = true; }
     hooks() { var services = this.services;
     return {
-      CHARS: services.charTypes.statsTable(), CHAR_LIST: services.charTypes.list, ULT: services.charTypes.skillTable(), ROLES: RoleKinds.TABLE, ROLE_LIST: RoleKinds.LIST, MAPS: MapCatalog.table(), roleGauge: function (c) { return services.catalog.gaugeOnHitOf(c); }, spawnOf: services.arenaMap.spawnOf.bind(services.arenaMap), BODY_R: ArenaSize.BODY_R, GAUGE_MAX: MatchRules.GAUGE_MAX, BOUND: ArenaSize.BOUND, MAP_IDS: MapCatalog.IDS, RESPAWN_MS: services.timescale.respawnMs, RESPAWN_PROTECT_MS: services.timescale.respawnProtectMs, myId: services.session.myId,
+      TURRET_MUZZLE_FORWARD: TurretSystem.MUZZLE_FORWARD, turretMuzzle: services.turrets.muzzleToward.bind(services.turrets), CHARS: services.charTypes.statsTable(), CHAR_LIST: services.charTypes.list, ULT: services.charTypes.skillTable(), ROLES: RoleKinds.TABLE, ROLE_LIST: RoleKinds.LIST, MAPS: MapCatalog.table(), roleGauge: function (c) { return services.catalog.gaugeOnHitOf(c); }, spawnOf: services.arenaMap.spawnOf.bind(services.arenaMap), BODY_R: ArenaSize.BODY_R, GAUGE_MAX: MatchRules.GAUGE_MAX, BOUND: ArenaSize.BOUND, MAP_IDS: MapCatalog.IDS, RESPAWN_MS: services.timescale.respawnMs, RESPAWN_PROTECT_MS: services.timescale.respawnProtectMs, myId: services.session.myId,
       VERSUS: services.versus,
       obstacles: function () { return { walls: services.arenaMap.obstacles, water: services.arenaMap.water }; },
       mapTopShot: function (id, pxW, pxH) {
@@ -12296,6 +12491,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.resultBoard = new ResultBoard(services);
       services.hud = new Hud2D(services);
       services.hudBars = new HudBars(services);
+      services.overlaySprites = new OverlayTextSprites(services);
       services.stage = new ArenaStage(services);
       services.geo = new GeometryLibrary();
       services.matlib = new MaterialLibrary();

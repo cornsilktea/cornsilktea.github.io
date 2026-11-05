@@ -550,6 +550,24 @@ class ResultCollector {
     done(foeStunned ? "pass" : "fail", foeStunned ? "기사가 기절한 상태에서도 마무리 기절이 발동함" : "기사가 기절해 있으면 마무리 기절이 취소됨");
   });
 
+  run(STUN, "궁수 난사: 연사 중에는 기본 공격이 안 나가고, 연사가 끝나면 다시 쏘는가", function (done) {
+    var y = OPEN_Y.forest, bad = [];
+    var W = world("forest", [
+      { id: "rg", team: "blue", char: "ranger", x: 250, y: y, gauge: api.GAUGE_MAX },
+      { id: "foe", team: "red", char: "knight", x: 450, y: y }
+    ]);
+    var rg = W.ent("rg");
+    api.useUlt(rg, 0);
+    W.step(api.ULT.mkGap);
+    var cdBefore = rg.cdUntil;
+    api.fireBasic(rg, 0);
+    if (rg.cdUntil !== cdBefore || rg.volley) bad.push("연사 중 기본 공격이 나감");
+    W.step(api.ULT.mkCount * api.ULT.mkGap + 300);
+    if (rg.burst) bad.push("연사가 끝나지 않음");
+    api.fireBasic(rg, 0);
+    if (rg.cdUntil <= W.t()) bad.push("연사 뒤 기본 공격이 안 나감");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "연사 중 막힘, 끝난 뒤 발사");
+  });
   run(STUN, "궁수 난사: 기절하는 순간 남은 화살이 멈추는가", function (done) {
     var y = OPEN_Y.forest;
     var W = world("forest", [
@@ -6812,6 +6830,24 @@ class EngineerDruidTests {
       W.step(first ? first.v.fly + 100 : 500);
       if (self.lost(W, "n1")) bad.push("대상이 피했는데 맞음 " + self.lost(W, "n1"));
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "비행 " + (first && first.v.fly) + "ms, 피하면 빗나감");
+    });
+    run(G, "포탑 포탄: 포탑 중심이 아니라 대상 쪽 총구에서 출발하고, 대상이 총구보다 가까우면 대상 위치를 넘지 않는가", function (done) {
+      var bad = [], forward = api.TURRET_MUZZLE_FORWARD, y = self.kit.OPEN_Y.forest;
+      var W = self.engineerWorld([{ id: "n1", x: 150 + 300 }]);
+      api.useUlt(W.ent("eg"), 0); W.frame(FRAME);
+      W.step(ULT.trWarmMs + 30);
+      var shot = self.shotsOf(W)[0];
+      if (!shot) bad.push("먼 대상에게 쏘지 않음");
+      else {
+        if (shot.v.x !== 150 || shot.v.mx !== 150 + forward || shot.v.my !== y) bad.push("총구 위치 " + shot.v.mx + "," + shot.v.my + " (포탑 " + shot.v.x + ")");
+        var wantFly = Math.round((300 - forward) / ULT.trShellSpeed * 1000);
+        if (shot.v.fly !== wantFly) bad.push("비행 시간 " + shot.v.fly + " (기대 " + wantFly + ")");
+      }
+      var near = api.turretMuzzle({ x: 150, y: y }, { x: 150 + 10, y: y });
+      if (near.x !== 160 || near.y !== y) bad.push("가까운 대상을 지나침 " + near.x);
+      var same = api.turretMuzzle({ x: 150, y: y }, { x: 150, y: y });
+      if (same.x !== 150 || same.y !== y) bad.push("같은 자리 대상 계산 오류");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "총구 " + forward + " 앞에서 출발, 대상을 넘지 않음");
     });
     run(G, "공학자 패시브: 포탑마다 사거리 안에서 이동속도 " + ULT.trSpeedBonus + "(게임 값) 증가하고, 두 포탑이 겹친 곳은 두 배인가", function (done) {
       var bad = [], W = self.engineerWorld([]), eg = W.ent("eg"), base = C.speed;
