@@ -284,28 +284,31 @@
   if (/[?&]fps(?:[=&]|$)/.test(location.search)) {
     var addFpsMeter = function () {
       var meter = document.createElement("div");
+      meter.setAttribute("data-fps-meter", "");
       meter.style.cssText = [
         "position:fixed",
-        "bottom:calc(8px + env(safe-area-inset-bottom, 0px))",
-        "left:50%",
-        "transform:translateX(-50%)",
+        "top:8px",
+        "right:calc(50% + 109px)",
         "z-index:2147483000",
-        "height:32px",
-        "padding:0 10px",
+        "height:24px",
+        "padding:0 8px",
         "background:rgba(0,0,0,0.72)",
         "color:#fff",
         "border-radius:4px",
-        "font:600 13px/32px monospace",
+        "font:600 12px/24px monospace",
         "pointer-events:none"
       ].join(";");
       document.body.appendChild(meter);
-      /* data-fps-beside 가 붙은 칸(30번 블루 팀 점수)이 화면에 있으면 그 왼쪽에 붙이고, 없으면 아래 가운데에 둡니다. */
+      /* 로비와 게임 화면에서 자리가 바뀌지 않도록 항상 위쪽 가운데의 왼쪽에 둡니다.
+         data-fps-beside 가 붙은 칸(30번 블루 팀 점수)이 화면에 있으면 그 왼쪽에 정확히 맞춥니다. */
       var placeMeter = function () {
         var tag = document.querySelector("[data-fps-beside]"), rect = tag ? tag.getBoundingClientRect() : null;
         if (rect && rect.width > 0) {
-          meter.style.cssText += ";bottom:auto;left:auto;transform:none;height:24px;padding:0 8px;font:600 12px/24px monospace;top:" + (rect.top + (rect.height - 24) / 2) + "px;right:" + (window.innerWidth - rect.left + 6) + "px";
+          meter.style.top = (rect.top + (rect.height - 24) / 2) + "px";
+          meter.style.right = (window.innerWidth - rect.left + 6) + "px";
         } else {
-          meter.style.cssText += ";top:auto;right:auto;bottom:calc(8px + env(safe-area-inset-bottom, 0px));left:50%;transform:translateX(-50%);height:32px;padding:0 10px;font:600 13px/32px monospace";
+          meter.style.top = "8px";
+          meter.style.right = "calc(50% + 109px)";
         }
       };
       /* 주소에 반 표시(?c=…)와 &fps 말고 다른 것이 붙어 있으면(&ov=1 같은 실험 값) 프레임 칸 왼쪽에 "&반&fps&ov=1" 꼴로 보여 줍니다. */
@@ -321,8 +324,6 @@
         tailLabel.style.cssText = meter.style.cssText;
         tailLabel.textContent = testedTail;
         var rect = meter.getBoundingClientRect();
-        tailLabel.style.left = "auto";
-        tailLabel.style.transform = "none";
         tailLabel.style.right = (window.innerWidth - rect.left + 6) + "px";
       };
       var frames = 0, worst = 0, last = performance.now(), windowStart = last;

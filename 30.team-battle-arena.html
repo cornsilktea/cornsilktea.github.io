@@ -12790,6 +12790,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   class FramePhaseMeter {
     static ENABLED = /[?&]fps(&|=|$)/.test(location.search);
     static HOLD_MS = 4000;
+    static EDGE_PX = 4;
     static LABELS = { world: "세계", net: "전송", host: "방장", render: "그림", hud: "화면" };
     constructor() { this.cur = {}; this.last = 0; this.start0 = 0; this.worst = null; this.box = null; }
     start(frameMs) {
@@ -12819,9 +12820,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     show() {
       if (!this.worst) return;
       if (!this.box) this.box = this.makeBox();
-      var anchor = document.querySelector("[data-fps-beside]"), rect = anchor ? anchor.getBoundingClientRect() : null;
-      if (rect && rect.width > 0) { this.box.style.top = (rect.top + 30) + "px"; this.box.style.right = (window.innerWidth - rect.left + 6) + "px"; }
       this.box.textContent = this.textOf(this.worst);
+      var fpsMeter = document.querySelector("[data-fps-meter]");
+      if (fpsMeter) { var rect = fpsMeter.getBoundingClientRect(); this.box.style.top = rect.bottom + "px"; this.box.style.right = Math.min(window.innerWidth - rect.right, window.innerWidth - this.box.offsetWidth - FramePhaseMeter.EDGE_PX) + "px"; }
     }
   }
   class GameLoop {
@@ -12834,7 +12835,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.netDiag.frame(frameMs);
       services.badConnection.frame();
       services.propThemes.spinMillBlades(dt);
-      if (!services.session.room || services.screens.now !== "game") { services.tourView.renderTour(nowMs, dt); return; }
+      if (!services.session.room || services.screens.now !== "game") { services.phases.start(frameMs); services.tourView.renderTour(nowMs, dt); services.phases.mark("render"); return; }
       var st = services.session.room.status;
       if ((st === "countdown" || st === "playing" || st === "ended") && services.session.room.startAt && (!services.match.game || services.match.game.startAt !== services.session.room.startAt)) {
         if (services.session.players[services.session.myId] && (services.session.players[services.session.myId].slot || services.flow.isSpec())) services.flow.initGame(); else return;
