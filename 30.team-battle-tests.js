@@ -963,6 +963,22 @@ class ResultCollector {
       done(!r.storming && !r.extra && !r.gaugeLocked ? "pass" : "fail", (r.storming ? "폭풍 계속됨" : "폭풍 끊김") + ", 끊긴 뒤 피해 " + r.extra + (r.gaugeLocked ? ", 게이지 잠김 남음" : ""));
     });
   });
+  run(DANCER, "칼날 폭풍: 회전 중에는 기본 공격이 안 나가고, 끝나면 다시 쓸 수 있는가", function (done) {
+    var y = OPEN_Y.forest, bad = [];
+    var W = world("forest", [
+      { id: "dc", team: "blue", char: "dancer", x: 250, y: y, gauge: api.GAUGE_MAX },
+      { id: "foe", team: "red", char: "knight", x: 700, y: y }
+    ]);
+    var dc = W.ent("dc");
+    api.useUlt(dc, 0);
+    dc.cdUntil = 0;
+    api.fireBasic(dc, 0);
+    if (dc.cdUntil !== 0) bad.push("회전 중 기본 공격이 나감");
+    W.step(api.ULT.bwDur + 100);
+    api.fireBasic(dc, 0);
+    if (dc.cdUntil <= W.t()) bad.push("회전이 끝난 뒤 기본 공격이 안 나감");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "회전 중 막힘, 끝난 뒤 사용");
+  });
   run(DANCER, "칼날 폭풍: " + api.secs(api.ULT.bwDur) + "간 이동속도 " + api.shownSpeed(api.CHARS.dancer.ultSpeed) + ", 반경 " + api.ULT.bwR + " 안 적에게 " + api.secs(api.ULT.bwTick) + "마다 " + api.ULT.bwDmg + " 피해, 따라다니고 끝나면 멈추는가", function (done) {
     var y = OPEN_Y.forest;
     var W = dancerDuel([
@@ -1466,6 +1482,19 @@ class ResultCollector {
     ].concat(extra || []));
   }
   function clericSwing(W) { var cl = W.ent("cl"); cl.cdUntil = 0; api.fireBasic(cl, 0); W.frame(FRAME); }
+  run(CLERIC, "요한계시록: 기도 중에는 기본 공격이 안 나가고, 끝나면 다시 쓸 수 있는가", function (done) {
+    var W = clericTeam(), cl = W.ent("cl"), bad = [];
+    W.ent("kn").hp = 100;
+    cl.gauge = api.GAUGE_MAX;
+    api.useUlt(cl, 0);
+    var cdBefore = cl.cdUntil = 0;
+    api.fireBasic(cl, 0);
+    if (cl.cdUntil !== cdBefore) bad.push("기도 중 기본 공격이 나감");
+    W.step(api.ULT.rvDur + 100);
+    api.fireBasic(cl, 0);
+    if (cl.cdUntil <= W.t()) bad.push("기도가 끝난 뒤 기본 공격이 안 나감");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "기도 중 막힘, 끝난 뒤 사용");
+  });
   run(CLERIC, "기본 공격: 반경 " + api.CHARS.cleric.range + " 안에서 체력 비율이 가장 낮은 아군 1명만 " + api.CHARS.cleric.graceHeal + " 회복하고, 자신·먼 아군·부활 보호 중 아군은 고르지 않는가", function (done) {
     var W = clericTeam([{ id: "far", team: "blue", char: "ranger", x: 300, y: OPEN_Y.forest - 480 }]);
     var cl = W.ent("cl"), kn = W.ent("kn"), rg = W.ent("rg"), far = W.ent("far"), bad = [];

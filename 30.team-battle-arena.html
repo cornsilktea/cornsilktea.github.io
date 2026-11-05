@@ -26,7 +26,7 @@
   "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
 } }
 </script>
-<link rel="stylesheet" href="30.team-battle-arena.css?v=20261105a">
+<link rel="stylesheet" href="30.team-battle-arena.css?v=20261105b">
 </head>
 <body>
 <canvas id="cv"></canvas>
@@ -3026,10 +3026,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     static ULT = {
       rvDur: GameTime.gameMs(3), rvTick: GameTime.gameMs(1), rvHeal: 20, rvDmg: 20, rvCastMs: 600, grLife: 650
     };
-    static STATS = { name: "클레릭", role: "caster", icon: "✝️", hp: 110, speed: GameTime.gameSpeed(170), cd: GameTime.gameMs(1.4), dmg: 0, graceHeal: 18, range: 400, noAim: true, healGauge: 400, ultName: "요한계시록", heals: true };
+    static STATS = { name: "클레릭", role: "caster", icon: "✝️", hp: 110, speed: GameTime.gameSpeed(170), cd: GameTime.gameMs(1.4), dmg: 0, graceHeal: 20, range: 400, noAim: true, healGauge: 400, ultName: "요한계시록", heals: true };
     isRevealing(E, t) { return E.buffUntil > t; }
     latePose(E, t) { return this.isRevealing(E, t) ? ["Ranged_Magic_Spellcasting", 1] : null; }
     isRooted(E, t) { return this.isRevealing(E, t); }
+    cannotAttack(E, t) { return this.isRevealing(E, t); }
     get showsHealRange() { return true; }
     overrideBasic(E, ang, reach, t) { var services = this.services; services.fieldFx.graceStrike(E, t); return true; }
     botAct(B, target, enemies, t) { var services = this.services; services.brain.botCleric(B, enemies, t); return true; }
@@ -3047,7 +3048,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.vision.revealBriefly(E.id, t);
     }
     ultDesc() { var services = this.services;
-      return "아군의 체력을 " + ClericType.STATS.healGauge + " 회복시키면 사용 가능. 사용 시 자신의 체력을 모두 회복하고 " + services.skilltext.secs(ClericType.ULT.rvDur) + "간 제자리에서 기도. 사용 순간부터 1초마다 " + (ClericType.ULT.rvDur / ClericType.ULT.rvTick + 1) + "번, 아군 전체는 체력 " + ClericType.ULT.rvHeal + " 회복, 적 전체는 " + ClericType.ULT.rvDmg + "의 피해. 기절·넉백·끌어당김을 당하면 취소";
+      return "아군의 체력을 " + ClericType.STATS.healGauge + " 회복시키면 사용 가능. 사용 시 자신의 체력을 모두 회복하고 " + services.skilltext.secs(ClericType.ULT.rvDur) + "간 제자리에서 기도. 사용 순간부터 1초마다 " + (ClericType.ULT.rvDur / ClericType.ULT.rvTick + 1) + "번, 아군 전체는 체력 " + ClericType.ULT.rvHeal + " 회복, 적 전체는 " + ClericType.ULT.rvDmg + "의 피해. 기도 중 기본 공격 불가, 기절·넉백·끌어당김을 당하면 취소";
     }
     passiveDesc() {
       var c = this.data;
@@ -3201,12 +3202,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
                recolor: [[1, 0, 2, "#FFB7CC", "#E0708F"], [1, 2, 1, "#FFE9F0", "#F2A9BE"], [2, 1, 1, "#C8303A", "#8A1820"], [0, 5, 1, "#C8303A", "#8A1820"], [2, 0, 1, "#FFFFFF", "#F2D6DE"]],
                ponytail: { hair: "#1E1A22", tie: "#D97B4F" } };
     static ULT = {
-      bwR: 150, bwDur: GameTime.gameMs(4), bwTick: GameTime.gameMs(0.3), bwHurtGaugeEvery: 4, bwDmg: 18, bwKillGauge: 5, bdR: 70, bdDmg: 10,
+      bwR: 150, bwDur: GameTime.gameMs(4), bwTick: GameTime.gameMs(0.3), bwHurtGaugeEvery: 4, bwDmg: 20, bwKillGauge: 5, bdR: 70, bdDmg: 10,
       bdDelay: GameTime.gameMs(0.4)
     };
     static STATS = { name: "검무희", role: "assassin", icon: "🌸", hp: 135, speed: GameTime.gameSpeed(175), ultSpeed: GameTime.gameSpeed(210), cd: GameTime.gameMs(1.2), dmg: 20, range: 350, pSpeed: 900, pr: 8, ultName: "칼날 폭풍" };
     get botRole() { return "back"; }
     isBladeStorming(E, t) { return E.buffUntil > t; }
+    cannotAttack(E, t) { return this.isBladeStorming(E, t); }
     earlyPose(E, t) { return this.isBladeStorming(E, t) ? ["Melee_2H_Attack_Spinning", 1.2] : null; }
     skillSpeed(E, t) { return E.buffUntil > t ? this.data.ultSpeed : null; }
     statDamageText(c) { var services = this.services; return services.skilltext.num(c.dmg) + "+" + services.skilltext.num(DancerType.ULT.bdDmg); }
@@ -3238,7 +3240,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       E.pending = null;
     }
     ultDesc() { var services = this.services;
-      return services.skilltext.secs(DancerType.ULT.bwDur) + "간 회전하며 " + services.skilltext.ultSpeedUpText(DancerType.STATS) + ". 반경 " + DancerType.ULT.bwR + "의 적은 " + services.skilltext.secs(DancerType.ULT.bwTick) + "마다 " + DancerType.ULT.bwDmg + "의 피해. 기절·넉백을 당하면 취소";
+      return services.skilltext.secs(DancerType.ULT.bwDur) + "간 회전하며 " + services.skilltext.ultSpeedUpText(DancerType.STATS) + ". 반경 " + DancerType.ULT.bwR + "의 적은 " + services.skilltext.secs(DancerType.ULT.bwTick) + "마다 " + DancerType.ULT.bwDmg + "의 피해. 회전 중 기본 공격 불가, 기절·넉백을 당하면 취소";
     }
     passiveDesc() { var services = this.services;
       return "단검이 적에게 맞거나 사거리 끝에 닿으면 " + services.skilltext.secs(DancerType.ULT.bdDelay) + " 뒤 회전해 반경 " + DancerType.ULT.bdR + "의 적에게 " + DancerType.ULT.bdDmg + "의 피해. 처치 시 게이지 " + DancerType.ULT.bwKillGauge + " 회복(스킬 중 처치는 종료 후)";
@@ -8615,7 +8617,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     buildClericRange() { var services = this.services;
       var g = new THREE.Group();
-      var fill = services.arenaView.flatMesh(services.geo.disc, services.matlib.clericRangeFillMat); fill.position.y = 1.1; g.add(fill);
       var edge = services.arenaView.flatMesh(new THREE.RingGeometry(0.985, 1, 72), services.matlib.clericRangeEdgeMat); edge.position.y = 1.3; g.add(edge);
       g.scale.set(ClericType.STATS.range, 1, ClericType.STATS.range);
       g.visible = false;
@@ -9381,7 +9382,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     static SKY_BEAM_DROP_MS = 300;
     static REV_ALLY_COLOR = 0xFFD84A;
     static REV_FOE_COLOR = 0x8C8A86;
-    constructor(services) { this.services = services; this.projPool = new ProjectileVisPool(services); this.stabFrom = new THREE.Vector3(); this.stabTo = new THREE.Vector3(); this.stabDir = new THREE.Vector3(); this.stabAxis = new THREE.Vector3(1, 0, 0); this.tmpV = new THREE.Vector3(); this.yUp = new THREE.Vector3(0, 1, 0); this.skyBeamFade = (function () {     var cv = document.createElement("canvas"); cv.width = 4; cv.height = 64;     var g = cv.getContext("2d"), grad = g.createLinearGradient(0, 0, 0, 64);     grad.addColorStop(0, "rgba(255,255,255,0)"); grad.addColorStop(0.55, "rgba(255,255,255,0.75)"); grad.addColorStop(1, "rgba(255,255,255,1)");     g.fillStyle = grad; g.fillRect(0, 0, 4, 64);     return new THREE.CanvasTexture(cv); })(); this.stormMaskCache = { tex: null, arena: "" }; this.projectiles = {}; this.melees = {}; }
+    constructor(services) { this.services = services; this.projPool = new ProjectileVisPool(services); this.stabFrom = new THREE.Vector3(); this.stabTo = new THREE.Vector3(); this.stabDir = new THREE.Vector3(); this.stabAxis = new THREE.Vector3(1, 0, 0); this.tmpV = new THREE.Vector3(); this.yUp = new THREE.Vector3(0, 1, 0); this.skyBeamFade = (function () {     var cv = document.createElement("canvas"); cv.width = 4; cv.height = 64;     var g = cv.getContext("2d"), grad = g.createLinearGradient(0, 0, 0, 64);     grad.addColorStop(0, "rgba(255,255,255,0)"); grad.addColorStop(0.55, "rgba(255,255,255,0.75)"); grad.addColorStop(1, "rgba(255,255,255,1)");     g.fillStyle = grad; g.fillRect(0, 0, 4, 64);     var tex = new THREE.CanvasTexture(cv); tex.generateMipmaps = false; tex.minFilter = THREE.LinearFilter; return tex; })(); this.stormMaskCache = { tex: null, arena: "" }; this.projectiles = {}; this.melees = {}; }
     makeProjVis(p) { var services = this.services;
       var d = p.d, g = services.effectView.projPool.takeOrBuild(d);
       var shooter = services.fighterView.fighters[d.owner];
@@ -9691,8 +9692,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class RevGraceView {
-    constructor(services) { this.services = services; }
-    makeSkyBeam(color, ash) { var services = this.services;
+    static HIDDEN = /[?&]nobeam(&|$)/.test(location.search);
+    static MAX_BEAMS = 4;
+    constructor(services) { this.services = services; this.spareBeams = {}; }
+    buildSkyBeam(color, ash) { var services = this.services;
       var g = new THREE.Group();
       var blend = ash ? THREE.NormalBlending : THREE.AdditiveBlending;
       var mat = new THREE.MeshBasicMaterial({ color: color, map: services.effectView.skyBeamFade, transparent: true, opacity: 0.5, depthWrite: false, blending: blend });
@@ -9701,13 +9704,31 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var outer = new THREE.Mesh(services.geo.skyBeam, mat); outer.scale.set(26, EffectView.SKY_BEAM_H, 26); g.add(outer);
       var inner = new THREE.Mesh(services.geo.skyBeam, core); inner.scale.set(9, EffectView.SKY_BEAM_H, 9); g.add(inner);
       var pad = services.arenaView.flatMesh(services.geo.disc, padMat); pad.scale.setScalar(34); pad.position.y = 1.5; g.add(pad);
-      g.userData = { mats: [mat, core, padMat], outer: outer, inner: inner, pad: pad };
+      g.userData = { mats: [mat, core, padMat], outer: outer, inner: inner, pad: pad, key: this.beamKey(color, ash) };
+      return g;
+    }
+    beamKey(color, ash) { return color + (ash ? "|ash" : "|glow"); }
+    makeSkyBeam(color, ash) { var services = this.services;
+      var spare = this.spareBeams[this.beamKey(color, ash)], g = (spare && spare.pop()) || this.buildSkyBeam(color, ash);
+      g.userData.inner.scale.x = g.userData.inner.scale.z = 9;
+      g.visible = true;
       services.stage.scene.add(g);
       return g;
     }
-    dropSkyBeam(b) { var services = this.services; services.stage.scene.remove(b); b.userData.mats.forEach(function (m) { m.dispose(); }); }
+    dropSkyBeam(b) { var services = this.services;
+      services.stage.scene.remove(b);
+      (this.spareBeams[b.userData.key] = this.spareBeams[b.userData.key] || []).push(b);
+    }
+    prefillBeams(count) { var view = this;
+      [[EffectView.REV_ALLY_COLOR, false], [EffectView.REV_FOE_COLOR, true]].forEach(function (kind) {
+        var key = view.beamKey(kind[0], kind[1]), spare = view.spareBeams[key] = view.spareBeams[key] || [];
+        while (spare.length < count) spare.push(view.buildSkyBeam(kind[0], kind[1]));
+      });
+    }
+    spareBeamRoots() { var spare = this.spareBeams; return Object.keys(spare).reduce(function (all, k) { return all.concat(spare[k]); }, []); }
     dropRevVis(r) { var services = this.services; if (!r.vis) return; Object.keys(r.vis || {}).forEach(function (id) { services.revGraceView.dropSkyBeam(r.vis[id]); }); r.vis = null; }
     placeSkyBeam(b, x, y, drop, fade, nowMs) {
+      if (RevGraceView.HIDDEN) { b.visible = false; return; }
       var ud = b.userData, len = EffectView.SKY_BEAM_H * drop;
       b.position.set(x, EffectView.SKY_BEAM_H - len, y);
       ud.outer.scale.y = ud.inner.scale.y = len;
@@ -11007,6 +11028,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   class Hud2D {
     static FONT = '"Nanum Gothic", "Malgun Gothic", sans-serif';
     static MAX_FLOAT_TEXTS = 12;
+    static POP_MS = 500;
+    static POP_SCALE = [{ transform: "scale(1)" }, { transform: "scale(1.6)", offset: 0.25 }, { transform: "scale(1)" }];
+    static POP_TINT = [{ color: "#D97B4F" }, { color: "#F4F1E8" }];
     static STALL_MS = 250;
     static FINAL_COUNT_MS = 10000;
     constructor(services) { this.services = services; this.tmpV = new THREE.Vector3(); this.lastCountSec = 0; this.labels = []; }
@@ -11074,7 +11098,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     popHudNum(id, value, shown) {
       var el = Dom.$(id);
       Dom.setText(el, String(value));
-      if (shown >= 0 && value > shown) { el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop"); }
+      if (shown >= 0 && value > shown) {
+        el.animate(Hud2D.POP_SCALE, { duration: Hud2D.POP_MS, easing: "ease-out" });
+        el.animate(Hud2D.POP_TINT, { duration: Hud2D.POP_MS, easing: "step-end" });
+      }
     }
     updateMyHud() { var services = this.services;
       var dmg = Math.round(services.match.me.dmg), assists = services.match.me.assists || 0;
@@ -11385,7 +11412,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       this.clericHaloMat = new THREE.MeshBasicMaterial({ color: 0xFFD84A, transparent: true, opacity: 0.32, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
       this.clericRingMat = new THREE.MeshBasicMaterial({ color: 0xFFE9A0, transparent: true, opacity: 0.7, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
       this.clericBookGlowMat = new THREE.MeshBasicMaterial({ color: 0xFFF1B0, transparent: true, opacity: 0.5, depthWrite: false, blending: THREE.AdditiveBlending });
-      this.clericRangeFillMat = new THREE.MeshBasicMaterial({ color: 0xFFF3C4, transparent: true, opacity: 0.05, depthWrite: false });
       this.clericRangeEdgeMat = new THREE.MeshBasicMaterial({ color: 0xFFF3C4, transparent: true, opacity: 0.35, depthWrite: false });
       this.lungeMat = new THREE.MeshBasicMaterial(MaterialLibrary.LUNGE);
       this.aimMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5, depthWrite: false, depthTest: false });
@@ -11501,7 +11527,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class PerfProbe {
-    static BUILD = "lag7";
+    static BUILD = "lag8";
     static PATH = "perfDiag/teambattle/";
     static RTT_KEEP = 50;
     static RECORDS = !Environment.SILENT_RUN;
@@ -11909,7 +11935,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     prefillPooledViews() { var services = this.services;
       if (!services.cameraRig.renderer || !services.models.kit.ready) return;
-      var necros = this.castersByTeam("necro"), engineers = this.castersByTeam("engineer"), druids = this.castersByTeam("druid");
+      var necros = this.castersByTeam("necro"), engineers = this.castersByTeam("engineer"), druids = this.castersByTeam("druid"), clerics = this.castersByTeam("cleric");
+      if (clerics.blue + clerics.red) services.revGraceView.prefillBeams(RevGraceView.MAX_BEAMS);
       ["blue", "red"].forEach(function (team) {
         services.fighterView.prefillMinions(team, necros[team] * NecroType.ULT.smMax);
         if (services.models.kit.propsReady) services.turrets.prefill(team, engineers[team] * EngineerType.ULT.trMax);
@@ -11917,7 +11944,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (services.models.kit.propsReady) services.groves.prefill(druids.blue + druids.red);
     }
     warmObjects() { var services = this.services;
-      return (this.kept || []).concat(services.fighterView.spareMinionRoots(), services.turrets.spareRoots(), services.groves.spare);
+      return (this.kept || []).concat(services.fighterView.spareMinionRoots(), services.turrets.spareRoots(), services.groves.spare, services.revGraceView.spareBeamRoots());
     }
   }
   class FramePhaseMeter {

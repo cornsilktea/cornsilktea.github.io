@@ -262,8 +262,6 @@
            background: rgba(14,20,17,.8); color: #F4F1E8; border: 1px solid rgba(255,255,255,.16); border-top: 2px solid #D97B4F; font-size: 12px; font-weight: 800; }
   #hudMe span { display: flex; flex-direction: column; align-items: center; line-height: 1.1; color: #A3B0A6; }
   #hudMe b { font-size: 18px; color: #F4F1E8; font-variant-numeric: tabular-nums; }
-  #hudMe b.pop { animation: hudMePop .5s ease-out; }
-  @keyframes hudMePop { 0% { transform: scale(1); color: #F4F1E8; } 25% { transform: scale(1.6); color: #D97B4F; } 100% { transform: scale(1); color: #F4F1E8; } }
   #btnLeaveGame { position: absolute; top: 8px; right: 8px; height: 34px; padding: 0 12px; font-size: 14px; font-weight: 800; border-radius: 6px; border: 1px solid rgba(255,138,138,.6); background: rgba(14,20,17,.8); color: #FF9A9A; }
   #practiceBar { position: absolute; top: 8px; right: 8px; display: flex; gap: 6px; pointer-events: auto; }
   #practiceBar button { height: 34px; padding: 0 12px; font-size: 14px; font-weight: 800; border-radius: 6px; border: 1px solid rgba(255,255,255,.28); border-bottom: 2px solid #D97B4F; background: rgba(14,20,17,.82); color: #F4F1E8; white-space: nowrap; }
