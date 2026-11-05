@@ -18,7 +18,7 @@
 
 **첫 사용 끊김**
 - `renderer.compile` 은 셰이더만 만든다. 텍스처·뼈 텍스처·버퍼 올리기와 GPU 상태 조합은 **실제로 그릴 때** 일어난다.
-- 카운트다운 첫 프레임에 숨은 부품 전부와 효과 표본을 켜고(표본은 화면 밖, `frustumCulled = false`) `renderer.render` 로 한 번 그린 뒤, 숨기고 다시 그린다. 화면에는 안 보인다. 30번 `ShaderWarmup.warmHiddenForms` 를 본보기로 한다.
+- 카운트다운 첫 프레임에 숨은 부품 전부와 효과 표본을 켜고(표본은 화면 밖, `frustumCulled = false`) `renderer.render` 로 한 번 그린 뒤, 숨기고 다시 그린다. 화면에는 안 보인다. 30번 `ShaderWarmup.warmHiddenForms` 를 본보기로 한다. 화면 밖 표본은 화소 계산이 안 돌 수 있으니, 표본을 아주 작게 줄여 화면 가운데 몇 화소에도 실제로 칠한다(`ShaderWarmup.paintRealPixels`, 효과는 태블릿에서 재서 확인).
 - 재사용 그림(소환수·설치물)은 그 캐릭터가 경기에 있을 때 최대 개수만큼 미리 만들어 같이 그려 둔다.
 
 **2D 글자·체력바**

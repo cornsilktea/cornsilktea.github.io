@@ -4718,6 +4718,10 @@ class ResultCollector {
       var base = await practiceRoom(fake, "16161"), E = api.MATCH.me, now0 = Date.now();
       E.gauge = 0; api.fillPracticeGauge();
       if (E.gauge !== api.GAUGE_MAX || !api.MATCH.game.forceNet) bad.push("게이지 채우기");
+      api.showScreen("game");
+      E.gauge = 0; window.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyH" }));
+      api.showScreen("lobby");
+      if (E.gauge !== api.GAUGE_MAX) bad.push("H 키로 안 채워짐");
       E.gauge = 0; E.skillUntil = Date.now() + 5000; api.fillPracticeGauge();
       if (E.gauge !== 0) bad.push("스킬 사용 중에 채워짐");
       E.skillUntil = 0; E.alive = false; api.fillPracticeGauge();

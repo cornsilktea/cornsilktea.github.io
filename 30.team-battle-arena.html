@@ -187,7 +187,7 @@
   <div id="killFeed"></div>
   <div id="killBanner"></div>
   <button id="btnLeaveGame" type="button">방 나가기</button>
-  <div id="practiceBar" hidden><button id="btnPracChar" type="button">캐릭터 변경</button><button id="btnPracGauge" type="button">스킬 게이지 채우기</button><button id="btnPracExit" type="button">연습장 나가기</button></div>
+  <div id="practiceBar" hidden><button id="btnPracChar" type="button">캐릭터 변경</button><button id="btnPracGauge" type="button">스킬 게이지 채우기(H)</button><button id="btnPracExit" type="button">연습장 나가기</button></div>
   <div id="practiceInfo" hidden></div>
   <div id="hudMe" hidden><span>킬<b id="hudMeK">0</b></span><span>데스<b id="hudMeD">0</b></span><span>어시스트<b id="hudMeA">0</b></span><span>피해량<b id="hudMeDmg">0</b></span></div>
   <div id="specL" class="specPanel blue" hidden></div>
@@ -7640,6 +7640,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (e.code === "KeyJ" && !e.repeat && services.input.canAct() && services.match.me.gauge >= MatchRules.GAUGE_MAX && !services.match.me.burst) {
         e.preventDefault(); var ua = services.autoAim.angle(services.match.me); services.match.me.angle = ua; services.attack.useUlt(services.match.me, ua);
       }
+      if (e.code === "KeyH" && !e.repeat && services.session.practiceMode()) { e.preventDefault(); services.practice.fillPracticeGauge(); }
     }
     onKeyUp(e) { var services = this.services; var k = services.input.keyName(e); if (k) services.input.keys[k] = false; }
     onJoyDown(cv, e) { var services = this.services;
@@ -12248,6 +12249,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   class ShaderWarmup {
     static PROBE_SPOT = -9000;
+    static DOT_PX = 24;
+    static DOT_SCALE = 0.04;
     constructor(services) { this.services = services; this.effectsWarmed = false; }
     sampleShots() { var services = this.services, P = ShaderWarmup.PROBE_SPOT;
       return services.charTypes.list.map(function (c) {
@@ -12324,6 +12327,20 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         obj.traverse(function (o) { o.frustumCulled = false; });
       });
     }
+    viewCenterOnGround() { var camera = this.services.stage.camera, dir = camera.getWorldDirection(new THREE.Vector3());
+      var k = dir.y < -0.01 ? -camera.position.y / dir.y : 0;
+      return { x: camera.position.x + dir.x * k, z: camera.position.z + dir.z * k };
+    }
+    paintRealPixels(objects) { var services = this.services, renderer = services.cameraRig.renderer, center = this.viewCenterOnGround(), S = ShaderWarmup.DOT_PX;
+      var saved = objects.map(function (obj) { return { obj: obj, position: obj.position.clone(), scale: obj.scale.clone() }; });
+      objects.forEach(function (obj) { obj.position.set(center.x, 0, center.z); obj.scale.setScalar(ShaderWarmup.DOT_SCALE); });
+      var el = renderer.domElement;
+      renderer.setScissorTest(true);
+      renderer.setScissor(el.clientWidth / 2 - S / 2, el.clientHeight / 2 - S / 2, S, S);
+      renderer.render(services.stage.scene, services.stage.camera);
+      renderer.setScissorTest(false);
+      saved.forEach(function (row) { row.obj.position.copy(row.position); row.obj.scale.copy(row.scale); });
+    }
     warmHiddenForms() { var services = this.services, warmup = this;
       if (!this.formsPending || !services.cameraRig.renderer) return;
       var views = Object.keys(services.fighterView.fighters || {}).map(function (id) { return services.fighterView.fighters[id]; });
@@ -12334,6 +12351,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var objects = this.warmObjects();
       this.placeWarmObjects(objects, shown);
       renderer.render(scene, camera);
+      this.paintRealPixels(objects);
       shown.forEach(function (o) { o.visible = false; });
       objects.forEach(function (obj) { if (obj.parent) obj.parent.remove(obj); });
       renderer.render(scene, camera);
