@@ -2801,6 +2801,41 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return ["Throw", E.ultUntil > E.atkAt ? 1.6 : 2.2];
     }
   }
+  class LancerShieldOrbit {
+    static MODEL = "shield_round_barbarian";
+    static COUNT = 3;
+    static RADIUS = 40;
+    static HEIGHT = 30;
+    static SIZE = 0.85;
+    static SPIN_MS = 1800;
+    static SWAY = 4;
+    constructor(services, root) {
+      this.group = new THREE.Group();
+      this.group.visible = false;
+      this.shields = [];
+      var template = services.models.kit.weapons[LancerShieldOrbit.MODEL];
+      if (!template) return;
+      for (var i = 0; i < LancerShieldOrbit.COUNT; i++) {
+        var holder = new THREE.Group(), shield = template.clone();
+        shield.scale.setScalar(ModelTuning.MODEL_SCALE * LancerShieldOrbit.SIZE);
+        shield.traverse(function (o) { if (o.isMesh) o.frustumCulled = false; });
+        holder.add(shield);
+        this.group.add(holder);
+        this.shields.push(holder);
+      }
+      root.add(this.group);
+    }
+    update(on, nowMs) {
+      this.group.visible = on && this.shields.length > 0;
+      if (!this.group.visible) return;
+      var base = nowMs / LancerShieldOrbit.SPIN_MS, step = Math.PI * 2 / LancerShieldOrbit.COUNT;
+      this.shields.forEach(function (holder, i) {
+        var a = base + i * step;
+        holder.position.set(Math.sin(a) * LancerShieldOrbit.RADIUS, LancerShieldOrbit.HEIGHT + LancerShieldOrbit.SWAY * Math.sin(nowMs / 300 + i * 2.1), Math.cos(a) * LancerShieldOrbit.RADIUS);
+        holder.rotation.y = a;
+      });
+    }
+  }
   class LancerType extends CharacterType {
     static MELEE = { color: 0xFFD27A, spark: "#FFD27A" };
     static MODEL = { file: "Barbarian", portraitPlant: true, right: "spear_A", rightScale: 1.35, hide: ["Barbarian_BearHat"], wear: { from: "knight", part: "Knight_Helmet" },
@@ -2809,6 +2844,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       lnWind: GameTime.gameMs(0.5), lnLen: 350, lnW: 108, lnDmg: 75, lnStunMs: GameTime.gameMs(1.7)
     };
     static STATS = { name: "창술사", role: "fighter", icon: "🔱", hp: 390, speed: GameTime.gameSpeed(150), cd: GameTime.gameMs(1.5), dmg: 32, range: 200, width: 50, respawnShield: true, ultName: "꿰뚫기", ultAim: true };
+    addMarkers(v, root, body) { v.guardOrbit = new LancerShieldOrbit(this.services, root); }
     isLancerWinding(E, t) { return E.ultUntil > t; }
     isRooted(E, t) { return this.isLancerWinding(E, t); }
     get idleClip() { return "Melee_2H_Idle"; }
@@ -7918,7 +7954,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       function load(url) { return files.load(url); }
       var weaponNames = [];
       ModelKit.modelChars(services).forEach(function (c) { [services.charTypes.modelOf(c).right, services.charTypes.modelOf(c).left].forEach(function (w) { if (w && weaponNames.indexOf(w) < 0) weaponNames.push(w); }); });
-      weaponNames.push("arrow_bow", "arrow_crossbow", ModelKit.MINION_MODEL.right, WraithType.BLADE_MODEL, BannerBearerType.FLAG_MODELS.blue, BannerBearerType.FLAG_MODELS.red);
+      weaponNames.push(LancerShieldOrbit.MODEL, "arrow_bow", "arrow_crossbow", ModelKit.MINION_MODEL.right, WraithType.BLADE_MODEL, BannerBearerType.FLAG_MODELS.blue, BannerBearerType.FLAG_MODELS.red);
       var jobs = [load(ModelKit.KIT_DIR + "animations/teambattle_anims.glb?v=crossbow").then(function (g) { g.animations.forEach(function (clip) { services.models.kit.clips[clip.name] = clip; }); }),
                   load(ModelKit.KIT_DIR + "animations/teambattle_large.glb?v=giant").then(function (g) { g.animations.forEach(function (clip) { services.models.kit.largeClips[clip.name] = clip; }); })];
       weaponNames.forEach(function (w) { jobs.push(load(ModelKit.KIT_DIR + "props/" + w + ".gltf").then(function (g) { services.models.kit.weapons[w] = services.modelStyle.lambertize(g.scene, w === ThrowerType.MODEL.right); })); });
@@ -10446,6 +10482,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         var glow = services.frameRenderer.glowOf(E, t);
         v.glowMats.forEach(function (m) { m.emissive.setHex(glow); });
         if (v.aura) { v.aura.visible = E.alive && (E.isBerserk(t) || E.isRiposting(t)); v.aura.scale.y = 0.9 + 0.15 * Math.sin(nowMs / 90); }
+        if (v.guardOrbit) v.guardOrbit.update(E.alive && E.shield, nowMs);
         if (v.shield) {
           v.shield.visible = E.alive && E.buffUntil > t;
           if (v.shield.visible) {
