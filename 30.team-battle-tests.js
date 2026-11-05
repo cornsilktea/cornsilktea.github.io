@@ -133,6 +133,21 @@ class ResultCollector {
     done(bad.length ? "fail" : "pass", bad.length ? bad.length + "곳 실패. 예: " + bad.slice(0, 3).join(" / ") : (5000 * api.MAP_IDS.length).toLocaleString() + "곳 모두 벽·물 밖으로 나옴");
   });
 
+  run(WALL, "연습장 포함 모든 맵: 어느 곳에 착지해도(점프 끝 밀어내기) 벽 속이나 벽 뒤 빈 곳에 남지 않는가", function (done) {
+    var bad = [], maps = api.MAP_IDS.concat(["practice"]);
+    maps.forEach(function (m) {
+      api.loadMapData(m);
+      for (var x = api.BOUND.l; x <= api.BOUND.r; x += 25) for (var y = api.BOUND.t; y <= api.BOUND.b; y += 25) {
+        var p = { x: x, y: y };
+        api.resolve(p);
+        var why = blockedAt(p.x, p.y);
+        if (why) bad.push(m + " (" + x + ", " + y + ") → (" + Math.round(p.x) + ", " + Math.round(p.y) + ") " + why);
+      }
+    });
+    api.loadMapData("forest");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.length + "곳 실패. 예: " + bad.slice(0, 3).join(" / ") : maps.length + "개 맵 모든 착지 지점이 빈 곳으로 나옴");
+  });
+
   function guardianIntoWall(hitchMs) {
     var W = world("forest", []), q = singleRowWall();
     var ty = q.y + q.h / 2 + api.BODY_R + 2;
@@ -7168,6 +7183,23 @@ class GiantTests {
       W.step(1500);
       if (api.FIELD.impactBlasts.length) bad.push("그림이 끝나지 않음");
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "반경 " + (blast && blast.r) + ", 피해 " + ULT.bsDmg);
+    });
+    run(G, "자객 그림: 돌진은 길이만큼, 회전베기는 반경만큼 칼날 선으로 나오고 예전 띠·원은 안 그리며 판정은 그대로인가", function (done) {
+      var bad = [], y = self.kit.OPEN_Y.forest, W, hm, foe, H = api.CHARS.hitman;
+      api.MATCH.stateByKey = {};
+      W = self.kit.world("forest", [{ id: "hm", team: "blue", char: "hitman", x: 200, y: y }, { id: "foe", team: "red", char: "guardian", x: 300, y: y }]);
+      hm = W.ent("hm"); foe = W.ent("foe");
+      api.FIELD.hitmanSlashes.length = 0; api.MATCH.melee = {};
+      api.fireBasic(hm, 0); W.frame(FRAME);
+      if (api.FIELD.hitmanSlashes.length !== 1 || !api.FIELD.hitmanSlashes[0].d.len) bad.push("돌진 칼날 선 " + api.FIELD.hitmanSlashes.length);
+      W.step(H.dashMs + H.finishDelay + 80);
+      var spin = api.FIELD.hitmanSlashes.filter(function (s) { return s.d && s.d.radius; })[0];
+      if (!spin) bad.push("회전베기 그림이 안 생김");
+      if (Object.keys(api.MATCH.melee).length) bad.push("예전 띠·원 그림이 남음");
+      if (foe.hp !== foe.maxHp - H.dashDmg - H.dmg) bad.push("피해 " + (foe.maxHp - foe.hp) + " (기대 " + (H.dashDmg + H.dmg) + ")");
+      W.step(1200);
+      if (api.FIELD.hitmanSlashes.length) bad.push("그림이 끝나지 않음");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "돌진·회전베기 그림과 피해 " + (H.dashDmg + H.dmg));
     });
     run(G, "화염술사 메테오 그림: " + ULT.mbDelay + "ms 뒤 떨어지는 순간 범위 폭발로 바뀌는가", function (done) {
       var bad = [], y = self.kit.OPEN_Y.forest, W, mage;

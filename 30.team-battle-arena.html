@@ -388,6 +388,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     galeView;
     meteorFall;
     impactBlasts;
+    hitmanSlashView;
     starfallView;
     aimGuide;
     fxView;
@@ -2308,7 +2309,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       this.bursts = []; this.pools = []; this.poolHit = {}; this.lunges = []; this.waves = [];
       this.holes = []; this.storms = []; this.revs = []; this.graces = []; this.domains = [];
       this.curses = {}; this.bladeSpins = []; this.turrets = []; this.groves = []; this.shells = []; this.gales = []; this.stars = [];
-      this.hooks = []; this.hookFlights = []; this.slams = []; this.hammerStrikes = []; this.streams = []; this.tsunamis = []; this.impactBlasts = [];
+      this.hooks = []; this.hookFlights = []; this.slams = []; this.hammerStrikes = []; this.streams = []; this.tsunamis = []; this.impactBlasts = []; this.hitmanSlashes = [];
     }
     dropOwnedBy(ownerId) { var services = this.services;
       var field = this, owned = function (item) { return (item.e || item.d).owner === ownerId; };
@@ -2340,6 +2341,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       this.streams.forEach(services.marinaStreamView.drop.bind(services.marinaStreamView));
       this.tsunamis.forEach(services.tsunamiView.drop.bind(services.tsunamiView));
       this.impactBlasts.forEach(services.impactBlasts.drop.bind(services.impactBlasts));
+      this.hitmanSlashes.forEach(services.hitmanSlashView.drop.bind(services.hitmanSlashView));
     }
     renderLingering(t, nowMs, dt) { var services = this.services;
       this.pools.forEach(function (pl) { services.poolView.renderPool(pl, t, nowMs); });
@@ -2357,6 +2359,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.marinaStreamView.render(t, nowMs);
       services.tsunamiView.render(t, nowMs);
       services.impactBlasts.render(t, nowMs);
+      services.hitmanSlashView.render(t, nowMs);
     }
   }
 
@@ -2435,6 +2438,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     get idleClip() { return "Idle_A"; }
     get hasDarkWave() { return false; }
     get hidesBasicEdge() { return false; }
+    get drawsOwnStrike() { return false; }
     get heavyStrikeSpark() { return false; }
     get showsHealRange() { return false; }
     showAimGuide(E, ult, c) { return false; }
@@ -3083,6 +3087,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       } else services.aimGuide.showAimStrip(0, services.dashMoves.dashReach(E, E.angle, c.dashRange) + ArenaSize.BODY_R, c.dashWidth);
       return true;
     }
+    get drawsOwnStrike() { return true; }
+    onStrikeShown(d) { this.services.hitmanSlashView.strike(d); }
     skillShotSpec() { return { count: 1, gap: 0, sp: HitmanType.ULT.exSpeed, dmg: HitmanType.ULT.exDmg, pr: HitmanType.ULT.exPr, range: HitmanType.ULT.exRange, ultKey: "execute", fx: { stunMs: HitmanType.ULT.exStunMs } }; }
     overrideBasic(E, ang, reach, t) { var services = this.services; services.dashMoves.dashStrike(E, ang); return true; }
     onHitLate(owner, h) { var services = this.services;
@@ -3098,10 +3104,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         if (execBlade) g.userData.spin = spinner;
       } else g.add(new THREE.Mesh(services.geo.shaft, services.models.basicMat("blade", 0xDCE3EC, 1)));
       if (execBlade) {
-        var bloodHalo = new THREE.Mesh(services.geo.ball, services.models.basicMat("execHalo", 0xE0142E, 0.3)); bloodHalo.scale.setScalar(34); g.add(bloodHalo);
-        var bloodCore = new THREE.Mesh(services.geo.ball, services.models.basicMat("execCore", 0x9A0018, 0.8)); bloodCore.scale.setScalar(14); g.add(bloodCore);
-        var execTrail = new THREE.Mesh(services.geo.trail, services.models.basicMat("trail-exec", 0xC8102E, 0.75)); execTrail.position.x = -40; execTrail.scale.set(220, 5, 5); g.add(execTrail);
-        var execEdge = new THREE.Mesh(services.geo.trail, services.models.glowMat("trail-exec-core", 0xFFFFFF, 0.7)); execEdge.position.x = -25; execEdge.scale.set(140, 1.4, 1.4); g.add(execEdge);
+        g.add(HitmanSlashShaders.ribbonMesh());
       } else {
         var cut = new THREE.Mesh(services.geo.trail, services.models.glowMat("trail-hitman", 0xFF4A5A, 0.55)); cut.position.x = -20; cut.scale.set(90, 1.1, 1.1); g.add(cut);
       }
@@ -5056,9 +5059,24 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         [[E.x - x0, x0 - ArenaSize.BODY_R, E.y], [x1 - E.x, x1 + ArenaSize.BODY_R, E.y], [E.y - y0, E.x, y0 - ArenaSize.BODY_R], [y1 - E.y, E.x, y1 + ArenaSize.BODY_R]].forEach(function (exit) {
           if (exit[0] < best && services.physics.insideBound(exit[1], exit[2]) && !services.physics.centerBlocked(exit[1], exit[2])) { best = exit[0]; nx = exit[1]; ny = exit[2]; }
         });
+        if (best === Infinity) { var open = services.physics.nearestOpenSpot(E.x, E.y); nx = open.x; ny = open.y; }
         E.x = nx; E.y = ny;
       } else { E.x = cx + ex / dd * ArenaSize.BODY_R; E.y = cy + ey / dd * ArenaSize.BODY_R; }
     }
+    bodyFitsAt(x, y) { var services = this.services;
+      function clear(o) { return MathKit.hyp(x - MathKit.clamp(x, o.x - o.w / 2, o.x + o.w / 2), y - MathKit.clamp(y, o.y - o.h / 2, o.y + o.h / 2)) >= ArenaSize.BODY_R; }
+      return this.insideBound(x, y) && services.arenaMap.obstacles.every(clear) && services.arenaMap.water.every(clear);
+    }
+    nearestOpenSpot(x, y) { var step = ArenaSize.TILE / 2, far = ArenaSize.BOUND.b - ArenaSize.BOUND.t;
+      for (var reach = step; reach <= far; reach += step) {
+        for (var i = 0; i < ArenaPhysics.SEARCH_DIRS; i++) {
+          var a = i / ArenaPhysics.SEARCH_DIRS * Math.PI * 2, sx = x + Math.cos(a) * reach, sy = y + Math.sin(a) * reach;
+          if (this.bodyFitsAt(sx, sy)) return { x: sx, y: sy };
+        }
+      }
+      return { x: x, y: y };
+    }
+    static SEARCH_DIRS = 32;
     centerBlocked(x, y) { var services = this.services;
       function inRect(o) { return Math.abs(x - o.x) < o.w / 2 && Math.abs(y - o.y) < o.h / 2; }
       return services.arenaMap.obstacles.some(inRect) || services.arenaMap.water.some(inRect);
@@ -6609,11 +6627,14 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.match.game.forceNet = true;
       if (T === services.match.me) services.sound.sfx("heal");
     }
-    hasOwnBlast(d) { return !!(d.hammer || d.mace); }
+    hasOwnBlast(d) { var services = this.services, who = services.session.players[d.owner] ? services.session.players[d.owner].characterType : "";
+      return !!(d.hammer || d.mace || services.charTypes.of(who).drawsOwnStrike);
+    }
     meleeStrike(key, d) { var services = this.services;
       var who = services.session.players[d.owner] ? services.session.players[d.owner].characterType : "";
       if (services.charTypes.waveOf(who) && d.len) {
         if (d.lanes) services.tsunamiView.add(d);
+        else if (services.melee.hasOwnBlast(d)) services.charTypes.of(who).onStrikeShown(d);
         else services.match.melee[key] = { d: d, at: Date.now() - Math.max(0, services.clock.now() - d.createdAt) / services.clock.scale };
         services.field.waves.push({ d: d, who: who, sparked: [], struck: [] });
         return;
@@ -10438,6 +10459,175 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       });
     }
   }
+  class HitmanSlashShaders {
+    static TONES = { deep: 0x8E1020, blade: 0xFF3D4E, core: 0xFFE9E4 };
+    static VERTEX = `
+      varying vec2 vP;
+      void main() { vP = position.xz; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
+    static DASH_FRAGMENT = `
+      uniform sampler2D uTex; uniform float uHead; uniform float uFade; uniform float uSeed; uniform float uLen; uniform vec3 uDeep; uniform vec3 uBlade; uniform vec3 uCore; varying vec2 vP;
+      float streak(float side, float width, float from, float to) {
+        float along = clamp((vP.x - from) / (to - from), 0.0, 1.0), thin = width * sin(along * 3.1416);
+        return step(from, vP.x) * step(vP.x, to) * smoothstep(thin, thin * 0.25, abs(vP.y - side));
+      }
+      void main() {
+        if (vP.x > uHead) discard;
+        float n = texture2D(uTex, vec2(vP.x * uLen / 300.0 + uSeed, uSeed)).r - 0.5;
+        float main = streak(n * 0.07, 0.05, 0.0, 1.0);
+        float side = max(streak(-0.2 + n * 0.1, 0.018, 0.12, 0.8), streak(0.24 - n * 0.1, 0.014, 0.3, 0.96));
+        float zone = 0.07 * smoothstep(0.5, 0.36, abs(vP.y)) * smoothstep(0.0, 0.12, vP.x);
+        vec3 color = mix(mix(uDeep, uBlade, max(main, side)), uCore, main * main * 0.45);
+        gl_FragColor = vec4(color, max(zone, max(main, side * 0.8)) * uFade);
+        #include <colorspace_fragment>
+      }`;
+    static SPIN_FRAGMENT = `
+      uniform float uHead; uniform float uFade; uniform vec3 uDeep; uniform vec3 uBlade; uniform vec3 uCore; varying vec2 vP;
+      float blade(float r, float around, float radius) {
+        float tail = smoothstep(0.6, 0.0, around), width = 0.008 + 0.075 * tail * tail;
+        return smoothstep(width, width * 0.3, abs(r - radius)) * tail;
+      }
+      void main() {
+        float r = length(vP);
+        if (r > 1.0 || r < 0.34) discard;
+        float around = atan(vP.y, vP.x) / 6.2832 + 0.5, lead = fract(uHead - around);
+        float outer = blade(r, lead, 0.88), inner = blade(r, fract(lead + 0.5), 0.62) * 0.65, line = max(outer, inner);
+        gl_FragColor = vec4(mix(mix(uDeep, uBlade, line), uCore, line * line * line * 0.55), line * uFade);
+        #include <colorspace_fragment>
+      }`;
+    static CROSS_FRAGMENT = `
+      uniform float uHead; uniform float uFade; uniform vec3 uDeep; uniform vec3 uBlade; uniform vec3 uCore; varying vec2 vP;
+      float cut(float across, float along, float grown) {
+        float k = along * 0.39 + 0.5;
+        if (k <= 0.0 || k >= 1.0 || k > grown) return 0.0;
+        float thin = 0.075 * sin(k * 3.1416);
+        return smoothstep(thin, thin * 0.2, abs(across) * 0.7071);
+      }
+      void main() {
+        float first = cut(vP.x - vP.y, vP.x + vP.y, min(1.0, uHead * 2.0));
+        float second = cut(vP.x + vP.y, vP.x - vP.y, max(0.0, uHead * 2.0 - 1.0));
+        float line = max(first, second);
+        gl_FragColor = vec4(mix(mix(uDeep, uBlade, line), uCore, line * line * 0.8), line * uFade);
+        #include <colorspace_fragment>
+      }`;
+    static RIBBON_FRAGMENT = `
+      uniform sampler2D uTex; uniform float uTime; uniform vec3 uDeep; uniform vec3 uBlade; uniform vec3 uCore; varying vec2 vP;
+      void main() {
+        float tailward = clamp(-vP.x, 0.0, 1.0), half_ = 0.46 * (1.0 - tailward) * (1.0 - tailward);
+        float n = texture2D(uTex, vec2(vP.x * 2.0 + uTime * 2.4, vP.y * 0.6)).b;
+        float body = smoothstep(half_, half_ * 0.35, abs(vP.y)), core = smoothstep(half_ * 0.3, 0.0, abs(vP.y));
+        vec3 color = mix(mix(uDeep, uBlade, n), uCore, core * (1.0 - tailward));
+        gl_FragColor = vec4(color, max(body * (0.34 + n * 0.5), core) * (1.0 - tailward));
+        #include <colorspace_fragment>
+      }`;
+    static RIBBON = null;
+    static uniformsOf() { var T = HitmanSlashShaders.TONES;
+      return { uTex: { value: WaterNoise.texture() }, uTime: { value: 0 }, uHead: { value: 0 }, uFade: { value: 0 }, uSeed: { value: 0 }, uLen: { value: 200 },
+               uDeep: { value: new THREE.Color(T.deep) }, uBlade: { value: new THREE.Color(T.blade) }, uCore: { value: new THREE.Color(T.core) } };
+    }
+    static ribbon() { var S = HitmanSlashShaders;
+      if (S.RIBBON) return S.RIBBON;
+      var geometry = new THREE.PlaneGeometry(1, 1); geometry.rotateX(-Math.PI / 2); geometry.translate(-0.5, 0, 0);
+      var uniforms = S.uniformsOf(), material = WaterNoise.softMaterial(uniforms, S.VERTEX, S.RIBBON_FRAGMENT, THREE.DoubleSide);
+      return S.RIBBON = { geometry: geometry, material: material, uniforms: uniforms };
+    }
+    static ribbonMesh() { var R = HitmanSlashShaders.ribbon(), mesh = new THREE.Mesh(R.geometry, R.material); mesh.scale.set(230, 1, 40); mesh.frustumCulled = false; mesh.renderOrder = 6; return mesh; }
+  }
+  class HitmanSlash {
+    static LIFE_SEC = 0.3;
+    constructor(at) { this.at = at; this.vis = null; }
+    get partName() { return ""; }
+    place(vis) {}
+    paint(vis, sec) {}
+    dress(vis) { vis.parts.forEach(function (part) { part.visible = false; }); vis[this.partName].visible = true; vis.uniforms.uSeed.value = WaterNoise.hash(this.at % 997, 3); this.place(vis); }
+  }
+  class HitmanDashSlash extends HitmanSlash {
+    static HOLD_SEC = 0.12;
+    constructor(d, at, scale) { super(at); this.d = d; this.travelSec = HitmanType.STATS.dashMs / scale / 1000; }
+    get partName() { return "dash"; }
+    get lifeSec() { return this.travelSec + HitmanDashSlash.HOLD_SEC; }
+    place(vis) { var d = this.d, length = d.len + ArenaSize.BODY_R;
+      vis.group.position.set(d.x, 3, d.y); vis.group.rotation.y = -d.angle;
+      vis.dash.scale.set(length, 1, d.width); vis.uniforms.uLen.value = length;
+    }
+    paint(vis, sec) { vis.uniforms.uHead.value = Math.min(1, sec / this.travelSec); vis.uniforms.uFade.value = MathKit.clamp((this.lifeSec - sec) / HitmanDashSlash.HOLD_SEC, 0, 1); }
+  }
+  class HitmanSpinSlash extends HitmanSlash {
+    static TURN_SEC = 0.16;
+    constructor(d, at) { super(at); this.d = d; }
+    get partName() { return "spin"; }
+    get lifeSec() { return HitmanSpinSlash.TURN_SEC + 0.1; }
+    place(vis) { var d = this.d, r = d.radius + ArenaSize.BODY_R; vis.group.position.set(d.x, 3, d.y); vis.group.rotation.y = 0; vis.spin.scale.set(r, 1, r); }
+    paint(vis, sec) { vis.uniforms.uHead.value = sec / HitmanSpinSlash.TURN_SEC; vis.uniforms.uFade.value = MathKit.clamp((this.lifeSec - sec) / 0.14, 0, 1); }
+  }
+  class HitmanExecuteCut extends HitmanSlash {
+    static R = 92;
+    static DRAW_SEC = 0.12;
+    constructor(x, y, at) { super(at); this.x = x; this.y = y; }
+    get partName() { return "cross"; }
+    get lifeSec() { return 0.42; }
+    place(vis) { vis.group.position.set(this.x, 3, this.y); vis.group.rotation.y = 0; vis.cross.scale.set(HitmanExecuteCut.R, 1, HitmanExecuteCut.R); }
+    paint(vis, sec) { vis.uniforms.uHead.value = Math.min(1, sec / HitmanExecuteCut.DRAW_SEC); vis.uniforms.uFade.value = MathKit.clamp((this.lifeSec - sec) / 0.2, 0, 1); }
+  }
+  class ExecuteBlast extends ImpactBlast {
+    static LIFE_SEC = 0.5;
+    static FRONT_SEC = 0.1;
+    static SPREAD = 0.03;
+    static PUFF_LIFE = 0.36;
+    static PUFF_SIZE = 34;
+    static LIFT = 26;
+    static PUFFS = 6;
+    static CHIPS = 12;
+    static CHIP_SPEED = 120;
+    static EDGE = 0;
+    static R = 62;
+    static TONES = { hot: 0xFFD8D2, mid: 0xC81E30, scorch: 0x1E0A0E, fireHot: 0xFF8C94, fire: 0x9E1626, smoke: 0x241218, chip: 0x5E0E1A, ember: 0xFF4A5A };
+  }
+  class HitmanSlashView {
+    static SHARED = null;
+    static shared() {
+      if (HitmanSlashView.SHARED) return HitmanSlashView.SHARED;
+      var flat = new THREE.PlaneGeometry(2, 2); flat.rotateX(-Math.PI / 2);
+      var line = new THREE.PlaneGeometry(1, 1); line.rotateX(-Math.PI / 2); line.translate(0.5, 0, 0);
+      return HitmanSlashView.SHARED = { flat: flat, line: line };
+    }
+    constructor(services) { this.services = services; this.free = []; }
+    buildVis() { var S = HitmanSlashShaders, G = HitmanSlashView.shared(), group = new THREE.Group(), uniforms = S.uniformsOf();
+      function part(geometry, fragment) {
+        var mesh = new THREE.Mesh(geometry, WaterNoise.softMaterial(uniforms, S.VERTEX, fragment));
+        mesh.frustumCulled = false; mesh.renderOrder = 5; group.add(mesh);
+        return mesh;
+      }
+      var vis = { group: group, uniforms: uniforms, dash: part(G.line, S.DASH_FRAGMENT), spin: part(G.flat, S.SPIN_FRAGMENT), cross: part(G.flat, S.CROSS_FRAGMENT) };
+      vis.parts = [vis.dash, vis.spin, vis.cross];
+      return vis;
+    }
+    warmSample() { var vis = this.buildVis(); vis.uniforms.uHead.value = 0.5; vis.uniforms.uFade.value = 1; vis.group.add(HitmanSlashShaders.ribbonMesh()); return vis.group; }
+    prefill(count) { while (this.free.length < count) this.free.push(this.buildVis()); }
+    spareRoots() { return this.free.map(function (vis) { vis.group.position.set(ShaderWarmup.PROBE_SPOT, 0, ShaderWarmup.PROBE_SPOT); return vis.group; }); }
+    add(slash) { this.services.field.hitmanSlashes.push(slash); return slash; }
+    strike(d) { var services = this.services, now = services.clock.now();
+      return this.add(d.len ? new HitmanDashSlash(d, now, services.clock.scale) : new HitmanSpinSlash(d, now));
+    }
+    executeAt(x, y) { var services = this.services, now = services.clock.now();
+      services.impactBlasts.add(new ExecuteBlast(x, y, ExecuteBlast.R, "", now));
+      return this.add(new HitmanExecuteCut(x, y, now));
+    }
+    drop(slash) { if (!slash.vis) return; this.services.stage.scene.remove(slash.vis.group); this.free.push(slash.vis); slash.vis = null; }
+    step(t) { var view = this, scale = this.services.clock.scale;
+      this.services.field.hitmanSlashes = this.services.field.hitmanSlashes.filter(function (slash) {
+        if (t < slash.at + slash.lifeSec * 1000 * scale) return true;
+        view.drop(slash);
+        return false;
+      });
+    }
+    render(t, nowMs) { var view = this, services = this.services;
+      HitmanSlashShaders.ribbon().uniforms.uTime.value = (nowMs % 100000) / 1000;
+      services.field.hitmanSlashes.forEach(function (slash) {
+        if (!slash.vis) { slash.vis = view.free.pop() || view.buildVis(); slash.dress(slash.vis); services.stage.scene.add(slash.vis.group); }
+        slash.paint(slash.vis, Math.max(0, t - slash.at) / services.clock.scale / 1000);
+      });
+    }
+  }
   class StarfallView {
     constructor(services) { this.services = services; }
     static STAR_R = 13;
@@ -10562,10 +10752,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     static STORM_R = 34;
     spark(x, y, color, size) { var services = this.services; services.match.fx.push({ k: "spark", x: x, y: y, c: color, s: size || 1, t: Date.now(), life: 260 }); }
     executeFx(x, y) { var services = this.services;
-      services.fxView.smoke(x, y);
-      services.fxView.spark(x, y, "#FF3A4A", 3);
-      services.fxView.spark(x, y, "#FFFFFF", 1.6);
-      services.match.fx.push({ k: "boom", x: x, y: y, r: 110, c: 0xFF2A3A, t: Date.now(), life: 500 });
+      services.hitmanSlashView.executeAt(x, y);
       if (services.match.me && MathKit.hyp(x - services.match.me.x, y - services.match.me.y) < 700) services.sound.sfx("boom");
     }
     smoke(x, y, color) { var services = this.services; services.match.fx.push({ k: "smoke", x: x, y: y, c: color || 0xC8C8CD, t: Date.now(), life: (RogueType.ULT.asSmokeMs + 150) / services.clock.scale }); }
@@ -11937,7 +12124,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class PerfProbe {
-    static BUILD = "lag9";
+    static BUILD = "lag10";
     static PATH = "perfDiag/teambattle/";
     static RTT_KEEP = 50;
     static RECORDS = !Environment.SILENT_RUN;
@@ -12275,6 +12462,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         function () { return services.effectView.makeLungeVis({ x: P, y: P, angle: 0, len: 120, width: 40 }); },
         function () { return services.meteorFall.warmSample(); },
         function () { return services.impactBlasts.warmSample(); },
+        function () { return services.hitmanSlashView.warmSample(); },
         function () { return services.poolView.makePoolVis(e); },
         function () { return services.poolView.makeHoleVis(e); },
         function () { return services.poolView.makeBottleVis(); },
@@ -12365,9 +12553,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (!services.cameraRig.renderer || !services.models.kit.ready) return;
       var necros = this.castersByTeam("necro"), engineers = this.castersByTeam("engineer"), druids = this.castersByTeam("druid"), clerics = this.castersByTeam("cleric");
       var mages = this.castersByTeam("mage"), smiths = this.castersByTeam("blacksmith"), giants = this.castersByTeam("giant"), giantCount = giants.blue + giants.red, mageCount = mages.blue + mages.red;
+      var hitmen = this.castersByTeam("hitman"), hitmanCount = hitmen.blue + hitmen.red;
+      services.hitmanSlashView.prefill(hitmanCount * 3);
       services.meteorFall.prefill(mageCount);
       services.galeView.prefill(giantCount);
-      services.impactBlasts.prefill(mageCount + smiths.blue + smiths.red + giantCount * 2);
+      services.impactBlasts.prefill(mageCount + smiths.blue + smiths.red + giantCount * 2 + hitmanCount);
       if (clerics.blue + clerics.red) services.revGraceView.prefillBeams(RevGraceView.MAX_BEAMS);
       ["blue", "red"].forEach(function (team) {
         services.fighterView.prefillMinions(team, necros[team] * NecroType.ULT.smMax);
@@ -12376,7 +12566,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (services.models.kit.propsReady) services.groves.prefill(druids.blue + druids.red);
     }
     warmObjects() { var services = this.services;
-      return (this.kept || []).concat(services.fighterView.spareMinionRoots(), services.turrets.spareRoots(), services.groves.spare, services.revGraceView.spareBeamRoots(), services.meteorFall.spareRoots(), services.galeView.spareRoots(), services.impactBlasts.spareRoots());
+      return (this.kept || []).concat(services.fighterView.spareMinionRoots(), services.turrets.spareRoots(), services.groves.spare, services.revGraceView.spareBeamRoots(), services.meteorFall.spareRoots(), services.galeView.spareRoots(), services.impactBlasts.spareRoots(), services.hitmanSlashView.spareRoots());
     }
   }
   class FramePhaseMeter {
@@ -12481,6 +12671,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.marinaStreams.step(t);
       services.tsunamiView.step(t);
       services.impactBlasts.step(t);
+      services.hitmanSlashView.step(t);
       services.bannerLedger.step(t);
       services.world.pruneLocal(t);
     }
@@ -12942,6 +13133,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.galeView = new GolemGaleView(services);
       services.meteorFall = new MeteorFallView(services);
       services.impactBlasts = new ImpactBlastView(services);
+      services.hitmanSlashView = new HitmanSlashView(services);
       services.starfallView = new StarfallView(services);
       services.aimGuide = new AimGuide(services);
       services.fxView = new FxView(services);
