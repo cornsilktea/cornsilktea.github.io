@@ -14,6 +14,49 @@
 (function () {
   "use strict";
 
+  /* ---------- 모든 자료 초당 60장 제한 (2026-11-06 선생님 요청) ----------
+     갤럭시탭은 화면을 터치하면 주사율이 90·120Hz 로 올라갑니다. 제한 없이 그 속도를 따라 그리면
+     제때 못 끝낸 장이 섞여 간격이 들쭉날쭉해집니다(S9 에서 터치만 해도 최저 30~45, 60Hz 로 두면 60/60).
+     이 파일은 모든 자료의 맨 앞에서 실행되므로 여기서 requestAnimationFrame 을 감싸면
+     게임마다 고치지 않아도, 앞으로 만드는 게임에도 저절로 적용되고 &fps 표시도 실제로 그린 장수를 셉니다.
+     다음 그릴 시각을 1/60초씩 더해 가므로 90Hz 처럼 나누어떨어지지 않는 화면에서도 평균 60장이 됩니다. */
+  class FrameRateLimiter {
+    constructor(nativeRequest) { this.nativeRequest = nativeRequest; this.pending = new Map(); this.lastId = 0; this.scheduled = false; this.nextDrawAt = 0; }
+    isDue(now) {
+      if (now < this.nextDrawAt - FrameRateLimiter.EARLY_MS) return false;
+      this.nextDrawAt = now - this.nextDrawAt > FrameRateLimiter.TARGET_MS ? now + FrameRateLimiter.TARGET_MS : this.nextDrawAt + FrameRateLimiter.TARGET_MS;
+      return true;
+    }
+    request(callback) { this.lastId++; this.pending.set(this.lastId, callback); this.schedule(); return this.lastId; }
+    cancel(id) { this.pending.delete(id); }
+    schedule() {
+      if (this.scheduled) return;
+      this.scheduled = true;
+      var limiter = this;
+      this.nativeRequest(function (now) { limiter.onNativeFrame(now); });
+    }
+    onNativeFrame(now) {
+      this.scheduled = false;
+      if (!this.pending.size) return;
+      if (!this.isDue(now)) { this.schedule(); return; }
+      var limiter = this, ids = Array.from(this.pending.keys());
+      ids.forEach(function (id) {
+        var callback = limiter.pending.get(id);
+        if (!callback) return;
+        limiter.pending.delete(id);
+        try { callback(now); } catch (err) { setTimeout(function () { throw err; }, 0); }
+      });
+    }
+  }
+  FrameRateLimiter.TARGET_MS = 1000 / 60;
+  FrameRateLimiter.EARLY_MS = 2;
+  window.PortalFrameRateLimiter = FrameRateLimiter;
+  if (typeof window.requestAnimationFrame === "function") {
+    var frameLimiter = new FrameRateLimiter(window.requestAnimationFrame.bind(window));
+    window.requestAnimationFrame = function (callback) { return frameLimiter.request(callback); };
+    window.cancelAnimationFrame = function (id) { frameLimiter.cancel(id); };
+  }
+
   /* ---------- 구형 전자칠판·태블릿 브라우저 대응 ----------
      이 파일은 모든 수업 자료의 <head> 맨 앞에서 실행되므로,
      오래된 브라우저에 없는 기능을 여기서 한 번만 채워 넣습니다.
@@ -283,10 +326,7 @@
         tailLabel.style.right = (window.innerWidth - rect.left + 6) + "px";
       };
       var frames = 0, worst = 0, last = performance.now(), windowStart = last;
-      /* 게임이 화면 주사율보다 적게 그리면(30번 초당 60장 제한) 화면 신호 수가 아니라 실제로 그린 장수를 세야 하므로,
-         portal-frame-drawn 이벤트를 보내는 게임은 그 이벤트로 셉니다. */
-      var drawnByGame = false;
-      var count = function (now) {
+      var tick = function (now) {
         var gap = now - last;
         last = now;
         frames++;
@@ -299,10 +339,6 @@
           placeTail();
           frames = 0; worst = 0; windowStart = now;
         }
-      };
-      document.addEventListener("portal-frame-drawn", function () { drawnByGame = true; count(performance.now()); });
-      var tick = function (now) {
-        if (!drawnByGame) count(now);
         requestAnimationFrame(tick);
       };
       requestAnimationFrame(tick);

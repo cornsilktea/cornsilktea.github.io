@@ -7241,22 +7241,33 @@ class GiantTests {
       if (api.FIELD.sniperMarks.length || api.FIELD.impactBlasts.length) bad.push("스킬 그림이 끝나지 않음");
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "기본 " + C.dmg + ", 스킬 " + ULT.pnDmg);
     });
-    run(G, "프레임 제한: 화면이 60·90·120·144Hz 여도 게임은 초당 60장 안팎만 그리는가", function (done) {
-      var bad = [], shown = [];
+    run(G, "프레임 제한: 화면이 60·90·120·144Hz 여도 초당 60장 안팎만 그리고, 취소·오류가 다른 콜백을 막지 않는가", function (done) {
+      var bad = [], shown = [], Limiter = window.PortalFrameRateLimiter, realTimeout = window.setTimeout;
       [60, 90, 120, 144].forEach(function (hz) {
-        var pacer = new api.FramePacer(), drawn = 0, ticks = hz * 10;
-        for (var i = 0; i <= ticks; i++) if (pacer.due(1000 + i * 1000 / hz)) drawn++;
+        var waiting = [], limiter = new Limiter(function (fn) { waiting.push(fn); }), drawn = 0, next = function () { drawn++; limiter.request(next); };
+        limiter.request(next);
+        for (var i = 0; i <= hz * 10; i++) { var batch = waiting; waiting = []; batch.forEach(function (fn) { fn(1000 + i * 1000 / hz); }); }
         var fps = drawn / 10;
         shown.push(hz + "Hz→" + fps);
         if (fps < 59 || fps > 61) bad.push(hz + "Hz 에서 " + fps + "장");
       });
+      var waiting = [], limiter = new Limiter(function (fn) { waiting.push(fn); }), calls = [], thrown = [];
+      window.setTimeout = function (fn) { thrown.push(fn); };
+      limiter.request(function () { calls.push("a"); throw new Error("x"); });
+      var gone = limiter.request(function () { calls.push("gone"); });
+      limiter.request(function () { calls.push("c"); });
+      limiter.cancel(gone);
+      waiting.pop()(1000);
+      window.setTimeout = realTimeout;
+      if (calls.join() !== "a,c") bad.push("콜백 실행 " + calls.join());
+      if (thrown.length !== 1) bad.push("오류 전달 " + thrown.length);
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : shown.join(", "));
     });
-    run(G, "공격·스킬 버튼: 흐림 그림자·둥근 자르기·배경 흐림이 없고 값은 transform 으로만 바뀌는가", function (done) {
+    run(G, "공격·스킬 버튼: 둥근 자르기·배경 흐림이 없고, 준비 빛은 미리 만든 층의 애니메이션이며 값은 transform 으로만 바뀌는가", function (done) {
       var bad = [], ult = document.getElementById("btnUlt"), atk = document.getElementById("btnAtk"), top = document.getElementById("hudTop");
       if (document.querySelector(".meterClip")) bad.push("둥근 자르기 층이 남음");
       [ult, atk].forEach(function (b) { if (getComputedStyle(b).boxShadow !== "none") bad.push(b.id + " 그림자"); });
-      if (getComputedStyle(ult, "::after").content !== "none") bad.push("빛 층이 남음");
+      if (getComputedStyle(ult, "::after").content === "none") bad.push("준비 빛 층이 없음");
       if ((getComputedStyle(top).backdropFilter || "none") !== "none") bad.push("위쪽 HUD 배경 흐림");
       if (ult.firstChild.className !== "fill" || atk.firstChild.className !== "cd") bad.push("게이지 칸 위치");
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "버튼·위쪽 HUD 모두 가벼운 층만 사용");
