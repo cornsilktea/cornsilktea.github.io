@@ -481,7 +481,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     static SILENT_RUN = /[?&](test|sim)(&|$)/.test(location.search);
     static LITE_MOTION = !!(window.matchMedia && matchMedia("(pointer: coarse)").matches);
     static TOUCH = !!(window.matchMedia && window.matchMedia("(pointer: coarse)").matches);
-    static PIX_START = Math.min(window.devicePixelRatio || 1, Environment.TOUCH ? 1.5 : 1.75);
+    static PIX_FORCED = (function () { var m = /[?&]pix=([0-9.]+)/.exec(location.search); return m ? Math.min(3, Math.max(0.5, parseFloat(m[1]))) : 0; })();
+    static PIX_START = Environment.PIX_FORCED || Math.min(window.devicePixelRatio || 1, Environment.TOUCH ? 1.5 : 1.75);
     static PIX_MIN = 0.75;
   }
   class MathKit {
