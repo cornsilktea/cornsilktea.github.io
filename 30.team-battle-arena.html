@@ -2438,6 +2438,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     statSkillDamage(c) { return null; }
     statAltCooldown(c) { return null; }
     get hasSkillClip() { return false; }
+    poseHeldProp(v, E, t) {}
     launchHandOf(model) { return model.getObjectByName("muzzle"); }
     addMarkers(v, root, body) {}
     playSkillClip(v, E, t) {}
@@ -2984,7 +2985,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
                leftRecolor: [[1, 2, 1, "#F2CF6A", "#A87A26"], [2, 1, 1, "#F2CF6A", "#A87A26"], [0, 3, 2, "#FFF3C4", "#E0B24A"], [1, 3, 1, "#FFF3C4", "#E0B24A"],
                              [1, 4, 1, "#FFF3C4", "#E0B24A"]] };
     static ULT = {
-      rvDur: GameTime.gameMs(4), rvTick: GameTime.gameMs(1), rvHeal: 20, rvDmg: 20, rvCastMs: 600, grLife: 650
+      rvDur: GameTime.gameMs(3), rvTick: GameTime.gameMs(1), rvHeal: 20, rvDmg: 20, rvCastMs: 600, grLife: 650
     };
     static STATS = { name: "클레릭", role: "caster", icon: "✝️", hp: 110, speed: GameTime.gameSpeed(170), cd: GameTime.gameMs(1.4), dmg: 0, graceHeal: 18, range: 400, noAim: true, healGauge: 400, ultName: "요한계시록", heals: true };
     isRevealing(E, t) { return E.buffUntil > t; }
@@ -3007,7 +3008,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.vision.revealBriefly(E.id, t);
     }
     ultDesc() { var services = this.services;
-      return "아군의 체력을 " + ClericType.STATS.healGauge + " 회복시키면 사용 가능. 사용 시 자신의 체력을 모두 회복하고 " + services.skilltext.secs(ClericType.ULT.rvDur) + "간 제자리에서 기도. 아군 전체는 1초당 체력 " + ClericType.ULT.rvHeal + " 회복, 적 전체는 1초당 " + ClericType.ULT.rvDmg + "의 피해. 기절·넉백·끌어당김을 당하면 취소";
+      return "아군의 체력을 " + ClericType.STATS.healGauge + " 회복시키면 사용 가능. 사용 시 자신의 체력을 모두 회복하고 " + services.skilltext.secs(ClericType.ULT.rvDur) + "간 제자리에서 기도. 사용 순간부터 1초마다 " + (ClericType.ULT.rvDur / ClericType.ULT.rvTick + 1) + "번, 아군 전체는 체력 " + ClericType.ULT.rvHeal + " 회복, 적 전체는 " + ClericType.ULT.rvDmg + "의 피해. 기절·넉백·끌어당김을 당하면 취소";
     }
     passiveDesc() {
       var c = this.data;
@@ -3759,8 +3760,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       mrFlyMs: GameTime.gameMs(0.3), mrHeal: 10, mrChainR: 300, mrDmg: 20, mrKb: 150, mrStunMs: GameTime.gameMs(0.5), mrWaveHeal: 20, mrLanes: 5, mrLen: 600,
       mrBotPushR: 150, mrBotMinFoes: 2, mrBotAllyHp: 0.5, mrWindMs: GameTime.gameMs(0.5)
     };
-    static STATS = { name: "마리나", role: "caster", icon: "🌊", hp: 115, speed: GameTime.gameSpeed(170), cd: GameTime.gameMs(1.4), dmg: 10, range: 380, noAim: true, ultName: "해일", ultAim: true, heals: true };
-    static WAVE = { travel: GameTime.gameMs(4.5), life: GameTime.gameMs(4.5) + 300 };
+    static STATS = { name: "마리나", role: "caster", icon: "🌊", hp: 110, speed: GameTime.gameSpeed(170), cd: GameTime.gameMs(1.4), dmg: 10, range: 380, noAim: true, ultName: "해일", ultAim: true, heals: true };
+    static WAVE = { travel: GameTime.gameMs(3), life: GameTime.gameMs(3) + 300 };
     get showsHealRange() { return true; }
     get startsSkillTimer() { return false; }
     get hasSkillClip() { return true; }
@@ -3775,10 +3776,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.aimGuide.showAimLanes(services.tsunamiLanes.plan(E.x, E.y, E.angle));
       return true;
     }
-    playSkillClip(v, E, t) { var services = this.services; services.fighterMotion.playOnce(v, "Ranged_Magic_Summon", services.models.kit.clips.Ranged_Magic_Summon.duration * 1000 / MarinaType.ULT.mrWindMs / services.clock.scale, t); }
+    playSkillClip(v, E, t) { this.services.fighterMotion.playOnce(v, TridentSlamPose.CLIP, (TridentSlamPose.IMPACT_SEC - TridentSlamPose.FROM_SEC) * 1000 / MarinaType.ULT.mrWindMs, t, null, TridentSlamPose.FROM_SEC); }
+    poseHeldProp(v, E, t) { TridentSlamPose.apply(v, E, t); }
     statDamageText(c) { var services = this.services, heal = services.skilltext.num(MarinaType.ULT.mrHeal); return services.skilltext.num(c.dmg) + "(" + heal + ")"; }
     cast(E, ang, reach, t) { var services = this.services, u = MarinaType.ULT;
       var x = MathKit.r1(E.x), y = MathKit.r1(E.y), angle = TsunamiLanes.exactAngle(ang);
+      E.angle = ang;
       E.ultUntil = t + u.mrWindMs;
       E.pending = null;
       services.session.room.ref.child("meleeHits").push({ team: E.team, owner: E.id, x: x, y: y, angle: angle, len: u.mrLen, width: u.mrLanes * ArenaSize.TILE, lanes: services.tsunamiLanes.plan(x, y, angle),
@@ -4010,6 +4013,34 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     static pixelScale(services) { return services.cameraRig.renderer.domElement.height * 0.5; }
   }
+  class TridentSlamPose {
+    static CLIP = "Melee_1H_Attack_Jump_Chop";
+    static FROM_SEC = 0.22;
+    static IMPACT_SEC = 0.8;
+    static SLAM_ROT = [-1.66, -1.31, -0.85];
+    static SLIDE = 0.74;
+    static LOWER_PART = 0.75;
+    static HOLD_SEC = 0.12;
+    static BACK_SEC = 0.22;
+    static setupOf(v, held) {
+      if (v.tridentSlam) return v.tridentSlam;
+      var R = TridentSlamPose.SLAM_ROT, slam = new THREE.Quaternion().setFromEuler(new THREE.Euler(R[0], R[1], R[2]));
+      v.tridentSlam = { held: held, rest: held.quaternion.clone(), slam: slam, slide: new THREE.Vector3(0, -TridentSlamPose.SLIDE, 0).applyQuaternion(slam) };
+      return v.tridentSlam;
+    }
+    static weightAt(E, t) { var P = TridentSlamPose, wind = MarinaType.ULT.mrWindMs, into = (t - E.ultUntil + wind) / wind;
+      if (into <= 0) return 0;
+      if (into < 1) return WaterNoise.ease(Math.min(1, into / P.LOWER_PART));
+      return 1 - WaterNoise.ease(MathKit.clamp((t - E.ultUntil - GameTime.gameMs(P.HOLD_SEC)) / GameTime.gameMs(P.BACK_SEC), 0, 1));
+    }
+    static apply(v, E, t) {
+      var held = v.tridentSlam ? v.tridentSlam.held : v.root.getObjectByName("mainhand");
+      if (!held) return;
+      var S = TridentSlamPose.setupOf(v, held), k = E.alive ? TridentSlamPose.weightAt(E, t) : 0;
+      held.quaternion.slerpQuaternions(S.rest, S.slam, k);
+      held.position.copy(S.slide).multiplyScalar(k);
+    }
+  }
   class MarinaStreamView {
     static SPLASH_SEC = 0.35;
     static ROWS = 26;
@@ -4117,6 +4148,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         #include <colorspace_fragment>
       }`;
     constructor(services) { this.services = services; this.free = []; this.tip = new THREE.Vector3(); }
+    static splashUniforms() {
+      return { uTex: { value: WaterNoise.texture() }, uFrom: { value: new THREE.Vector3() }, uTo: { value: new THREE.Vector3(1, 0, 0) }, uTime: { value: 0 }, uTail: { value: 0 }, uHead: { value: 1 }, uLen: { value: 100 }, uSplash: { value: 0 }, uPixelScale: { value: 400 },
+               uDeep: { value: new THREE.Color() }, uMid: { value: new THREE.Color() }, uFoam: { value: new THREE.Color() } };
+    }
+    static splashParts(uniforms) { var V = MarinaStreamView, S = V.shared();
+      return { drops: new THREE.Points(S.drops, WaterNoise.softMaterial(uniforms, V.DROP_VERTEX, V.DROP_FRAGMENT)), ripple: new THREE.Mesh(S.ripple, WaterNoise.softMaterial(uniforms, V.RIPPLE_VERTEX, V.RIPPLE_FRAGMENT)) };
+    }
     static addTube(pos, idx, rows, ring, strand) {
       var base = pos.length / 3;
       for (var r = 0; r <= rows; r++) for (var s = 0; s <= ring; s++) pos.push(r / rows, s / ring * Math.PI * 2, strand);
@@ -4141,17 +4179,15 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return MarinaStreamView.GEO;
     }
     buildVis() { var V = MarinaStreamView, S = V.shared(), group = new THREE.Group();
-      var uniforms = { uTex: { value: WaterNoise.texture() }, uFrom: { value: new THREE.Vector3() }, uTo: { value: new THREE.Vector3(1, 0, 0) }, uTime: { value: 0 }, uTail: { value: 0 }, uHead: { value: 1 }, uLen: { value: 100 }, uSplash: { value: 0 }, uPixelScale: { value: 400 },
-                       uDeep: { value: new THREE.Color() }, uMid: { value: new THREE.Color() }, uFoam: { value: new THREE.Color() } };
-      var vis = { group: group, uniforms: uniforms, body: new THREE.Mesh(S.body, WaterNoise.softMaterial(uniforms, V.BODY_VERTEX, V.BODY_FRAGMENT, THREE.DoubleSide)), drops: new THREE.Points(S.drops, WaterNoise.softMaterial(uniforms, V.DROP_VERTEX, V.DROP_FRAGMENT)), ripple: new THREE.Mesh(S.ripple, WaterNoise.softMaterial(uniforms, V.RIPPLE_VERTEX, V.RIPPLE_FRAGMENT)) };
+      var uniforms = V.splashUniforms(), splash = V.splashParts(uniforms);
+      var vis = { group: group, uniforms: uniforms, body: new THREE.Mesh(S.body, WaterNoise.softMaterial(uniforms, V.BODY_VERTEX, V.BODY_FRAGMENT, THREE.DoubleSide)), drops: splash.drops, ripple: splash.ripple };
       vis.ripple.position.y = 2; vis.ripple.scale.set(112, 1, 112);
       [vis.ripple, vis.body, vis.drops].forEach(function (part, i) { part.frustumCulled = false; part.renderOrder = 4 + i; group.add(part); });
       this.paint(vis, "heal");
       return vis;
     }
-    paint(vis, kind) { var tones = kind === "heal" ? MarinaStreamView.HEAL_TONES : MarinaStreamView.HIT_TONES, u = vis.uniforms;
-      u.uDeep.value.set(tones.deep); u.uMid.value.set(tones.mid); u.uFoam.value.set(tones.foam);
-    }
+    static tint(u, tones) { u.uDeep.value.set(tones.deep); u.uMid.value.set(tones.mid); u.uFoam.value.set(tones.foam); }
+    paint(vis, kind) { MarinaStreamView.tint(vis.uniforms, kind === "heal" ? MarinaStreamView.HEAL_TONES : MarinaStreamView.HIT_TONES); }
     acquire() { var vis = this.free.pop() || this.buildVis(); this.services.stage.scene.add(vis.group); return vis; }
     drop(s) { if (!s.vis) return; this.services.stage.scene.remove(s.vis.group); this.free.push(s.vis); s.vis = null; }
     warmSample() { return this.buildVis().group; }
@@ -4191,8 +4227,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     static FADE_END_SEC = 0.45;
     static FADE_WALL_SEC = 0.35;
     static BURST_SEC = 0.75;
-    static RISE_SEC = 0.3;
-    static WIND_RISE = 0.62;
+    static RISE_SEC = 0.4;
+    static SPREAD_SEC = 0.07;
+    static SLAM_REACH = 78;
+    static SLAM_SIDE = 11;
+    static SLAM_SEC = 0.6;
+    static SLAM_TONES = { deep: "#127FAE", mid: "#58DDDC", foam: "#F4FDFF" };
     static WET_SEC = 1;
     static COLUMNS = 6;
     static SHEET_ROWS = 8;
@@ -4364,9 +4404,17 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
                   edge: new THREE.InstancedMesh(S.flat, new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false }), n + V.SIDES) };
       [vis.sheet, vis.edge, vis.wall, vis.spray].forEach(function (part, i) { part.frustumCulled = false; part.renderOrder = 4 + i; group.add(part); });
       vis.edge.position.y = 2.2;
+      this.addSlamSplash(vis);
       return vis;
     }
-    warmSample() { var vis = this.buildVis(); this.setEdges(vis, [600, 600, 300, 600, 600], "blue"); this.paint(vis, { lanes: [600, 600, 300, 600, 600] }, 500, 500); return vis.group; }
+    addSlamSplash(vis) { var V = TsunamiView, uniforms = MarinaStreamView.splashUniforms(), parts = MarinaStreamView.splashParts(uniforms);
+      MarinaStreamView.tint(uniforms, V.SLAM_TONES);
+      uniforms.uTo.value.set(V.SLAM_REACH, 6, V.SLAM_SIDE); uniforms.uHead.value = 0;
+      parts.ripple.position.set(V.SLAM_REACH, 3, V.SLAM_SIDE); parts.ripple.scale.set(190, 1, 190);
+      [parts.ripple, parts.drops].forEach(function (part, i) { part.frustumCulled = false; part.renderOrder = 8 + i; vis.group.add(part); });
+      vis.slam = uniforms;
+    }
+    warmSample() { var vis = this.buildVis(); this.placeEdges(vis, [600, 600, 300, 600, 600], 0); this.paint(vis, { lanes: [600, 600, 300, 600, 600] }, 500, 500); return vis.group; }
     add(d) { this.services.field.tsunamis.push({ d: d, vis: null, departed: false }); }
     drop(item) { if (!item.vis) return; this.services.stage.scene.remove(item.vis.group); this.free.push(item.vis); item.vis = null; }
     lifeMs() { return MarinaType.WAVE.travel + GameTime.gameMs(TsunamiView.WET_SEC) + 100; }
@@ -4385,37 +4433,38 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       p.position.set(x, 0, z); p.quaternion.identity(); p.scale.set(sizeX, 1, sizeZ); p.updateMatrix();
       mesh.setMatrixAt(i, p.matrix);
     }
-    setEdges(vis, lens, team) { var n = lens.length, half = ArenaSize.TILE / 2, w = TsunamiView.EDGE_WIDTH;
-      vis.edge.material.color.set(Palette.C_FX[team] || 0xFFFFFF);
-      for (var i = 0; i < n; i++) this.setFlat(vis.edge, i, lens[i], TsunamiLanes.laneOffset(i), lens[i] > 0 ? w : 0, ArenaSize.TILE);
+    placeEdges(vis, lens, front) { var n = lens.length, half = ArenaSize.TILE / 2, w = TsunamiView.EDGE_WIDTH;
+      for (var i = 0; i < n; i++) this.setFlat(vis.edge, i, lens[i], TsunamiLanes.laneOffset(i), lens[i] > front ? w : 0, ArenaSize.TILE);
       for (var j = 0; j <= n; j++) {
-        var before = j > 0 ? lens[j - 1] : 0, after = j < n ? lens[j] : 0, z = TsunamiLanes.laneOffset(0) - half + j * ArenaSize.TILE;
-        this.setFlat(vis.edge, n + j, (before + after) / 2, z, Math.abs(before - after), w);
+        var before = j > 0 ? lens[j - 1] : 0, after = j < n ? lens[j] : 0, far = Math.max(before, after), near = Math.max(Math.min(before, after), front), z = TsunamiLanes.laneOffset(0) - half + j * ArenaSize.TILE;
+        this.setFlat(vis.edge, n + j, (near + far) / 2, z, Math.max(0, far - near), w);
       }
       vis.edge.instanceMatrix.needsUpdate = true;
     }
     acquire(item) { var services = this.services, vis = this.free.pop() || this.buildVis(), d = item.d;
       vis.group.position.set(d.x, 0, d.y); vis.group.rotation.y = -d.angle;
-      this.setEdges(vis, d.lanes, d.team);
+      vis.edge.material.color.set(Palette.C_FX[d.team] || 0xFFFFFF);
       services.stage.scene.add(vis.group);
       return vis;
     }
-    riseAt(age) { var V = TsunamiView, wind = MarinaType.ULT.mrWindMs;
-      return age < 0 ? V.WIND_RISE * MathKit.clamp(1 + age / wind, 0, 1) : Math.min(1, V.WIND_RISE + (1 - V.WIND_RISE) * age / GameTime.gameMs(V.RISE_SEC));
-    }
-    paintLane(vis, i, len, age, rise) { var V = TsunamiView, u = MarinaType.ULT, travel = MarinaType.WAVE.travel, slot = i + 1, shared = vis.uniforms;
+    riseAt(age) { return age <= 0 ? 0 : Math.min(1, age / GameTime.gameMs(TsunamiView.RISE_SEC)); }
+    paintLane(vis, i, len, age) { var V = TsunamiView, u = MarinaType.ULT, travel = MarinaType.WAVE.travel, slot = i + 1, shared = vis.uniforms, started = age >= 0;
       var endAge = travel * len / u.mrLen, stopped = len > 0 && len < u.mrLen, gone = len > 0 ? MathKit.clamp((age - endAge) / GameTime.gameMs(stopped ? V.FADE_WALL_SEC : V.FADE_END_SEC), 0, 1) : 1;
-      shared.uReach.value[slot] = Math.min(len, u.mrLen * Math.max(0, age) / travel);
+      var fromCenter = Math.abs(i - (u.mrLanes - 1) / 2), rise = this.riseAt(age - GameTime.gameMs(V.SPREAD_SEC) * fromCenter);
+      shared.uReach.value[slot] = Math.min(len, Math.max(V.SLAM_REACH, u.mrLen * Math.max(0, age) / travel));
       shared.uLift.value[slot] = len > 0 ? rise * (1 - gone) : 0;
-      shared.uWet.value[slot] = len > 0 ? MathKit.clamp(1 - (age - endAge) / GameTime.gameMs(V.WET_SEC), 0, 1) : 0;
+      shared.uWet.value[slot] = len > 0 && started ? MathKit.clamp(1 - (age - endAge) / GameTime.gameMs(V.WET_SEC), 0, 1) : 0;
       shared.uBurst.value[slot] = stopped && age >= endAge ? Math.min(1, (age - endAge) / GameTime.gameMs(V.BURST_SEC)) : 0;
     }
-    paint(vis, d, age, nowMs) { var view = this, shared = vis.uniforms, n = d.lanes.length, rise = this.riseAt(age);
-      d.lanes.forEach(function (len, i) { view.paintLane(vis, i, len, age, rise); });
+    paint(vis, d, age, nowMs) { var view = this, shared = vis.uniforms, n = d.lanes.length;
+      d.lanes.forEach(function (len, i) { view.paintLane(vis, i, len, age); });
       shared.uReach.value[0] = shared.uReach.value[n + 1] = -1000;
+      this.placeEdges(vis, d.lanes, MarinaType.ULT.mrLen * Math.max(0, age) / MarinaType.WAVE.travel);
       shared.uTime.value = (nowMs % 100000) / 1000;
-      shared.uPixelScale.value = WaterNoise.pixelScale(this.services);
-      vis.edge.material.opacity = 0.85 * MathKit.clamp(1 + age / MarinaType.ULT.mrWindMs, 0, 1) * (1 - MathKit.clamp((age - MarinaType.WAVE.travel) / GameTime.gameMs(TsunamiView.WET_SEC), 0, 1));
+      shared.uPixelScale.value = vis.slam.uPixelScale.value = WaterNoise.pixelScale(this.services);
+      vis.slam.uTime.value = shared.uTime.value;
+      vis.slam.uSplash.value = MathKit.clamp(age / GameTime.gameMs(TsunamiView.SLAM_SEC), 0, 1);
+      vis.edge.material.opacity = 0.85 * MathKit.clamp(1 + age / MarinaType.ULT.mrWindMs, 0, 1);
     }
     render(t, nowMs) { var view = this;
       this.services.field.tsunamis.forEach(function (item) {
@@ -5562,19 +5611,21 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     revTickIndex(e, t) { return Math.floor((t - e.createdAt) / e.tick); }
     stepRevs(t) { var services = this.services;
       services.field.revs = services.field.revs.filter(function (r) {
-        var e = r.e;
-        if (r.cut || t >= e.createdAt + e.dur) { services.revGraceView.dropRevVis(r); return false; }
-        if (t < e.createdAt || services.session.room.status !== "playing") return true;
-        var tick = services.fieldFx.revTickIndex(e, t);
+        var e = r.e, ended = t >= e.createdAt + e.dur;
+        if (r.cut) { services.revGraceView.dropRevVis(r); return false; }
+        if (t >= e.createdAt && services.session.room.status === "playing") services.fieldFx.applyRevTick(r, t);
+        if (ended) services.revGraceView.dropRevVis(r);
+        return !ended;
+      });
+    }
+    applyRevTick(r, t) { var services = this.services, e = r.e, tick = services.fieldFx.revTickIndex(e, t), healAt = Math.min(t, e.createdAt + e.dur - 1);
         services.targets.localTargets().forEach(function (T) {
           if (T.minion || T.id === e.owner || r.ticked[T.id] >= tick) return;
           r.ticked[T.id] = tick;
           if (!T.alive || T.isProtected(t)) return;
-          if (T.team === e.team) services.fieldFx.healAlly(T, e.owner, e.heal, t);
+          if (T.team === e.team) services.fieldFx.healAlly(T, e.owner, e.heal, healAt);
           else services.damage.damage(T, e.dmg, e.owner, false, "revelation");
         });
-        return true;
-      });
     }
     potionFlightMs(dist) {
       var c = ThrowerType.STATS, far = Math.min(1, Math.max(0, (dist - c.minRange) / (c.range - c.minRange)));
@@ -6191,7 +6242,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         if (h.bk) owner.blocked = (owner.blocked || 0) + h.bk;
         services.charTypes.of(owner.char).onHitEarly(owner, h);
         if (h.hl) owner.heal += h.hl;
-        if (h.hl && services.charTypes.statsOf(owner.char).healGauge && !owner.isGaugeLocked()) owner.gauge = Math.min(MatchRules.GAUGE_MAX, owner.gauge + h.hl * MatchRules.GAUGE_MAX / services.charTypes.statsOf(owner.char).healGauge);
+        if (h.hl && services.charTypes.statsOf(owner.char).healGauge && !owner.isGaugeLocked(h.t)) owner.gauge = Math.min(MatchRules.GAUGE_MAX, owner.gauge + h.hl * MatchRules.GAUGE_MAX / services.charTypes.statsOf(owner.char).healGauge);
         if (h.cs) owner.stunDealt = (owner.stunDealt || 0) + h.cs / 1000;
         if (h.ss) owner.slowDealt = (owner.slowDealt || 0) + h.ss / 1000;
         if (h.sw) owner.slowWeight = (owner.slowWeight || 0) + h.sw / 1000;
@@ -8371,6 +8422,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         else if (E.mv && v.speed > 15) services.fighterMotion.showClip(v, "Walking_A", MathKit.clamp(v.speed / 110, 0.6, 1.4), true);
         else services.fighterMotion.showClip(v, services.charTypes.of(E.char).idleClip, 1, true);
       }
+      type.poseHeldProp(v, E, t);
       v.mixer.update(E.alive && E.isFrostFrozen(t) ? 0 : gameDt);
     }
     animateMinion(v, M, t, dt) { var services = this.services;

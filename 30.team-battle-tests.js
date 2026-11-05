@@ -1511,8 +1511,8 @@ class ResultCollector {
     var ok = got[0] === want0 && got[1] === api.GAUGE_MAX && got[2] === want2;
     done(ok ? "pass" : "fail", n + "번 회복(" + n * heal + ") → " + got[0] + ", " + (n + 1) + "번째 → " + got[1] + ", 6만 회복 → " + got[2] + " (기대 " + want0 + "·" + api.GAUGE_MAX + "·" + want2 + ")");
   });
-  var RV_TICKS = Math.ceil(api.ULT.rvDur / api.ULT.rvTick);
-  run(CLERIC, "요한계시록: " + api.secs(api.ULT.rvDur) + "간 아군은 1초당 " + api.ULT.rvHeal + " 회복, 적은 1초당 " + api.ULT.rvDmg + " 피해를 사용 순간부터 1초마다 " + Math.ceil(api.ULT.rvDur / api.ULT.rvTick) + "번 받고 거리와 상관없으며, 클레릭은 사용 순간 체력이 모두 차는가", function (done) {
+  var RV_TICKS = api.ULT.rvDur / api.ULT.rvTick + 1;
+  run(CLERIC, "요한계시록: " + api.secs(api.ULT.rvDur) + "간 아군은 1초당 " + api.ULT.rvHeal + " 회복, 적은 1초당 " + api.ULT.rvDmg + " 피해를 사용 순간부터 1초마다 " + RV_TICKS + "번 받고 거리와 상관없으며, 클레릭은 사용 순간 체력이 모두 차는가", function (done) {
     var W = clericTeam(), cl = W.ent("cl"), kn = W.ent("kn"), foe = W.ent("foe"), foe2 = W.ent("foe2"), bad = [], times = [];
     kn.hp = 100; cl.hp = 50; foe.hp = foe.maxHp = 1000; foe2.x = 750; foe2.y = 1250; foe2.hp = foe2.maxHp = 1000;
     cl.gauge = api.GAUGE_MAX;
@@ -6395,6 +6395,7 @@ class MarinaTests {
     run(G, "해일 출발: 시전 뒤 " + ULT.mrWindMs + "ms 동안 멈춰 서고 앞의 적도 안 맞으며, 준비 중 앞으로 들어온 적은 맞는가", function (done) {
       var bad = [], W = self.squad([self.foe("near", 0, 40), self.foe("behind", 0, -200)]), M = self.castDown(W), x = M.x, y = M.y;
       if (api.speedOf(M) !== 0) bad.push("시전 중 이동 속도 " + api.speedOf(M));
+      if (M.angle !== Math.PI / 2) bad.push("시전 방향을 보지 않음 " + M.angle);
       M.cdUntil = 0; var shots = self.streams(W).length; api.fireBasic(M, 0);
       if (self.streams(W).length !== shots) bad.push("시전 중 기본 공격이 나감");
       W.step(ULT.mrWindMs - 50);
