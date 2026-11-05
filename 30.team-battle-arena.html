@@ -401,6 +401,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     matlib;
     loop;
     shaderWarmup;
+    phases;
     kitNote;
     fxMats;
     quality;
@@ -11716,6 +11717,43 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       probe.root.parent.remove(probe.root); this.minionProbe = probe;
     }
   }
+  class FramePhaseMeter {
+    static ENABLED = /[?&]fps(&|=|$)/.test(location.search);
+    static HOLD_MS = 4000;
+    static LABELS = { world: "세계", net: "전송", host: "방장", render: "그림", hud: "화면" };
+    constructor() { this.cur = {}; this.last = 0; this.start0 = 0; this.worst = null; this.box = null; }
+    start(frameMs) {
+      if (!FramePhaseMeter.ENABLED) return;
+      var now = performance.now(), prev = this.cur;
+      if (this.start0 && (!this.worst || frameMs > this.worst.frameMs || now - this.worst.at > FramePhaseMeter.HOLD_MS)) this.worst = { frameMs: frameMs, at: now, js: this.jsOf(prev), phases: prev };
+      this.cur = {}; this.last = this.start0 = now;
+      this.show();
+    }
+    mark(name) {
+      if (!FramePhaseMeter.ENABLED) return;
+      var now = performance.now();
+      this.cur[name] = (this.cur[name] || 0) + now - this.last;
+      this.last = now;
+    }
+    jsOf(phases) { return Object.keys(phases).reduce(function (sum, k) { return sum + phases[k]; }, 0); }
+    textOf(w) {
+      var parts = Object.keys(FramePhaseMeter.LABELS).map(function (k) { return FramePhaseMeter.LABELS[k] + " " + Math.round(w.phases[k] || 0); });
+      return "최악 " + Math.round(w.frameMs) + "ms (코드 " + Math.round(w.js) + ", 나머지 " + Math.round(Math.max(0, w.frameMs - w.js)) + ")\n" + parts.join(" · ");
+    }
+    makeBox() {
+      var box = document.createElement("div");
+      box.style.cssText = "position:fixed;z-index:2147483000;padding:3px 8px;background:rgba(0,0,0,0.72);color:#fff;border-radius:4px;font:600 11px/15px monospace;white-space:pre;pointer-events:none";
+      document.body.appendChild(box);
+      return box;
+    }
+    show() {
+      if (!this.worst) return;
+      if (!this.box) this.box = this.makeBox();
+      var anchor = document.querySelector("[data-fps-beside]"), rect = anchor ? anchor.getBoundingClientRect() : null;
+      if (rect && rect.width > 0) { this.box.style.top = (rect.top + 30) + "px"; this.box.style.right = (window.innerWidth - rect.left + 6) + "px"; }
+      this.box.textContent = this.textOf(this.worst);
+    }
+  }
   class GameLoop {
     constructor(services) { this.services = services; this.lastFrame = Date.now(); }
     start() { var services = this.services; requestAnimationFrame(function () { services.loop.frame(); }); }
@@ -11732,14 +11770,20 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         if (services.session.players[services.session.myId] && (services.session.players[services.session.myId].slot || services.flow.isSpec())) services.flow.initGame(); else return;
       }
       if (!services.match.game) return;
+      services.phases.start(frameMs);
       var t = services.clock.now();
       services.world.stepWorld(t, dt * services.clock.scale, true, dt);
+      services.phases.mark("world");
       if (st === "countdown" || st === "playing") { services.netstate.netWrite(false); services.clock.keepInSync(); }
+      services.phases.mark("net");
       if (services.session.isHost()) { services.flow.hostJudge(); services.flow.hostCleanup(); }
+      services.phases.mark("host");
       services.frameRenderer.render(t, dt);
+      services.phases.mark("render");
       services.shaderWarmup.warmHiddenForms();
       services.hud.updateHud(t);
       services.quality.update(frameMs);
+      services.phases.mark("hud");
     }
   }
   class WorldStepper {
@@ -12249,6 +12293,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.matlib = new MaterialLibrary();
       services.fxMats = new EffectMaterialPool();
       services.shaderWarmup = new ShaderWarmup(services);
+      services.phases = new FramePhaseMeter();
       services.kitNote = new KitLoadNote(services);
       services.quality = new ArenaQuality(services);
       services.perf = new PerfProbe(services);
