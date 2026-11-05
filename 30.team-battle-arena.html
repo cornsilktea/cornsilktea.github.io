@@ -2642,7 +2642,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     ultDesc() { var services = this.services;
       return "지정한 곳에 " + services.skilltext.secs(MageType.ULT.mbDelay) + " 뒤 반경 " + MageType.ULT.mbR + "의 폭발. 적은 " + MageType.ULT.mbDmgMin + "~" + MageType.ULT.mbDmg + "의 피해, " +
-      services.skilltext.num(MageType.ULT.mbStunMin / services.clock.scale / 1000) + "~" + services.skilltext.secs(MageType.ULT.mbStunMs) + "의 기절. 중심에 가까울수록 강함";
+      services.skilltext.num(MageType.ULT.mbStunMin / services.clock.scale / 1000) + "~" + services.skilltext.secs(MageType.ULT.mbStunMs) + "간 기절. 중심에 가까울수록 강함";
     }
     passiveDesc() { var services = this.services;
       var c = this.data;
@@ -2827,7 +2827,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return services.skilltext.secs(LancerType.ULT.lnWind) + " 준비 후 사거리 " + LancerType.ULT.lnLen + "의 창 찌르기. 맞은 적은 모두 " + LancerType.ULT.lnDmg + "의 피해를 입고 " + services.skilltext.secs(LancerType.ULT.lnStunMs) + "간 기절";
     }
     passiveDesc() {
-      return "게임을 시작할 때와 부활할 때마다 다음에 받는 피해 1회를 막는 보호막 생성. 기절·둔화 등 효과는 막지 못함";
+      return "다음에 받는 피해 1회를 막는 보호막을 두르고 시작(기절·둔화 등 효과는 막지 못함). 죽을 때마다 한 번";
     }
     basicDesc() {
       var c = this.data;
@@ -2962,7 +2962,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
     ultDesc() { var services = this.services;
       return "자신을 중심으로 " + services.skilltext.secs(ShamanType.ULT.dmGrowMs) + "간 반경 " + ShamanType.ULT.dmR + "까지 커진 뒤 " + services.skilltext.secs(ShamanType.ULT.dmDur - ShamanType.ULT.dmGrowMs) + "간 유지되는 영역 생성. 커지는 동안 닿은 적은 " + services.skilltext.secs(ShamanType.ULT.dmStunMs) +
-      " 기절 후 " + ShamanType.ULT.dmBoltDmg + "의 피해. 영역 안 기본 공격은 가장 가까운 적 1명에게 최대 체력의 " + services.skilltext.pctOf(ShamanType.ULT.dmStrikeMaxHpRate) + "%의 피해와 " + services.skilltext.secs(ShamanType.ULT.dmStrikeStunMs) + " 기절";
+      "간 기절 후 " + ShamanType.ULT.dmBoltDmg + "의 피해. 영역 안 기본 공격은 가장 가까운 적 1명에게 최대 체력의 " + services.skilltext.pctOf(ShamanType.ULT.dmStrikeMaxHpRate) + "%의 피해와 " + services.skilltext.secs(ShamanType.ULT.dmStrikeStunMs) + "간 기절";
     }
     passiveDesc() { var services = this.services;
       return "공격이 적중할 때마다 대상에게 저주 1회 부여. 저주가 " + ShamanType.ULT.cuStacks + "회 중첩되면 폭발하여 " + ShamanType.ULT.cuBoomDmg + "의 피해. " + services.skilltext.secs(ShamanType.ULT.cuExpireMs) + " 이상 갱신되지 않으면 저주 소멸";
@@ -3444,7 +3444,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     skillGlow(E, t) { return E.ultUntil > t ? 0x2A1060 : 0; }
     playSkillClip(v, E, t) { var services = this.services; services.fighterMotion.playOnce(v, "Ranged_Magic_Spellcasting_Long", 2.6, t); }
     attackClip(v, E, t) { return ["Ranged_Magic_Shoot", 1.8]; }
-    passiveDesc() { var services = this.services; return AstrologerType.ULT.sfStunEvery + "번째 기본 공격마다 별똥별에 맞은 적을 " + services.skilltext.secs(AstrologerType.ULT.sfStunMs) + " 기절"; }
+    passiveDesc() { var services = this.services; return AstrologerType.ULT.sfStunEvery + "번째 기본 공격마다 별똥별에 맞은 적을 " + services.skilltext.secs(AstrologerType.ULT.sfStunMs) + "간 기절"; }
     basicDesc() { var services = this.services;
       return "사거리 " + this.data.range + "의 지정한 곳에 별똥별을 떨어뜨려 " + services.skilltext.secs(AstrologerType.ULT.sfDelay) + " 뒤 반경 " + AstrologerType.ULT.sfR + " 안의 적에게 " + this.data.dmg + "의 피해";
     }
@@ -3788,13 +3788,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.vision.revealBriefly(E.id, t);
     }
     ultDesc() { var services = this.services, u = MarinaType.ULT;
-      return services.skilltext.secs(u.mrWindMs) + " 뒤 폭 " + u.mrLanes + "칸의 해일을 보내 적에게 " + u.mrDmg + "의 피해·밀어냄·" + services.skilltext.secs(u.mrStunMs) + " 기절, 아군은 " + u.mrWaveHeal + " 회복";
+      return services.skilltext.secs(u.mrWindMs) + " 뒤 폭 " + u.mrLanes + "칸의 해일을 보내 적은 " + u.mrDmg + "의 피해를 입고 밀려나며 " + services.skilltext.secs(u.mrStunMs) + "간 기절, 아군은 체력 " + u.mrWaveHeal + " 회복";
     }
     passiveDesc() { var c = this.data, u = MarinaType.ULT;
-      return "가장 다친 아군을 " + u.mrHeal + " 회복(다친 아군이 없으면 가까운 적에게 " + c.dmg + "의 피해). 물줄기는 근처 대상에게 한 번 더 튄다";
+      return "가장 다친 아군의 체력 " + u.mrHeal + " 회복(다친 아군이 없으면 가까운 적에게 " + c.dmg + "의 피해). 물줄기는 근처 대상에게 한 번 더 튄다";
     }
     basicDesc() { var c = this.data, u = MarinaType.ULT;
-      return "가장 다친 아군을 " + u.mrHeal + " 회복(다친 아군이 없으면 가까운 적에게 " + c.dmg + "의 피해)";
+      return "가장 다친 아군의 체력 " + u.mrHeal + " 회복(다친 아군이 없으면 가까운 적에게 " + c.dmg + "의 피해)";
     }
   }
   class TsunamiLanes {

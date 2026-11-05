@@ -6495,7 +6495,7 @@ class MarinaTests {
     var self = this, api = this.api, run = this.kit.run, G = MarinaTests.GROUP, ULT = api.ULT, C = api.CHARS.marina, Mind = api.MARINA_BOT;
     run(G, "카드: 설명 숫자가 값과 맞고, 스킬 이름·통계표 평균 피해·직업군·통계 표시가 맞는가", function (done) {
       var bad = [], ult = api.ultDesc("marina"), pas = api.passiveDesc("marina"), basic = api.basicDesc("marina"), table = api.statTable("marina");
-      [api.secs(ULT.mrWindMs) + " 뒤", ULT.mrDmg + "의 피해", "밀어냄", api.secs(ULT.mrStunMs) + " 기절", ULT.mrWaveHeal + " 회복", "폭 " + ULT.mrLanes + "칸"].forEach(function (w) { if (ult.indexOf(w) < 0) bad.push("스킬 설명에 없음: " + w); });
+      [api.secs(ULT.mrWindMs) + " 뒤", ULT.mrDmg + "의 피해", "밀려나며", api.secs(ULT.mrStunMs) + "간 기절", "체력 " + ULT.mrWaveHeal + " 회복", "폭 " + ULT.mrLanes + "칸"].forEach(function (w) { if (ult.indexOf(w) < 0) bad.push("스킬 설명에 없음: " + w); });
       [ULT.mrHeal + " 회복", C.dmg + "의 피해", "한 번 더"].forEach(function (w) { if (pas.indexOf(w) < 0) bad.push("패시브 설명에 없음: " + w); });
       if (/\.$/.test(ult) || /\.$/.test(pas)) bad.push("마침표로 끝남");
       if ((ult + pas + basic).indexOf("undefined") >= 0 || (ult + pas + basic).indexOf("NaN") >= 0) bad.push("값이 비어 있음");
