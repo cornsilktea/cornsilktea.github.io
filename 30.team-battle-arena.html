@@ -2603,7 +2603,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class MageType extends MagicShooterType {
-    static MODEL = { file: "Mage", portraitPlant: true, right: "staff", recolor: [[1, 0, 2, "#D8342E", "#6A0E10"], [1, 7, 1, "#4A1012", "#1E0507"], [1, 2, 1, "#FF9A3A", "#C8401A"], [2, 1, 1, "#FF9A3A", "#C8401A"]],
+    static MODEL = { file: "Mage", portraitPlant: true, plantLean: 0.2, plantShrink: 0.68, right: "staff", recolor: [[1, 0, 2, "#D8342E", "#6A0E10"], [1, 7, 1, "#4A1012", "#1E0507"], [1, 2, 1, "#FF9A3A", "#C8401A"], [2, 1, 1, "#FF9A3A", "#C8401A"]],
                rightRecolor: [[2, 6, 1, "#FFD27A", "#E0341E"]] };
     static ULT = {
       mbDelay: GameTime.gameMs(1), mbR: 250, mbDmg: 110, mbDmgMin: 75, mbCast: 550, mbMin: 60, mbStunMs: GameTime.gameMs(1.7),
@@ -2839,7 +2839,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   class BlacksmithType extends CharacterType {
     static MELEE = { color: 0xFFB45A, spark: "#FFB45A" };
-    static MODEL = { file: "Engineer", right: "hammer_A", hide: ["Engineer_Backpack"],
+    static MODEL = { file: "Engineer", portraitPlant: true, right: "hammer_A", hide: ["Engineer_Backpack"],
                   recolor: [[0, 1, 1, "#3A2416", "#17100A"], [1, 0, 1, "#7A4E2D", "#3E2412"], [1, 3, 1, "#5A5F66", "#2E3136"], [0, 5, 1, "#F08A3A", "#9A3E14"],
                             [1, 7, 1, "#4B413A", "#231D19"], [0, 7, 1, "#5C4636", "#2B2018"], [2, 1, 1, "#E8742A", "#8F3A0E"], [2, 7, 1, "#E8742A", "#8F3A0E"], [3, 0, 1, "#E8742A", "#8F3A0E"]] };
     static ULT = {
@@ -2976,7 +2976,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class ClericType extends CharacterType {
-    static MODEL = { file: "Rogue_Hooded", portraitPlant: true, right: "staff", left: "spellbook_closed", hide: ["RogueHooded_Mask"],
+    static MODEL = { file: "Rogue_Hooded", portraitPlant: true, plantLean: 0.3, right: "staff", left: "spellbook_closed", hide: ["RogueHooded_Mask"],
                recolor: [[1, 1, 1, "#FFFFFF", "#D8D0BE"], [2, 1, 1, "#FFFFFF", "#D8D0BE"], [1, 0, 1, "#FFE58A", "#E0B040"], [0, 5, 2, "#E0B24A", "#8F6A22"],
                          [1, 5, 2, "#E0B24A", "#8F6A22"], [2, 3, 1, "#E0B24A", "#8F6A22"], [2, 4, 2, "#E0B24A", "#8F6A22"], [2, 7, 1, "#E0B24A", "#8F6A22"]],
                rightRecolor: [[2, 6, 1, "#FFFBD6", "#F5CE4E"], [0, 6, 1, "#FFFFFF", "#D8D0BE"], [1, 5, 1, "#FFFFFF", "#D8D0BE"], [0, 3, 2, "#F7DC7A", "#C0902E"],
@@ -3118,7 +3118,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class FrostType extends MagicShooterType {
-    static MODEL = { file: "Mage", portraitPlant: true, right: "staff_A", left: "spellbook_closed",
+    static MODEL = { file: "Mage", portraitPlant: true, plantLean: 0.2, plantShrink: 0.68, right: "staff_A", left: "spellbook_closed",
                recolor: [[1, 0, 1, "#F2F6FA", "#C9D6E2"], [1, 1, 1, "#8FD8F0", "#4FA9D9"], [1, 2, 1, "#8FD8F0", "#4FA9D9"], [2, 1, 1, "#8FD8F0", "#4FA9D9"], [0, 5, 1, "#F2F6FA", "#C9D6E2"]] };
     static ULT = {
       frSlowMs: GameTime.gameMs(1.5), frSlowMul: 0.8, frSlowStep: 0.2, frFreezeMs: GameTime.gameMs(1), frFreezeMaxHpRate: 0.1, frBzHides: true, frBzR: 400,
@@ -3454,7 +3454,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   class GiantType extends ArcMeleeType {
     static FORM_MODELS = { giantGolem: { file: "Skeleton_Golem", right: "Skeleton_Mace_Large", scale: 0.85 } };
-    static MODEL = { file: "Barbarian_Large", right: "Skeleton_Mace_Large", scale: 0.85, portraitFit: 1.1 };
+    static MODEL = { file: "Barbarian_Large", right: "Skeleton_Mace_Large", scale: 0.85, portraitFit: 0.94, portraitShiftX: 0.12 };
     static ULT = {
       gjCast: 300, gjMin: 60, gjTransformMs: GameTime.gameMs(1.2), gjDur: GameTime.gameMs(6), gjDef: 0.65, gjR: 150, gjTick: GameTime.gameMs(1),
       gjTickDmg: 20, gjMaceRange: 200, gjMaceDmg: 23
@@ -7846,11 +7846,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     static SKIN_COLS = 8;
     static SKIN_ROWS = 4;
     static PONYTAIL = { x: 0, y: 0.62, z: -0.6, tieR: 0.12, tailLen: 0.8, tailTop: 0.13, tailTip: 0.03, tilt: 0.45 };
-    static PLANT_OUTWARD = 0.25;
-    static PLANT_FORWARD = 0.18;
+    static PLANT_OUTWARD = 0.12;
+    static PLANT_FORWARD = 0.06;
     static GRIP_OUTWARD = 0.1;
     static GRIP_FORWARD = 0.05;
     static PLANT_MAX_K = 1.5;
+    static PLANT_LEAN = 0.12;
     constructor(services) { this.services = services; this.tmpV = new THREE.Vector3(); this.yUp = new THREE.Vector3(0, 1, 0); this.kit = { ready: false, chars: {}, weapons: {}, clips: {}, largeClips: {}, props: {}, muzzle: {} }; }
     glslVec3(v) { return "vec3(" + v.x.toFixed(4) + ", " + v.y.toFixed(4) + ", " + v.z.toFixed(4) + ")"; }
     meHullMat(geo) { var services = this.services;
@@ -7972,19 +7973,20 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       });
       return box.getSize(new THREE.Vector3()).y;
     }
-    shrinkTallHeld(m, extraTurn, tilt, atHand) { var services = this.services;
+    shrinkTallHeld(m, spec) { var services = this.services;
       var held = m.getObjectByName("mainhand"); if (!held) return;
       var limit = services.models.bodyHeight(m) * ModelKit.PLANT_MAX_K, length = new THREE.Box3().setFromObject(held).getSize(new THREE.Vector3()).y;
       if (length <= limit) return;
       held.scale.multiplyScalar(limit / length);
-      services.models.plantHeldUpright(m, extraTurn, tilt, atHand);
+      services.models.plantHeldUpright(m, spec);
     }
-    plantHeldUpright(m, extraTurn, tilt, atHand) { var services = this.services;
+    plantHeldUpright(m, spec) { var services = this.services;
+      var extraTurn = spec.plantTurn, tilt = spec.plantTilt, atHand = spec.plantAtHand, lean = spec.plantLean != null ? spec.plantLean : ModelKit.PLANT_LEAN;
       var held = m.getObjectByName("mainhand"); if (!held) return;
       held.position.set(0, 0, 0);
       var handTurn = new THREE.Quaternion(), bodyTurn = new THREE.Quaternion(), foot = new THREE.Vector3();
       held.parent.getWorldQuaternion(handTurn); m.getWorldQuaternion(bodyTurn);
-      held.quaternion.copy(handTurn.invert().multiply(bodyTurn));
+      held.quaternion.copy(handTurn.invert().multiply(bodyTurn.clone().multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), lean))));
       if (extraTurn) held.quaternion.multiply(new THREE.Quaternion().setFromAxisAngle(services.models.yUp, extraTurn));
       if (tilt) held.quaternion.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), tilt));
       m.updateMatrixWorld(true);
@@ -8008,7 +8010,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         m.rotation.y = -0.45;
         var mix = new THREE.AnimationMixer(m); mix.clipAction(services.charTypes.of(c).clips.Idle_A).play(); mix.update(0.3);
         m.updateMatrixWorld(true);
-        if (services.charTypes.modelOf(c).portraitPlant) { services.models.plantHeldUpright(m, services.charTypes.modelOf(c).plantTurn, services.charTypes.modelOf(c).plantTilt, services.charTypes.modelOf(c).plantAtHand); services.models.shrinkTallHeld(m, services.charTypes.modelOf(c).plantTurn, services.charTypes.modelOf(c).plantTilt, services.charTypes.modelOf(c).plantAtHand); }
+        if (services.charTypes.modelOf(c).portraitPlant) { if (services.charTypes.modelOf(c).plantShrink) m.getObjectByName("mainhand").scale.multiplyScalar(services.charTypes.modelOf(c).plantShrink); services.models.plantHeldUpright(m, services.charTypes.modelOf(c)); services.models.shrinkTallHeld(m, services.charTypes.modelOf(c)); }
         services.charTypes.of(c).dressPortrait(m);
         return { c: c, m: m, box: new THREE.Box3().setFromObject(m) };
       });
@@ -8016,6 +8018,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       posed.forEach(function (p) {
         if (!services.charTypes.modelOf(p.c).portraitFit) return;
         p.m.scale.multiplyScalar(tallest * services.charTypes.modelOf(p.c).portraitFit / p.box.max.y);
+        p.m.position.x += tallest * (services.charTypes.modelOf(p.c).portraitShiftX || 0);
         p.m.updateMatrixWorld(true);
       });
       var frameH = tallest * 1.12, dist = frameH / 2 / Math.tan(15 * Math.PI / 180);
