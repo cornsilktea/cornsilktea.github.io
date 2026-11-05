@@ -34,7 +34,6 @@
 <div id="kitNote" hidden><span id="kitNoteText"></span><button id="btnKitRetry" class="mini" type="button" hidden>다시 불러오기</button></div>
 <div id="glLostNote" hidden>화면을 다시 그리지 못했어요. 새로고침하면 같은 캐릭터로 이어서 할 수 있어요.</div>
 <div id="tourFade" hidden></div>
-<div id="tourCaption" hidden><i></i><span id="tourCam"></span></div>
 <div id="versusCurtain" class="tbv-curtain" hidden>
   <div class="tbv-curtain-in">
     <div class="tbv-head">⚔️ 상대 팀을 찾았어요!</div>
@@ -585,16 +584,16 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       "................",
       "................",
       "................",
-      "##..##....##..##",
-      "....#......#....",
-      '"".x#......#x.""',
-      '""..#.x..x.#..""',
-      "....#..##..#....",
-      "....#......#....",
+      "..##........##..",
       "................",
-      '###...""""...###',
-      "......x..x......",
-      "..##........##.."
+      '""............""',
+      '""............""',
+      "....##....##....",
+      "................",
+      "................",
+      ".##..........##.",
+      "................",
+      '.....#""""#.....'
     ] };
   }
   class WindhillMap {
@@ -2560,7 +2559,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       E.slamAt = E.buffUntil;
     }
     ultDesc() { var services = this.services;
-      return services.skilltext.secs(KnightType.ULT.tkDur) + "간 받는 피해 " + services.skilltext.num(KnightType.ULT.tkDef) + "배. 끝날 때 반경 " + KnightType.ULT.tkStunR + "의 적은 " + services.skilltext.secs(KnightType.ULT.tkStunMs) + "간 기절";
+      return services.skilltext.secs(KnightType.ULT.tkDur) + "간 받는 피해 " + services.skilltext.pctOf(1 - KnightType.ULT.tkDef) + "% 감소. 끝날 때 반경 " + KnightType.ULT.tkStunR + "의 적은 " + services.skilltext.secs(KnightType.ULT.tkStunMs) + "간 기절";
     }
     passiveDesc() {
       var c = this.data;
@@ -2828,7 +2827,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return services.skilltext.secs(LancerType.ULT.lnWind) + " 준비 후 사거리 " + LancerType.ULT.lnLen + "의 창 찌르기. 맞은 적은 모두 " + LancerType.ULT.lnDmg + "의 피해를 입고 " + services.skilltext.secs(LancerType.ULT.lnStunMs) + "간 기절";
     }
     passiveDesc() {
-      return "게임을 시작할 때와 부활할 때마다 적의 다음 피해 1회를 막는 보호막 생성. 기절·둔화 등 효과는 막지 못함";
+      return "게임을 시작할 때와 부활할 때마다 다음에 받는 피해 1회를 막는 보호막 생성. 기절·둔화 등 효과는 막지 못함";
     }
     basicDesc() {
       var c = this.data;
@@ -3618,7 +3617,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     onStrikeShown(d) { var services = this.services; if (d.len) services.hammerStrikes.add(d, BannerStrikeGlow); }
     ultDesc() { var services = this.services;
       var u = BannerBearerType.ULT;
-      return services.skilltext.secs(u.bnDur) + "간 반경 " + u.bnR + " 안의 아군은 받는 피해 " + services.skilltext.pctOf(1 - u.bnDef) + "% 감소, 주는 피해 " + services.skilltext.pctOf(u.bnAtk - 1) + "% 증가";
+      return services.skilltext.secs(u.bnDur) + "간 반경 " + u.bnR + " 안의 아군과 자신은 받는 피해 " + services.skilltext.pctOf(1 - u.bnDef) + "% 감소, 주는 피해 " + services.skilltext.pctOf(u.bnAtk - 1) + "% 증가";
     }
     passiveDesc() { var services = this.services;
       var u = BannerBearerType.ULT;
@@ -3757,7 +3756,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     static MODEL = { file: "Mage", portraitPlant: true, rightBuilt: "trident", rightScale: 1.2, rightRot: [0.4, -0.2, 0.95], hide: ["Mage_Hat"],
                 recolor: [[1, 0, 1, "#1C7F8C", "#0F4A5C"], [1, 1, 1, "#173A63", "#0B1F3C"], [1, 2, 1, "#38B6C8", "#1B6F86"], [2, 1, 1, "#173A63", "#0B1F3C"], [0, 5, 1, "#38B6C8", "#1B6F86"]] };
     static ULT = {
-      mrFlyMs: GameTime.gameMs(0.3), mrHeal: 10, mrChainR: 300, mrDmg: 20, mrKb: 150, mrStunMs: GameTime.gameMs(0.5), mrWaveHeal: 20, mrLanes: 5, mrLen: 600,
+      mrFlyMs: GameTime.gameMs(0.3), mrHeal: 10, mrChainR: 300, mrDmg: 20, mrKb: 150, mrStunMs: GameTime.gameMs(0.5), mrWaveHeal: 10, mrLanes: 6, mrLen: 600,
       mrBotPushR: 150, mrBotMinFoes: 2, mrBotAllyHp: 0.5, mrWindMs: GameTime.gameMs(0.5)
     };
     static STATS = { name: "마리나", role: "caster", icon: "🌊", hp: 110, speed: GameTime.gameSpeed(170), cd: GameTime.gameMs(1.4), dmg: 10, range: 380, noAim: true, ultName: "해일", ultAim: true, heals: true };
@@ -4223,12 +4222,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   class TsunamiView {
     static WALL_HEIGHT = 92;
+    static SLOTS = MarinaType.ULT.mrLanes + 2;
+    static CENTER = (MarinaType.ULT.mrLanes / 2).toFixed(1);
     static CREST_SETBACK = 12;
     static FADE_END_SEC = 0.45;
     static FADE_WALL_SEC = 0.35;
     static BURST_SEC = 0.75;
     static RISE_SEC = 0.4;
-    static SPREAD_SEC = 0.07;
     static SLAM_REACH = 78;
     static SLAM_SIDE = 11;
     static SLAM_SEC = 0.6;
@@ -4245,7 +4245,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
                     [17, 1, 1, 1, 0.98], [21, 0.86, 1, 1.15, 0.86], [15, 0.72, 0.7, 0.75, 0.42], [7, 0.62, 0.3, 0.35, 0.22], [3, 0.46, 0.18, 0.1, 0.26], [6, 0.28, 0.42, 0, 0.42], [14, 0.12, 0.88, 0, 0.72], [28, 0, 1, 0, 0.9]];
     static SHARED = null;
     static LANE_GLSL = `
-      uniform float uReach[7]; uniform float uTime;
+      uniform float uReach[${TsunamiView.SLOTS}]; uniform float uTime;
       float shoulderOf(int i, float f, float width) {
         float left = mix(1.0, smoothstep(0.0, width, f), clamp(abs(uReach[i] - uReach[i - 1]) / 24.0, 0.0, 1.0));
         float right = mix(1.0, smoothstep(0.0, width, 1.0 - f), clamp(abs(uReach[i] - uReach[i + 1]) / 24.0, 0.0, 1.0));
@@ -4253,12 +4253,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       }`;
     static WALL_VERTEX = TsunamiView.LANE_GLSL + `
       attribute float aFoam; attribute float aLip; attribute float aTone;
-      uniform float uLift[7];
+      uniform float uLift[${TsunamiView.SLOTS}];
       varying float vFoam; varying float vTone; varying float vHeight; varying float vAlong; varying float vSide; varying float vLane;
       void main() {
         float lane = floor(position.z), f = position.z - lane, shape = position.x;
         int i = int(lane) + 1;
-        float reach = uReach[i], lift = uLift[i], shoulder = shoulderOf(i, f, 0.42), side = (position.z - 2.5) * TILE;
+        float reach = uReach[i], lift = uLift[i], shoulder = shoulderOf(i, f, 0.42), side = (position.z - ${TsunamiView.CENTER}) * TILE;
         float roll = sin(side * 0.041 + uTime * 1.5) * 0.6 + sin(side * 0.097 - uTime * 2.4 + 1.7) * 0.4;
         float backScale = shape < 0.0 ? clamp(reach / 150.0, 0.12, 1.0) : 1.0;
         float curl = aLip * (8.0 + 7.0 * sin(side * 0.06 + uTime * 2.8));
@@ -4292,12 +4292,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         #include <colorspace_fragment>
       }`;
     static SHEET_VERTEX = TsunamiView.LANE_GLSL + `
-      uniform float uWet[7];
+      uniform float uWet[${TsunamiView.SLOTS}];
       varying float vWet; varying float vBehind; varying float vAlong; varying float vSide; varying float vEdge;
       void main() {
         float lane = floor(position.z), f = position.z - lane;
         int i = int(lane) + 1;
-        float reach = uReach[i], along = position.x * (reach + 10.0), side = (position.z - 2.5) * TILE;
+        float reach = uReach[i], along = position.x * (reach + 10.0), side = (position.z - ${TsunamiView.CENTER}) * TILE;
         vWet = uWet[i]; vBehind = reach + 10.0 - along; vAlong = along; vSide = side; vEdge = shoulderOf(i, f, 0.2);
         gl_Position = projectionMatrix * modelViewMatrix * vec4(along, 1.6, side, 1.0);
       }`;
@@ -4316,13 +4316,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         #include <colorspace_fragment>
       }`;
     static SPRAY_VERTEX = TsunamiView.LANE_GLSL + `
-      uniform float uLift[7]; uniform float uBurst[7]; uniform float uPixelScale;
+      uniform float uLift[${TsunamiView.SLOTS}]; uniform float uBurst[${TsunamiView.SLOTS}]; uniform float uPixelScale;
       varying float vFade;
       void main() {
         float lane = floor(position.z), seed = position.x, other = position.y;
         int i = int(lane) + 1;
         float lift = uLift[i], burst = uBurst[i], reach = uReach[i];
-        float age = fract(other + uTime * (0.5 + 0.55 * seed)), side = (position.z - 2.5) * TILE + sin(seed * 41.0) * age * 12.0;
+        float age = fract(other + uTime * (0.5 + 0.55 * seed)), side = (position.z - ${TsunamiView.CENTER}) * TILE + sin(seed * 41.0) * age * 12.0;
         float along = reach - SETBACK + 10.0 + (seed - 0.72) * age * 44.0, height = WALL * lift * (0.68 + age * (0.5 + 0.42 * other)) - age * age * WALL * 0.62 * lift;
         float fade = (1.0 - age) * min(1.0, age * 7.0) * smoothstep(0.03, 0.2, lift);
         float size = (3.5 + 8.5 * seed) * (0.55 + 0.75 * age);
@@ -4414,7 +4414,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       [parts.ripple, parts.drops].forEach(function (part, i) { part.frustumCulled = false; part.renderOrder = 8 + i; vis.group.add(part); });
       vis.slam = uniforms;
     }
-    warmSample() { var vis = this.buildVis(); this.placeEdges(vis, [600, 600, 300, 600, 600], 0); this.paint(vis, { lanes: [600, 600, 300, 600, 600] }, 500, 500); return vis.group; }
+    warmSample() { var vis = this.buildVis(), lanes = [600, 600, 300, 600, 600, 600]; this.placeEdges(vis, lanes, 0); this.paint(vis, { lanes: lanes }, 500, 500); return vis.group; }
     add(d) { this.services.field.tsunamis.push({ d: d, vis: null, departed: false }); }
     drop(item) { if (!item.vis) return; this.services.stage.scene.remove(item.vis.group); this.free.push(item.vis); item.vis = null; }
     lifeMs() { return MarinaType.WAVE.travel + GameTime.gameMs(TsunamiView.WET_SEC) + 100; }
@@ -4450,7 +4450,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     riseAt(age) { return age <= 0 ? 0 : Math.min(1, age / GameTime.gameMs(TsunamiView.RISE_SEC)); }
     paintLane(vis, i, len, age) { var V = TsunamiView, u = MarinaType.ULT, travel = MarinaType.WAVE.travel, slot = i + 1, shared = vis.uniforms, started = age >= 0;
       var endAge = travel * len / u.mrLen, stopped = len > 0 && len < u.mrLen, gone = len > 0 ? MathKit.clamp((age - endAge) / GameTime.gameMs(stopped ? V.FADE_WALL_SEC : V.FADE_END_SEC), 0, 1) : 1;
-      var fromCenter = Math.abs(i - (u.mrLanes - 1) / 2), rise = this.riseAt(age - GameTime.gameMs(V.SPREAD_SEC) * fromCenter);
+      var rise = this.riseAt(age);
       shared.uReach.value[slot] = Math.min(len, Math.max(V.SLAM_REACH, u.mrLen * Math.max(0, age) / travel));
       shared.uLift.value[slot] = len > 0 ? rise * (1 - gone) : 0;
       shared.uWet.value[slot] = len > 0 && started ? MathKit.clamp(1 - (age - endAge) / GameTime.gameMs(V.WET_SEC), 0, 1) : 0;
@@ -7932,7 +7932,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         services.charTypes.list.forEach(function (c) { if (services.charTypes.modelOf(c).muzzle) services.models.kit.muzzle[c] = services.models.aimedMuzzle(c); });
         services.models.kit.ready = true; services.models.kit.failed = false;
         services.models.makePortraits();
-        services.tourView.buildShowcase();
         services.shaderWarmup.warmEffects();
         services.kitNote.render();
       }).catch(function () { services.models.kit.failed = true; services.kitNote.render(); });
@@ -8096,6 +8095,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   class PropBuilder {
     static MILL_SPIN = 0.7;
     static DUNGEON_TILE_H = 3;
+    static DUNGEON_WALL_H = 46;
     constructor(services) { this.services = services; this.box = new Map(); this.seed = 20260926; this.millBlades = []; }
     seeded() { var services = this.services; services.props.seed = (services.props.seed * 1664525 + 1013904223) % 4294967296; return services.props.seed / 4294967296; }
     propSize(tpl) { var services = this.services;
@@ -8244,7 +8244,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.arenaMap.rows.forEach(function (row, r) {
         for (var c = 0; c < services.arenaMap.cols; c++) {
           var ch = row.charAt(c), zone = services.arenaView.zoneOfRow(r);
-          if (ch === "#") { blocks.push({ w: ArenaSize.TILE * 1.02, h: 62, d: ArenaSize.TILE * 1.02, x: services.arenaMap.tileX(c), z: services.arenaMap.tileY(r), yaw: services.props.quarterTurn() }); continue; }
+          if (ch === "#") { blocks.push({ w: ArenaSize.TILE * 1.02, h: PropBuilder.DUNGEON_WALL_H, d: ArenaSize.TILE * 1.02, x: services.arenaMap.tileX(c), z: services.arenaMap.tileY(r), yaw: services.props.quarterTurn() }); continue; }
           var shade = ch === '"' ? 0x6A6272 : zone === "blue" ? 0xB4CCFF : zone === "red" ? 0xFFBDB2 : 0xF2F0EC - Math.floor(services.props.seeded() * 3) * 0x0A0A0A;
           floors[!zone && ch === "." && services.props.seeded() < 0.12 ? 1 : 0].push({ w: ArenaSize.TILE, h: PropBuilder.DUNGEON_TILE_H, d: ArenaSize.TILE, y: 0.2 - PropBuilder.DUNGEON_TILE_H, x: services.arenaMap.tileX(c), z: services.arenaMap.tileY(r), yaw: services.props.quarterTurn(), color: shade });
           if (ch === "x") (services.props.seeded() < 0.5 ? boxes : barrels).push({ x: services.arenaMap.tileX(c), z: services.arenaMap.tileY(r), yaw: services.props.seeded() * 6.28 });
@@ -10277,8 +10277,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class TourView {
-    static SPOTS = [["warrior", "blue", 330, 585], ["ranger", "blue", 450, 555], ["mage", "blue", 570, 585],
-                    ["knight", "red", 330, 765], ["rogue", "red", 450, 795], ["sniper", "red", 570, 765], ["wraith", "red", 450, 700], ["bearer", "blue", 450, 650], ["marina", "blue", 330, 650]];
     static SHOTS = [
       { name: "아레나 전경", orbit: true, center: [450, 0, 675], radius: 1350, height: 850, arc: [1.1, 1.95] },
       { name: "중앙 대치", from: [110, 100, 930], to: [790, 100, 930], lookFrom: [380, 60, 675], lookTo: [520, 60, 675] },
@@ -10292,8 +10290,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     static SHOT_MS = 7000;
     static FADE_MS = 600;
     constructor(services) { this.services = services;
-      this.state = { on: false, index: 0, start: 0, caption: "", dirty: true, drawnAt: 0 };
-      this.showcase = [];
+      this.state = { on: false, index: 0, start: 0, dirty: true, drawnAt: 0 };
       this.group = null;
       this.look = new THREE.Vector3();
       this.lowEnd = Environment.TOUCH || (navigator.hardwareConcurrency > 0 && navigator.hardwareConcurrency <= 4);
@@ -10301,14 +10298,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     attachTo(stageScene) { var services = this.services;
       this.group = new THREE.Group(); this.group.visible = false; stageScene.add(this.group);
       window.addEventListener("resize", function () { services.tourView.state.dirty = true; });
-    }
-    buildShowcase() { var services = this.services;
-      TourView.SPOTS.forEach(function (s, i) {
-        var E = Object.assign(new Unit(services), { id: "tour" + i, team: s[1], char: s[0], x: s[2], y: s[3], angle: s[1] === "blue" ? Math.PI / 2 : -Math.PI / 2,
-                  atkAt: 0, ultUntil: 0, buffUntil: 0, stealthUntil: 0, alive: true, mv: false, nextAtk: 1200 + i * 700 + Math.random() * 1500 });
-        var v = services.fighterView.makeVis(E, services.tourView.group);
-        v.root.position.set(E.x, 0, E.y); v.body.rotation.y = -E.angle;      services.tourView.showcase.push({ E: E, v: v });
-      });
     }
     tourStill() { var services = this.services; return services.tourView.lowEnd || services.cameraRig.pix < Environment.PIX_START; }
     bushShot(shot) { var services = this.services;
@@ -10325,11 +10314,11 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.fxView.clear3d();
       Canvases.overlayCtx.setTransform(1, 0, 0, 1, 0, 0); Canvases.overlayCtx.clearRect(0, 0, Canvases.overlay.width, Canvases.overlay.height);
       services.tourView.group.visible = true;
-      Dom.show(Dom.$("tourFade"), true); Dom.show(Dom.$("tourCaption"), true);
+      Dom.show(Dom.$("tourFade"), true);
     }
     endTour() { var services = this.services;
       services.tourView.state.on = false; services.tourView.group.visible = false;
-      Dom.show(Dom.$("tourFade"), false); Dom.show(Dom.$("tourCaption"), false);
+      Dom.show(Dom.$("tourFade"), false);
       services.cameraRig.view.snap = true; services.cameraRig.view.fitKey = "";
     }
     renderTour(nowMs, dt) { var services = this.services;
@@ -10339,7 +10328,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (frozen !== services.tourView.state.frozen) {
         services.tourView.state.frozen = frozen; services.tourView.state.dirty = true;
         services.tourView.group.visible = !frozen;
-        Dom.show(Dom.$("tourCaption"), !frozen);
       }
       var still = frozen || services.tourView.tourStill();
       if (services.tourView.state.mapShown !== services.arenaMap.id) {
@@ -10366,16 +10354,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.stage.camera.lookAt(services.tourView.look);
       services.stage.camera.updateMatrixWorld();
       Dom.$("tourFade").style.opacity = still ? "0" : Math.max(0, 1 - Math.min(elapsed, TourView.SHOT_MS - elapsed) / TourView.FADE_MS).toFixed(3);
-      var camNo = still ? 1 : services.tourView.state.index + 1;
-      var cap = "CAM " + (camNo < 10 ? "0" : "") + camNo + " · " + MapCatalog.of(services.arenaMap.id).name + " · " + shot.name;
-      if (cap !== services.tourView.state.caption) { services.tourView.state.caption = cap; Dom.setText(Dom.$("tourCam"), cap); }
-      var t = services.clock.now();
-      if (!frozen) services.tourView.showcase.forEach(function (s) {
-        if (!s.E.nextAtk || s.E.nextAtk < 100000) s.E.nextAtk = t + s.E.nextAtk;
-        if (t >= s.E.nextAtk) { s.E.atkAt = t; s.E.nextAtk = t + 1800 + Math.random() * 2600; }
-        services.fighterMotion.animate(s.v, s.E, t, dt, false);
-        if (s.v.chainRig) s.v.chainRig.update(s.E, t, dt);
-      });
       services.arenaView.bushVis.forEach(function (bv) { bv.mats.forEach(function (m) { m.opacity = bv.full; }); });
       services.cameraRig.renderer.render(services.stage.scene, services.stage.camera);
     }

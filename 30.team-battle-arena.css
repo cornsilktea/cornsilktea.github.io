@@ -17,8 +17,6 @@
   .titleMain .tb { color: #6FA8FF; text-shadow: 0 4px 0 rgba(0, 0, 0, .45), 0 0 18px rgba(76, 141, 255, .7); }
   .titleMain .tr { color: #FF7A70; text-shadow: 0 4px 0 rgba(0, 0, 0, .45), 0 0 18px rgba(255, 90, 78, .7); }
   #tourFade { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 1; background: #000; opacity: 1; pointer-events: none; }
-  #tourCaption { position: fixed; right: 18px; bottom: calc(env(safe-area-inset-bottom, 0px) + 16px); z-index: 31; pointer-events: none; font-size: 14px; font-weight: 800; letter-spacing: .06em; color: #F4F1E8; text-shadow: 0 1px 3px #000; }
-  #tourCaption i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: #F2C230; margin-right: 7px; box-shadow: 0 0 8px #F2C230; }
   .wrap { width: 100%; max-width: 760px; margin: 0 auto; }
   .card { background: var(--sg-panel); border: 1px solid var(--sg-line-mid); border-radius: 8px; padding: 22px 20px; margin-bottom: 14px; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
   h1 { font-size: 30px; font-weight: 800; text-align: center; margin-bottom: 6px; }

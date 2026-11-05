@@ -6030,7 +6030,7 @@ class BannerBearerTests {
     });
     run(G, "카드: 설명 숫자가 값과 맞고 표에 undefined·NaN 이 없는가", function (done) {
       var bad = [], u = api.ultDesc("bearer"), p = api.passiveDesc("bearer"), b = api.basicDesc("bearer"), C = api.CHARS.bearer;
-      if (u !== "8초간 반경 " + ULT.bnR + " 안의 아군은 받는 피해 20% 감소, 주는 피해 10% 증가") bad.push(u);
+      if (u !== "8초간 반경 " + ULT.bnR + " 안의 아군과 자신은 받는 피해 20% 감소, 주는 피해 10% 증가") bad.push(u);
       if (p !== "반경 " + ULT.bnMarchR + " 안의 아군과 자신은 이동속도 40 증가") bad.push(p);
       if (b.indexOf(String(C.range)) < 0 || b.indexOf(String(C.width)) < 0 || b.indexOf(String(C.dmg)) < 0) bad.push(b);
       if (/undefined|NaN/.test(u + p + b)) bad.push("글자 오류");
@@ -6303,12 +6303,12 @@ class MarinaTests {
   registerLanes() {
     var self = this, api = this.api, run = this.kit.run, G = MarinaTests.GROUP, ULT = api.ULT, L = api.TSUNAMI_LANES, E = api.TsunamiLanes;
     function allFull(lens) { return lens.every(function (n) { return n === ULT.mrLen; }); }
-    run(G, "칸 계산: 벽이 없으면 5칸 모두 " + ULT.mrLen + ", 양쪽 2칸만 막히면 그 2칸만 짧고 나머지 3칸은 " + ULT.mrLen + " 인가", function (done) {
+    run(G, "칸 계산: 벽이 없으면 " + ULT.mrLanes + "칸 모두 " + ULT.mrLen + ", 오른쪽 2칸만 막히면 그 2칸만 짧고 나머지 " + (ULT.mrLanes - 2) + "칸은 " + ULT.mrLen + " 인가", function (done) {
       var bad = [];
       api.loadMapData("practice");
       if (!allFull(L.plan(MarinaTests.X, MarinaTests.Y, Math.PI / 2))) bad.push("연습장 " + L.plan(MarinaTests.X, MarinaTests.Y, Math.PI / 2));
       var maps = ["forest", "river", "dungeon", "windhill"], found = null;
-      for (var i = 0; i < maps.length && !found; i++) found = self.spotWhere(maps[i], function (lens) { return lens[0] === ULT.mrLen && lens[1] === ULT.mrLen && lens[2] === ULT.mrLen && lens[3] > 0 && lens[3] < ULT.mrLen && lens[4] > 0 && lens[4] < ULT.mrLen; });
+      for (var i = 0; i < maps.length && !found; i++) found = self.spotWhere(maps[i], function (lens) { return lens.slice(0, ULT.mrLanes - 2).every(function (n) { return n === ULT.mrLen; }) && lens.slice(ULT.mrLanes - 2).every(function (n) { return n > 0 && n < ULT.mrLen; }); });
       if (!found) bad.push("오른쪽 2칸만 막히는 자리를 못 찾음");
       self.verdict(done, bad, found ? "일부 칸만 막힘 예 " + found.map + " " + found.lens.join(",") : "");
     });
@@ -6320,11 +6320,11 @@ class MarinaTests {
       });
       if (inWall) bad.push("벽 안 출발 칸이 0 이 아님 " + inWall.lens);
       var thin = self.spotWhere("forest", function (lens, x, y, ang) {
-        var ca = Math.cos(ang), sa = Math.sin(ang), off = E.laneOffset(4);
+        var ca = Math.cos(ang), sa = Math.sin(ang), off = E.laneOffset(ULT.mrLanes - 1);
         return !self.tileIsBlock(x - sa * off, y + ca * off) && !api.losClear(x, y, x - sa * off, y + ca * off);
       });
       if (!thin) bad.push("얇은 벽 자리를 못 찾음");
-      else if (thin.lens[4] !== 0) bad.push("얇은 벽 너머 칸이 있음 " + thin.lens);
+      else if (thin.lens[ULT.mrLanes - 1] !== 0) bad.push("얇은 벽 너머 칸이 있음 " + thin.lens);
       api.loadMapData("forest");
       if (!L.blockAt(-1, 3) || !L.blockAt(3, -1) || !L.blockAt(9999, 3)) bad.push("맵 밖이 벽이 아님");
       var water = self.spotWhere("river", function (lens, x, y, ang) {
@@ -6349,7 +6349,7 @@ class MarinaTests {
       if (!bridge) bad.push("다리를 지나 끝까지 가는 칸이 없음");
       self.verdict(done, bad, "벽 안·얇은 벽·맵 밖·물·다리 규칙 확인");
     });
-    run(G, "칸 계산: 5맵 무작위 위치·각도(비스듬한 각도 포함)에서 표본과 어긋나지 않고 lens 는 항상 0~" + ULT.mrLen + " 의 정수 5개인가", function (done) {
+    run(G, "칸 계산: 5맵 무작위 위치·각도(비스듬한 각도 포함)에서 표본과 어긋나지 않고 lens 는 항상 0~" + ULT.mrLen + " 의 정수 " + ULT.mrLanes + "개인가", function (done) {
       var bad = [], seed = 20261104, checked = 0;
       function rnd() { seed = (seed * 1664525 + 1013904223) % 4294967296; return seed / 4294967296; }
       api.MAP_IDS.forEach(function (map) {
@@ -6445,11 +6445,11 @@ class MarinaTests {
       self.verdict(done, bad, "피하기·면역·끊기·기절 중 진행 확인");
     });
     run(G, "해일 판정: 벽에 막힌 칸 너머 적은 안 맞고 뚫린 칸의 적은 맞는가", function (done) {
-      var bad = [], spot = self.spotWhere("forest", function (lens) { return lens[0] === ULT.mrLen && lens[4] > 100 && lens[4] < 300; }) || self.spotWhere("river", function (lens) { return lens[0] === ULT.mrLen && lens[4] > 100 && lens[4] < 300; });
+      var bad = [], spot = self.spotWhere("forest", function (lens) { return lens[0] === ULT.mrLen && lens[ULT.mrLanes - 1] > 100 && lens[ULT.mrLanes - 1] < 300; }) || self.spotWhere("river", function (lens) { return lens[0] === ULT.mrLen && lens[ULT.mrLanes - 1] > 100 && lens[ULT.mrLanes - 1] < 300; });
       if (!spot) { self.verdict(done, ["자리를 못 찾음"], ""); return; }
       var ca = Math.cos(spot.angle), sa = Math.sin(spot.angle);
       function laneSpot(i, along) { var off = api.TsunamiLanes.laneOffset(i); return { x: spot.x - sa * off + ca * along, y: spot.y + ca * off + sa * along }; }
-      var beyond = laneSpot(4, spot.lens[4] + 120), open = laneSpot(0, spot.lens[4] + 120), before = laneSpot(4, spot.lens[4] - 40);
+      var beyond = laneSpot(ULT.mrLanes - 1, spot.lens[ULT.mrLanes - 1] + 120), open = laneSpot(0, spot.lens[ULT.mrLanes - 1] + 120), before = laneSpot(ULT.mrLanes - 1, spot.lens[ULT.mrLanes - 1] - 40);
       var W = self.scene(spot.map, [{ id: "mr", team: "blue", char: "marina", x: spot.x, y: spot.y, slot: 1 }, { id: "beyond", x: beyond.x, y: beyond.y }, { id: "open", x: open.x, y: open.y }, { id: "before", x: before.x, y: before.y }]), M = W.ent("mr");
       M.gauge = api.GAUGE_MAX; api.useUlt(M, spot.angle);
       var sent = W.log.filter(function (p) { return p.path === "meleeHits"; })[0].v;
@@ -6481,9 +6481,9 @@ class MarinaTests {
       self.verdict(done, bad, "회복 " + ULT.mrWaveHeal + " 한 번, 자신 제외");
     });
     run(G, "해일: 칸 판정이 아군에게도 똑같이 적용되어 막힌 칸 너머 아군은 회복하지 않는가", function (done) {
-      var bad = [], spot = self.spotWhere("forest", function (lens) { return lens[0] === ULT.mrLen && lens[4] > 100 && lens[4] < 300; }) || self.spotWhere("river", function (lens) { return lens[0] === ULT.mrLen && lens[4] > 100 && lens[4] < 300; });
+      var bad = [], spot = self.spotWhere("forest", function (lens) { return lens[0] === ULT.mrLen && lens[ULT.mrLanes - 1] > 100 && lens[ULT.mrLanes - 1] < 300; }) || self.spotWhere("river", function (lens) { return lens[0] === ULT.mrLen && lens[ULT.mrLanes - 1] > 100 && lens[ULT.mrLanes - 1] < 300; });
       if (!spot) { self.verdict(done, ["자리를 못 찾음"], ""); return; }
-      var ca = Math.cos(spot.angle), sa = Math.sin(spot.angle), off = api.TsunamiLanes.laneOffset(4), along = spot.lens[4] + 120;
+      var ca = Math.cos(spot.angle), sa = Math.sin(spot.angle), off = api.TsunamiLanes.laneOffset(ULT.mrLanes - 1), along = spot.lens[ULT.mrLanes - 1] + 120;
       var W = self.scene(spot.map, [{ id: "mr", team: "blue", char: "marina", x: spot.x, y: spot.y, slot: 1 }, { id: "a", team: "blue", char: "guardian", x: spot.x - sa * off + ca * along, y: spot.y + ca * off + sa * along, slot: 2 }]), M = W.ent("mr"), a = self.hurt(W.ent("a"), 0.5), hp = a.hp;
       M.gauge = api.GAUGE_MAX; api.useUlt(M, spot.angle);
       self.finishWave(W);
@@ -6561,7 +6561,7 @@ class MarinaTests {
       if (sent.angle !== api.TsunamiLanes.exactAngle(sent.angle)) bad.push("각도 자릿수");
       ["dmg", "heal", "kb", "kbAlong", "wave", "width", "len", "u"].forEach(function (k) { if (sent[k] === undefined) bad.push("빠진 값 " + k); });
       var W2 = self.squad([self.foe("f", 0, 300), self.foe("g", 100, 300)]), M2 = W2.ent("mr"), custom = JSON.parse(JSON.stringify(sent));
-      custom.createdAt = W2.t(); custom.lanes = [ULT.mrLen, ULT.mrLen, 100, ULT.mrLen, ULT.mrLen];
+      custom.createdAt = W2.t(); custom.lanes = [ULT.mrLen, ULT.mrLen, 100, 100, ULT.mrLen, ULT.mrLen];
       onOtherDevice(W2, "f", function (me) {
         api.onMelee("wave-a", custom);
         self.finishWave(W2);
