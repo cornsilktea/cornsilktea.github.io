@@ -283,7 +283,10 @@
         tailLabel.style.right = (window.innerWidth - rect.left + 6) + "px";
       };
       var frames = 0, worst = 0, last = performance.now(), windowStart = last;
-      var tick = function (now) {
+      /* 게임이 화면 주사율보다 적게 그리면(30번 초당 60장 제한) 화면 신호 수가 아니라 실제로 그린 장수를 세야 하므로,
+         portal-frame-drawn 이벤트를 보내는 게임은 그 이벤트로 셉니다. */
+      var drawnByGame = false;
+      var count = function (now) {
         var gap = now - last;
         last = now;
         frames++;
@@ -296,6 +299,10 @@
           placeTail();
           frames = 0; worst = 0; windowStart = now;
         }
+      };
+      document.addEventListener("portal-frame-drawn", function () { drawnByGame = true; count(performance.now()); });
+      var tick = function (now) {
+        if (!drawnByGame) count(now);
         requestAnimationFrame(tick);
       };
       requestAnimationFrame(tick);

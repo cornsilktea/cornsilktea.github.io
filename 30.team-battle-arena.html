@@ -26,7 +26,7 @@
   "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
 } }
 </script>
-<link rel="stylesheet" href="30.team-battle-arena.css?v=20261105e">
+<link rel="stylesheet" href="30.team-battle-arena.css?v=20261106a">
 </head>
 <body>
 <canvas id="cv"></canvas>
@@ -12338,7 +12338,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class PerfProbe {
-    static BUILD = "lag13";
+    static BUILD = "lag14";
     static PATH = "perfDiag/teambattle/";
     static RTT_KEEP = 50;
     static RECORDS = !Environment.SILENT_RUN;
@@ -12789,8 +12789,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   class FramePhaseMeter {
     static ENABLED = /[?&]fps(&|=|$)/.test(location.search);
     static HOLD_MS = 4000;
+    static DRAWN_EVENT = new Event("portal-frame-drawn");
     static LABELS = { world: "세계", net: "전송", host: "방장", render: "그림", hud: "화면" };
     constructor() { this.cur = {}; this.last = 0; this.start0 = 0; this.worst = null; this.box = null; }
+    noteFrame() { if (FramePhaseMeter.ENABLED) document.dispatchEvent(FramePhaseMeter.DRAWN_EVENT); }
     start(frameMs) {
       if (!FramePhaseMeter.ENABLED) return;
       var now = performance.now(), prev = this.cur;
@@ -12823,11 +12825,23 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       this.box.textContent = this.textOf(this.worst);
     }
   }
+  class FramePacer {
+    static TARGET_MS = 1000 / 60;
+    static EARLY_MS = 2;
+    constructor() { this.next = 0; }
+    due(now) {
+      if (now < this.next - FramePacer.EARLY_MS) return false;
+      this.next = now - this.next > FramePacer.TARGET_MS ? now + FramePacer.TARGET_MS : this.next + FramePacer.TARGET_MS;
+      return true;
+    }
+  }
   class GameLoop {
-    constructor(services) { this.services = services; this.lastFrame = Date.now(); }
-    start() { var services = this.services; requestAnimationFrame(function () { services.loop.frame(); }); }
-    frame() { var services = this.services;
-      requestAnimationFrame(function () { services.loop.frame(); });
+    constructor(services) { this.services = services; this.lastFrame = Date.now(); this.pacer = new FramePacer(); }
+    start() { var services = this.services; requestAnimationFrame(function (now) { services.loop.frame(now); }); }
+    frame(now) { var services = this.services;
+      requestAnimationFrame(function (next) { services.loop.frame(next); });
+      if (!this.pacer.due(now)) return;
+      services.phases.noteFrame();
       var nowMs = Date.now(), frameMs = nowMs - services.loop.lastFrame, dt = Math.min(0.05, frameMs / 1000); services.loop.lastFrame = nowMs;
       services.perf.frame(frameMs);
       services.netDiag.frame(frameMs);
@@ -12981,7 +12995,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       HUD: services.hud, SOUND: services.sound, BACKEND: services.backend, TIMESCALE: services.timescale, THREE: THREE, CAMERA_RIG: services.cameraRig, ARENA_VIEW: services.arenaView, PROPS: services.props, PROP_THEMES: services.propThemes, camera: services.stage.camera, overlay: Canvases.overlay, QA: services.quality, PIX_MIN: Environment.PIX_MIN, PIX_START: Environment.PIX_START, SCENERY: services.arenaView.scenery,
       setDb: function (fake) { var before = services.backend.db; services.backend.db = fake; return before; },
       setTestLink: function (flag) { var before = services.backend.isTestLink; services.backend.isTestLink = flag; return before; },
-      MAP_X0: ArenaSize.MAP_X0, MAP_Y0: ArenaSize.MAP_Y0, TSUNAMI_LANES: services.tsunamiLanes, TsunamiLanes: TsunamiLanes, MARINA_STREAMS: services.marinaStreams, MARINA_BOT: services.marinaBot, TridentProp: TridentProp, HOOK_PATH: services.hookPath, HOOK_PULL: services.hookPull, HOOK_VIEW: services.hookView, playersNow: function () { return services.session.players; }, HAMMER_STRIKES: services.hammerStrikes, HammerStrikeBurst: HammerStrikeBurst, BANNER_AURA: services.bannerAura, BANNER_LEDGER: services.bannerLedger, BannerCreditLedger: BannerCreditLedger, makeBannerGlow: function (d) { return new BannerStrikeGlow(services, d); }, BannerStrikeGlow: BannerStrikeGlow, BannerBearerRig: BannerBearerRig, DraggedChain: DraggedChain, WraithChainRig: WraithChainRig, ChainSlamBurst: ChainSlamBurst, FIGHTER_VIEW: services.fighterView, GEO: services.geo, FRAME_RENDERER: services.frameRenderer, stage: services.stage, CHAR_TYPES: services.charTypes, AUTO_AIM: services.autoAim, AUTO_AIM_ERR: AutoAim.AUTO_AIM_ERR, AUTO_AIM_LEAD: AutoAim.AUTO_AIM_LEAD, FullscreenKeeper: FullscreenKeeper, DRAFT_AI: services.draftAi,
+      FramePacer: FramePacer, MAP_X0: ArenaSize.MAP_X0, MAP_Y0: ArenaSize.MAP_Y0, TSUNAMI_LANES: services.tsunamiLanes, TsunamiLanes: TsunamiLanes, MARINA_STREAMS: services.marinaStreams, MARINA_BOT: services.marinaBot, TridentProp: TridentProp, HOOK_PATH: services.hookPath, HOOK_PULL: services.hookPull, HOOK_VIEW: services.hookView, playersNow: function () { return services.session.players; }, HAMMER_STRIKES: services.hammerStrikes, HammerStrikeBurst: HammerStrikeBurst, BANNER_AURA: services.bannerAura, BANNER_LEDGER: services.bannerLedger, BannerCreditLedger: BannerCreditLedger, makeBannerGlow: function (d) { return new BannerStrikeGlow(services, d); }, BannerStrikeGlow: BannerStrikeGlow, BannerBearerRig: BannerBearerRig, DraggedChain: DraggedChain, WraithChainRig: WraithChainRig, ChainSlamBurst: ChainSlamBurst, FIGHTER_VIEW: services.fighterView, GEO: services.geo, FRAME_RENDERER: services.frameRenderer, stage: services.stage, CHAR_TYPES: services.charTypes, AUTO_AIM: services.autoAim, AUTO_AIM_ERR: AutoAim.AUTO_AIM_ERR, AUTO_AIM_LEAD: AutoAim.AUTO_AIM_LEAD, FullscreenKeeper: FullscreenKeeper, DRAFT_AI: services.draftAi,
       DRAFT: services.draft, DRAFT_VIEW: services.draftView, DRAFT_STEPS: Draft.STEPS, DRAFT_STEP_MS: Draft.STEP_MS, DRAFT_AI_MS: Draft.AI_MS, DRAFT_AI_TRADE_MS: Draft.AI_TRADE_MS, DRAFT_ABSENT_WAIT_MS: Draft.ABSENT_WAIT_MS, NO_BAN: Draft.NO_BAN,
       STATS: services.stats, STATS_PATH: MatchStats.path, STATS_PATCHES: StatsPatches, STATS_PENDING: MatchStats.PENDING, STATS_SETTLE_MS: MatchStats.SETTLE_MS, STATS_HOLD_MAX_MS: MatchStats.HOLD_MAX_MS,
       CLOCK: services.clock, GameClock: GameClock, CLOCK_KEEP: GameClock.KEEP, CLOCK_PINGS: GameClock.PINGS,
@@ -13491,7 +13505,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     bind() { var services = this.services;
     Dom.$("btnPracChar").onclick = function () { services.practice.openPracticeChars(); };
     Dom.$("btnPracGauge").onclick = function () { services.practice.fillPracticeGauge(); };
-    Dom.$("btnPracGauge").addEventListener("touchstart", function (e) { if (e.cancelable) e.preventDefault(); services.practice.fillPracticeGauge(); }, { passive: false });
     Dom.$("btnPracExit").onclick = function () { services.practice.leavePractice(); };
     Dom.$("btnPcClose").onclick = function () { Dom.show(Dom.$("pcModal"), false); };
     Dom.$("pcModal").addEventListener("click", function (e) { if (e.target === Dom.$("pcModal")) Dom.show(Dom.$("pcModal"), false); });

@@ -7241,6 +7241,17 @@ class GiantTests {
       if (api.FIELD.sniperMarks.length || api.FIELD.impactBlasts.length) bad.push("스킬 그림이 끝나지 않음");
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "기본 " + C.dmg + ", 스킬 " + ULT.pnDmg);
     });
+    run(G, "프레임 제한: 화면이 60·90·120·144Hz 여도 게임은 초당 60장 안팎만 그리는가", function (done) {
+      var bad = [], shown = [];
+      [60, 90, 120, 144].forEach(function (hz) {
+        var pacer = new api.FramePacer(), drawn = 0, ticks = hz * 10;
+        for (var i = 0; i <= ticks; i++) if (pacer.due(1000 + i * 1000 / hz)) drawn++;
+        var fps = drawn / 10;
+        shown.push(hz + "Hz→" + fps);
+        if (fps < 59 || fps > 61) bad.push(hz + "Hz 에서 " + fps + "장");
+      });
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : shown.join(", "));
+    });
     run(G, "공격·스킬 버튼: 흐림 그림자·둥근 자르기·배경 흐림이 없고 값은 transform 으로만 바뀌는가", function (done) {
       var bad = [], ult = document.getElementById("btnUlt"), atk = document.getElementById("btnAtk"), top = document.getElementById("hudTop");
       if (document.querySelector(".meterClip")) bad.push("둥근 자르기 층이 남음");
@@ -7248,7 +7259,6 @@ class GiantTests {
       if (getComputedStyle(ult, "::after").content !== "none") bad.push("빛 층이 남음");
       if ((getComputedStyle(top).backdropFilter || "none") !== "none") bad.push("위쪽 HUD 배경 흐림");
       if (ult.firstChild.className !== "fill" || atk.firstChild.className !== "cd") bad.push("게이지 칸 위치");
-      if (getComputedStyle(document.getElementById("btnPracGauge")).touchAction !== "none") bad.push("게이지 채우기 버튼 터치 처리");
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "버튼·위쪽 HUD 모두 가벼운 층만 사용");
     });
     run(G, "화염술사 메테오 그림: " + ULT.mbDelay + "ms 뒤 떨어지는 순간 범위 폭발로 바뀌는가", function (done) {
