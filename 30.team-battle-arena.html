@@ -4909,6 +4909,8 @@ SinglePassMaterials.enable(THREE);
     constructor(services) { this.services = services; }
     static KILL_FEED_MS = 4000;
     static KILL_FEED_MAX = 4;
+    static SCREEN_GAP_PX = 8;
+    static PLAYER_AREA_RATIO = 0.5;
     static MULTI_KILL_MS = 3000;
     static MULTI_KILL_TAGS = [null, null, ["", "더블 킬"], ["triple", "트리플 킬"], ["quadra", "쿼드라 킬"], ["penta", "펜타 킬"]];
     clear() {
@@ -4944,8 +4946,16 @@ SinglePassMaterials.enable(THREE);
         + services.killfeed.multiKillTag(streak));
       feed.appendChild(row);
       if (k.k === services.session.myId && k.v !== services.session.myId) services.killfeed.showKillBanner(nameTag(victim, services.targets.ent(k.v)), streak);
-      while (feed.children.length > KillFeed.KILL_FEED_MAX) feed.firstChild.remove();
+      services.killfeed.fitToScreen(feed);
       setTimeout(function () { row.remove(); }, KillFeed.KILL_FEED_MS);
+    }
+    bottomLimit() {
+      var panel = Dom.$("specR");
+      if (!panel.hidden && Dom.$("scrGame").classList.contains("spec")) return panel.getBoundingClientRect().top - KillFeed.SCREEN_GAP_PX;
+      return window.innerHeight * KillFeed.PLAYER_AREA_RATIO;
+    }
+    fitToScreen(feed) { var limit = this.bottomLimit();
+      while (feed.children.length > 1 && (feed.children.length > KillFeed.KILL_FEED_MAX || feed.getBoundingClientRect().bottom > limit)) feed.firstChild.remove();
     }
     showKillBanner(victimTag, streak) { var services = this.services;
       var tag = KillFeed.MULTI_KILL_TAGS[Math.min(streak, 5)], banner = Dom.$("killBanner");
@@ -13087,7 +13097,7 @@ SinglePassMaterials.enable(THREE);
       bindRoom: function (fakeRoom, players) { services.session.room = fakeRoom; services.session.players = players; },
       unbindRoom: function () { services.session.room = null; services.session.players = {}; },
       setMyId: function (id) { var before = services.session.myId; services.session.myId = id; return before; },
-      HUD: services.hud, LIVE_BOARD: services.liveBoard, END_BANNER: services.endBanner,RESULT_BOARD: services.resultBoard,SOUND: services.sound, BACKEND: services.backend, TIMESCALE: services.timescale, THREE: THREE, CAMERA_RIG: services.cameraRig, ARENA_VIEW: services.arenaView, PROPS: services.props, PROP_THEMES: services.propThemes, camera: services.stage.camera, overlay: Canvases.overlay, QA: services.quality, PIX_MIN: Environment.PIX_MIN, PIX_START: Environment.PIX_START, SCENERY: services.arenaView.scenery,
+      HUD: services.hud, LIVE_BOARD: services.liveBoard, END_BANNER: services.endBanner, KILL_FEED: services.killfeed, RESULT_BOARD: services.resultBoard,SOUND: services.sound, BACKEND: services.backend, TIMESCALE: services.timescale, THREE: THREE, CAMERA_RIG: services.cameraRig, ARENA_VIEW: services.arenaView, PROPS: services.props, PROP_THEMES: services.propThemes, camera: services.stage.camera, overlay: Canvases.overlay, QA: services.quality, PIX_MIN: Environment.PIX_MIN, PIX_START: Environment.PIX_START, SCENERY: services.arenaView.scenery,
       setDb: function (fake) { var before = services.backend.db; services.backend.db = fake; return before; },
       setTestLink: function (flag) { var before = services.backend.isTestLink; services.backend.isTestLink = flag; return before; },
       MAP_X0: ArenaSize.MAP_X0, MAP_Y0: ArenaSize.MAP_Y0, TSUNAMI_LANES: services.tsunamiLanes, TsunamiLanes: TsunamiLanes, MARINA_STREAMS: services.marinaStreams, MARINA_BOT: services.marinaBot, TridentProp: TridentProp, HOOK_PATH: services.hookPath, HOOK_PULL: services.hookPull, HOOK_VIEW: services.hookView, playersNow: function () { return services.session.players; }, HAMMER_STRIKES: services.hammerStrikes, HammerBasicBlast: HammerBasicBlast, BANNER_AURA: services.bannerAura, BANNER_LEDGER: services.bannerLedger, BannerCreditLedger: BannerCreditLedger, makeBannerGlow: function (d) { return new BannerStrikeGlow(services, d); }, BannerStrikeGlow: BannerStrikeGlow, BannerBearerRig: BannerBearerRig, DraggedChain: DraggedChain, WraithChainRig: WraithChainRig, ChainSlamBurst: ChainSlamBurst, FIGHTER_VIEW: services.fighterView, GEO: services.geo, FRAME_RENDERER: services.frameRenderer, stage: services.stage, CHAR_TYPES: services.charTypes, AUTO_AIM: services.autoAim, AUTO_AIM_ERR: AutoAim.AUTO_AIM_ERR, AUTO_AIM_LEAD: AutoAim.AUTO_AIM_LEAD, FullscreenKeeper: FullscreenKeeper, DRAFT_AI: services.draftAi,

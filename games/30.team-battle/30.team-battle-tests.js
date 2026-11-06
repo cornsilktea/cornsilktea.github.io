@@ -2646,6 +2646,32 @@ class ResultCollector {
     } finally { roster.rows = realRows; board.update(false); }
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "6행·7열·팀 구분선·변경 때만 다시 그림·숨김");
   });
+  run(FLOWG, "킬 로그(우측 상단): 줄마다 화살표·피해자·연속 킬 열이 같은 세로줄에 서고, 최대 줄 수와 화면 높이(관전은 오른쪽 카드 위)를 넘지 않는가", function (done) {
+    var bad = [], scr = document.getElementById("scrGame"), feed = document.getElementById("killFeed"), specR = document.getElementById("specR"), K = api.KILL_FEED;
+    var saved = { hidden: scr.hidden, cls: scr.className, feed: feed.innerHTML, specHidden: specR.hidden };
+    function fill(n) {
+      var html = "";
+      for (var i = 0; i < n; i++) html += '<div class="kf"><b class="b">가나다 <small>투척병</small></b><span class="kfArrow">▶</span><b class="r">' + (i % 2 ? "라마바사" : "라") + ' <small>화염술사</small></b>' + (i % 3 === 0 ? '<span class="kfStreak">더블 킬</span>' : "") + "</div>";
+      feed.innerHTML = html;
+    }
+    function lefts(sel) { return Array.prototype.map.call(feed.querySelectorAll(sel), function (e) { return Math.round(e.getBoundingClientRect().left); }); }
+    try {
+      scr.hidden = false; scr.className = ""; specR.hidden = true;
+      fill(6);
+      var rows = feed.querySelectorAll(".kf");
+      ["b.b", ".kfArrow", "b.r"].forEach(function (sel) { var l = lefts(sel); if (l.some(function (v) { return v !== l[0]; })) bad.push(sel + " 줄이 안 맞음 " + l); });
+      var streaks = lefts(".kfStreak"); if (streaks.some(function (v) { return v !== streaks[0]; })) bad.push("연속 킬 줄이 안 맞음 " + streaks);
+      if (feed.getBoundingClientRect().right > window.innerWidth + 1) bad.push("오른쪽으로 넘침");
+      K.fitToScreen(feed);
+      if (feed.children.length > 4) bad.push("선수 화면 최대 줄 수 초과 " + feed.children.length);
+      if (feed.children.length > 1 && feed.getBoundingClientRect().bottom > window.innerHeight * 0.5) bad.push("선수 화면 높이 초과");
+      scr.className = "spec"; specR.hidden = false; fill(6); K.fitToScreen(feed);
+      var limit = specR.getBoundingClientRect().top - 8;
+      if (feed.children.length > 1 && feed.getBoundingClientRect().bottom > limit) bad.push("관전 화면에서 오른쪽 카드를 가림 " + feed.getBoundingClientRect().bottom + " / " + limit);
+      if (rows.length !== 6) bad.push("만든 줄 수 " + rows.length);
+    } finally { scr.hidden = saved.hidden; scr.className = saved.cls; feed.innerHTML = saved.feed; specR.hidden = saved.specHidden; }
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "화살표·피해자·연속 킬 세로줄 정렬, 선수 4줄·높이 절반 이하, 관전은 카드 위까지");
+  });
   run(FLOWG, "경기 종료 2초 배너: 선수는 승리(파랑)·패배(빨강), 관전자는 'OO팀 승리!'(흰 글자·팀색 테두리), 무승부, 2초가 지나면 꺼지는가", function (done) {
     var bad = [], B = api.END_BANNER;
     var win = B.wordsFor("blue", "blue"), lose = B.wordsFor("blue", "red"), blueSpec = B.wordsFor("blue", null), redSpec = B.wordsFor("red", null), draw = B.wordsFor("draw", "blue");
