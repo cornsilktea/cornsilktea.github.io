@@ -8857,6 +8857,7 @@ SinglePassMaterials.enable(THREE);
   class ChainSlamBurst {
     static TEXTURES = null;
     static LIFE_SEC = 0.85;
+    static CRACK_CAPACITY = 8;
     static WATER_CHECK_STEP = 20;
     static CRACK_WIDTH = 170;
     static FLASH_OPACITY = 0.75;
@@ -8901,9 +8902,8 @@ SinglePassMaterials.enable(THREE);
     }
     static textures() { return ChainSlamBurst.TEXTURES || (ChainSlamBurst.TEXTURES = { soft: ChainSlamBurst.softTexture(), crack: ChainSlamBurst.crackTexture() }); }
     constructor(services, d) {
-      this.services = services; this.d = d; this.seed = (d.createdAt || 0) % 97;
+      this.services = services;
       this.matrix = new THREE.Matrix4(); this.spot = new THREE.Vector3(); this.size = new THREE.Vector3(); this.turn = new THREE.Quaternion(); this.axis = new THREE.Vector3(1, 0, 0); this.heading = new THREE.Vector3(); this.spin = new THREE.Euler(); this.tint = new THREE.Color();
-      this.ca = Math.cos(d.angle); this.sa = Math.sin(d.angle);
       this.group = new THREE.Group(); this.mats = []; this.meshes = [];
       var tex = ChainSlamBurst.textures();
       this.crackMat = this.material({ map: tex.crack, color: ChainSlamBurst.CRACK_COLOR, transparent: true, depthWrite: false, opacity: 0.9 });
@@ -8911,7 +8911,19 @@ SinglePassMaterials.enable(THREE);
       this.dustMat = this.material({ map: tex.soft, color: 0xFFFFFF, transparent: true, depthWrite: false });
       this.bitsMat = this.material({ color: 0xFFFFFF, transparent: true });
       this.emberMat = this.material({ color: ChainSlamBurst.EMBER_COLOR, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
-      this.buildCracks(); this.buildFlash(); this.buildDust(); this.buildBits(); this.buildEmbers();
+      this.crackMesh = this.instanced(services.geo.slamQuad, this.crackMat, ChainSlamBurst.CRACK_CAPACITY);
+      this.flashStrip = services.arenaView.flatMesh(services.geo.strip, this.flashMat);
+      this.flashStrip.position.set(-15, 2.4, 0);
+      this.flashHolder = new THREE.Group(); this.flashHolder.add(this.flashStrip); this.group.add(this.flashHolder);
+      this.dustMesh = this.instanced(services.geo.slamQuad, this.dustMat, ChainSlamBurst.DUST_COUNT);
+      this.bitsMesh = this.instanced(services.geo.meteorRock, this.bitsMat, ChainSlamBurst.BITS_COUNT);
+      this.emberMesh = this.instanced(services.geo.stabLine, this.emberMat, ChainSlamBurst.EMBER_COUNT);
+      this.aim(d);
+    }
+    aim(d) {
+      this.d = d; this.seed = (d.createdAt || 0) % 97; this.ca = Math.cos(d.angle); this.sa = Math.sin(d.angle);
+      this.group.position.set(0, 0, 0); this.group.visible = true;
+      this.aimCracks(); this.aimFlash(); this.aimDust(); this.aimBits(); this.aimEmbers();
       this.update(0);
     }
     material(params) { var m = new THREE.MeshBasicMaterial(params); this.mats.push(m); return m; }
@@ -8925,10 +8937,11 @@ SinglePassMaterials.enable(THREE);
       return services.arenaMap.water.some(function (o) { return Math.abs(x - o.x) < o.w / 2 && Math.abs(y - o.y) < o.h / 2; });
     }
     alongLine(u, side) { var along = this.d.len * u; return { x: this.d.x + this.ca * along - this.sa * side, y: this.d.y + this.sa * along + this.ca * side }; }
-    buildCracks() { var services = this.services;
-      var runs = this.dryRuns(), mesh = this.instanced(services.geo.slamQuad, this.crackMat, Math.max(1, runs.length)), width = this.constructor.CRACK_WIDTH;
+    aimCracks() {
+      var runs = this.dryRuns().slice(0, ChainSlamBurst.CRACK_CAPACITY), mesh = this.crackMesh, width = ChainSlamBurst.CRACK_WIDTH;
       var flat = new THREE.Quaternion(), roll = new THREE.Quaternion(), up = new THREE.Vector3(0, 0, 1);
       flat.setFromAxisAngle(this.axis, -Math.PI / 2);
+      mesh.count = Math.max(1, runs.length);
       if (!runs.length) this.hideAt(mesh, 0);
       for (var i = 0; i < runs.length; i++) {
         var p = this.alongLine((runs[i].from + runs[i].to) / 2, 0), length = this.d.len * (runs[i].to - runs[i].from) * 1.12;
@@ -8937,7 +8950,7 @@ SinglePassMaterials.enable(THREE);
         this.spot.set(p.x, 1.6 + i * 0.01, p.y); this.size.set(length, Math.min(width, length * 0.8), 1);
         this.matrix.compose(this.spot, this.turn, this.size); mesh.setMatrixAt(i, this.matrix);
       }
-      mesh.instanceMatrix.needsUpdate = true; this.crackMesh = mesh;
+      mesh.instanceMatrix.needsUpdate = true;
     }
     dryRuns() {
       var runs = [], from = null, steps = Math.max(1, Math.ceil(this.d.len / ChainSlamBurst.WATER_CHECK_STEP));
@@ -8948,35 +8961,32 @@ SinglePassMaterials.enable(THREE);
       }
       return runs;
     }
-    buildFlash() { var services = this.services;
-      var strip = services.arenaView.flatMesh(services.geo.strip, this.flashMat), holder = new THREE.Group();
-      strip.scale.set(this.d.len + 30, this.d.width * 0.95, 1); strip.position.set(-15, 2.4, 0);
-      holder.add(strip); holder.position.set(this.d.x, 0, this.d.y); holder.rotation.y = -this.d.angle;
-      this.group.add(holder);
+    aimFlash() {
+      this.flashStrip.scale.set(this.d.len + 30, this.d.width * 0.95, 1);
+      this.flashHolder.position.set(this.d.x, 0, this.d.y); this.flashHolder.rotation.y = -this.d.angle;
     }
-    buildDust() { var services = this.services;
-      var count = this.constructor.DUST_COUNT, mesh = this.instanced(services.geo.slamQuad, this.dustMat, count);
+    aimDust() {
+      var count = ChainSlamBurst.DUST_COUNT, mesh = this.dustMesh;
       this.dust = [];
       for (var i = 0; i < count; i++) {
         var u = (i + this.wave(i, 5)) / count, p = this.alongLine(u, (this.wave(i, 6) - 0.5) * this.d.width * 0.7), wet = this.overWater(p.x, p.y);
         this.dust.push({ x: p.x, z: p.y, delay: u * 0.07, rise: 26 + this.wave(i, 7) * 42, driftX: (this.wave(i, 8) - 0.5) * 34, driftZ: (this.wave(i, 9) - 0.5) * 34, from: 10 + this.wave(i, 10) * 8, to: 48 + this.wave(i, 11) * 34, life: 0.5 + this.wave(i, 12) * 0.33 });
         mesh.setColorAt(i, this.tint.setHex(wet ? ChainSlamBurst.SPRAY_COLOR : ChainSlamBurst.DUST_COLOR));
       }
-      mesh.instanceColor.needsUpdate = true; this.dustMesh = mesh;
+      mesh.instanceColor.needsUpdate = true;
     }
-    buildBits() { var services = this.services;
-      var count = this.constructor.BITS_COUNT, mesh = this.instanced(services.geo.meteorRock, this.bitsMat, count);
+    aimBits() {
+      var count = ChainSlamBurst.BITS_COUNT, mesh = this.bitsMesh;
       this.bits = [];
       for (var i = 0; i < count; i++) {
         var u = (i + this.wave(i, 13)) / count, side = (this.wave(i, 14) - 0.5) * this.d.width * 0.45, p = this.alongLine(u, side), wet = this.overWater(p.x, p.y), push = (side >= 0 ? 1 : -1) * (40 + this.wave(i, 15) * 130), ahead = (this.wave(i, 16) - 0.35) * 110;
         this.bits.push({ x: p.x, z: p.y, delay: u * 0.07, vx: this.ca * ahead - this.sa * push, vz: this.sa * ahead + this.ca * push, vy: 130 + this.wave(i, 17) * 210, size: (wet ? 1.2 : 2.2) + this.wave(i, 18) * 3.4, spin: 6 + this.wave(i, 19) * 14, phase: this.wave(i, 20) * 6 });
         mesh.setColorAt(i, this.tint.setHex(wet ? ChainSlamBurst.SPRAY_COLOR : ChainSlamBurst.STONE_COLOR));
       }
-      mesh.instanceColor.needsUpdate = true; this.bitsMesh = mesh;
+      mesh.instanceColor.needsUpdate = true;
     }
-    buildEmbers() { var services = this.services;
-      var count = this.constructor.EMBER_COUNT;
-      this.emberMesh = this.instanced(services.geo.stabLine, this.emberMat, count);
+    aimEmbers() {
+      var count = ChainSlamBurst.EMBER_COUNT;
       this.embers = [];
       for (var i = 0; i < count; i++) {
         var u = (i + this.wave(i, 21)) / count, p = this.alongLine(u, (this.wave(i, 22) - 0.5) * 20), a = this.wave(i, 23) * Math.PI * 2, speed = 130 + this.wave(i, 24) * 300;
@@ -9022,11 +9032,6 @@ SinglePassMaterials.enable(THREE);
         slam.emberMesh.setMatrixAt(i, slam.matrix);
       });
       this.dustMesh.instanceMatrix.needsUpdate = this.bitsMesh.instanceMatrix.needsUpdate = this.emberMesh.instanceMatrix.needsUpdate = true;
-    }
-    dispose() {
-      if (this.group.parent) this.group.parent.remove(this.group);
-      this.meshes.forEach(function (m) { m.dispose(); });
-      this.mats.forEach(function (m) { m.dispose(); });
     }
   }
   class BannerStrikeGlow {
@@ -9157,7 +9162,9 @@ SinglePassMaterials.enable(THREE);
     }
   }
   class HookChainView {
+    static BURSTS_PER_CASTER = 2;
     spare = {};
+    spareBursts = [];
     static LINK_CAPACITY = 90;
     static MAT = { color: 0xA7AFBC, transparent: true, opacity: 1 };
     static WRAP_MAT = { color: 0xC4CBD6 };
@@ -9188,7 +9195,7 @@ SinglePassMaterials.enable(THREE);
     }
     makeChainVis(withBlade, withWrap) { var services = this.services;
       var spare = this.spare[this.chainKey(withBlade, withWrap)], vis = (spare && spare.pop()) || this.buildChainVis(withBlade, withWrap);
-      vis.mat.opacity = 1; vis.group.visible = true; vis.links.mesh.count = 0;
+      vis.mat.opacity = 1; vis.group.visible = true; vis.group.position.set(0, 0, 0); vis.links.mesh.count = 0;
       services.stage.scene.add(vis.group);
       return vis;
     }
@@ -9197,16 +9204,17 @@ SinglePassMaterials.enable(THREE);
       services.stage.scene.remove(vis.group);
       (this.spare[vis.key] = this.spare[vis.key] || []).push(vis);
     }
-    prefill(casters) { var view = this;
+    prefill(casters) { var view = this, burstCount = casters * HookChainView.BURSTS_PER_CASTER;
+      while (this.spareBursts.length < burstCount) this.spareBursts.push(new ChainSlamBurst(this.services, { x: 0, y: 0, angle: 0, len: 120, width: 60, createdAt: 0 }));
       [[true, false], [true, true], [false, false]].forEach(function (kind) {
         var key = view.chainKey(kind[0], kind[1]), spare = view.spare[key] = view.spare[key] || [];
         while (spare.length < casters) spare.push(view.buildChainVis(kind[0], kind[1]));
       });
     }
-    spareRoots() { var spare = this.spare; return Object.keys(spare).reduce(function (all, key) { return all.concat(spare[key].map(function (vis) { vis.group.position.set(ShaderWarmup.PROBE_SPOT, 0, ShaderWarmup.PROBE_SPOT); return vis.group; })); }, []); }
+    spareRoots() { var spare = this.spare, chains = Object.keys(spare).reduce(function (all, key) { return all.concat(spare[key].map(function (vis) { vis.group.position.set(ShaderWarmup.PROBE_SPOT, 0, ShaderWarmup.PROBE_SPOT); return vis.group; })); }, []); return chains.concat(this.spareBursts.map(function (burst) { burst.group.position.set(ShaderWarmup.PROBE_SPOT, 0, ShaderWarmup.PROBE_SPOT); return burst.group; })); }
     dropHook(h) { this.dropVis(h.vis); h.vis = null; }
     dropFlight(f) { this.dropVis(f.vis); f.vis = null; }
-    dropSlam(s) { this.dropVis(s.vis); s.vis = null; if (s.burst) { s.burst.dispose(); s.burst = null; } }
+    dropSlam(s) { this.dropVis(s.vis); s.vis = null; if (s.burst) { this.services.stage.scene.remove(s.burst.group); this.spareBursts.push(s.burst); s.burst = null; } }
     warmSample() { var services = this.services;
       var vis = this.makeChainVis(true, true), lambert = new ChainLinkMesh(services.geo.chainLink, new THREE.MeshLambertMaterial({ color: WraithChainRig.COLOR, transparent: true }), 1, ModelTuning.MODEL_SCALE);
       vis.group.add(lambert.mesh); vis.links.mesh.count = 1; lambert.mesh.count = 1;
@@ -9345,13 +9353,14 @@ SinglePassMaterials.enable(THREE);
         if (left > 0) view.drawSlamLinks(s.vis.links, d, ca, sa, (1 - fall * fall) * HookChainView.SLAM_RISE);
         if (fall < 1) return;
         if (!s.burst) {
-          s.burst = new ChainSlamBurst(services, d);
+          s.burst = view.takeBurst(d);
           services.stage.scene.add(s.burst.group);
           if (services.targets.hear(d)) services.sound.sfx("chain");
         }
         s.burst.update((age - HookChainView.SLAM_DROP_MS) / services.clock.scale / 1000);
       });
     }
+    takeBurst(d) { var burst = this.spareBursts.pop(); if (!burst) return new ChainSlamBurst(this.services, d); burst.aim(d); return burst; }
     drawSlamLinks(links, d, ca, sa, rise) {
       var n = Math.min(links.capacity, Math.max(2, Math.ceil(d.len / DraggedChain.PITCH) + 1));
       for (var i = 0; i < n; i++) {
@@ -12276,7 +12285,7 @@ SinglePassMaterials.enable(THREE);
     }
   }
   class PerfProbe {
-    static BUILD = "lag21";
+    static BUILD = "lag22";
     static PATH = "perfDiag/teambattle/";
     static RTT_KEEP = 50;
     static RECORDS = !Environment.SILENT_RUN;
