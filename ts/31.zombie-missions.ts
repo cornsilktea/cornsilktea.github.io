@@ -142,7 +142,7 @@ class ZombieMissionProgress {
     return missions.length > 0 && done >= missions.length;
   }
 
-  // 3분을 버텨도 미션을 다 못 끝냈으면 좀비 승리, 미션을 다 끝내고 한 명이라도 살아 있어야 인간 승리.
+  // 제한 시간을 버텨도 미션을 다 못 끝냈으면 좀비 승리, 미션을 다 끝내고 한 명이라도 살아 있어야 인간 승리.
   static humansWin(survivors: number, missions: readonly ZombieMission[], done: number): boolean {
     return survivors > 0 && (missions.length === 0 || ZombieMissionProgress.complete(missions, done));
   }

@@ -11,7 +11,7 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="정보 수업용 링크 모음">
 <meta property="og:title" content="미드나잇 좀비 아웃브레이크">
-<meta property="og:description" content="한밤중 2층 학교에서 2~5명이 방 코드로 모여 하는 3D 좀비 술래잡기 / 좀비 1명이 15초 뒤 출발, 닿으면 감염되어 좀비로 변신 / 3분 동안 살아남으면 인간 승리 (WASD 이동·방향키 시점·Q 뒤돌기·스페이스 대쉬)">
+<meta property="og:description" content="한밤중 2층 학교에서 2~5명이 방 코드로 모여 하는 3D 좀비 술래잡기 / 좀비 1명이 10초 뒤 출발, 닿으면 감염되어 좀비로 변신 / 2분 30초 동안 살아남으면 인간 승리 (WASD 이동·방향키 시점·Q 뒤돌기·스페이스 대쉬)">
 <meta property="og:url" content="https://cornsilktea.github.io/31.zombie-outbreak.html">
 <meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
 <meta name="twitter:card" content="summary">
@@ -126,25 +126,27 @@
   #topbar { position: absolute; top: 0; left: 0; right: 0; padding: calc(env(safe-area-inset-top, 0px) + 8px) 12px 30px;
     display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;
     background: linear-gradient(to bottom, rgba(4, 7, 18, .7), rgba(4, 7, 18, 0)); }
-  #roleBox { min-width: 130px; }
   .hudLab { font-size: 11px; font-weight: 700; letter-spacing: .12em; color: #C9D3E6; }
-  #roleLine { display: flex; align-items: center; gap: 8px; margin: 0; }
-  #roleIcon { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 17px; background: #DCE6D6; text-shadow: none; box-shadow: 0 1px 3px rgba(0, 0, 0, .4); }
-  #roleIcon.zombie { background: #C8323C; }
-  #roleText { font-size: 26px; font-weight: 800; }
-  #roleSub { font-size: 13px; font-weight: 700; color: #E4E9F2; max-width: 44vw; }
+  #rosterBox { position: absolute; left: 12px; top: calc(env(safe-area-inset-top, 0px) + 8px); display: flex; flex-direction: column; gap: 3px; width: min(230px, 30vw); }
+  .zrRow { display: flex; align-items: center; gap: 6px; height: 24px; padding: 0 9px; border-radius: 4px; border-left: 3px solid #3EE870; background: rgba(8, 10, 16, .72); font-size: 14px; font-weight: 800; text-shadow: none; }
+  .zrRow.zombie { border-left-color: #FF2638; }
+  .zrRow.origin { border-left-color: #FFD27A; background: rgba(120, 18, 28, .82); }
+  .zrRow.me { box-shadow: inset 0 0 0 1px #D97B4F; }
+  .zrName { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #fff; }
+  .zrRole { flex: 0 0 auto; color: #3EE870; }
+  .zrRow.zombie .zrRole { color: #FF6B6B; }
+  .zrRow.origin .zrRole { color: #FFD27A; }
   #timerBox { position: absolute; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 8px); transform: translateX(-50%); text-align: center; }
   #timer { font-size: 38px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.05; }
   #timer.danger { color: #FF6B6B; }
   #timer.tick { animation: timerTick 1s ease-out; text-shadow: 0 0 10px rgba(255, 80, 80, .7); }
   @keyframes timerTick { 0% { transform: scale(1); } 18% { transform: scale(1.3); } 100% { transform: scale(1); } }
   #aliveLine { font-size: 13px; font-weight: 700; color: #E4E9F2; }
-  #centerMsg { position: absolute; left: 50%; top: 30%; transform: translate(-50%, -50%); width: 92vw; text-align: center; font-size: clamp(24px, 4.2vw, 44px); font-weight: 800; line-height: 1.3; }
+  #centerMsg { position: absolute; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 360px); transform: translate(-50%, -50%); width: 92vw; text-align: center; font-size: clamp(24px, 4.2vw, 44px); font-weight: 800; line-height: 1.3; }
   #centerMsg small { display: block; font-size: .5em; font-weight: 700; margin-top: 6px; color: #F1F4FA; }
   #centerMsg.red { color: #FF6B6B; }
   #feed { position: absolute; left: 50%; transform: translateX(-50%); top: calc(env(safe-area-inset-top, 0px) + 100px); display: flex; flex-direction: column; align-items: center; gap: 6px; width: max-content; max-width: 56vw; }
-  #feed div { display: flex; align-items: center; gap: 10px; padding: 8px 18px; border-radius: 4px; border-left: 4px solid #C8323C; background: rgba(8, 10, 16, .72); font-size: 20px; font-weight: 800; text-shadow: none; animation: feedIn .25s ease-out; }
-  #feed div.mine { background: rgba(120, 18, 28, .78); }
+  #feed div { display: flex; align-items: center; gap: 10px; padding: 8px 18px; border-radius: 4px; border-left: 4px solid #C8323C; background: rgba(120, 18, 28, .82); font-size: 20px; font-weight: 800; text-shadow: none; animation: feedIn .25s ease-out; }
   #feed .killIcon { font-size: 22px; }
   @keyframes feedIn { from { opacity: 0; transform: translateY(-14px); } to { opacity: 1; transform: none; } }
   #dashBox { position: absolute; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 26px); transform: translateX(-50%); width: min(300px, 70vw); text-align: center; }
@@ -156,7 +158,7 @@
   #specBox, #specList { display: none; }
   #hud.spec #specBox { display: block; min-width: 130px; }
   #hud.spec #specList { display: flex; }
-  #hud.spec #roleBox, #hud.spec #dashBox { display: none; }
+  #hud.spec #rosterBox, #hud.spec #dashBox { display: none; }
   #specBox .rec { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #E0293D; margin-right: 6px; vertical-align: 1px; animation: recBlink 1.2s steps(1) infinite; }
   #specTitle { font-size: 22px; font-weight: 800; margin-top: 3px; }
   #specHint { font-size: 12px; font-weight: 700; color: #C9D3E6; margin-top: 2px; }
@@ -219,10 +221,15 @@
   body.touch #btnGameLeave { top: calc(env(safe-area-inset-top, 0px) + 8px); bottom: auto; }
   body.touch #hud:not(.spec) #floorMap { left: 12px; right: auto; top: calc(env(safe-area-inset-top, 0px) + 150px); bottom: auto; width: min(320px, 38vw); }
   body.touch #dashBox { bottom: calc(env(safe-area-inset-bottom, 0px) + 40px); width: min(260px, 34vw); }
+  @media (max-height: 560px) {
+    #feed { top: calc(env(safe-area-inset-top, 0px) + 88px); gap: 3px; }
+    #feed div { padding: 4px 12px; font-size: 15px; }
+    #feed .killIcon { font-size: 16px; }
+    #centerMsg { top: 66%; }
+  }
   @media (max-width: 640px) {
     #timer { font-size: 30px; }
     #specList button { height: 36px; font-size: 14px; }
-    #roleText { font-size: 20px; }
     .codeNum { font-size: 44px; }
   }
   #scrParty { --st-accent: var(--sg-primary); --st-accent-ink: #fff; --st-title: #F4F1E8; --st-ink: var(--sg-ink); --st-ink-mid: var(--sg-ink-mid); --st-ink-soft: var(--sg-ink-soft); --st-bg: 12, 14, 20; --st-panel: var(--sg-panel); }
@@ -298,13 +305,11 @@
       <div id="specTitle"></div>
       <div id="specHint">←→ 또는 아래 버튼으로 시점 바꾸기</div>
     </div>
-    <div id="roleBox">
-      <div id="roleLine"><div id="roleIcon">🧑</div><div id="roleText">인간</div></div>
-    </div>
   </div>
+  <div id="rosterBox"></div>
   <div id="timerBox">
     <div class="hudLab">남은 시간</div>
-    <div id="timer">3:00</div>
+    <div id="timer">2:30</div>
     <div id="aliveLine"></div>
     <div class="room-code-tag in-flow" id="hudRoomCode"></div>
   </div>
@@ -332,7 +337,7 @@
   <div class="wrap">
     <div class="card titleCard">
       <h1 class="titleMain">미드나잇<span>좀비 아웃브레이크</span></h1>
-      <p class="sub">불 꺼진 학교에 무언가 돌아다닙니다. 달빛만 비치는 교실과 복도에서 3분 동안 살아남으세요.</p>
+      <p class="sub">불 꺼진 학교에 무언가 돌아다닙니다. 달빛만 비치는 교실과 복도에서 2분 30초 동안 살아남으세요.</p>
     </div>
     <div class="card">
       <div class="hello">내 닉네임: <b id="startNick"></b> <button type="button" class="mini" data-maker-open data-nick-setting>✏️ 닉네임 설정</button></div>
@@ -363,13 +368,14 @@
       <h2>규칙</h2>
       <ul class="rules">
         <li>2~5명이 방 코드로 모이고, 방장이 시작하면 한 명이 무작위로 좀비가 됩니다.</li>
-        <li>좀비는 중앙현관에서 15초 동안 기다린 뒤 출발합니다. 그동안에는 닿아도 감염되지 않습니다.</li>
+        <li>좀비는 중앙현관에서 10초 동안 기다린 뒤 출발합니다. 그동안에는 닿아도 감염되지 않습니다.</li>
         <li>밤이라 멀리까지 보이지 않습니다. 2층 건물 곳곳에 숨으세요.</li>
         <li>좀비에게 닿으면 2초 동안 굳은 뒤 좀비로 변합니다.</li>
         <li>1분마다 학교 종이 울리고, 마지막 30초에는 좀비가 더 빨라집니다.</li>
-        <li>인간은 판마다 달라지는 미션 3개를 시작 15초 뒤부터 2층 → 1층 → 2층 순서로 하나씩 받습니다. 미션 장소(교실 앞쪽 벽)에 가서 숲 미니게임을 2번 성공하면 한 개가 끝납니다. 좀비는 미션을 알 수 없습니다.</li>
-        <li>인간이 미션 3개를 모두 끝내고 3분을 버티면 인간 승리입니다. 미션을 못 끝낸 채 3분이 지나거나 모두 감염되면 좀비 승리입니다.</li>
-        <li>오른쪽 아래 학교 지도(1·2층)를 누르면 크게 보이고 교실 이름이 나옵니다. 내 위치가 보이고 인간에게는 미션 장소가 노란 불빛으로 나옵니다. 좀비는 다른 좀비의 위치(빨간 불빛)를 항상 볼 수 있습니다. 남은 시간 2분 30초부터 20초마다 3초 동안만, 좀비는 인간(초록 불빛)의 위치를, 인간은 좀비(빨간 불빛)의 위치를 볼 수 있습니다.</li>
+        <li>인간은 판마다 달라지는 미션 3개를 시작 10초 뒤부터 2층 → 1층 → 2층 순서로 하나씩 받습니다. 미션 장소(교실 앞쪽 벽)에 가서 숲 미니게임을 2번 성공하면 한 개가 끝납니다. 좀비는 미션을 알 수 없습니다.</li>
+        <li>인간이 미션 3개를 모두 끝내고 2분 30초를 버티면 인간 승리입니다. 미션을 못 끝낸 채 2분 30초가 지나거나 모두 감염되면 좀비 승리입니다.</li>
+        <li>오른쪽 아래 학교 지도(1·2층)를 누르면 크게 보이고 교실 이름이 나옵니다. 내 위치가 보이고 인간에게는 미션 장소가 노란 불빛으로 나옵니다. 좀비는 다른 좀비의 위치(빨간 불빛)를 항상 볼 수 있습니다. 남은 시간 2분 5초부터 20초마다 3초 동안만, 좀비는 인간(초록 불빛)의 위치를, 인간은 좀비(빨간 불빛)의 위치를 볼 수 있습니다. 마지막 10초에는 내내 볼 수 있습니다.</li>
+        <li>몸이 대부분 보이는 캐릭터는 머리 위에 닉네임이 나옵니다(좀비 빨강, 인간 초록). 벽이나 캐비닛 뒤에 숨었거나 멀어서 흐릿하면 나오지 않습니다.</li>
         <li>방마다 관전자 1명이 따로 들어와 플레이어들의 시점을 번갈아 볼 수 있습니다. 게임 중에 들어온 플레이어는 다음 판부터 참가합니다.</li>
       </ul>
     </div>
@@ -443,7 +449,8 @@
 <script charset="utf-8" src="31.zombie-outbreak-stats.js?v=20261104a"></script>
 <script charset="utf-8" src="31.zombie-versus.js?v=20261104a"></script>
 <script charset="utf-8" src="40.forest-minigame.js?v=13"></script>
-<script charset="utf-8" src="31.zombie-missions.js?v=20261104a"></script>
+<script charset="utf-8" src="31.zombie-missions.js?v=20261106a"></script>
+<script charset="utf-8" src="31.zombie-hud.js?v=20261106a"></script>
 <script>new CharacterMakerDialog(undefined, false);</script>
 <div id="loading">3D 학교를 준비하는 중입니다…</div>
 
@@ -458,10 +465,10 @@ const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
 const okeys = o => Object.keys(o || {});
 const escapeHtml = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
-const ROUND_MS = 180000, COUNTDOWN_MS = 3000, ZOMBIE_HOLD_MS = 15000, FINAL_RUSH_MS = 30000;
+const ROUND_MS = ZombieRoundClock.ROUND_MS, COUNTDOWN_MS = 3000, ZOMBIE_HOLD_MS = ZombieRoundClock.HOLD_MS, FINAL_RUSH_MS = ZombieRoundClock.RUSH_MS;
 const INFECT_INJURE_MS = 700, INFECT_FALL_MS = 1600, INFECT_STANDUP_MS = 2400, STANDUP_SKIP_SEC = 1.0;
 const INFECT_ZOMBIE_MODEL_MS = INFECT_INJURE_MS + INFECT_FALL_MS, INFECT_TOTAL_MS = INFECT_ZOMBIE_MODEL_MS + INFECT_STANDUP_MS;
-const BELL_ELAPSED_MS = [60000, 120000];
+const BELL_ELAPSED_MS = ZombieRoundClock.BELL_ELAPSED_MS;
 const HUMAN_SPEED = 5.2, ZOMBIE_SPEED = 6.0, RUSH_SPEED_MULT = 1.5;
 const HUMAN_VIEW_SCALE = 0.8, ZOMBIE_VIEW_SCALE = 0.63;
 const ZOMBIE_RUN_ANIM = 1.5, ZOMBIE_RUN_ANIM_RUSH = 1.95;
@@ -3419,7 +3426,7 @@ const zombieTop = new ZombieTopMessages((text, small, red) => {
 }, () => performance.now());
 
 class ZombieMissionController {
-  static OPEN_AFTER_MS = 15000;
+  static OPEN_AFTER_MS = ZOMBIE_HOLD_MS;
   constructor() {
     this.sites = ZombieMissionSites.build(FLOOR_PLANS, BUILDING_X, BAY_W, CORRIDOR_Z, BUILDING_Z);
     this.list = []; this.done = 0; this.announced = 0; this.loaded = false; this.run = null; this.near = null; this.builtKind = "";
@@ -3665,7 +3672,7 @@ function beginRound() {
 
 const avatars = {};
 const round = {
-  key: 0, active: false, iAmIn: false, lastElapsed: -1e9, bellsRung: {}, rushAnnounced: false, releaseAnnounced: false,
+  key: 0, active: false, iAmIn: false, lastElapsed: -1e9, bellsRung: {}, rushAnnounced: false, releaseAnnounced: false, finalRevealAnnounced: false,
   countBeeped: {}, myInfectedAt: 0, infectSent: false, dashReadyAt: 0, dashUntil: 0, dashDir: null, dashStartMs: 0, dashProgress: 0,
   turnFrom: 0, turnTo: 0, turnStart: 0, lastNet: 0, lastSent: "", forceNet: false, knownInfected: {}, becameZombieShown: false,
   endRequested: false, quitSides: {}, spectateIndex: 0, viewedId: null, fov: BASE_FOV, camYaw: 0, camElev: 0.3, camDist: CAM_DIST, resultSaved: null
@@ -3674,6 +3681,7 @@ const me = { x: 0, y: 0, z: 0, vy: 0 };
 
 function removeAvatar(id) { if (avatars[id]) { avatars[id].dispose(); delete avatars[id]; } }
 function clearRound() {
+  zombieNameTags.clear();
   for (const id in avatars) removeAvatar(id);
   round.active = false; round.key = 0; round.viewedId = null; holdRing.visible = false;
   $("feed").innerHTML = "";
@@ -3690,7 +3698,7 @@ function beginLocalRound() {
   const ids = roundIds();
   round.key = room.startAt; round.active = true;
   round.iAmIn = ids.includes(myId);
-  round.lastElapsed = -1e9; round.bellsRung = {}; round.rushAnnounced = false; round.releaseAnnounced = false; round.countBeeped = {};
+  round.lastElapsed = -1e9; round.bellsRung = {}; round.rushAnnounced = false; round.releaseAnnounced = false; round.finalRevealAnnounced = false; round.countBeeped = {};
   round.myInfectedAt = 0; round.infectSent = false; round.dashReadyAt = 0; round.dashUntil = 0; round.dashDir = null;
   round.turnStart = 0; round.lastSent = ""; round.forceNet = true; round.knownInfected = {}; round.becameZombieShown = false;
   round.endRequested = false; round.quitSides = {}; round.spectateIndex = 0; round.resultSaved = null;
@@ -3704,6 +3712,8 @@ function beginLocalRound() {
     if (p.infected) round.knownInfected[id] = true;
   });
   if (round.iAmIn) { const av = avatars[myId]; me.x = av.pos.x; me.z = av.pos.z; me.y = 0; me.vy = 0; }
+  zombieNameTags.build(ids);
+  zombieRoster.reset();
   $("vignette").className = "";
   flashCenter("", "", 0);
 }
@@ -3796,10 +3806,9 @@ function tryDash() {
 }
 
 function flashCenter(text, small, ms, red) { zombieTop.post(text, small, ms, red); }
-function pushFeed(text, involvesMe) {
+function pushFeed(text) {
   const feed = $("feed"), item = document.createElement("div");
   item.innerHTML = '<span class="killIcon">🧟</span>' + escapeHtml(text);
-  if (involvesMe) item.className = "mine";
   feed.prepend(item);
   while (feed.children.length > 5) feed.lastChild.remove();
   setTimeout(() => item.remove(), 6000);
@@ -3958,7 +3967,7 @@ function pushKillFeed(zombieId, victimId) {
     ? withJosa(nickOf(zombieId), "이", "가") + " " + withJosa(nickOf(victimId), "을", "를") + " 감염시켰습니다."
     : withJosa(nickOf(victimId), "이", "가") + " 감염되었습니다.";
   const involvesMe = victimId === myId || zombieId === myId;
-  pushFeed(text, involvesMe);
+  pushFeed(text);
   playKillBell(involvesMe);
 }
 function becomeInfected(t, byId) {
@@ -4374,18 +4383,6 @@ class ZombieMapLight {
     c.fillStyle = g; c.beginPath(); c.arc(x, y, radius, 0, Math.PI * 2); c.fill();
   }
 }
-class ZombieHumanPing {
-  static PERIOD_MS = 20000;
-  static SHOW_MS = 3000;
-  static FIRST_MS = 30000;
-  static activeAt(elapsedMs) { return elapsedMs >= ZombieHumanPing.FIRST_MS && (elapsedMs - ZombieHumanPing.FIRST_MS) % ZombieHumanPing.PERIOD_MS < ZombieHumanPing.SHOW_MS; }
-  static fadeAt(elapsedMs) { return 1 - ((elapsedMs - ZombieHumanPing.FIRST_MS) % ZombieHumanPing.PERIOD_MS) / ZombieHumanPing.SHOW_MS; }
-  static secondsUntilNext(elapsedMs) {
-    const e = Math.max(0, elapsedMs);
-    const wait = e < ZombieHumanPing.FIRST_MS ? ZombieHumanPing.FIRST_MS - e : ZombieHumanPing.PERIOD_MS - ((e - ZombieHumanPing.FIRST_MS) % ZombieHumanPing.PERIOD_MS);
-    return Math.ceil(wait / 1000);
-  }
-}
 const floorMapBase = { cv: document.createElement("canvas"), w: 0, h: 0, dpr: 0, labels: false };
 function floorMapUnits() {
   const M = FLOOR_MAP, slabH = (M.z1 - M.z0) * M.depth;
@@ -4525,6 +4522,84 @@ function drawFloorMap(t) {
   }
 }
 
+class ZombieNameTag {
+  static CANVAS_W = 384;
+  static CANVAS_H = 64;
+  static SCREEN_H = 0.05;
+  static HEAD_Y = { human: 1.85, zombie: 1.62 };
+  static HUMAN = 0x3EE870;
+  static ZOMBIE = 0xFF3B4A;
+  static FADE_PER_SEC = 7;
+  constructor(nickname, parent) {
+    const cv = document.createElement("canvas"); cv.width = ZombieNameTag.CANVAS_W; cv.height = ZombieNameTag.CANVAS_H;
+    const c = cv.getContext("2d"), font = size => "800 " + size + 'px "Nanum Gothic", "Malgun Gothic", sans-serif';
+    let size = 44; c.font = font(size);
+    while (size > 22 && c.measureText(nickname).width > cv.width - 20) { size -= 2; c.font = font(size); }
+    c.textAlign = "center"; c.textBaseline = "middle"; c.lineJoin = "round"; c.lineWidth = 8; c.strokeStyle = "rgba(0, 0, 0, .9)"; c.fillStyle = "#fff";
+    c.strokeText(nickname, cv.width / 2, cv.height / 2 + 2); c.fillText(nickname, cv.width / 2, cv.height / 2 + 2);
+    this.texture = new THREE.CanvasTexture(cv); this.texture.colorSpace = THREE.SRGBColorSpace; this.texture.generateMipmaps = false; this.texture.minFilter = THREE.LinearFilter;
+    renderer.initTexture(this.texture);
+    this.material = new THREE.SpriteMaterial({ map: this.texture, transparent: true, opacity: 0, depthTest: false, depthWrite: false, fog: false, sizeAttenuation: false, toneMapped: false });
+    this.sprite = new THREE.Sprite(this.material);
+    this.sprite.scale.set(ZombieNameTag.SCREEN_H * cv.width / cv.height, ZombieNameTag.SCREEN_H, 1);
+    this.sprite.renderOrder = 20; this.sprite.frustumCulled = false;
+    this.parent = parent; parent.add(this.sprite);
+    this.shown = false; this.zombie = null;
+  }
+  followHead(kind) { this.sprite.position.y = ZombieNameTag.HEAD_Y[kind]; }
+  setZombie(zombie) {
+    if (zombie === this.zombie) return;
+    this.zombie = zombie; this.material.color.setHex(zombie ? ZombieNameTag.ZOMBIE : ZombieNameTag.HUMAN);
+  }
+  fade(dt, prewarm) {
+    const step = ZombieNameTag.FADE_PER_SEC * dt, target = this.shown ? 1 : 0, now = this.material.opacity;
+    const next = now < target ? Math.min(target, now + step) : Math.max(target, now - step);
+    if (next !== now) this.material.opacity = next;
+    this.sprite.visible = next > 0 || prewarm;
+  }
+  dispose() { this.parent.remove(this.sprite); this.material.dispose(); this.texture.dispose(); }
+}
+class ZombieNameTags {
+  constructor() {
+    this.tags = new Map(); this.order = []; this.cursor = 0; this.screenSpot = new THREE.Vector3(); this.nearBoxes = []; this.chest = { x: 0, y: 0, z: 0 };
+    const slab = new ZombieFloorSlab(FLOOR_H, { x0: -BUILDING_X, x1: BUILDING_X, z0: -BUILDING_Z, z1: BUILDING_Z }, [{ x0: -54, x1: -42, z0: STAIR_Z0, z1: LANDING_Z1 }, { x0: 42, x1: 54, z0: STAIR_Z0, z1: LANDING_Z1 }]);
+    this.sight = new ZombieBodySight(spot => this.onScreen(spot), (x0, x1, z0, z1) => collidersNear(x0, x1, z0, z1, this.nearBoxes), slab);
+  }
+  onScreen(spot) {
+    const p = this.screenSpot.set(spot.x, spot.y, spot.z).project(camera);
+    return Math.abs(p.x) <= 1 && Math.abs(p.y) <= 1 && p.z < 1;
+  }
+  build(ids) {
+    this.clear();
+    ids.forEach(id => { if (avatars[id]) this.tags.set(id, new ZombieNameTag(avatars[id].nickname, avatars[id].root)); });
+    this.order = ids.filter(id => this.tags.has(id));
+  }
+  clear() { this.tags.forEach(tag => tag.dispose()); this.tags.clear(); this.order = []; this.cursor = 0; }
+  judge(id, tag, focusId) {
+    const av = avatars[id];
+    if (id === focusId || !av || !av.root.visible) { tag.shown = false; return; }
+    const chest = this.chest; chest.x = av.pos.x; chest.y = av.pos.y + ZombieBodySight.CHEST_HEIGHT; chest.z = av.pos.z;
+    const distance = Math.hypot(chest.x - camera.position.x, chest.y - camera.position.y, chest.z - camera.position.z);
+    if (!ZombieNameTagRule.withinRange(tag.shown, distance, scene.fog)) { tag.shown = false; return; }
+    tag.shown = ZombieNameTagRule.shows(tag.shown, this.sight.visiblePoints(camera.position, av.pos));
+  }
+  update(t, dt) {
+    if (!this.order.length) return;
+    const focusId = round.iAmIn ? myId : round.viewedId, id = this.order[this.cursor = (this.cursor + 1) % this.order.length];
+    this.judge(id, this.tags.get(id), focusId);
+    const prewarm = t < room.startAt;
+    this.tags.forEach((tag, tagId) => {
+      if (tagId === focusId) tag.shown = false;
+      tag.setZombie(!!isZombieNow(tagId, t));
+      tag.followHead(avatars[tagId].kind);
+      tag.fade(dt, prewarm);
+    });
+  }
+  hide() { this.tags.forEach(tag => { tag.shown = false; tag.material.opacity = 0; tag.sprite.visible = false; }); }
+}
+const zombieNameTags = new ZombieNameTags();
+const zombieRoster = new ZombieRosterView($("rosterBox"));
+
 const FINAL_COUNT_MS = 10000;
 let lastCountSec = 0;
 function updateHud(t, nowMs) {
@@ -4551,8 +4626,7 @@ function updateHud(t, nowMs) {
     return;
   }
   const zombieRole = amIZombieRole(), zombieForm = zombieFormActive(myId, t);
-  setText($("roleText"), isOriginZombie(myId) ? "숙주 좀비" : zombieRole ? "좀비" : "인간");
-  $("roleIcon").className = zombieRole ? "zombie" : ""; setText($("roleIcon"), zombieRole ? "🧟" : "🧑");
+  zombieRoster.refresh(nowMs, () => roundIds().map(id => ({ name: nickOf(id), role: !isZombieNow(id, t) ? "human" : isOriginZombie(id) ? "origin" : "zombie", since: infectedAtOf(id), me: id === myId })));
   if (zombieRole && !vignette.classList.contains("flash")) vignette.className = "zombie";
   if (!zombieRole) vignette.className = "";
   if (round.myInfectedAt && showsZombieModel(myId, t) && !round.becameZombieShown) {
@@ -4587,8 +4661,8 @@ function roundEvents(t) {
   } else if (!round.countBeeped.go) {
     round.countBeeped.go = true; playCountBeep(true);
     if (!round.iAmIn) flashCenter("시작!", "", 1500);
-    else if (isOriginZombie(myId)) flashCenter("당신은 좀비입니다", "15초 동안 중앙현관에서 기다린 뒤 추격을 시작합니다.", 3500, true);
-    else flashCenter("도망치세요!", "15초 뒤 좀비가 풀려나고 미션이 나옵니다.", 2500);
+    else if (isOriginZombie(myId)) flashCenter("당신은 좀비입니다", (ZOMBIE_HOLD_MS / 1000) + "초 동안 중앙현관에서 기다린 뒤 추격을 시작합니다.", 3500, true);
+    else flashCenter("도망치세요!", (ZOMBIE_HOLD_MS / 1000) + "초 뒤 좀비가 풀려나고 미션이 나옵니다.", 2500);
   }
   holdRing.visible = elapsed < ZOMBIE_HOLD_MS && room.originZombieId && !!avatars[room.originZombieId];
   if (elapsed >= ZOMBIE_HOLD_MS && prev < ZOMBIE_HOLD_MS && !round.releaseAnnounced) {
@@ -4604,6 +4678,10 @@ function roundEvents(t) {
   if (elapsed >= ROUND_MS - FINAL_RUSH_MS && prev < ROUND_MS - FINAL_RUSH_MS && !round.rushAnnounced) {
     round.rushAnnounced = true; playRushAlarm();
     flashCenter("마지막 30초!", "좀비가 50% 빨라지고 숙주 좀비의 대쉬 대기시간이 2초로 줄어듭니다.", 3200, true);
+  }
+  if (ZombieHumanPing.finalAt(elapsed) && !ZombieHumanPing.finalAt(prev) && !round.finalRevealAnnounced) {
+    round.finalRevealAnnounced = true;
+    flashCenter("마지막 10초!", "모든 좀비와 인간의 위치가 지도에 계속 드러납니다.", 2600, true);
   }
   round.lastElapsed = elapsed;
 }
@@ -4662,7 +4740,7 @@ function renderResult() {
   setText($("resSub"), room.quitSide === "zombie" ? "좀비가 모두 나가서 인간이 승리했습니다."
     : room.quitSide === "human" ? "인간이 모두 나가서 좀비가 승리했습니다."
     : humansWon ? "미션을 모두 끝내고 끝까지 살아남은 학생: " + survivors.join(", ")
-    : survivors.length ? "3분이 지났지만 미션을 모두 끝내지 못했습니다. (" + (room.missionCleared || 0) + " / " + ZombieMissionCatalog.COUNT + ")" : "모든 학생이 감염되었습니다.");
+    : survivors.length ? "2분 30초가 지났지만 미션을 모두 끝내지 못했습니다. (" + (room.missionCleared || 0) + " / " + ZombieMissionCatalog.COUNT + ")" : "모든 학생이 감염되었습니다.");
   const label = { origin: '<span class="badge origin">숙주 좀비</span>', infected: '<span class="badge infected">감염</span>', survived: '<span class="badge alive">생존</span>' };
   $("resBody").innerHTML = ids.map(id => {
     const f = final[id];
@@ -4930,6 +5008,7 @@ function frame(nowMs) {
   updateClock();
   updateSky();
   cullAvatars();
+  if (screenNow === "game" && round.active) zombieNameTags.update(t, dt); else zombieNameTags.hide();
   renderer.render(scene, camera);
 }
 requestAnimationFrame(frame);
