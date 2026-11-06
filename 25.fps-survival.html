@@ -469,6 +469,7 @@
 <script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }</script>
 <script charset="utf-8" src="character-kit.js?v=20261011"></script>
 <script charset="utf-8" src="character-maker.js?v=20261026a"></script>
+<script charset="utf-8" src="room-drop-recovery.js?v=20261106a"></script>
 <script charset="utf-8" src="match-kit.js?v=20261103a"></script>
 <script charset="utf-8" src="account-match-kit.js?v=20261103e"></script>
 <script charset="utf-8" src="25.fps-survival-stats.js?v=20261027b"></script>
@@ -2437,14 +2438,15 @@ function enterRoom(code) {
   T.players = {}; T.status = "lobby"; T.host = null; T.hostLoaded = false; T.raw = {}; T.kills = {}; T.dmg = {};
   resetMatchLocal(); clearTeamItems();
   const ref = T.ref;
-  ref.child("players/" + T.myId).onDisconnect().remove();
-  ref.child("st/" + T.myId).onDisconnect().remove();
+  T.drop = new RoomDropRecovery(new FpsRoomDropHost(), T.db, ["players", "st"]);
+  T.drop.arm(ref);
+  T.drop.watchConnection(ref);
   const pref = ref.child("players");
   sub(pref, "child_added", s => { T.players[s.key] = s.val(); playersChanged(); });
   sub(pref, "child_changed", s => { T.players[s.key] = s.val(); playersChanged(); });
   sub(pref, "child_removed", s => {
+    if (s.key === T.myId && !T.leaving) { T.drop.recover(s.val() || T.players[T.myId] || null); return; }
     delete T.players[s.key]; removeEnt(s.key); delete T.bots[s.key];
-    if (s.key === T.myId && !T.leaving) { exitRoom("방에서 나가졌어요."); return; }
     checkHost(); playersChanged();
   });
   sub(ref.child("hostPlayerId"), "value", s => { T.host = s.val(); T.hostLoaded = true; checkHost(); if (isHost() && T.match) adoptBots(); playersChanged(); });
@@ -2473,6 +2475,15 @@ function enterRoom(code) {
   teamScreen("lobby");
 }
 const HOST_ORDER = { blue: 0, red: 1, spec: 2 };
+class FpsRoomDropHost {
+  myId() { return T.myId; }
+  room() { return T.ref; }
+  leaving() { return T.leaving; }
+  exit(message) { exitRoom(message); }
+  subscribe(ref, event, listener) { sub(ref, event, listener); }
+  returnRecord(saved) { return saved; }
+  afterReturn() { T.sent = {}; T.forceNet = true; }
+}
 function nextHost(ps) {
   const join = byJoin(ps);
   return humanIds(ps).sort((a, b) => {

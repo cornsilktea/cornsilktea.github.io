@@ -444,6 +444,7 @@
     <div class="zv-hint">곧 게임이 시작돼요. 잠시만 기다려 주세요.</div>
   </div>
 </div>
+<script charset="utf-8" src="room-drop-recovery.js?v=20261106a"></script>
 <script charset="utf-8" src="match-kit.js?v=20261103d"></script>
 <script charset="utf-8" src="account-match-kit.js?v=20261104a"></script>
 <script charset="utf-8" src="31.zombie-outbreak-stats.js?v=20261104a"></script>
@@ -3265,12 +3266,14 @@ function enterRoom(code) {
   room.code = code; room.ref = db.ref(ROOM_ROOT + "/" + code); room.leaving = false;
   room.players = {}; room.status = null; room.host = null; room.hostLoaded = false; room.startAt = 0; room.final = null;
   const ref = room.ref;
-  ref.child("players/" + myId).onDisconnect().remove();
-  ref.child("st/" + myId).onDisconnect().remove();
+  room.drop = new RoomDropRecovery(new ZombieRoomDropHost(), db, ["players", "st"]);
+  room.drop.arm(ref);
+  room.drop.watchConnection(ref);
   const pref = ref.child("players");
   sub(pref, "child_added", s => { room.players[s.key] = s.val(); playersChanged(); });
   sub(pref, "child_changed", s => { room.players[s.key] = s.val(); playersChanged(); });
   sub(pref, "child_removed", s => {
+    if (s.key === myId && !room.leaving) { room.drop.recover(s.val() || room.players[myId] || null); return; }
     const gone = room.players[s.key];
     if (gone && !gone.bot && gone.inRound && room.status === "playing") round.quitSides[gone.role === "zombie" || gone.infected ? "zombie" : "human"] = true;
     delete room.players[s.key]; removeAvatar(s.key);
@@ -3293,6 +3296,15 @@ function enterRoom(code) {
   sub(stRef, "child_changed", s => onRemoteState(s.key, s.val()));
   setText($("lobbyCode"), code);
   showScreen("lobby");
+}
+class ZombieRoomDropHost {
+  myId() { return myId; }
+  room() { return room.ref; }
+  leaving() { return room.leaving; }
+  exit(message) { exitToStart(message); }
+  subscribe(ref, event, listener) { sub(ref, event, listener); }
+  returnRecord(saved) { return saved; }
+  afterReturn() { round.lastSent = ""; round.forceNet = true; }
 }
 function nextHost(ps) { const joinOrder = byJoin(ps); return humanIdsOf(ps).sort((a, b) => (!!ps[a].spec - !!ps[b].spec) || joinOrder(a, b))[0]; }
 function checkHost() {
