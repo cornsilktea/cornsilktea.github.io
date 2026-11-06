@@ -4016,7 +4016,7 @@ class ResultCollector {
       api.addAi("red"); await sleep(10); api.renderLobby();
       if (el("btnStart").disabled || el("startHint").textContent !== "") bad.push("양 팀 1명씩 '" + el("startHint").textContent + "' 잠김 " + el("btnStart").disabled);
       api.addAi("red"); await sleep(10); api.renderLobby();
-      if (el("btnStart").disabled || el("startHint").textContent.indexOf("인원이 달라요 (블루 1 vs 레드 2)") < 0) bad.push("인원 다름 안내 '" + el("startHint").textContent + "'");
+      if (el("btnStart").disabled || el("startHint").textContent !== "") bad.push("인원이 달라도 안내가 없어야 함 '" + el("startHint").textContent + "'");
       if (el("listRed").innerHTML.indexOf("data-ai-del") < 0) bad.push("AI 빼기 버튼");
       fake.put(base + "players/" + me() + "/team", "spec"); await sleep(10); api.renderLobby();
       if (el("btnJoinBlue").hidden || el("btnJoinRed").hidden || !el("btnSpec").hidden) bad.push("관전일 때 버튼");

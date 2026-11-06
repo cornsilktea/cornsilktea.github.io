@@ -1435,7 +1435,7 @@ SinglePassMaterials.enable(THREE);
         hint = ok ? "연습 봇을 상대로 혼자 연습해요. 게임 시작을 누르면 연습장에 들어가요." : "블루팀이나 레드팀으로 이동해 주세요.";
       } else {
         if (nb < 1 || nr < 1) hint = "양 팀에 1명 이상 있어야 시작할 수 있어요.";
-        else { ok = true; hint = nb !== nr ? "인원이 달라요 (블루 " + nb + " vs 레드 " + nr + ") — 그래도 시작할 수 있어요." : ""; }
+        else ok = true;
       }
       if (!cup && !practice) ["blue", "red"].forEach(function (team) {
         services.session.teamIds(team).forEach(function (id) {
@@ -12218,7 +12218,7 @@ SinglePassMaterials.enable(THREE);
       var mine = E === services.match.me, teamCss = E.team === "blue" ? "#2F6FD6" : "#D6453D", ny = top - (compact ? 10 : 13), gauge = ally;
       services.overlaySprites.drawNameTag(E.nickname || "", teamCss, mine, p.x, ny, compact);
       if (mine) services.hudBars.drawMeArrow(p.x, ny - 14);
-      var frameH = bh + 4 + (gauge ? (compact ? 5 : 7) : 0);
+      var frameH = bh + 4 + (gauge ? 7 : 0);
       Canvases.overlayCtx.fillStyle = "rgba(10,14,12,.85)"; services.hud.pill(x0 - 2, top - 2, bw + 4, frameH, 3); Canvases.overlayCtx.fill();
       Canvases.overlayCtx.lineWidth = mine ? 2.5 : 1.5; Canvases.overlayCtx.strokeStyle = mine ? MeMarker.CSS : teamCss; Canvases.overlayCtx.stroke();
       Canvases.overlayCtx.fillStyle = ally ? (ratio < 0.3 ? "#F2A33A" : "#4CC27E") : "#E8505A";
@@ -12227,7 +12227,7 @@ SinglePassMaterials.enable(THREE);
       Canvases.overlayCtx.fillStyle = "rgba(10,14,12,.6)";
       if (E.maxHp <= 1000 && !compact) for (var hp = 50; hp < E.maxHp; hp += 50) Canvases.overlayCtx.fillRect(x0 + bw * hp / E.maxHp, top, 1, bh);
       if (gauge) {
-        var gy = top + bh + (compact ? 2 : 3), gh = compact ? 3 : 4, full = E.gauge >= MatchRules.GAUGE_MAX, t = services.clock.now(), act = E.hasSkillActive(t);
+        var gy = top + bh + 3, gh = 4, full = E.gauge >= MatchRules.GAUGE_MAX, t = services.clock.now(), act = E.hasSkillActive(t);
         Canvases.overlayCtx.fillStyle = "rgba(10,14,12,.8)"; Canvases.overlayCtx.fillRect(x0 - 1, gy - 1, bw + 2, gh + 2);
         Canvases.overlayCtx.fillStyle = act ? "#F06BB5" : (full ? "#FF5A4E" : "#F2C230");
         Canvases.overlayCtx.fillRect(x0, gy, bw * (act ? E.skillLeft(t) : MathKit.clamp(E.gauge / MatchRules.GAUGE_MAX, 0, 1)), gh);
