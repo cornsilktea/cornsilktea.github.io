@@ -254,6 +254,8 @@
          다 채워 등록하기 전에는 닫히지 않는다(그 사이 누가 앞질러 거부되면 자동으로 닫힘).
          돌려주는 값은 세계 신기록으로 등록된 기록(반 신기록만 등록했거나 아니면 null). */
       prompt: function (v, title) {
+        /* 한 판이 끝났다는 신호 — usage-meter.js 가 이때까지 쓴 Firebase 사용량을 기록한다 */
+        window.dispatchEvent(new Event("portal-round-end"));
         PersonalBests.pushGame(game);
         if (blocked()) return Promise.resolve(null);
         /* 기기에 들고 있던 기록은 게임을 시작할 때 읽은 값이라, 그 사이 다른 학생이 더 높은 기록을 냈을 수 있다.

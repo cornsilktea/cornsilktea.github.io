@@ -1013,6 +1013,22 @@
         }
       }
     },
+    "usageDaily": {
+      ".read": "auth != null && (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')",
+      ".write": "auth != null && (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')",
+      "$day": {
+        "$game": {
+          ".write": "auth != null",
+          ".validate": "$day.matches(/^20[0-9]{6}$/) && $game.matches(/^[a-z0-9]{1,30}$/)",
+          "down": { ".validate": "newData.isNumber() && newData.val() - (data.exists() ? data.val() : 0) >= 0 && newData.val() - (data.exists() ? data.val() : 0) <= 500000000" },
+          "up": { ".validate": "newData.isNumber() && newData.val() - (data.exists() ? data.val() : 0) >= 0 && newData.val() - (data.exists() ? data.val() : 0) <= 500000000" },
+          "req": { ".validate": "newData.isNumber() && newData.val() - (data.exists() ? data.val() : 0) >= 0 && newData.val() - (data.exists() ? data.val() : 0) <= 1000000" },
+          "sec": { ".validate": "newData.isNumber() && newData.val() - (data.exists() ? data.val() : 0) >= 0 && newData.val() - (data.exists() ? data.val() : 0) <= 3600" },
+          "rounds": { ".validate": "newData.isNumber() && newData.val() - (data.exists() ? data.val() : 0) >= 0 && newData.val() - (data.exists() ? data.val() : 0) <= 1" },
+          "$other": { ".validate": false }
+        }
+      }
+    },
     "archive": {
       ".read": "auth != null && (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')",
       ".write": "auth != null && (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"

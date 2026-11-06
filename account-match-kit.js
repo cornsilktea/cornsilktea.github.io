@@ -257,7 +257,9 @@ class AccountMatchStore {
     async record(report, context) {
         const key = this.keyOf(report);
         const pending = await this.settleOtherThan(key);
-        return this.write(report, context, !!pending && pending.id === key);
+        const result = await this.write(report, context, !!pending && pending.id === key);
+        window.dispatchEvent(new Event(AccountMatchStore.ROUND_END_EVENT));
+        return result;
     }
     async arm(report) {
         const key = this.keyOf(report);
@@ -357,6 +359,7 @@ class AccountMatchStore {
         return finish(plan.countsStats ? "stats" : "recent");
     }
 }
+AccountMatchStore.ROUND_END_EVENT = "portal-round-end";
 class AccountOutbox {
     static readAll() {
         try {

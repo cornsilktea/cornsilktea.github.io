@@ -307,6 +307,8 @@ class AccountPendingCodec {
 }
 
 class AccountMatchStore<R, P extends AccountMatchPlanBase, N, E extends AccountRecentHeadEntry, C> {
+  static readonly ROUND_END_EVENT = "portal-round-end";
+
   constructor(
     private readonly database: AccountDatabaseLike,
     private readonly user: PortalUser,
@@ -338,7 +340,9 @@ class AccountMatchStore<R, P extends AccountMatchPlanBase, N, E extends AccountR
   async record(report: R, context: C): Promise<string> {
     const key = this.keyOf(report);
     const pending = await this.settleOtherThan(key);
-    return this.write(report, context, !!pending && pending.id === key);
+    const result = await this.write(report, context, !!pending && pending.id === key);
+    window.dispatchEvent(new Event(AccountMatchStore.ROUND_END_EVENT));
+    return result;
   }
 
   async arm(report: R): Promise<string> {

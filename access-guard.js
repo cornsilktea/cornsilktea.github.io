@@ -181,6 +181,13 @@
     (document.head || document.documentElement).appendChild(loginScript);
   }
 
+  /* ---------- Firebase 사용량 재기 ----------
+     usage-meter.js 가 이 쪽 이후의 Firebase 요청·웹소켓 바이트를 세어 판이 끝날 때(portal-round-end 이벤트)
+     usageDaily/<날짜>/<자료> 에 더한다. 제어판 '사용량' 탭에서 본다. 처음 요청부터 세도록 동기로 불러온다. */
+  if (script && script.src && slug && document.readyState === "loading") {
+    document.write('<script charset="utf-8" src="' + script.src.replace("access-guard.js", "usage-meter.js") + '"><\/script>');
+  }
+
   /* 버튼이 화면 배경에서 튀지 않게, 뒤 배경이 밝으면 옅은 어두운 판·어두운 글씨,
      어두우면 옅은 밝은 판·밝은 글씨로 칠합니다. 배경을 못 알아내면 어두운 쪽으로 봅니다. */
   function pageBackgroundIsLight() {
