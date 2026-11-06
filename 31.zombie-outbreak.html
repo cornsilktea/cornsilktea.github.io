@@ -444,7 +444,7 @@
     <div class="zv-hint">곧 게임이 시작돼요. 잠시만 기다려 주세요.</div>
   </div>
 </div>
-<script charset="utf-8" src="room-drop-recovery.js?v=20261106a"></script>
+<script charset="utf-8" src="room-drop-recovery.js?v=20261106b"></script>
 <script charset="utf-8" src="match-kit.js?v=20261103d"></script>
 <script charset="utf-8" src="account-match-kit.js?v=20261104a"></script>
 <script charset="utf-8" src="31.zombie-outbreak-stats.js?v=20261104a"></script>
@@ -3156,7 +3156,8 @@ try {
 let serverOffset = 0;
 if (db) db.ref(".info/serverTimeOffset").on("value", s => { serverOffset = s.val() || 0; });
 function serverNow() { return Date.now() + serverOffset; }
-const myId = "p" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+const resumeStore = new RoomResumeStore("zombie");
+const myId = resumeStore.identity();
 
 function refreshNick() {
   const nick = PlayerProfile.storedNick();
@@ -3270,8 +3271,9 @@ function enterRoom(code) {
   room.drop.arm(ref);
   room.drop.watchConnection(ref);
   const pref = ref.child("players");
-  sub(pref, "child_added", s => { room.players[s.key] = s.val(); playersChanged(); });
-  sub(pref, "child_changed", s => { room.players[s.key] = s.val(); playersChanged(); });
+  resumeStore.keepFresh(() => room.ref ? { code: room.code, myId, record: room.players[myId] || null } : null);
+  sub(pref, "child_added", s => { room.players[s.key] = s.val(); if (s.key === myId) resumeStore.save(room.code, myId, s.val()); playersChanged(); });
+  sub(pref, "child_changed", s => { room.players[s.key] = s.val(); if (s.key === myId) resumeStore.save(room.code, myId, s.val()); playersChanged(); });
   sub(pref, "child_removed", s => {
     if (s.key === myId && !room.leaving) { room.drop.recover(s.val() || room.players[myId] || null); return; }
     const gone = room.players[s.key];
@@ -3315,7 +3317,7 @@ function checkHost() {
 function leaveRoom() {
   if (!room.ref) return;
   const ref = room.ref;
-  room.leaving = true; unsubAll();
+  room.leaving = true; unsubAll(); resumeStore.clear();
   try { ref.child("players/" + myId).onDisconnect().cancel(); ref.child("st/" + myId).onDisconnect().cancel(); } catch (e) {}
   ref.child("st/" + myId).remove().catch(() => {});
   ref.child("players/" + myId).remove().then(() => ref.child("players").once("value")).then(s => {
@@ -3331,7 +3333,7 @@ function leaveRoom() {
 }
 function exitToStart(msg) {
   if (room.ref) {
-    room.leaving = true; unsubAll();
+    room.leaving = true; unsubAll(); resumeStore.clear();
     try { room.ref.child("players/" + myId).onDisconnect().cancel(); room.ref.child("st/" + myId).onDisconnect().cancel(); } catch (e) {}
   }
   resetRoomLocal();
@@ -3342,7 +3344,7 @@ function resetRoomLocal() {
   clearRound();
 }
 window.addEventListener("pagehide", () => {
-  if (room.ref) { try { room.ref.child("players/" + myId).remove(); room.ref.child("st/" + myId).remove(); } catch (e) {} }
+  if (room.ref) { resumeStore.save(room.code, myId, room.players[myId] || null); try { room.ref.child("players/" + myId).remove(); room.ref.child("st/" + myId).remove(); } catch (e) {} }
 });
 
 class ZombieVersusCurtain {
@@ -5150,6 +5152,17 @@ $("btnAgain").onclick = blurAfter(playAgain);
 $("btnResultLeave").onclick = blurAfter(leaveRoom);
 $("btnGameLeave").onclick = blurAfter(() => { if (confirm(zombieRandom.forfeitApplies() || zombieReporter.forfeitApplies() ? MkForfeit.QUESTION : "방을 나가시겠습니까?")) { zombieRandom.forfeitIfLate(); zombieReporter.leaving(); leaveRoom(); } });
 if (!db) startMsg("온라인 연결 설정을 불러오지 못했습니다. (firebase-config.js·인터넷 연결 확인)");
+
+class ZombieResumeStarter {
+  static run() {
+    if (!db || !resumeStore.read()) return;
+    startMsg("이어서 들어가는 중…");
+    resumeStore.rejoin(db, ROOM_ROOT)
+      .then(code => { if (code) { startMsg(""); enterRoom(code); } else { resumeStore.clear(); startMsg(""); } })
+      .catch(() => { resumeStore.clear(); startMsg(""); });
+  }
+}
+ZombieResumeStarter.run();
 })();
 </script>
 </body>

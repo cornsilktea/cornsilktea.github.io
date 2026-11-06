@@ -121,7 +121,17 @@ class VbRoomSession {
         this.onClosed = () => undefined;
         this.subscriptions = [];
         this.leaving = false;
-        this.ref = backend.database.ref(VbConfig.ROOT + "/" + code);
+        this.database = backend.database;
+        this.ref = this.database.ref(VbConfig.ROOT + "/" + code);
+        this.dropRecovery = new RoomDropRecovery({
+            myId: () => this.myId,
+            room: () => this.ref,
+            leaving: () => this.leaving,
+            exit: (message) => this.onClosed(message),
+            subscribe: (ref, event, listener) => this.subscribe(ref, event, listener),
+            returnRecord: (saved) => saved,
+            afterReturn: () => { this.armDisconnect(); this.onChange("players"); }
+        }, this.database, ["players", "st", "in"]);
     }
     isHost() {
         return this.hostId === this.myId;
@@ -141,6 +151,10 @@ class VbRoomSession {
     }
     connect() {
         this.armDisconnect();
+        this.subscribe(this.database.ref(".info/connected"), "value", (snapshot) => {
+            if (snapshot.val() === true && !this.leaving)
+                this.armDisconnect();
+        });
         const playersRef = this.ref.child("players");
         this.subscribe(playersRef, "child_added", (snapshot) => this.setPlayer(snapshot));
         this.subscribe(playersRef, "child_changed", (snapshot) => this.setPlayer(snapshot));
@@ -276,11 +290,11 @@ class VbRoomSession {
         this.onChange("players");
     }
     removePlayer(snapshot) {
-        this.players.delete(snapshot.key);
         if (snapshot.key === this.myId && !this.leaving) {
-            this.onClosed("연결이 끊겨 방에서 나왔어요.");
+            this.dropRecovery.recover(snapshot.val() || this.players.get(this.myId) || null);
             return;
         }
+        this.players.delete(snapshot.key);
         this.onPlayerRemoved(snapshot.key);
         this.onChange("players");
     }

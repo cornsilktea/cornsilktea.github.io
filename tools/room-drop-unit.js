@@ -71,5 +71,33 @@ const tick = () => new Promise((r) => setImmediate(r));
   conn.fn({ val: () => true });
   check(".info/connected 가 켜지면 끊김 삭제를 다시 건다", t.store.armed.length === 2);
 
+  const memory = {};
+  const resumeSandbox = {
+    sessionStorage: { getItem: (k) => (k in memory ? memory[k] : null), setItem: (k, v) => { memory[k] = String(v); }, removeItem: (k) => { delete memory[k]; } },
+    window: { setInterval: () => 1, clearInterval: () => undefined },
+    Date,
+  };
+  vm.createContext(resumeSandbox);
+  vm.runInContext(fs.readFileSync(path.join(__dirname, "..", "room-drop-recovery.js"), "utf8") + "\nthis.RoomResumeStore = RoomResumeStore;", resumeSandbox);
+  const Store = resumeSandbox.RoomResumeStore;
+  const store = new Store("fps");
+  const firstId = store.identity();
+  check("저장이 없으면 새 아이디", /^p/.test(firstId) && store.read() === null);
+  store.save("12345", firstId, { team: "blue" });
+  check("저장 뒤 같은 아이디를 돌려준다", store.identity() === firstId && store.read().code === "12345");
+  check("3분이 지나면 이어하지 않음", store.read(Date.now() + 181000) === null);
+  const live = build("playing");
+  live.store.data["room/12345/status"] = "playing";
+  live.store.data["room/12345/players"] = { other: { team: "red" } };
+  const rejoinDb = { ref: (p) => new FakeRef(live.store, p) };
+  const code = await store.rejoin(rejoinDb, "room");
+  check("방이 남아 있으면 코드와 함께 내 정보를 다시 쓴다", code === "12345" && live.store.data["room/12345/players/" + firstId].team === "blue");
+  live.store.data["room/12345/status"] = null;
+  const gone = await store.rejoin(rejoinDb, "room");
+  check("방이 사라졌으면 null 이고 저장을 지운다", gone === null && store.read() === null);
+  store.save("1", "x", { a: 1 });
+  store.clear();
+  check("clear 후 읽으면 없음", store.read() === null);
+
   process.exit(results.every(Boolean) ? 0 : 1);
 })();

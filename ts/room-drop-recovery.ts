@@ -11,6 +11,98 @@ interface RoomDropHost {
   afterReturn(): void;
 }
 
+interface RoomResumeEntry {
+  code: string;
+  myId: string;
+  record: Record<string, unknown>;
+  savedAt: number;
+}
+
+/* 새로고침·탭 복원 뒤 이어하기(30번 RoomResume 과 같은 규칙): 방 코드·내 아이디·내 정보를 이 탭 sessionStorage 에 적어 두고,
+   페이지가 다시 열리면 RESUME_MS 안이고 방이 남아 있을 때 같은 아이디로 다시 들어간다. 직접 나가면 지운다. */
+class RoomResumeStore {
+  static readonly RESUME_MS = 180000;
+  static readonly SAVE_EVERY_MS = 20000;
+  private timer = 0;
+
+  constructor(private readonly game: string) {}
+
+  static newId(): string {
+    return "p" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+  }
+
+  private key(): string {
+    return this.game + "_resume_v1";
+  }
+
+  read(now: number = Date.now()): RoomResumeEntry | null {
+    try {
+      const raw = sessionStorage.getItem(this.key());
+      if (!raw) return null;
+      const entry = JSON.parse(raw) as RoomResumeEntry;
+      if (!entry || !entry.code || !entry.myId || now - entry.savedAt > RoomResumeStore.RESUME_MS) return null;
+      return entry;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  identity(): string {
+    const entry = this.read();
+    return entry ? entry.myId : RoomResumeStore.newId();
+  }
+
+  save(code: string, myId: string, record: Record<string, unknown> | null): void {
+    if (!record) return;
+    try {
+      sessionStorage.setItem(this.key(), JSON.stringify({ code, myId, record, savedAt: Date.now() }));
+    } catch (error) {
+      return;
+    }
+  }
+
+  clear(): void {
+    this.stopKeepFresh();
+    try {
+      sessionStorage.removeItem(this.key());
+    } catch (error) {
+      return;
+    }
+  }
+
+  keepFresh(current: () => { code: string; myId: string; record: Record<string, unknown> | null } | null): void {
+    this.stopKeepFresh();
+    this.timer = window.setInterval(() => {
+      const now = current();
+      if (now) this.save(now.code, now.myId, now.record);
+    }, RoomResumeStore.SAVE_EVERY_MS);
+  }
+
+  private stopKeepFresh(): void {
+    if (this.timer) window.clearInterval(this.timer);
+    this.timer = 0;
+  }
+
+  async rejoin(database: FirebaseDatabase, root: string): Promise<string | null> {
+    const entry = this.read();
+    if (!entry) return null;
+    const room = database.ref(root + "/" + entry.code);
+    try {
+      const [statusSnapshot, playersSnapshot] = await Promise.all([room.child("status").once("value"), room.child("players").once("value")]);
+      const players = playersSnapshot.val<Record<string, Record<string, unknown>>>() || {};
+      const hasHuman = Object.keys(players).some((id) => !players[id].isAI && !players[id].bot && !players[id].isBot);
+      if (statusSnapshot.val<string>() === null || !hasHuman) {
+        this.clear();
+        return null;
+      }
+      if (!players[entry.myId]) await room.child("players/" + entry.myId).set(entry.record);
+      return entry.code;
+    } catch (error) {
+      return null;
+    }
+  }
+}
+
 class RoomDropRecovery {
   static readonly TRIES = 3;
   static readonly RETRY_MS = 1000;

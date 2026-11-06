@@ -142,9 +142,21 @@ class VbRoomSession {
   readonly ref: FirebaseRef;
   private subscriptions: Array<{ ref: FirebaseRef; event: FirebaseEvent; listener: (snapshot: FirebaseSnapshot) => void }> = [];
   private leaving = false;
+  private readonly database: FirebaseDatabase;
+  private readonly dropRecovery: RoomDropRecovery;
 
   constructor(private readonly backend: VbBackend, readonly code: string, readonly myId: string, private readonly hosting: boolean) {
-    this.ref = (backend.database as FirebaseDatabase).ref(VbConfig.ROOT + "/" + code);
+    this.database = backend.database as FirebaseDatabase;
+    this.ref = this.database.ref(VbConfig.ROOT + "/" + code);
+    this.dropRecovery = new RoomDropRecovery({
+      myId: () => this.myId,
+      room: () => this.ref,
+      leaving: () => this.leaving,
+      exit: (message) => this.onClosed(message),
+      subscribe: (ref, event, listener) => this.subscribe(ref, event, listener),
+      returnRecord: (saved) => saved,
+      afterReturn: () => { this.armDisconnect(); this.onChange("players"); }
+    }, this.database, ["players", "st", "in"]);
   }
 
   isHost(): boolean {
@@ -169,6 +181,9 @@ class VbRoomSession {
 
   connect(): void {
     this.armDisconnect();
+    this.subscribe(this.database.ref(".info/connected"), "value", (snapshot) => {
+      if (snapshot.val<boolean>() === true && !this.leaving) this.armDisconnect();
+    });
     const playersRef = this.ref.child("players");
     this.subscribe(playersRef, "child_added", (snapshot) => this.setPlayer(snapshot));
     this.subscribe(playersRef, "child_changed", (snapshot) => this.setPlayer(snapshot));
@@ -300,11 +315,11 @@ class VbRoomSession {
   }
 
   private removePlayer(snapshot: FirebaseSnapshot): void {
-    this.players.delete(snapshot.key);
     if (snapshot.key === this.myId && !this.leaving) {
-      this.onClosed("연결이 끊겨 방에서 나왔어요.");
+      this.dropRecovery.recover(snapshot.val<Record<string, unknown>>() || (this.players.get(this.myId) as unknown as Record<string, unknown>) || null);
       return;
     }
+    this.players.delete(snapshot.key);
     this.onPlayerRemoved(snapshot.key);
     this.onChange("players");
   }

@@ -469,7 +469,7 @@
 <script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }</script>
 <script charset="utf-8" src="character-kit.js?v=20261011"></script>
 <script charset="utf-8" src="character-maker.js?v=20261026a"></script>
-<script charset="utf-8" src="room-drop-recovery.js?v=20261106a"></script>
+<script charset="utf-8" src="room-drop-recovery.js?v=20261106b"></script>
 <script charset="utf-8" src="match-kit.js?v=20261103a"></script>
 <script charset="utf-8" src="account-match-kit.js?v=20261103e"></script>
 <script charset="utf-8" src="25.fps-survival-stats.js?v=20261027b"></script>
@@ -2280,7 +2280,7 @@ const TEAM_ITEM_WAVES = (() => {
 const NET_FLAG = { alive: 1, pistol: 2, protect: 4, moving: 8 };
 const netDebug = /netdebug/.test(location.hash);
 const T = {
-  db: null, ref: null, code: "", myId: "p" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4),
+  db: null, ref: null, code: "", resume: new RoomResumeStore("fps"), myId: new RoomResumeStore("fps").identity(),
   serverOffset: 0, players: {}, status: null, host: null, hostLoaded: false, startAt: 0, botFill: true, itemWave: 0,
   subs: [], botSubs: [], leaving: false, screen: "", spec: false, match: null, me: null, pov: null,
   ents: {}, bots: {}, raw: {}, kills: {}, dmg: {}, items: {}, bullets: [], sent: {}, lastNet: 0, forceNet: false, statusSent: "",
@@ -2442,8 +2442,9 @@ function enterRoom(code) {
   T.drop.arm(ref);
   T.drop.watchConnection(ref);
   const pref = ref.child("players");
-  sub(pref, "child_added", s => { T.players[s.key] = s.val(); playersChanged(); });
-  sub(pref, "child_changed", s => { T.players[s.key] = s.val(); playersChanged(); });
+  T.resume.keepFresh(() => T.ref ? { code: T.code, myId: T.myId, record: T.players[T.myId] || null } : null);
+  sub(pref, "child_added", s => { T.players[s.key] = s.val(); if (s.key === T.myId) T.resume.save(T.code, T.myId, s.val()); playersChanged(); });
+  sub(pref, "child_changed", s => { T.players[s.key] = s.val(); if (s.key === T.myId) T.resume.save(T.code, T.myId, s.val()); playersChanged(); });
   sub(pref, "child_removed", s => {
     if (s.key === T.myId && !T.leaving) { T.drop.recover(s.val() || T.players[T.myId] || null); return; }
     delete T.players[s.key]; removeEnt(s.key); delete T.bots[s.key];
@@ -2499,7 +2500,7 @@ function checkHost() {
 function leaveRoom() {
   if (!T.ref) return;
   const ref = T.ref, me = T.myId;
-  T.leaving = true; unsub(T.subs); unsub(T.botSubs);
+  T.leaving = true; unsub(T.subs); unsub(T.botSubs); T.resume.clear();
   try { ref.child("players/" + me).onDisconnect().cancel(); ref.child("st/" + me).onDisconnect().cancel(); } catch (e) {}
   ref.child("st/" + me).remove().catch(() => {});
   ref.child("players/" + me).remove().then(() => ref.child("players").once("value")).then(s => {
@@ -2515,14 +2516,14 @@ function leaveRoom() {
 }
 function exitRoom(msg) {
   if (T.ref) {
-    T.leaving = true; unsub(T.subs); unsub(T.botSubs);
+    T.leaving = true; unsub(T.subs); unsub(T.botSubs); T.resume.clear();
     try { T.ref.child("players/" + T.myId).onDisconnect().cancel(); T.ref.child("st/" + T.myId).onDisconnect().cancel(); } catch (e) {}
   }
   T.ref = null; T.players = {}; T.raw = {}; T.kills = {}; T.dmg = {};
   resetMatchLocal(); clearTeamItems();
   fpsRandom.roomClosed(msg);
 }
-window.addEventListener("pagehide", () => { if (T.ref) { try { T.ref.child("players/" + T.myId).remove(); T.ref.child("st/" + T.myId).remove(); } catch (e) {} } });
+window.addEventListener("pagehide", () => { if (T.ref) { T.resume.save(T.code, T.myId, T.players[T.myId] || null); try { T.ref.child("players/" + T.myId).remove(); T.ref.child("st/" + T.myId).remove(); } catch (e) {} } });
 
 function playersChanged() {
   if (T.lobbyQueued) return;
@@ -3642,8 +3643,21 @@ function syncTouchPad() {
   releaseTouch();
 }
 
+class FpsResumeStarter {
+  static run() {
+    if (!T.resume.read()) return;
+    enterTeamMode();
+    teamStartMsg("이어서 들어가는 중…");
+    connectDb()
+      .then(() => T.resume.rejoin(T.db, TEAM.root))
+      .then(code => { if (code) { teamStartMsg(""); enterRoom(code); } else { T.resume.clear(); teamStartMsg(""); } })
+      .catch(() => { T.resume.clear(); teamStartMsg(""); });
+  }
+}
+
 renderRecords();
 showCard("start");
+FpsResumeStarter.run();
 requestAnimationFrame(loop);
 </script>
 </body>

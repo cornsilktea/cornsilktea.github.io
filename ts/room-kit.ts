@@ -146,6 +146,8 @@ class RkSession<P extends RkPlayerRecord> {
   readonly ref: FirebaseRef;
   private subscriptions: Array<{ ref: FirebaseRef; event: FirebaseEvent; listener: (snapshot: FirebaseSnapshot) => void }> = [];
   private leaving = false;
+  private readonly database: FirebaseDatabase;
+  private readonly dropRecovery: RoomDropRecovery;
 
   constructor(
     backend: RkBackend,
@@ -156,6 +158,16 @@ class RkSession<P extends RkPlayerRecord> {
     private readonly valueNames: readonly string[]
   ) {
     this.ref = (backend.database as FirebaseDatabase).ref(rules.root + "/" + code);
+    this.database = backend.database as FirebaseDatabase;
+    this.dropRecovery = new RoomDropRecovery({
+      myId: () => this.myId,
+      room: () => this.ref,
+      leaving: () => this.leaving,
+      exit: (message) => this.onClosed(message),
+      subscribe: (ref, event, listener) => this.subscribe(ref, event, listener),
+      returnRecord: (saved) => saved,
+      afterReturn: () => { this.armDisconnect(); this.onChange("players"); }
+    }, this.database, ["players", "st", "in"]);
   }
 
   value<T>(name: string): T | null {
@@ -178,6 +190,9 @@ class RkSession<P extends RkPlayerRecord> {
 
   connect(): void {
     this.armDisconnect();
+    this.subscribe(this.database.ref(".info/connected"), "value", (snapshot) => {
+      if (snapshot.val<boolean>() === true && !this.leaving) this.armDisconnect();
+    });
     const playersRef = this.ref.child("players");
     this.subscribe(playersRef, "child_added", (snapshot) => this.setPlayer(snapshot));
     this.subscribe(playersRef, "child_changed", (snapshot) => this.setPlayer(snapshot));
@@ -307,11 +322,11 @@ class RkSession<P extends RkPlayerRecord> {
   }
 
   private removePlayer(snapshot: FirebaseSnapshot): void {
-    this.players.delete(snapshot.key);
     if (snapshot.key === this.myId && !this.leaving) {
-      this.onClosed("연결이 끊겨 방에서 나왔어요.");
+      this.dropRecovery.recover(snapshot.val<Record<string, unknown>>() || (this.players.get(this.myId) as unknown as Record<string, unknown>) || null);
       return;
     }
+    this.players.delete(snapshot.key);
     this.onPlayerRemoved(snapshot.key);
     this.onChange("players");
   }
