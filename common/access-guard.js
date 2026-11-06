@@ -298,12 +298,12 @@
         "top:8px",
         "right:calc(50% + 109px)",
         "z-index:2147483000",
-        "height:24px",
+        "height:18px",
         "padding:0 8px",
         "background:rgba(0,0,0,0.72)",
         "color:#fff",
-        "border-radius:4px",
-        "font:600 12px/24px monospace",
+        "border-radius:4px 4px 0 0",
+        "font:600 11px/18px monospace",
         "pointer-events:none"
       ].join(";");
       document.body.appendChild(meter);
@@ -313,7 +313,7 @@
       var placeMeter = function () {
         var tag = document.querySelector("[data-fps-beside]"), rect = tag ? tag.getBoundingClientRect() : null;
         if (rect && rect.width > 0) {
-          meter.style.top = (rect.top + (rect.height - 24) / 2) + "px";
+          meter.style.top = (tag.parentElement.getBoundingClientRect().top + 2) + "px";
           meter.style.right = "auto";
           meter.style.left = (rect.right + 10) + "px";
         } else {

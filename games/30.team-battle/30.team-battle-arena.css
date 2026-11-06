@@ -258,26 +258,29 @@
   @keyframes kfIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
   #hudCount .b { color: #6FA8FF; }
   #hudCount .r { color: #FF7A70; }
-  #liveBoard { position: absolute; top: 8px; left: 8px; padding: 3px 8px 4px; border-radius: 8px; pointer-events: none; white-space: nowrap;
-               background: rgba(14,20,17,.72); color: #F4F1E8; border: 1px solid rgba(255,255,255,.16); border-top: 2px solid #D97B4F; }
+  #liveBoard { position: absolute; top: 8px; left: 8px; padding: 6px 10px 7px; border-radius: 8px; pointer-events: none; white-space: nowrap;
+               background: rgba(14,20,17,.8); color: #F4F1E8; }
   #liveBoard[hidden] { display: none; }
-  #liveBoard table { border-collapse: collapse; font-size: 12px; line-height: 1.2; }
-  #liveBoard th { padding: 1px 5px; font-size: 10px; font-weight: 700; color: #A3B0A6; border-bottom: 1px solid rgba(255,255,255,.18); }
-  #liveBoard td { padding: 2px 5px; font-weight: 800; text-align: center; font-variant-numeric: tabular-nums; border-bottom: 1px solid rgba(255,255,255,.07); }
+  #liveBoard table { border-collapse: separate; border-spacing: 0; font-size: 12px; line-height: 1.2; }
+  #liveBoard th { padding: 0 6px 5px; font-size: 10px; font-weight: 700; color: #A3B0A6; }
+  #liveBoard td { padding: 3px 6px; font-weight: 800; text-align: center; font-variant-numeric: tabular-nums; }
   #liveBoard th.nm, #liveBoard td.nm, #liveBoard td.job { text-align: left; }
   #liveBoard td.nm { max-width: 92px; overflow: hidden; text-overflow: ellipsis; }
   #liveBoard td.job { font-size: 11px; font-weight: 700; color: #A3B0A6; }
   #liveBoard tr.mine td { background: rgba(242,208,107,.16); }
-  #liveBoard tr.teamSplit td { border-top: 2px solid rgba(255,255,255,.7); }
+  #liveBoard tr.teamSplit td { padding-top: 9px; }
+  #liveBoard tr.mine td:first-child { border-radius: 4px 0 0 4px; }
+  #liveBoard tr.mine td:last-child { border-radius: 0 4px 4px 0; }
   #liveBoard .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; vertical-align: middle; }
   #liveBoard .dot.blue { background: #2F6FD6; }
   #liveBoard .dot.red { background: #D6453D; }
   @media (max-width: 900px) { #liveBoard th.job, #liveBoard td.job { display: none; } }
   @media (max-width: 700px) {
-    #liveBoard { padding: 2px 4px 3px; }
+    #liveBoard { padding: 4px 6px 5px; }
     #liveBoard table { font-size: 10px; }
-    #liveBoard th { font-size: 9px; padding: 1px 3px; }
+    #liveBoard th { font-size: 9px; padding: 0 3px 3px; }
     #liveBoard td { padding: 1px 3px; }
+    #liveBoard tr.teamSplit td { padding-top: 5px; }
     #liveBoard td.nm { max-width: 44px; }
     #liveBoard .dot { width: 6px; height: 6px; }
   }
