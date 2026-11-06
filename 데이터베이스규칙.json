@@ -1005,6 +1005,9 @@
             "sw": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 10000" },
             "sh": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 10000" },
             "err": { ".validate": "newData.isString() && newData.val().length <= 60" },
+            "gapN": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000" },
+            "gaps": { ".validate": "newData.isString() && newData.val().length <= 400" },
+            "m": { ".validate": "newData.isNumber() && newData.val() >= 0" },
             "$other": { ".validate": false }
           }
         }

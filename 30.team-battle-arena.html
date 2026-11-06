@@ -12296,12 +12296,14 @@ SinglePassMaterials.enable(THREE);
     constructor() { this.all = new SampleTally(); this.reset(); }
     reset() { this.all.reset(); this.lastAt = {}; this.wasMoving = {}; this.byKey = {}; }
     note(key, moving, at) {
+      var gap = 0;
       if (this.wasMoving[key] && this.lastAt[key]) {
-        var gap = at - this.lastAt[key];
+        gap = at - this.lastAt[key];
         this.all.add(gap);
         (this.byKey[key] = this.byKey[key] || new SampleTally()).add(gap);
       }
       this.lastAt[key] = at; this.wasMoving[key] = moving;
+      return gap;
     }
     keyCount() { return Object.keys(this.lastAt).length; }
     staleMovingCount(now, limitMs) { var tally = this; return Object.keys(this.lastAt).filter(function (k) { return tally.wasMoving[k] && now - tally.lastAt[k] > limitMs; }).length; }
@@ -12355,19 +12357,35 @@ SinglePassMaterials.enable(THREE);
       }).catch(function () {});
     }
   }
+  class SignalGapLog {
+    static MIN_GAP_MS = 2000;
+    static KEEP = 20;
+    static TEXT_LEN = 400;
+    constructor() { this.reset(); }
+    reset() { this.total = 0; this.items = []; }
+    add(key, gapMs, startOffsetMs) {
+      this.total++;
+      if (this.items.length < SignalGapLog.KEEP) this.items.push(Math.round(startOffsetMs / 100) + ":" + Math.round(gapMs) + ":" + key);
+    }
+    text() { return this.items.join(",").slice(0, SignalGapLog.TEXT_LEN); }
+  }
   class PerfProbe {
-    static BUILD = "lag23";
+    static BUILD = "lag24";
     static PATH = "perfDiag/teambattle/";
     static RTT_KEEP = 50;
     static RECORDS = !Environment.SILENT_RUN;
     static ERR_LEN = 60;
-    constructor(services) { this.services = services; this.frames = new FrameTally(); this.arrivals = new ArrivalTally(); this.rtts = new SampleTally(); this.snaps = 0; this.startAt = 0; this.sentFor = 0; this.endError = ""; }
+    constructor(services) {
+      this.services = services; this.frames = new FrameTally(); this.arrivals = new ArrivalTally(); this.gaps = new SignalGapLog(); this.rtts = new SampleTally(); this.snaps = 0; this.startAt = 0; this.sentFor = 0; this.endError = ""; this.awayAt = 0;
+      var probe = this;
+      document.addEventListener("visibilitychange", function () { probe.awayAt = performance.now(); });
+    }
     noteEndError(step, e) { if (!this.endError) this.endError = (step + ": " + String((e && e.message) || e)).slice(0, PerfProbe.ERR_LEN); }
     playing() { var room = this.services.session.room; return !!(room && room.status === "playing" && this.services.match.game); }
     followMatch() {
       var room = this.services.session.room;
       if (!room || !room.startAt || room.startAt === this.startAt) return;
-      this.startAt = room.startAt; this.frames.reset(); this.arrivals.reset(); this.snaps = 0;
+      this.startAt = room.startAt; this.frames.reset(); this.arrivals.reset(); this.gaps.reset(); this.snaps = 0;
       DeviceInfo.learnOnce(this.services.cameraRig.renderer);
     }
     frame(frameMs) { this.followMatch(); if (this.playing() && !document.hidden) this.frames.add(frameMs); }
@@ -12378,7 +12396,8 @@ SinglePassMaterials.enable(THREE);
     }
     noteState(key, value) {
       if (!this.playing() || this.isLocalKey(key)) return;
-      this.arrivals.note(key, typeof value === "string" && value.split(",", 4)[3] === "1", performance.now());
+      var at = performance.now(), gap = this.arrivals.note(key, typeof value === "string" && value.split(",", 4)[3] === "1", at);
+      if (gap >= SignalGapLog.MIN_GAP_MS && this.awayAt < at - gap) this.gaps.add(key, gap, this.services.clock.real() - this.startAt - gap);
     }
     noteSnap() { if (this.playing()) this.snaps++; }
     noteRtt(ms) { if (Environment.SILENT_RUN) return; this.rtts.add(ms); this.rtts.keepLast(PerfProbe.RTT_KEEP); }
@@ -12401,7 +12420,7 @@ SinglePassMaterials.enable(THREE);
         st50: probe.cap(this.arrivals.all.quantile(0.5), 60000), st95: probe.cap(this.arrivals.all.quantile(0.95), 60000),
         stMax: probe.cap(this.arrivals.all.max(), 600000), st95w: probe.cap(this.arrivals.worstQuantile(0.95), 60000),
         snap: probe.cap(this.snaps, 10000), rttN: probe.cap(this.rtts.count(), 1000), rtt50: probe.cap(this.rtts.quantile(0.5), 10000), rttMax: probe.cap(this.rtts.max(), 10000)
-      }, DeviceInfo.summary(), this.endError ? { err: this.endError } : {});
+      }, DeviceInfo.summary(), this.endError ? { err: this.endError } : {}, this.gaps.total ? { gapN: probe.cap(this.gaps.total, 1000), gaps: this.gaps.text(), m: this.startAt } : {});
     }
     matchEnded() {
       this.followMatch();

@@ -595,6 +595,8 @@
           </div>
           <p class="msg" id="lagMsg"></p>
           <div id="lagTable" class="stats-box"></div>
+          <p class="msg" id="lagGapMsg"></p>
+          <div id="lagGaps" class="stats-box"></div>
         </div>
 
         <!-- 40번 동마의 숲 섬 코드(2026-10-30): 학생은 시작 화면에 코드를 넣어 섬에 들어가고(forestCodes/<코드> = {cls, island}),
@@ -1711,6 +1713,8 @@ class LagDiagPanel {
     if (!/^20[0-9]{6}$/.test(day)) { say("lagMsg", "날짜를 골라 주세요."); return; }
     this.loadedDay = day;
     $("lagTable").textContent = "";
+    $("lagGaps").textContent = "";
+    $("lagGapMsg").textContent = "";
     say("lagMsg", "불러오는 중…");
     try {
       const r = await fetch(await authedUrl("perfDiag/teambattle/" + day), { cache: "no-store" });
@@ -1745,6 +1749,64 @@ class LagDiagPanel {
     this.groups().forEach((g) => {
       const tr = el("tr");
       LagDiagPanel.COLUMNS.forEach(([, cell]) => tr.appendChild(el("td", null, cell(g))));
+      table.appendChild(tr);
+    });
+    box.appendChild(table);
+    new LagGapReport(this.rows).render($("lagGaps"), $("lagGapMsg"));
+  }
+}
+
+/* 2초 넘는 신호 공백 보고서(빌드 lag24~): 기기가 남긴 gaps("경기 시작 뒤 0.1초:공백 ms:캐릭터 키") 를 절대 시각으로 바꿔
+   시간이 겹치는 것끼리 묶는다. 겹친 판 수가 여러 개면 교실 와이파이·회선, 한 판 안 여러 기기면 방장 쪽·Firebase,
+   한 기기만이면 그 태블릿의 연결을 의심한다. */
+class LagGapReport {
+  static SHOWN = 30;
+  constructor(rows) { this.rows = rows; }
+
+  events() {
+    const list = [];
+    this.rows.forEach((row, rowIndex) => {
+      if (!row.gaps || !(+row.m > 0)) return;
+      String(row.gaps).split(",").forEach((item) => {
+        const [tenths, gap, key] = item.split(":");
+        const start = +row.m + (+tenths) * 100;
+        if (!(+gap > 0)) return;
+        list.push({ start, end: start + (+gap), gap: +gap, key: key || "?", rowIndex, match: (row.cls || "") + "/" + row.m, dev: row.dev || "?", host: +row.host === 1 });
+      });
+    });
+    return list.sort((a, b) => a.start - b.start);
+  }
+
+  clusters() {
+    const out = [];
+    this.events().forEach((e) => {
+      const last = out[out.length - 1];
+      if (last && e.start <= last.end) {
+        last.end = Math.max(last.end, e.end); last.events.push(e);
+      } else out.push({ start: e.start, end: e.end, events: [e] });
+    });
+    return out.map((c) => ({
+      start: c.start, gap: c.events.reduce((m, e) => Math.max(m, e.gap), 0),
+      devices: new Set(c.events.map((e) => e.rowIndex)).size, matches: new Set(c.events.map((e) => e.match)).size,
+      keys: new Set(c.events.map((e) => e.match + e.key)).size,
+      hostSeen: c.events.some((e) => e.host)
+    }));
+  }
+
+  render(box, msg) {
+    box.textContent = "";
+    const withGaps = this.rows.filter((r) => +r.gapN > 0).length;
+    const clusters = this.clusters();
+    msg.textContent = "2초 넘는 신호 공백: 기록 " + this.rows.length + "개 중 " + withGaps + "개에 있음 · 겹친 묶음 " + clusters.length + "개" +
+      (clusters.length ? " (길이 순 위 " + Math.min(LagGapReport.SHOWN, clusters.length) + "개 표시)" : "");
+    if (!clusters.length) return;
+    const table = el("table"), head = el("tr");
+    ["시각", "최대 길이", "겹친 기기", "겹친 판", "끊긴 캐릭터 수", "방장 기기 포함"].forEach((t) => head.appendChild(el("th", null, t)));
+    table.appendChild(head);
+    clusters.sort((a, b) => b.gap - a.gap).slice(0, LagGapReport.SHOWN).forEach((c) => {
+      const tr = el("tr"), when = new Date(c.start);
+      [when.toLocaleTimeString("ko-KR"), (c.gap / 1000).toFixed(1) + "초", String(c.devices), String(c.matches), String(c.keys), c.hostSeen ? "예" : "아니오"]
+        .forEach((t) => tr.appendChild(el("td", null, t)));
       table.appendChild(tr);
     });
     box.appendChild(table);
