@@ -1,7 +1,7 @@
 # KayKit 에셋 도감 (새 게임 만들 때 어느 에셋을 쓸지 찾는 곳)
 
 에셋 보관 폴더: `C:\Users\user\Downloads\3d-assets\organized` (KayKit 21개 + Quaternius 6개 + Kenney 3개 팩의 glTF 를 용도별로 정리한 것. FBX·OBJ 원본 팩 폴더는 2026-10-03 에 지웠다 — 필요하면 각 사이트에서 다시 받는다). 저장소에는 게임에 쓰는 것만 `assets/kaykit/` 에 둔다(KayKit 172개 + 우주전쟁용 `assets/kaykit/war/`).
-조사한 날: 2026-10-03(KayKit), 2026-10-09(Quaternius·Kenney 추가), 2026-10-10(KayKit Adventurers EXTRA·Skeletons EXTRA·Character Animations 1.1 의 Rig_Large 추가). 보관 폴더 이름은 `allkaykit` 에서 `3d-assets` 로 바꿨다(2026-10-09). 옛 이름 `Downloads\allkaykit` 은 새 폴더를 가리키는 바로가기(junction)로 남겨 두었다 — 옛 경로를 쓰던 것이 없으면 지워도 된다. 도구 이름(`kaykit-*`)과 `assets/kaykit/` 는 그대로다.
+조사한 날: 2026-11-06(KayKit Mixed Bag 2 추가 — `tools/kaykit-organize-extra.js` 계획표에 `MIXED_BAG_2` 줄 추가), 2026-10-03(KayKit), 2026-10-09(Quaternius·Kenney 추가), 2026-10-10(KayKit Adventurers EXTRA·Skeletons EXTRA·Character Animations 1.1 의 Rig_Large 추가). 보관 폴더 이름은 `allkaykit` 에서 `3d-assets` 로 바꿨다(2026-10-09). 옛 이름 `Downloads\allkaykit` 은 새 폴더를 가리키는 바로가기(junction)로 남겨 두었다 — 옛 경로를 쓰던 것이 없으면 지워도 된다. 도구 이름(`kaykit-*`)과 `assets/kaykit/` 는 그대로다.
 `organized` 에 팩을 더 넣으면 아래 명령으로 도감을 다시 만든다. 새 팩을 받았을 때는 `node tools/kaykit-organize-extra.js "C:\Users\user\Downloads" "C:\Users\user\Downloads\3d-assets\organized"` 의 계획표(`ExtraPackPlan`)에 줄을 더해 복사한 뒤 도감을 만든다(끊어진 텍스처 연결을 자동 검사).
 
 ```bash
@@ -48,6 +48,7 @@ node tools/kaykit-catalog.js "C:\Users\user\Downloads\3d-assets\organized" asset
 | **KayKit_ResourceBits_1.0_FREE** | 76 | 자원: 구리·금·은·철 괴/덩어리, 통나무·판자·돌벽돌, 천, 연료통, 톱니바퀴 부품 | 자원 채집·건설 경영 게임 |
 | **KayKit_RPGToolsBits_1.0_FREE** | 49 | 도구: 망치·톱·삽·곡괭이·렌치·드라이버·연필·지도·두루마리·나침반·돋보기·횃불 | 제작/채집 게임, 도구 아이콘, 보물찾기 지도 |
 | **KayKit_FantasyWeaponsBits_1.0_FREE** | 31 | 검 5·도끼 3·활 2·창·할버드·망치 3·방패 3·단검·지팡이·화살 | 무기 아이템. 캐릭터 손에 붙이거나 바닥 습득물로 |
+| **KayKit_Mixed_Bag_2_FREE** (2026-11-06) | 30 | 잡동사니 2집: 고양이 헤드폰 4종·게이머 의자 2·휴대용 게임기·기타 케이스·액자 5·깨진/온전한 장식 거울·**함정(곰덫 2·거미줄 4)**·**미믹 책(book_mimic)**·위자 보드·유령 토트백·귀신의 집(haunted_manor)·가을 화환·자전거 헬멧·피클·피클 병·썰매 | 할로윈·공포 장식, 방 꾸미기(게이머방), 함정·미믹 같은 던전 요소, 수집품. `models/mixed-bag-2` (Mixed Bag 1 과 섞이지 않게 따로 둠) |
 | **KayKit_Space_Base_Bits_1.0_FREE** | 57 | 우주 기지 모듈·착륙선·화물·우주 트럭·터널·태양광 패널·풍력 터빈·지형 | 우주 기지 건설·탐사 게임 |
 | **KayKit_Mixed_Bag_1_FREE** | 41 | 잡동사니: 기타·롤러스케이트·우산·타코·즉석카메라·퍼즐 큐브·서커스 천막·닭 인형·쇠사슬 | 이벤트·수집품·장식 |
 
@@ -142,6 +143,7 @@ EXTRA 팩 두 개 안의 `Animations/` 는 Rig_Medium·Rig_Large 의 General·Mo
 | 보드게임 / 주사위 / 도미노 | (필요 없음) | BoardGameBits |
 | 서바이벌 / 채집 / 낚시 | 모험가 + Tools(낚시·벌목·채굴) | Forest Nature, ResourceBits, RPGToolsBits |
 | 공포 / 할로윈 | 스켈레톤 + Special | HalloweenBits, Dungeon |
+| 함정·미믹 던전 / 귀신의 집 | 모험가 + 스켈레톤 | Mixed Bag 2(곰덫·거미줄·미믹 책·위자 보드·유령 토트백·haunted_manor), Halloween Bits, Dungeon |
 | 겨울 / 선물 / 기차 | 모험가 + Simulation(환호) | Holiday Bits |
 | 도시 / 자동차 | (자동차는 City Builder 5대) | City Builder Bits |
 | 우주 기지 | 모험가 | Space Base Bits |

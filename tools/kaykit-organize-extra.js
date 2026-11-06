@@ -21,6 +21,7 @@ class ExtraPackPlan {
   static ADVENTURERS_EXTRA = "KayKit_Adventurers_2.0_EXTRA/KayKit_Adventurers_2.0_EXTRA";
   static SKELETONS_EXTRA = "KayKit_Skeletons_1.1_EXTRA/KayKit_Skeletons_1.1_EXTRA";
   static ANIMATIONS = "KayKit_Character_Animations_1.1/KayKit_Character_Animations_1.1";
+  static MIXED_BAG_2 = "KayKit_Mixed_Bag_2_FREE/KayKit_Mixed_Bag_2_FREE";
   static SHIPS = ["Bob", "Challenger", "Dispatcher", "Executioner", "Imperial", "Insurgent", "Omen", "Pancake", "Spitfire", "Striker", "Zenith"];
 
   static jobs() {
@@ -49,6 +50,10 @@ class ExtraPackPlan {
       new ExtraPackJob(`${ExtraPackPlan.ANIMATIONS}/Animations/gltf/Rig_Large`, "animations/rig-large", /\.glb$/i),
       new ExtraPackJob(`${ExtraPackPlan.ANIMATIONS}/Mannequin Character/characters`, "characters/mannequin", /\.glb$/i),
     );
+    jobs.push(
+      new ExtraPackJob(`${ExtraPackPlan.MIXED_BAG_2}/Assets/gltf`, "models/mixed-bag-2", ExtraPackPlan.GLTF_ONLY, true),
+      new ExtraPackJob(`${ExtraPackPlan.MIXED_BAG_2}/Textures`, "models/mixed-bag-2", /\.png$/i, true),
+    );
     for (const ship of ExtraPackPlan.SHIPS) {
       jobs.push(new ExtraPackJob(`${ExtraPackPlan.SPACESHIPS}/${ship}/glTF`, "models/quaternius-ultimate-spaceships", /\.gltf$/i));
       jobs.push(new ExtraPackJob(`${ExtraPackPlan.SPACESHIPS}/${ship}/Textures`, `models/quaternius-ultimate-spaceships/textures/${ship}`, /\.png$/i));
@@ -67,6 +72,7 @@ class ExtraPackPlan {
       [`${ExtraPackPlan.ADVENTURERS_EXTRA}/License.txt`, "KayKit-Adventurers-EXTRA.txt"],
       [`${ExtraPackPlan.SKELETONS_EXTRA}/License.txt`, "KayKit-Skeletons-EXTRA.txt"],
       [`${ExtraPackPlan.ANIMATIONS}/License.txt`, "KayKit-CharacterAnimations.txt"],
+      [`${ExtraPackPlan.MIXED_BAG_2}/License.txt`, "KayKit-MixedBag2.txt"],
       ["kenney_space-kit/License.txt", "Kenney-SpaceKit.txt"],
       ["kenney_space-station-kit/License.txt", "Kenney-SpaceStationKit.txt"],
       ["kenney_modular-space-kit_1.0/License.txt", "Kenney-ModularSpaceKit.txt"],
