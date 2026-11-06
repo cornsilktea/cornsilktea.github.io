@@ -17,6 +17,12 @@
 - 같은 모양 조각이 여러 개면 `InstancedMesh` 하나로 그린다(풀숲·덩굴·번개·눈송이). 인스턴스 위치가 변하면 `frustumCulled = false`.
 - 같은 모양은 지오메트리·잡음 텍스처를 공유한다. 프레임마다 `new Vector3`·`new Float32Array` 를 만들지 않고 클래스의 임시 변수를 쓴다.
 
+**three.js 함정(2026-11-06 30번에서 확인)**
+- `transparent: true` + `DoubleSide` 재질은 2번 그려지고 그릴 때마다 셰이더 설정을 다시 계산해 메모리를 크게 쓴다. `forceSinglePass = true` 로 한 번에 그린다(30번 `SinglePassMaterials`).
+- `SkeletonUtils.clone` 한 캐릭터는 몸 조각마다 뼈대와 뼈 텍스처를 따로 가진다. 뼈 목록이 같으면 하나로 합친다(30번 `SharedSkeleton`).
+- 재사용 그림을 예열 때 화면 밖으로 옮겼다면 꺼낼 때 위치를 다시 정한다.
+- 진단 표시도 매 프레임 DOM 을 쓰면 측정값을 흔든다. 0.5초에 한 번, 바뀔 때만 쓴다.
+
 **첫 사용 끊김**
 - `renderer.compile` 은 셰이더만 만든다. 텍스처·뼈 텍스처·버퍼 올리기와 GPU 상태 조합은 **실제로 그릴 때** 일어난다.
 - 카운트다운 첫 프레임에 숨은 부품 전부와 효과 표본을 켜고(표본은 화면 밖, `frustumCulled = false`) `renderer.render` 로 한 번 그린 뒤, 숨기고 다시 그린다. 화면에는 안 보인다. 30번 `ShaderWarmup.warmHiddenForms` 를 본보기로 한다. 화면 밖 표본은 화소 계산이 안 돌 수 있으니, 표본을 아주 작게 줄여 화면 가운데 몇 화소에도 실제로 칠한다(`ShaderWarmup.paintRealPixels`, 효과는 태블릿에서 재서 확인).

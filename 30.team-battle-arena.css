@@ -291,7 +291,7 @@
   .pcBox .roleCards { flex-wrap: wrap; overflow: visible; }
   .pcBox .dfCard { cursor: pointer; }
 
-  .actBtn { position: absolute; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-direction: column; font-weight: 800; color: #fff; touch-action: none; -webkit-user-select: none; user-select: none; }
+  .actBtn { contain: layout style; position: absolute; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-direction: column; font-weight: 800; color: #fff; touch-action: none; -webkit-user-select: none; user-select: none; }
   #btnAtk { right: 26px; bottom: 44px; width: 112px; height: 112px; background: #2F4A39; border: 4px solid rgba(255,255,255,.88); font-size: 19px; line-height: 1.1; text-shadow: 0 1px 0 rgba(0,0,0,.6); }
   #btnAtk .ic { display: block; font-style: normal; font-size: 30px; }
   #btnAtk .cd { position: absolute; inset: 0; border-radius: 50%; transform: scale(0); will-change: transform; background: rgba(0,0,0,.45); pointer-events: none; }

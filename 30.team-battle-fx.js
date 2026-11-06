@@ -1060,6 +1060,37 @@ StealthBurstPool.R = 110;
 StealthBurstPool.PUFFS = 16;
 StealthBurstPool.MAX_WAITING = 6;
 StealthBurstPool.TONES = { uDeep: 0x120A1E, uFire: 0x6A3FA0 };
+class SinglePassMaterials {
+    static enable(three) {
+        Object.defineProperty(three.Material.prototype, "forceSinglePass", { configurable: true, get: () => true, set: () => { } });
+    }
+}
+class SharedSkeleton {
+    static sameBind(a, b) {
+        if (a.bones.length !== b.bones.length)
+            return false;
+        return a.bones.every((bone, i) => {
+            if (bone !== b.bones[i])
+                return false;
+            const left = a.boneInverses[i].elements, right = b.boneInverses[i].elements;
+            return left.every((value, k) => Math.abs(value - right[k]) < SharedSkeleton.SAME_INVERSE_EPS);
+        });
+    }
+    static unify(root) {
+        const kept = [];
+        root.traverse((node) => {
+            const mesh = node;
+            if (!mesh.isSkinnedMesh)
+                return;
+            const twin = kept.find((skeleton) => SharedSkeleton.sameBind(skeleton, mesh.skeleton));
+            if (twin)
+                mesh.skeleton = twin;
+            else
+                kept.push(mesh.skeleton);
+        });
+    }
+}
+SharedSkeleton.SAME_INVERSE_EPS = 1e-5;
 class ArenaFxViews {
     constructor(host) {
         const kit = new ArenaFxKit(host);

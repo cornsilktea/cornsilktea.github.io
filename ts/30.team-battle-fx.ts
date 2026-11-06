@@ -1240,6 +1240,35 @@ class StealthBurstPool extends ArenaFxPool<StealthBurstVis> {
   }
 }
 
+class SinglePassMaterials {
+  static enable(three: ThreeModule): void {
+    Object.defineProperty(three.Material.prototype, "forceSinglePass", { configurable: true, get: () => true, set: () => {} });
+  }
+}
+
+class SharedSkeleton {
+  static readonly SAME_INVERSE_EPS = 1e-5;
+
+  private static sameBind(a: Three<"Skeleton">, b: Three<"Skeleton">): boolean {
+    if (a.bones.length !== b.bones.length) return false;
+    return a.bones.every((bone, i) => {
+      if (bone !== b.bones[i]) return false;
+      const left = a.boneInverses[i].elements, right = b.boneInverses[i].elements;
+      return left.every((value, k) => Math.abs(value - right[k]) < SharedSkeleton.SAME_INVERSE_EPS);
+    });
+  }
+
+  static unify(root: Three<"Object3D">): void {
+    const kept: Three<"Skeleton">[] = [];
+    root.traverse((node) => {
+      const mesh = node as Three<"SkinnedMesh">;
+      if (!mesh.isSkinnedMesh) return;
+      const twin = kept.find((skeleton) => SharedSkeleton.sameBind(skeleton, mesh.skeleton));
+      if (twin) mesh.skeleton = twin; else kept.push(mesh.skeleton);
+    });
+  }
+}
+
 class ArenaFxViews {
   readonly arcBlades: ArcBladePool;
   readonly thrustBlades: ThrustBladePool;
