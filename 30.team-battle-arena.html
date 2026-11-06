@@ -293,7 +293,7 @@
 <script charset="utf-8" src="account-match-kit.js?v=20261103e"></script>
 <script charset="utf-8" src="account-stats.js?v=20261104c"></script>
 <script charset="utf-8" src="30.team-battle-versus.js?v=20261104a"></script>
-<script charset="utf-8" src="30.team-battle-fx.js?v=20261106e"></script>
+<script charset="utf-8" src="30.team-battle-fx.js?v=20261106f"></script>
 <script charset="utf-8" src="patch-notes.js?v=20261029b"></script>
 <script type="module">
 import * as THREE from "three";
@@ -2385,6 +2385,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     get keepsLowHp() { return false; }
     get meleeColor() { return Object.prototype.hasOwnProperty.call(this.constructor, "MELEE") ? this.constructor.MELEE.color : undefined; }
     get meleeTrail() { return 30; }
+    get meleeOutline() { return this.meleeColor || 0xFFFFFF; }
     get meleeSpark() { return Object.prototype.hasOwnProperty.call(this.constructor, "MELEE") ? this.constructor.MELEE.spark : undefined; }
     cast(E, ang, reach, t) {}
     overrideBasic(E, ang, reach, t) { return false; }
@@ -2920,7 +2921,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     };
     static STATS = { name: "대장장이", role: "fighter", icon: "🔨", hp: 445, speed: GameTime.gameSpeed(150), cd: GameTime.gameMs(1.8), dmg: 30, range: 180, width: 150, windup: GameTime.gameMs(0.5), fx: { stunMs: GameTime.gameMs(0.5) }, ultName: "내려찍기", ultAim: true };
     get hidesBasicEdge() { return true; }
-    onStrikeShown(d) { var services = this.services; if (d.len && !d.zone) services.hammerStrikes.add(d); }
+    onStrikeShown(d) { if (d.len && !d.zone) this.services.impactBlasts.hammerBasic(d); }
     isHammerLeaping(E, t) { return E.ultUntil > t; }
     isRooted(E, t) { return this.isHammerLeaping(E, t); }
     showAimGuide(E, ult, c) { var services = this.services;
@@ -2998,6 +2999,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class ShamanType extends CharacterType {
+    get meleeOutline() { return 0xC0101E; }
     static MELEE = { color: 0x241C2E, spark: "#8A1420" };
     static MODEL = { file: "Knight", right: "fistweapon_A", left: "fistweapon_A", rightScale: 1.35, leftScale: 1.35, hide: ["Knight_Helmet", "Knight_HelmetVisor", "Knight_Cape"],
                recolor: [[0, 1, 1, "#2E2C34", "#101014"], [0, 3, 1, "#3C3548", "#16121C"], [0, 4, 1, "#2A2532", "#0C0A10"], [0, 7, 1, "#3C3548", "#16121C"], [1, 2, 2, "#3C3548", "#141019"],
@@ -9017,22 +9019,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       this.mats.forEach(function (m) { m.dispose(); });
     }
   }
-  class HammerStrikeBurst extends ChainSlamBurst {
-    static LIFE_SEC = 0.6;
-    static CRACK_WIDTH = 105;
-    static FLASH_OPACITY = 0.3;
-    static DUST_COUNT = 5;
-    static BITS_COUNT = 6;
-    static EMBER_COUNT = 8;
-    static IMPACT_FROM = 0.4;
-    static IMPACT_LEN = 0.55;
-    static IMPACT_WIDTH = 0.5;
-    static impactLine(d) {
-      var from = d.len * HammerStrikeBurst.IMPACT_FROM;
-      return { x: d.x + Math.cos(d.angle) * from, y: d.y + Math.sin(d.angle) * from, angle: d.angle, len: d.len * HammerStrikeBurst.IMPACT_LEN, width: d.width * HammerStrikeBurst.IMPACT_WIDTH, createdAt: d.createdAt };
-    }
-    constructor(services, d) { super(services, HammerStrikeBurst.impactLine(d)); }
-  }
   class BannerStrikeGlow {
     static FADE_SEC = 0.28;
     static OPACITY = 0.85;
@@ -9141,9 +9127,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class HammerStrikeView {
+    static LIFE_SEC = 0.6;
     constructor(services) { this.services = services; }
-    add(d, burstType) { this.services.field.hammerStrikes.push({ d: d, burstType: burstType || HammerStrikeBurst, burst: null }); }
-    lifeMs() { return HammerStrikeBurst.LIFE_SEC * 1000 * this.services.clock.scale; }
+    add(d, burstType) { this.services.field.hammerStrikes.push({ d: d, burstType: burstType, burst: null }); }
+    lifeMs() { return HammerStrikeView.LIFE_SEC * 1000 * this.services.clock.scale; }
     drop(item) { if (item.burst) { item.burst.dispose(); item.burst = null; } }
     step(t) { var view = this, services = this.services, life = this.lifeMs();
       services.field.hammerStrikes = services.field.hammerStrikes.filter(function (item) {
@@ -9454,7 +9441,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     makeMeleeVis(d) { var services = this.services;
       if (d.stab) return services.effectView.makeStabVis(d);
       var who = services.session.players[d.owner] ? services.session.players[d.owner].characterType : "";
-      if (!d.zap && !services.charTypes.of(who).hidesBasicEdge && !(d.len && services.charTypes.waveOf(who))) return this.makeBladeVis(d, services.charTypes.of(who));
+      var meleeType = services.charTypes.of(who), rolling = d.len && services.charTypes.waveOf(who);
+      if (!d.zap && meleeType.hidesBasicEdge && !d.u) return this.makeOutlineVis(d, meleeType).root;
+      if (!d.zap && !meleeType.hidesBasicEdge && !rolling) return this.makeBladeVis(d, meleeType);
       var g = new THREE.Group(), col = d.zap ? Palette.ZAP_GLOW : d.u ? 0xFF6A3D : (services.charTypes.of(who).meleeColor || 0xFFFFFF);
       var fillM = services.fxMats.acquire("basic", { color: col, transparent: true, opacity: 0.2, depthWrite: false });
       var darkWave = services.charTypes.of(who).hasDarkWave && !d.u;
@@ -9480,17 +9469,18 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       }
       fill.position.y = 2; edge.position.y = 24;
       g.add(fill); g.add(edge); g.position.set(d.x, 0, d.y); g.rotation.y = -d.angle;
-      g.userData = { fill: fillM, edge: edgeM, edgeMesh: edge, fillMesh: fill, line: d.len ? d.len + ArenaSize.BODY_R : 0, puffs: puffs };
+      g.userData = { fill: fillM, edge: edgeM, edgeMesh: edge, fillMesh: fill, line: d.len ? d.len + ArenaSize.BODY_R : 0, puffs: puffs, outline: rolling && !d.zap && !d.u ? this.makeOutlineVis(d, meleeType) : null };
       services.stage.scene.add(g);
       return g;
     }
+    makeOutlineVis(d, type) { return this.services.arenaFx.thrustBlades.outline(d.x, d.y, d.angle, d.len + ArenaSize.BODY_R, d.width, type.meleeOutline, 0); }
     makeBladeVis(d, type) { var fx = this.services.arenaFx, look = { blade: d.u ? 0xFF6A3D : (type.meleeColor || 0xFFFFFF), trail: d.u ? 40 : type.meleeTrail }, seed = (d.createdAt || 0) % 997 / 97;
       if (d.len) return fx.thrustBlades.thrust(d.x, d.y, d.angle, d.len + ArenaSize.BODY_R, d.width, look, seed).root;
       return fx.arcBlades.swing(d.x, d.y, d.angle, d.radius + ArenaSize.BODY_R, d.arc || Math.PI * 2, look, seed).root;
     }
     makeLungeVis(d) { return this.services.arenaFx.lungeBands.spawn(d.x, d.y, d.angle, d.len + ArenaSize.BODY_R, d.width); }
     dropLungeVis(l) { if (!l.vis) return; this.services.arenaFx.lungeBands.give(l.vis); l.vis = null; }
-    releaseMeleeVis(g) { var services = this.services; if (g.userData.fxVis) { g.userData.fxPool.give(g.userData.fxVis); return; } services.stage.scene.remove(g); services.fxMats.release(g.userData.fill); services.fxMats.release(g.userData.edge); }
+    releaseMeleeVis(g) { var services = this.services; if (g.userData.fxVis) { g.userData.fxPool.give(g.userData.fxVis); return; } if (g.userData.outline) services.arenaFx.thrustBlades.give(g.userData.outline); services.stage.scene.remove(g); services.fxMats.release(g.userData.fill); services.fxMats.release(g.userData.edge); }
     dropMelee(k) { var services = this.services; var g = services.effectView.melees[k]; if (!g) return; services.effectView.releaseMeleeVis(g); delete services.effectView.melees[k]; }
     stormGrain() {
       if (this.stormGrainTex) return this.stormGrainTex;
@@ -10345,7 +10335,21 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       vis.bolt.visible = sec < T.BOLT_SEC;
     }
   }
-  class MaceBlast extends ImpactBlast {
+  class GougeBlast extends ImpactBlast {
+    static GOUGE_WIDTH = 58;
+    constructor(x, y, r, team, at, fromX, fromY) { super(x, y, r, team, at); this.fromX = fromX; this.fromY = fromY; }
+    dress(vis, lite) { super.dress(vis, lite);
+      var dx = this.fromX - this.x, dy = this.fromY - this.y, len = MathKit.hyp(dx, dy);
+      vis.gouge.visible = len > 1;
+      vis.gouge.position.set(dx, 2.8, dy); vis.gouge.rotation.y = Math.atan2(dy, -dx); vis.gouge.scale.set(len, 1, this.constructor.GOUGE_WIDTH);
+      vis.uniforms.uGougeLen.value = len;
+    }
+    paint(vis, sec, nowMs) { super.paint(vis, sec, nowMs); var u = vis.uniforms, life = this.constructor.LIFE_SEC;
+      u.uGougeReach.value = Math.min(1, sec / 0.05);
+      u.uGougeFade.value = MathKit.clamp((life - sec) / (life * 0.6), 0, 1);
+    }
+  }
+  class MaceBlast extends GougeBlast {
     static LIFE_SEC = 0.55;
     static FRONT_SEC = 0.1;
     static SPREAD = 0.04;
@@ -10357,24 +10361,30 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     static CHIP_SPEED = 130;
     static EDGE = 0;
     static R = 72;
-    static GOUGE_WIDTH = 58;
     static TONES = { hot: 0xFFE3B4, mid: 0xFF8C38, scorch: 0x241A13, fireHot: 0xFFE7BC, fire: 0xC9A77E, smoke: 0x6B5C4D, chip: 0x483C33, ember: 0xFFC060 };
     static spotOf(services, d) {
       var V = services.fighterView.fighters[d.tgt] || services.fighterView.minions[d.tgt], T = services.targets.ent(d.tgt);
       if (V) return { x: V.root.position.x, y: V.root.position.z };
       return T ? { x: T.x, y: T.y } : { x: d.x + Math.cos(d.angle) * d.radius / 2, y: d.y + Math.sin(d.angle) * d.radius / 2 };
     }
-    constructor(services, d) { var spot = MaceBlast.spotOf(services, d); super(spot.x, spot.y, MaceBlast.R, d.team, d.createdAt); this.fromX = d.x; this.fromY = d.y; }
-    dress(vis, lite) { super.dress(vis, lite);
-      var dx = this.fromX - this.x, dy = this.fromY - this.y, len = MathKit.hyp(dx, dy);
-      vis.gouge.visible = len > 1;
-      vis.gouge.position.set(dx, 2.8, dy); vis.gouge.rotation.y = Math.atan2(dy, -dx); vis.gouge.scale.set(len, 1, MaceBlast.GOUGE_WIDTH);
-      vis.uniforms.uGougeLen.value = len;
-    }
-    paint(vis, sec, nowMs) { super.paint(vis, sec, nowMs); var u = vis.uniforms, C = MaceBlast;
-      u.uGougeReach.value = Math.min(1, sec / 0.05);
-      u.uGougeFade.value = MathKit.clamp((C.LIFE_SEC - sec) / (C.LIFE_SEC * 0.6), 0, 1);
-    }
+    constructor(services, d) { var spot = MaceBlast.spotOf(services, d); super(spot.x, spot.y, MaceBlast.R, d.team, d.createdAt, d.x, d.y); }
+  }
+  class HammerBasicBlast extends GougeBlast {
+    static LIFE_SEC = 0.6;
+    static FRONT_SEC = 0.1;
+    static SPREAD = 0.04;
+    static PUFF_LIFE = 0.42;
+    static PUFF_SIZE = 50;
+    static LIFT = 38;
+    static PUFFS = 8;
+    static CHIPS = 14;
+    static CHIP_SPEED = 150;
+    static EDGE = 0;
+    static GOUGE_WIDTH = 74;
+    static IMPACT_AT = 0.68;
+    static IMPACT_R = 0.5;
+    static TONES = { hot: 0xFFE3B4, mid: 0xFF8C38, scorch: 0x2A2118, fireHot: 0xFFE7BC, fire: 0xC9BCA6, smoke: 0x7A6E5C, chip: 0x6E665A, ember: 0xFFB65A };
+    constructor(d) { var C = HammerBasicBlast, along = d.len * C.IMPACT_AT; super(d.x + Math.cos(d.angle) * along, d.y + Math.sin(d.angle) * along, d.width * C.IMPACT_R, d.team, d.createdAt, d.x, d.y); }
   }
   class GuardianWallBlast extends ImpactBlast {
     static LIFE_SEC = 0.85;
@@ -10490,6 +10500,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     meteor(e) { return this.add(new MeteorBlast(e.x, e.y, e.r, e.team, e.createdAt + e.delay)); }
     thunder(d) { return this.add(new ThunderBlast(d.x, d.y, d.radius + ArenaSize.BODY_R, d.team, d.createdAt)); }
     mace(d) { return this.add(new MaceBlast(this.services, d)); }
+    hammerBasic(d) { return this.add(new HammerBasicBlast(d)); }
     guardBreak(d) { return this.add(new GuardBreakBlast(d.x, d.y, d.radius + ArenaSize.BODY_R, d.team, d.createdAt)); }
     star(e) { return this.add(new (e.stun ? StunStarBlast : StarBlast)(e.x, e.y, e.r, e.team, this.services.clock.now())); }
     guardianWall(d) { return this.add(new GuardianWallBlast(d.x, d.y, d.radius + ArenaSize.BODY_R, d.team, d.createdAt, d.angle)); }
@@ -11444,6 +11455,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         var f = age / life;
         if (g.userData.stab) { services.effectView.placeStabLine(g, m.d, f); return; }
         if (g.userData.fxVis) { g.userData.fxPool.paint(g.userData.fxVis, f); return; }
+        if (g.userData.outline) services.arenaFx.thrustBlades.paint(g.userData.outline, f);
         g.userData.fill.opacity = 0.2 * (1 - f);
         g.userData.edge.opacity = 0.9 * (1 - (wave ? f * f : f));
         if (wave) {
@@ -12242,7 +12254,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class PerfProbe {
-    static BUILD = "lag19";
+    static BUILD = "lag20";
     static PATH = "perfDiag/teambattle/";
     static RTT_KEEP = 50;
     static RECORDS = !Environment.SILENT_RUN;
@@ -12678,7 +12690,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.sniperShots.prefill(sniperCount * 3 + (rangers.blue + rangers.red) * 4);
       services.meteorFall.prefill(mageCount);
       services.galeView.prefill(giantCount);
-      services.impactBlasts.prefill(mageCount + smiths.blue + smiths.red + giantCount * 2 + hitmanCount + sniperCount + guardianCount + starCount + knights.blue + knights.red);
+      services.impactBlasts.prefill(mageCount + (smiths.blue + smiths.red) * 2 + giantCount * 2 + hitmanCount + sniperCount + guardianCount + starCount + knights.blue + knights.red);
       if (clerics.blue + clerics.red) services.revGraceView.prefillBeams(RevGraceView.MAX_BEAMS);
       ["blue", "red"].forEach(function (team) {
         services.fighterView.prefillMinions(team, necros[team] * NecroType.ULT.smMax);
@@ -12886,7 +12898,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       HUD: services.hud, SOUND: services.sound, BACKEND: services.backend, TIMESCALE: services.timescale, THREE: THREE, CAMERA_RIG: services.cameraRig, ARENA_VIEW: services.arenaView, PROPS: services.props, PROP_THEMES: services.propThemes, camera: services.stage.camera, overlay: Canvases.overlay, QA: services.quality, PIX_MIN: Environment.PIX_MIN, PIX_START: Environment.PIX_START, SCENERY: services.arenaView.scenery,
       setDb: function (fake) { var before = services.backend.db; services.backend.db = fake; return before; },
       setTestLink: function (flag) { var before = services.backend.isTestLink; services.backend.isTestLink = flag; return before; },
-      MAP_X0: ArenaSize.MAP_X0, MAP_Y0: ArenaSize.MAP_Y0, TSUNAMI_LANES: services.tsunamiLanes, TsunamiLanes: TsunamiLanes, MARINA_STREAMS: services.marinaStreams, MARINA_BOT: services.marinaBot, TridentProp: TridentProp, HOOK_PATH: services.hookPath, HOOK_PULL: services.hookPull, HOOK_VIEW: services.hookView, playersNow: function () { return services.session.players; }, HAMMER_STRIKES: services.hammerStrikes, HammerStrikeBurst: HammerStrikeBurst, BANNER_AURA: services.bannerAura, BANNER_LEDGER: services.bannerLedger, BannerCreditLedger: BannerCreditLedger, makeBannerGlow: function (d) { return new BannerStrikeGlow(services, d); }, BannerStrikeGlow: BannerStrikeGlow, BannerBearerRig: BannerBearerRig, DraggedChain: DraggedChain, WraithChainRig: WraithChainRig, ChainSlamBurst: ChainSlamBurst, FIGHTER_VIEW: services.fighterView, GEO: services.geo, FRAME_RENDERER: services.frameRenderer, stage: services.stage, CHAR_TYPES: services.charTypes, AUTO_AIM: services.autoAim, AUTO_AIM_ERR: AutoAim.AUTO_AIM_ERR, AUTO_AIM_LEAD: AutoAim.AUTO_AIM_LEAD, FullscreenKeeper: FullscreenKeeper, DRAFT_AI: services.draftAi,
+      MAP_X0: ArenaSize.MAP_X0, MAP_Y0: ArenaSize.MAP_Y0, TSUNAMI_LANES: services.tsunamiLanes, TsunamiLanes: TsunamiLanes, MARINA_STREAMS: services.marinaStreams, MARINA_BOT: services.marinaBot, TridentProp: TridentProp, HOOK_PATH: services.hookPath, HOOK_PULL: services.hookPull, HOOK_VIEW: services.hookView, playersNow: function () { return services.session.players; }, HAMMER_STRIKES: services.hammerStrikes, HammerBasicBlast: HammerBasicBlast, BANNER_AURA: services.bannerAura, BANNER_LEDGER: services.bannerLedger, BannerCreditLedger: BannerCreditLedger, makeBannerGlow: function (d) { return new BannerStrikeGlow(services, d); }, BannerStrikeGlow: BannerStrikeGlow, BannerBearerRig: BannerBearerRig, DraggedChain: DraggedChain, WraithChainRig: WraithChainRig, ChainSlamBurst: ChainSlamBurst, FIGHTER_VIEW: services.fighterView, GEO: services.geo, FRAME_RENDERER: services.frameRenderer, stage: services.stage, CHAR_TYPES: services.charTypes, AUTO_AIM: services.autoAim, AUTO_AIM_ERR: AutoAim.AUTO_AIM_ERR, AUTO_AIM_LEAD: AutoAim.AUTO_AIM_LEAD, FullscreenKeeper: FullscreenKeeper, DRAFT_AI: services.draftAi,
       DRAFT: services.draft, DRAFT_VIEW: services.draftView, DRAFT_STEPS: Draft.STEPS, DRAFT_STEP_MS: Draft.STEP_MS, DRAFT_AI_MS: Draft.AI_MS, DRAFT_AI_TRADE_MS: Draft.AI_TRADE_MS, DRAFT_ABSENT_WAIT_MS: Draft.ABSENT_WAIT_MS, NO_BAN: Draft.NO_BAN,
       STATS: services.stats, STATS_PATH: MatchStats.path, STATS_PATCHES: StatsPatches, STATS_PENDING: MatchStats.PENDING, STATS_SETTLE_MS: MatchStats.SETTLE_MS, STATS_HOLD_MAX_MS: MatchStats.HOLD_MAX_MS,
       CLOCK: services.clock, GameClock: GameClock, CLOCK_KEEP: GameClock.KEEP, CLOCK_PINGS: GameClock.PINGS,

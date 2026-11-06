@@ -137,11 +137,14 @@ class BladeTrailShaders {
     varying vec2 vP;
     void main() { vP = position.xz; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
   static readonly ARC_ZONE_FRAGMENT = `
-    uniform float uArc; uniform float uFade; uniform vec3 uBlade; varying vec2 vP;
+    uniform float uArc; uniform float uFade; uniform float uLen; uniform vec3 uBlade; uniform vec3 uDeep; varying vec2 vP;
     void main() {
-      float r = length(vP);
-      if (r > 1.0 || abs(atan(vP.y, vP.x)) > uArc * 0.5) discard;
-      gl_FragColor = vec4(uBlade, (0.13 + 0.5 * smoothstep(0.955, 0.985, r)) * uFade);
+      float r = length(vP), toSide = uArc * 0.5 - abs(atan(vP.y, vP.x));
+      if (r > 1.0 || toSide < 0.0) discard;
+      float gap = (1.0 - r) * uLen;
+      if (uArc < 6.28) gap = min(gap, r * uLen * sin(min(toSide, 1.5708)));
+      float line = smoothstep(4.0, 2.5, gap), halo = smoothstep(7.5, 4.0, gap);
+      gl_FragColor = vec4(mix(uDeep, uBlade, line), max(0.1, max(line * 0.98, halo * 0.5)) * uFade);
       #include <colorspace_fragment>
     }`;
   static readonly ARC_SWOOSH_FRAGMENT = `
@@ -163,10 +166,11 @@ class BladeTrailShaders {
       #include <colorspace_fragment>
     }`;
   static readonly LINE_ZONE_FRAGMENT = `
-    uniform float uFade; uniform float uLen; uniform float uWide; uniform vec3 uBlade; varying vec2 vP;
+    uniform float uFade; uniform float uLen; uniform float uWide; uniform vec3 uBlade; uniform vec3 uDeep; varying vec2 vP;
     void main() {
-      float limit = max(smoothstep(0.5 - 6.0 / uWide, 0.5 - 3.0 / uWide, abs(vP.y)), smoothstep(1.0 - 6.0 / uLen, 1.0 - 3.0 / uLen, vP.x));
-      gl_FragColor = vec4(uBlade, (0.12 + 0.5 * limit) * uFade);
+      float gap = min((0.5 - abs(vP.y)) * uWide, (1.0 - vP.x) * uLen);
+      float line = smoothstep(4.0, 2.5, gap), halo = smoothstep(7.5, 4.0, gap);
+      gl_FragColor = vec4(mix(uDeep, uBlade, line), max(0.1, max(line * 0.98, halo * 0.5)) * uFade);
       #include <colorspace_fragment>
     }`;
   static readonly THRUST_FRAGMENT = `
@@ -274,6 +278,7 @@ class ArcBladePool extends BladeTrailPool {
     vis.zone.scale.set(radius, 1, radius);
     vis.swoosh.scale.set(radius, 1, radius);
     (vis.uniforms.uArc as ArenaFxNumberUniform).value = arc;
+    (vis.uniforms.uLen as ArenaFxNumberUniform).value = radius;
     vis.thick.value = Math.min(0.85, look.trail / radius);
     return vis;
   }
@@ -293,6 +298,13 @@ class ThrustBladePool extends BladeTrailPool {
     (vis.uniforms.uLen as ArenaFxNumberUniform).value = length;
     (vis.uniforms.uWide as ArenaFxNumberUniform).value = width;
     vis.thick.value = Math.min(0.5, look.trail / width);
+    vis.swoosh.visible = true;
+    return vis;
+  }
+
+  outline(x: number, y: number, angle: number, length: number, width: number, blade: number, seed: number): BladeTrailVis {
+    const vis = this.thrust(x, y, angle, length, width, { blade, trail: 0 }, seed);
+    vis.swoosh.visible = false;
     return vis;
   }
 
@@ -459,10 +471,9 @@ class DomainShaders {
       vec4 cloud = texture2D(uTex, spot + vec2(uTime * 0.012, uTime * 0.008));
       vec4 lace = texture2D(uTex, spot * 1.5 - vec2(uTime * 0.018, 0.0) + cloud.rg * 0.04);
       float crack = smoothstep(0.52, 0.8, lace.g + cloud.r * 0.14);
-      float arm = smoothstep(0.74, 1.0, 0.5 + 0.5 * sin(atan(vP.y, vP.x) * 5.0 + log(r + 0.08) * 7.0 - uTime * 1.5)) * smoothstep(1.0, 0.25, r);
       float rim = smoothstep(0.966, 0.984, r);
-      vec3 color = mix(mix(uDark, uCrimson, max(crack, arm * 0.6)), uRim, rim);
-      gl_FragColor = vec4(color, max(0.46 + crack * 0.4 + arm * 0.2, rim) * uFade);
+      vec3 color = mix(mix(uDark, uCrimson, crack), uRim, rim);
+      gl_FragColor = vec4(color, max(0.46 + crack * 0.4, rim) * uFade);
       #include <colorspace_fragment>
     }`;
   static readonly DOME_VERTEX = `
@@ -1054,6 +1065,7 @@ abstract class SkillAuraPool extends ArenaFxPool<SkillAuraVis> {
 
   attachTo(parent: Three<"Object3D">): SkillAuraHandle {
     const vis = this.free.pop() || this.build();
+    vis.root.position.set(0, 0, 0);
     parent.add(vis.root);
     return new SkillAuraHandle(this, vis);
   }
@@ -1274,7 +1286,7 @@ class ArenaFxViews {
   prefillForMatch(counts: { toxicPools: number; domains: number; starfalls: number; stealthBursts: number }): void {
     this.stealthBursts.prefill(counts.stealthBursts);
     this.arcBlades.prefill(6);
-    this.thrustBlades.prefill(3);
+    this.thrustBlades.prefill(6);
     this.stabs.prefill(2);
     this.lungeBands.prefill(2);
     this.toxicPools.prefill(counts.toxicPools);

@@ -5595,23 +5595,17 @@ class WraithTests {
       if (burst && burst.group.parent) bad.push("그림이 남음");
       self.verdict(done, bad, "균열·먼지·파편·불티 후 정리");
     });
-    run(G, "대장장이 타격 이펙트: 기본 공격 타격 때만 작은 균열이 생기고, 사슬 망령보다 적으며, 끝나면 남지 않는가", function (done) {
-      var bad = [], W = self.scene("forest", [{ id: "bs", team: "blue", char: "blacksmith", x: 450, y: 675, slot: 1 }, { id: "foe", char: "dummy", x: 450, y: 1000, slot: 1 }]), A = W.ent("bs"), view = api.HAMMER_STRIKES, H = api.HammerStrikeBurst, P = api.ChainSlamBurst;
+    run(G, "대장장이 타격 이펙트: 기본 공격 타격 때만 재사용 폭발 그림이 생기고, 옛 입자 그림은 안 만들며, 끝나면 남지 않는가", function (done) {
+      var bad = [], W = self.scene("forest", [{ id: "bs", team: "blue", char: "blacksmith", x: 450, y: 675, slot: 1 }, { id: "foe", char: "dummy", x: 450, y: 1000, slot: 1 }]), A = W.ent("bs"), B = api.HammerBasicBlast;
+      var isHammerHit = function (blast) { return blast instanceof B; };
       api.fireBasic(A, Math.PI / 2);
-      if (api.FIELD.hammerStrikes.length) bad.push("대기 표시 때 터짐");
+      if (api.FIELD.impactBlasts.some(isHammerHit)) bad.push("대기 표시 때 터짐");
       W.step(api.CHARS.blacksmith.windup + 100, 16);
-      var item = api.FIELD.hammerStrikes[0];
-      if (!item) bad.push("타격 때 이펙트가 안 생김");
-      else {
-        view.render(W.t());
-        var burst = item.burst;
-        if (!burst || !burst.group.parent) bad.push("그림이 안 생김");
-        else if (burst.dust.length !== H.DUST_COUNT || burst.dust.length >= P.DUST_COUNT || burst.bits.length >= P.BITS_COUNT || burst.embers.length >= P.EMBER_COUNT) bad.push("입자 수 어긋남");
-        W.step(H.LIFE_SEC * 1000 + 100, 16);
-        if (api.FIELD.hammerStrikes.length) bad.push("목록이 남음");
-        if (burst && burst.group.parent) bad.push("그림이 남음");
-      }
-      self.verdict(done, bad, "타격 때 작은 균열, 끝나면 정리");
+      if (!api.FIELD.impactBlasts.some(isHammerHit)) bad.push("타격 때 이펙트가 안 생김");
+      if (api.FIELD.hammerStrikes.length) bad.push("옛 입자 그림이 생김");
+      W.step(B.LIFE_SEC * 1000 + 100, 16);
+      if (api.FIELD.impactBlasts.some(isHammerHit)) bad.push("목록이 남음");
+      self.verdict(done, bad, "타격 때 재사용 폭발, 끝나면 정리");
     });
   }
 
