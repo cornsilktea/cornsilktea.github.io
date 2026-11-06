@@ -178,12 +178,12 @@ class BladeTrailPool extends ArenaFxPool {
         vis.root.rotation.y = -angle;
         vis.blade.value.setHex(look.blade);
         vis.deep.value.setHex(look.blade).multiplyScalar(0.42);
-        vis.core.value.setHex(look.blade).lerp(BladeTrailPool.WHITE(this.kit), 0.82);
+        vis.core.value.setHex(look.blade).lerp(BladeTrailPool.white(this.kit), 0.82);
         vis.seed.value = seed;
         vis.head.value = 0;
         vis.fade.value = 1;
     }
-    static WHITE(kit) {
+    static white(kit) {
         return BladeTrailPool.whiteColor || (BladeTrailPool.whiteColor = new kit.THREE.Color(0xFFFFFF));
     }
     paint(vis, f) {
@@ -563,7 +563,6 @@ class StarfallPool extends ArenaFxPool {
         const uniforms = { uTex: kit.noise(), uR: r, uK: k, uTime: time, uPulse: pulse, uPixelScale: pixelScale, uDeep: deep, uTint: tint, uHot: hot, uTeam: team, uSize: kit.number(StarfallPool.HEAD_SIZE), uTailLen: kit.number(StarfallPool.TAIL), uDir: { value: path.dir } };
         const zone = kit.mesh(kit.flat, kit.soft(uniforms, BladeTrailShaders.VERTEX, S.ZONE_FRAGMENT), 2);
         zone.position.y = 2.2;
-        const scaleZone = zone;
         const head = kit.mesh(shapes.head, kit.soft(uniforms, S.HEAD_VERTEX, S.HEAD_FRAGMENT, kit.THREE.DoubleSide), 8);
         const tail = kit.mesh(shapes.tail, kit.soft(uniforms, DomainShaders.DOME_VERTEX, S.TAIL_FRAGMENT, kit.THREE.DoubleSide), 7);
         tail.quaternion.setFromUnitVectors(new kit.THREE.Vector3(0, 1, 0), path.dir);
@@ -572,7 +571,7 @@ class StarfallPool extends ArenaFxPool {
         const star = new kit.THREE.Group();
         star.add(tail, dust, head);
         const root = new kit.THREE.Group();
-        root.add(scaleZone, star);
+        root.add(zone, star);
         root.userData.zone = zone;
         return { root, star, dust, r, k, time, pulse, pixelScale, deep, tint, hot, team };
     }
@@ -648,6 +647,408 @@ class LungeBandPool extends ArenaFxPool {
 }
 LungeBandPool.Y = 2.6;
 LungeBandPool.TONES = { deep: 0x7A0E08, hot: 0xFF2A1F, core: 0xFFD9B0 };
+class OrbShotShaders {
+}
+OrbShotShaders.ORB_VERTEX = `
+    uniform float uSize; varying vec2 vP;
+    void main() {
+      vP = position.xy;
+      vec4 center = modelViewMatrix * vec4(0.0, 0.0, 0.0, 1.0);
+      center.xy += position.xy * uSize;
+      gl_Position = projectionMatrix * center;
+    }`;
+OrbShotShaders.ORB_FRAGMENT = `
+    uniform sampler2D uTex; uniform float uTime; uniform float uSpike; uniform vec3 uGlow; uniform vec3 uBody; uniform vec3 uCore; varying vec2 vP;
+    void main() {
+      float d = length(vP);
+      if (d > 1.0) discard;
+      float a = atan(vP.y, vP.x);
+      float n = texture2D(uTex, vP * 0.22 + vec2(uTime * 0.7, -uTime * 0.5)).r;
+      float r = d + uSpike * 0.3 * (1.0 - pow(abs(cos(a * 3.0 + uTime * 3.0)), 5.0)) + (n - 0.5) * 0.2;
+      float core = smoothstep(0.34, 0.14, r), body = smoothstep(0.7, 0.48, r), halo = smoothstep(1.0, 0.45, d);
+      gl_FragColor = vec4(mix(mix(uGlow, uBody, body), uCore, core), max(max(core, body * 0.96), halo * halo * 0.6));
+      #include <colorspace_fragment>
+    }`;
+OrbShotShaders.TAIL_FRAGMENT = `
+    uniform sampler2D uTex; uniform float uTime; uniform vec3 uGlow; uniform vec3 uBody; varying vec2 vP;
+    void main() {
+      float back = clamp(-vP.x, 0.0, 1.0), half_ = 0.46 * (1.0 - back);
+      float across = abs(vP.y);
+      if (across >= half_) discard;
+      float body = 1.0 - across / half_;
+      float n = texture2D(uTex, vec2(vP.x * 1.3 + uTime * 2.8, vP.y * 0.4)).r;
+      gl_FragColor = vec4(mix(uGlow, uBody, body), body * (1.0 - back) * (0.45 + 0.55 * n));
+      #include <colorspace_fragment>
+    }`;
+class OrbShotMaker {
+    constructor(kit) {
+        this.kit = kit;
+        this.sets = {};
+        this.orbShape = null;
+        this.tailShape = null;
+        this.time = kit.number(0);
+    }
+    tick(nowMs) {
+        this.time.value = (nowMs % 100000) / 1000;
+    }
+    materials(name) {
+        const existing = this.sets[name];
+        if (existing)
+            return existing;
+        const kit = this.kit, L = OrbShotMaker.LOOKS[name], S = OrbShotShaders;
+        const uniforms = { uTex: kit.noise(), uTime: this.time, uSpike: kit.number(L.spike), uSize: kit.number(L.size), uGlow: kit.color(L.glow), uBody: kit.color(L.body), uCore: kit.color(L.core) };
+        return this.sets[name] = { orb: kit.soft(uniforms, S.ORB_VERTEX, S.ORB_FRAGMENT, kit.THREE.DoubleSide), tail: kit.soft(uniforms, BladeTrailShaders.VERTEX, S.TAIL_FRAGMENT) };
+    }
+    attachTo(group, name) {
+        const kit = this.kit, L = OrbShotMaker.LOOKS[name], set = this.materials(name);
+        if (!this.orbShape) {
+            this.orbShape = new kit.THREE.PlaneGeometry(2, 2);
+            this.tailShape = new kit.THREE.PlaneGeometry(1, 1);
+            this.tailShape.rotateX(-Math.PI / 2);
+            this.tailShape.translate(-0.5, 0, 0);
+        }
+        const tail = kit.mesh(this.tailShape, set.tail, 6);
+        tail.scale.set(L.tailLength, 1, L.tailWidth);
+        group.add(tail, kit.mesh(this.orbShape, set.orb, 7));
+    }
+}
+OrbShotMaker.LOOKS = {
+    necro: { glow: 0x8E4DFF, body: 0x7A3BE0, core: 0xE6D2FF, spike: 0, size: 25, tailLength: 74, tailWidth: 24 },
+    frost: { glow: 0x8FD8F0, body: 0xBFEFFF, core: 0xFFFFFF, spike: 1, size: 25, tailLength: 80, tailWidth: 20 }
+};
+class SkillAuraShaders {
+}
+SkillAuraShaders.WALL_VERTEX = DomainShaders.DOME_VERTEX;
+SkillAuraShaders.FLAME_FRAGMENT = `
+    uniform sampler2D uTex; uniform float uTime; uniform float uFade; uniform vec3 uDeep; uniform vec3 uFire; uniform vec3 uHot; varying vec2 vUv; varying float vFacing;
+    void main() {
+      float big = texture2D(uTex, vec2(vUv.x * 3.0, vUv.y * 0.8 - uTime * 1.5)).r;
+      float fine = texture2D(uTex, vec2(vUv.x * 6.0 + big * 0.2, vUv.y * 1.8 - uTime * 2.3)).r;
+      float flame = big * 0.62 + fine * 0.42 + 0.48 - vUv.y * 1.15;
+      float body = smoothstep(0.34, 0.6, flame) * smoothstep(0.02, 0.28, vFacing);
+      gl_FragColor = vec4(mix(mix(uDeep, uFire, smoothstep(0.3, 0.6, flame)), uHot, smoothstep(0.68, 1.0, flame)), body * 0.82 * uFade);
+      #include <colorspace_fragment>
+    }`;
+SkillAuraShaders.FLAME_FLOOR_FRAGMENT = `
+    uniform sampler2D uTex; uniform float uTime; uniform float uFade; uniform float uBurst; uniform vec3 uDeep; uniform vec3 uFire; uniform vec3 uHot; varying vec2 vP;
+    void main() {
+      float r = length(vP);
+      if (r > 1.0) discard;
+      float n = texture2D(uTex, vP * 0.3 + vec2(uTime * 0.05, -uTime * 0.09)).g;
+      float glow = smoothstep(1.0, 0.45, r) * (0.34 + 0.66 * smoothstep(0.3, 0.75, n));
+      float front = 1.0 - uBurst, ring = uBurst * smoothstep(0.14, 0.0, abs(r - front));
+      gl_FragColor = vec4(mix(mix(uDeep, uFire, glow), uHot, ring), max(glow * 0.72, ring) * uFade);
+      #include <colorspace_fragment>
+    }`;
+SkillAuraShaders.SPARK_VERTEX = `
+    uniform float uTime; uniform float uPixelScale; uniform float uReach; uniform float uHeight; varying float vLife;
+    void main() {
+      float a = position.x * 6.2832 + uTime * (position.z - 0.5) * 2.0, reach = uReach * (0.4 + 0.6 * position.y), life = fract(uTime * (0.8 + 0.8 * position.z) + position.x * 5.0);
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(cos(a) * reach, 6.0 + life * uHeight, sin(a) * reach, 1.0);
+      gl_PointSize = (3.0 + 6.0 * position.z) * uPixelScale * projectionMatrix[1][1] / gl_Position.w;
+      vLife = (1.0 - life) * min(1.0, life * 7.0);
+    }`;
+SkillAuraShaders.SPARK_FRAGMENT = `
+    uniform float uFade; uniform vec3 uHot; varying float vLife;
+    void main() {
+      gl_FragColor = vec4(uHot, smoothstep(0.5, 0.1, length(gl_PointCoord - 0.5)) * vLife * uFade);
+      #include <colorspace_fragment>
+    }`;
+SkillAuraShaders.HEX_FRAGMENT = `
+    uniform sampler2D uTex; uniform float uTime; uniform float uFade; uniform float uBurst; uniform vec3 uFire; uniform vec3 uHot; varying vec2 vUv; varying float vFacing;
+    float hexEdge(vec2 p) {
+      vec2 q = vec2(p.x * 1.1547, p.y + p.x * 0.57735), c = floor(q), f = fract(q);
+      float m = mod(c.x + c.y, 3.0);
+      vec2 d = m < 1.0 ? f : m < 2.0 ? f - vec2(1.0, 0.0) * step(f.y, f.x) - vec2(0.0, 1.0) * step(f.x, f.y) : f - 1.0;
+      return max(abs(d.x), max(abs(d.y), abs(d.x + d.y) * 0.5));
+    }
+    void main() {
+      float edge = 1.0 - vFacing;
+      float cell = smoothstep(0.82, 0.96, hexEdge(vec2(vUv.x * 14.0, vUv.y * 6.0)));
+      float flow = smoothstep(0.42, 0.72, texture2D(uTex, vec2(vUv.x * 2.0, vUv.y * 0.7 - uTime * 0.28)).r);
+      float wave = uBurst * smoothstep(0.12, 0.0, abs(vUv.y - (1.0 - uBurst)));
+      gl_FragColor = vec4(mix(uFire, uHot, max(cell * flow, wave)), (0.08 + edge * edge * 0.62 + cell * (0.18 + 0.5 * flow) + wave) * uFade);
+      #include <colorspace_fragment>
+    }`;
+SkillAuraShaders.HEX_RING_FRAGMENT = `
+    uniform float uFade; uniform float uTime; uniform vec3 uRing; varying vec2 vP;
+    void main() {
+      vec2 q = abs(vP);
+      float a = uTime * 0.9, c = cos(a), s = sin(a);
+      q = abs(vec2(c * vP.x - s * vP.y, s * vP.x + c * vP.y));
+      float hex = max(q.x * 0.866 + q.y * 0.5, q.y);
+      float line = smoothstep(0.78, 0.84, hex) * smoothstep(0.98, 0.92, hex);
+      gl_FragColor = vec4(uRing, line * 0.92 * uFade);
+      #include <colorspace_fragment>
+    }`;
+SkillAuraShaders.BLADE_STORM_FRAGMENT = `
+    uniform sampler2D uTex; uniform float uTime; uniform float uFade; uniform vec3 uDeep; uniform vec3 uFire; uniform vec3 uHot; varying vec2 vP;
+    float blades(float around, float count, float speed) {
+      float lead = fract(around * count + uTime * speed);
+      return lead * lead * lead;
+    }
+    void main() {
+      float r = length(vP);
+      if (r > 1.0) discard;
+      float around = atan(vP.y, vP.x) / 6.2832;
+      float n = texture2D(uTex, vec2(r * 2.2 - uTime * 0.25, around * 3.0)).b;
+      float outer = blades(around + r * 0.2, 3.0, 2.3) * smoothstep(0.46, 0.66, r) * smoothstep(1.0, 0.9, r);
+      float inner = blades(around - r * 0.3, 2.0, -3.1) * smoothstep(0.2, 0.34, r) * smoothstep(0.56, 0.44, r);
+      float blade = max(outer, inner * 0.8);
+      float edge = smoothstep(0.962, 0.982, r);
+      vec3 color = mix(mix(uDeep, uFire, blade), uHot, max(blade * blade * blade, edge));
+      gl_FragColor = vec4(color, max(max(0.1 + 0.1 * n, blade * (0.55 + 0.45 * n)), edge * 0.85) * uFade);
+      #include <colorspace_fragment>
+    }`;
+SkillAuraShaders.PETAL_VERTEX = `
+    uniform float uTime; uniform float uPixelScale; uniform float uReach; varying float vLife; varying float vTurn;
+    void main() {
+      float a = position.x * 6.2832 + uTime * (2.2 + position.z), reach = uReach * (0.3 + 0.68 * position.y), life = fract(uTime * 0.7 + position.x * 9.0);
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(cos(a) * reach, 14.0 + 26.0 * position.z + 16.0 * sin(life * 6.2832), sin(a) * reach, 1.0);
+      gl_PointSize = (9.0 + 8.0 * position.z) * uPixelScale * projectionMatrix[1][1] / gl_Position.w;
+      vLife = sin(life * 3.1416); vTurn = a * 2.0;
+    }`;
+SkillAuraShaders.PETAL_FRAGMENT = `
+    uniform float uFade; uniform vec3 uFire; uniform vec3 uHot; varying float vLife; varying float vTurn;
+    void main() {
+      vec2 q = gl_PointCoord - 0.5;
+      float c = cos(vTurn), s = sin(vTurn);
+      q = vec2(c * q.x - s * q.y, s * q.x + c * q.y);
+      float d = q.x * q.x * 22.0 + q.y * q.y * 7.0;
+      if (d > 1.0) discard;
+      gl_FragColor = vec4(mix(uFire, uHot, 1.0 - d), vLife * uFade);
+      #include <colorspace_fragment>
+    }`;
+SkillAuraShaders.VEIL_FRAGMENT = `
+    uniform sampler2D uTex; uniform float uTime; uniform float uFade; uniform float uBurst; uniform vec3 uDeep; uniform vec3 uFire; varying vec2 vP;
+    void main() {
+      float r = length(vP);
+      if (r > 1.0) discard;
+      float a = atan(vP.y, vP.x);
+      vec2 swirl = vec2(cos(a + uTime * 0.5 + r * 2.0), sin(a + uTime * 0.5 + r * 2.0)) * r * 0.4;
+      float n = texture2D(uTex, swirl + vec2(uTime * 0.03, 0.0)).r;
+      float wisp = smoothstep(0.42, 0.72, n) * smoothstep(1.0, 0.55, r) * smoothstep(0.2, 0.5, r);
+      gl_FragColor = vec4(mix(uDeep, uFire, wisp), (wisp * 0.62 + smoothstep(1.0, 0.3, r) * 0.2) * uFade);
+      #include <colorspace_fragment>
+    }`;
+class SkillAuraHandle {
+    constructor(pool, vis) {
+        this.pool = pool;
+        this.vis = vis;
+        this.shown = 0;
+        this.lastMs = 0;
+        this.wasOn = false;
+        this.burstLeft = 0;
+        vis.root.visible = false;
+    }
+    update(on, nowMs) {
+        const step = Math.min(0.1, Math.max(0, (nowMs - this.lastMs) / 1000)), P = this.pool;
+        this.lastMs = nowMs;
+        if (on && !this.wasOn)
+            this.burstLeft = 1;
+        this.wasOn = on;
+        this.shown = ArenaFxKit.clamp01(this.shown + (on ? step / P.fadeInSec : -step / P.fadeOutSec));
+        this.burstLeft = Math.max(0, this.burstLeft - step / P.burstSec);
+        this.vis.root.visible = this.shown > 0;
+        if (!this.vis.root.visible)
+            return;
+        this.vis.fade.value = this.shown;
+        this.vis.burst.value = this.burstLeft;
+        P.paintNow(this.vis, nowMs);
+    }
+    release() {
+        this.pool.give(this.vis);
+    }
+}
+class SkillAuraPool extends ArenaFxPool {
+    constructor() {
+        super(...arguments);
+        this.fadeInSec = 0.15;
+        this.fadeOutSec = 0.25;
+        this.burstSec = 0.45;
+        this.sparkSeeds = null;
+    }
+    common(tones) {
+        const kit = this.kit, fade = kit.number(1), burst = kit.number(0), time = kit.number(0), pixelScale = kit.number(400);
+        const uniforms = { uTex: kit.noise(), uFade: fade, uBurst: burst, uTime: time, uPixelScale: pixelScale };
+        Object.keys(tones).forEach((name) => { uniforms[name] = kit.color(tones[name]); });
+        return { uniforms, fade, burst, time, pixelScale };
+    }
+    seeds(count, salt) {
+        return this.sparkSeeds || (this.sparkSeeds = this.kit.seededPoints(count, salt));
+    }
+    warmPaint(vis) {
+        vis.root.visible = true;
+    }
+    attachTo(parent) {
+        const vis = this.free.pop() || this.build();
+        parent.add(vis.root);
+        return new SkillAuraHandle(this, vis);
+    }
+    paintNow(vis, nowMs) {
+        vis.time.value = (nowMs % 100000) / 1000;
+        vis.pixelScale.value = this.kit.host.pixelScale();
+        if (vis.sparks)
+            vis.sparks.visible = !this.kit.host.isLite();
+    }
+}
+class BerserkAuraPool extends SkillAuraPool {
+    constructor() {
+        super(...arguments);
+        this.wall = null;
+    }
+    build() {
+        const kit = this.kit, S = SkillAuraShaders, C = this.common(BerserkAuraPool.TONES);
+        C.uniforms.uReach = kit.number(40);
+        C.uniforms.uHeight = kit.number(92);
+        if (!this.wall) {
+            this.wall = new kit.THREE.CylinderGeometry(1, 0.8, 1, 18, 1, true);
+            this.wall.translate(0, 0.5, 0);
+        }
+        const flames = kit.mesh(this.wall, kit.soft(C.uniforms, S.WALL_VERTEX, S.FLAME_FRAGMENT, kit.THREE.DoubleSide), 6);
+        flames.scale.set(44, 84, 44);
+        const floor = kit.mesh(kit.flat, kit.soft(C.uniforms, BladeTrailShaders.VERTEX, S.FLAME_FLOOR_FRAGMENT), 3);
+        floor.position.y = 1.6;
+        floor.scale.set(70, 1, 70);
+        const sparks = kit.points(this.seeds(14, 131), kit.soft(C.uniforms, S.SPARK_VERTEX, S.SPARK_FRAGMENT), 8);
+        const root = new kit.THREE.Group();
+        root.add(floor, flames, sparks);
+        return { root, fade: C.fade, burst: C.burst, time: C.time, pixelScale: C.pixelScale, sparks };
+    }
+}
+BerserkAuraPool.TONES = { uDeep: 0x7A1204, uFire: 0xFF4A12, uHot: 0xFFD27A };
+class GuardAuraPool extends SkillAuraPool {
+    constructor() {
+        super(...arguments);
+        this.dome = null;
+    }
+    build() {
+        const kit = this.kit, S = SkillAuraShaders, C = this.common(GuardAuraPool.TONES);
+        this.dome = this.dome || new kit.THREE.SphereGeometry(47, 18, 8, 0, Math.PI * 2, 0, Math.PI / 2);
+        const material = kit.soft(C.uniforms, S.WALL_VERTEX, S.HEX_FRAGMENT);
+        material.blending = kit.THREE.AdditiveBlending;
+        const dome = kit.mesh(this.dome, material, 7);
+        dome.scale.y = 2.15;
+        const ring = kit.mesh(kit.flat, kit.soft(C.uniforms, BladeTrailShaders.VERTEX, S.HEX_RING_FRAGMENT), 3);
+        ring.position.y = 2;
+        ring.scale.set(56, 1, 56);
+        const root = new kit.THREE.Group();
+        root.add(ring, dome);
+        return { root, fade: C.fade, burst: C.burst, time: C.time, pixelScale: C.pixelScale, sparks: null };
+    }
+}
+GuardAuraPool.TONES = { uFire: 0x3D8CFF, uHot: 0xCDE8FF, uRing: 0xFFD54A };
+class BladeStormAuraPool extends SkillAuraPool {
+    constructor(kit, radius) {
+        super(kit);
+        this.radius = radius;
+    }
+    build() {
+        const kit = this.kit, S = SkillAuraShaders, C = this.common(BladeStormAuraPool.TONES);
+        C.uniforms.uReach = kit.number(this.radius);
+        const floor = kit.mesh(kit.flat, kit.soft(C.uniforms, BladeTrailShaders.VERTEX, S.BLADE_STORM_FRAGMENT), 3);
+        floor.position.y = 2;
+        floor.scale.set(this.radius, 1, this.radius);
+        const sparks = kit.points(this.seeds(18, 149), kit.soft(C.uniforms, S.PETAL_VERTEX, S.PETAL_FRAGMENT), 8);
+        const root = new kit.THREE.Group();
+        root.add(floor, sparks);
+        return { root, fade: C.fade, burst: C.burst, time: C.time, pixelScale: C.pixelScale, sparks };
+    }
+}
+BladeStormAuraPool.TONES = { uDeep: 0x7A1820, uFire: 0xE0708F, uHot: 0xFFF3F6 };
+class StealthVeilPool extends SkillAuraPool {
+    build() {
+        const kit = this.kit, C = this.common(StealthVeilPool.TONES);
+        const floor = kit.mesh(kit.flat, kit.soft(C.uniforms, BladeTrailShaders.VERTEX, SkillAuraShaders.VEIL_FRAGMENT), 3);
+        floor.position.y = 1.8;
+        floor.scale.set(58, 1, 58);
+        const root = new kit.THREE.Group();
+        root.add(floor);
+        return { root, fade: C.fade, burst: C.burst, time: C.time, pixelScale: C.pixelScale, sparks: null };
+    }
+}
+StealthVeilPool.TONES = { uDeep: 0x150D22, uFire: 0x6A3FA0 };
+class StealthBurstShaders {
+}
+StealthBurstShaders.RING_FRAGMENT = `
+    uniform sampler2D uTex; uniform float uAge; uniform vec3 uDeep; uniform vec3 uFire; varying vec2 vP;
+    void main() {
+      float r = length(vP);
+      if (r > 1.0) discard;
+      float n = texture2D(uTex, vP * 0.3 + uAge * 0.2).r;
+      float front = 1.0 - (1.0 - uAge) * (1.0 - uAge);
+      float ring = smoothstep(0.22, 0.0, abs(r + (n - 0.5) * 0.24 - front));
+      float inside = smoothstep(front, front - 0.2, r) * 0.5;
+      gl_FragColor = vec4(mix(uDeep, uFire, ring), max(ring, inside) * (1.0 - uAge));
+      #include <colorspace_fragment>
+    }`;
+StealthBurstShaders.SMOKE_VERTEX = `
+    uniform float uAge; uniform float uPixelScale; varying float vFade; varying float vSeed;
+    void main() {
+      float a = position.x * 6.2832, grow = 1.0 - (1.0 - uAge) * (1.0 - uAge), out_ = (12.0 + 60.0 * position.y) * grow;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(cos(a) * out_, 8.0 + grow * (30.0 + 44.0 * position.z), sin(a) * out_, 1.0);
+      gl_PointSize = (42.0 + 34.0 * position.z) * (0.6 + 0.7 * grow) * uPixelScale * projectionMatrix[1][1] / gl_Position.w;
+      vFade = min(1.0, uAge * 12.0) * (1.0 - uAge * uAge); vSeed = position.y;
+    }`;
+StealthBurstShaders.SMOKE_FRAGMENT = `
+    uniform sampler2D uTex; uniform float uAge; uniform vec3 uDeep; uniform vec3 uFire; varying float vFade; varying float vSeed;
+    void main() {
+      vec2 q = gl_PointCoord - 0.5;
+      float d = length(q);
+      if (d > 0.5) discard;
+      float n = texture2D(uTex, q * 0.3 + vSeed + uAge * 0.1).r;
+      gl_FragColor = vec4(mix(uDeep, uFire, n * 0.7), smoothstep(0.5, 0.14, d + (n - 0.5) * 0.26) * vFade * 0.86);
+      #include <colorspace_fragment>
+    }`;
+class StealthBurstPool extends ArenaFxPool {
+    constructor() {
+        super(...arguments);
+        this.seeds = null;
+        this.waiting = [];
+        this.running = [];
+    }
+    build() {
+        const kit = this.kit, S = StealthBurstShaders, T = StealthBurstPool.TONES, age = kit.number(0.3), pixelScale = kit.number(400);
+        const uniforms = { uTex: kit.noise(), uAge: age, uPixelScale: pixelScale, uDeep: kit.color(T.uDeep), uFire: kit.color(T.uFire) };
+        this.seeds = this.seeds || kit.seededPoints(StealthBurstPool.PUFFS, 163);
+        const ring = kit.mesh(kit.flat, kit.soft(uniforms, BladeTrailShaders.VERTEX, S.RING_FRAGMENT), 3);
+        ring.position.y = 2;
+        ring.scale.set(StealthBurstPool.R, 1, StealthBurstPool.R);
+        const smoke = kit.points(this.seeds, kit.soft(uniforms, S.SMOKE_VERTEX, S.SMOKE_FRAGMENT), 8);
+        const root = new kit.THREE.Group();
+        root.add(ring, smoke);
+        return { root, age, pixelScale, smoke };
+    }
+    burst(x, y) {
+        this.waiting.push({ x, y });
+        if (this.waiting.length > StealthBurstPool.MAX_WAITING)
+            this.waiting.shift();
+    }
+    tick(nowMs) {
+        this.waiting.forEach((spot) => {
+            const vis = this.take();
+            vis.root.position.set(spot.x, 0, spot.y);
+            vis.smoke.geometry.setDrawRange(0, this.kit.host.isLite() ? StealthBurstPool.PUFFS >> 1 : StealthBurstPool.PUFFS);
+            this.running.push({ vis, startMs: nowMs });
+        });
+        this.waiting = [];
+        this.running = this.running.filter((item) => {
+            const k = (nowMs - item.startMs) / StealthBurstPool.LIFE_MS;
+            if (k >= 1) {
+                this.give(item.vis);
+                return false;
+            }
+            item.vis.age.value = k;
+            item.vis.pixelScale.value = this.kit.host.pixelScale();
+            return true;
+        });
+    }
+}
+StealthBurstPool.LIFE_MS = 750;
+StealthBurstPool.R = 110;
+StealthBurstPool.PUFFS = 16;
+StealthBurstPool.MAX_WAITING = 6;
+StealthBurstPool.TONES = { uDeep: 0x120A1E, uFire: 0x6A3FA0 };
 class ArenaFxViews {
     constructor(host) {
         const kit = new ArenaFxKit(host);
@@ -659,11 +1060,22 @@ class ArenaFxViews {
         this.skyBeams = new SkyBeamMaker(kit);
         this.starfalls = new StarfallPool(kit, () => host.meteorPath());
         this.lungeBands = new LungeBandPool(kit);
+        this.orbs = new OrbShotMaker(kit);
+        this.berserkAuras = new BerserkAuraPool(kit);
+        this.guardAuras = new GuardAuraPool(kit);
+        this.bladeStormAuras = new BladeStormAuraPool(kit, host.bladeStormRadius);
+        this.stealthVeils = new StealthVeilPool(kit);
+        this.stealthBursts = new StealthBurstPool(kit);
     }
     get all() {
-        return [this.arcBlades, this.thrustBlades, this.stabs, this.toxicPools, this.domains, this.starfalls, this.lungeBands];
+        return [this.arcBlades, this.thrustBlades, this.stabs, this.toxicPools, this.domains, this.starfalls, this.lungeBands, this.berserkAuras, this.guardAuras, this.bladeStormAuras, this.stealthVeils, this.stealthBursts];
+    }
+    tick(nowMs) {
+        this.orbs.tick(nowMs);
+        this.stealthBursts.tick(nowMs);
     }
     prefillForMatch(counts) {
+        this.stealthBursts.prefill(counts.stealthBursts);
         this.arcBlades.prefill(6);
         this.thrustBlades.prefill(3);
         this.stabs.prefill(2);

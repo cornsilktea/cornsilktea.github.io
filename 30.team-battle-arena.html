@@ -293,7 +293,7 @@
 <script charset="utf-8" src="account-match-kit.js?v=20261103e"></script>
 <script charset="utf-8" src="account-stats.js?v=20261104c"></script>
 <script charset="utf-8" src="30.team-battle-versus.js?v=20261104a"></script>
-<script charset="utf-8" src="30.team-battle-fx.js?v=20261106c"></script>
+<script charset="utf-8" src="30.team-battle-fx.js?v=20261106e"></script>
 <script charset="utf-8" src="patch-notes.js?v=20261029b"></script>
 <script type="module">
 import * as THREE from "three";
@@ -2463,6 +2463,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     earlyPose(E, t) { return null; }
     latePose(E, t) { return null; }
     skillGlow(E, t) { return 0; }
+    skillAuraOn(E, t) { return false; }
+    showStealthStart(x, y) { this.services.fxView.smoke(x, y, this.smokeColor); }
     ultDesc() { return ""; }
     passiveDesc() { return ""; }
     basicDesc() {
@@ -2501,7 +2503,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     skillSpeed(E, t) { return E.buffUntil > t ? this.data.ultSpeed : null; }
     statSkillDamage(c) { return Math.round(c.dmg * WarriorType.ULT.bzDmgMul); }
     statAltCooldown(c) { return c.cd * WarriorType.ULT.bzCdMul; }
-    addMarkers(v, root, body) { var services = this.services; v.aura = new THREE.Mesh(services.geo.aura, services.matlib.auraMat); v.aura.visible = false; root.add(v.aura); }
+    addMarkers(v, root, body) { v.skillAura = this.services.arenaFx.berserkAuras.attachTo(root); }
+    skillAuraOn(E, t) { return E.buffUntil > t; }
     skillGlow(E, t) { return E.buffUntil > t ? 0x772200 : 0; }
     cast(E, ang, reach, t) {
       E.buffUntil = t + WarriorType.ULT.bzDur;
@@ -2571,7 +2574,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     get heavyStrikeSpark() { return true; }
     skillGuard(T, amount, t) { return T.buffUntil > t ? Math.round(amount * KnightType.ULT.tkDef) : amount; }
     tallyBlocked(T, unguarded, amount) { T.blocked = (T.blocked || 0) + Math.min(unguarded, T.hp) - Math.min(amount, T.hp); }
-    addMarkers(v, root, body) { var services = this.services; v.shield = services.fighterAuras.makeShieldAura(); root.add(v.shield); }
+    addMarkers(v, root, body) { v.skillAura = this.services.arenaFx.guardAuras.attachTo(root); }
+    skillAuraOn(E, t) { return E.buffUntil > t; }
+    drawsOwnStrike(d) { return !!d.slam; }
+    onStrikeShown(d) { if (d.slam) this.services.impactBlasts.guardBreak(d); }
     skillGlow(E, t) { return E.buffUntil > t ? 0x2A3A66 : 0; }
     latePose(E, t) { return E.buffUntil > t ? ["Melee_Blocking", 1] : null; }
     cast(E, ang, reach, t) {
@@ -2598,6 +2604,12 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     static STATS = { name: "궁수", role: "shooter", icon: "🏹", hp: 100, speed: GameTime.gameSpeed(130), haste: { add: 10 / MatchRules.GAME_SPEED, ms: GameTime.gameMs(6), max: 50 / MatchRules.GAME_SPEED }, cd: GameTime.gameMs(0.8), dmg: 20, range: 500, pSpeed: 520, pr: 12, shots: 2, gap: 70, ultName: "난사", ultAim: true };
     get idleClip() { return "Ranged_Bow_Idle"; }
     basicHitMark(d) { return d.isSkill ? false : d.swingAt; }
+    static VOLLEY_COLOR = 0xFF8A3D;
+    static VOLLEY_MUZZLE = { size: 62, sec: 0.11 };
+    static VOLLEY_HIT = { size: 58, sec: 0.18 };
+    projectileMesh(g, d) { super.projectileMesh(g, d); if (!d.isSkill) return; g.remove(g.children[g.children.length - 1]); g.add(SniperShotShaders.tailMesh(RangerType.VOLLEY_COLOR, 170, 18)); }
+    onShotLaunched(p) { if (p.d.isSkill) this.services.sniperShots.flash(p.d.x, p.d.y, Math.atan2(p.dy, p.dx), RangerType.VOLLEY_MUZZLE, RangerType.VOLLEY_COLOR, p.d.createdAt); }
+    onShotHitShown(d, T) { var services = this.services; if (d.isSkill) services.sniperShots.flash(T.x, T.y, Math.atan2(d.vy, d.vx), RangerType.VOLLEY_HIT, RangerType.VOLLEY_COLOR, services.clock.now()); }
     onHitLate(owner, h) { if (h.u === "volley") owner.gauge = Math.min(MatchRules.GAUGE_MAX, owner.gauge + RangerType.ULT.mkRefund); }
     ultLeadSeconds(dist) { return dist / RangerType.ULT.mkSpeed; }
     launchHandOf(model) { return model.getObjectByName("handslotl"); }
@@ -2672,6 +2684,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class RogueType extends CharacterType {
+    addMarkers(v, root, body) { v.skillAura = this.services.arenaFx.stealthVeils.attachTo(root); }
+    skillAuraOn(E, t) { return E.isStealthed(t); }
+    showStealthStart(x, y) { this.services.arenaFx.stealthBursts.burst(x, y); }
     get meleeTrail() { return 22; }
     static MELEE = { color: 0xC9D6E6, spark: "#DCE3EC" };
     static MODEL = { file: "Rogue_Hooded", right: "dagger", left: "dagger",
@@ -2698,7 +2713,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       E.ultUntil = t + RogueType.ULT.asSmokeMs;
       E.stealthUntil = t + RogueType.ULT.asSmokeMs + RogueType.ULT.asDur;
       E.skillDur = RogueType.ULT.asSmokeMs + RogueType.ULT.asDur;
-      services.fxView.smoke(E.x, E.y);
+      this.showStealthStart(E.x, E.y);
     }
     ultDesc() { var services = this.services;
       return services.skilltext.secs(RogueType.ULT.asDur) + "간 은신 상태가 되고 " + services.skilltext.ultSpeedUpText(RogueType.STATS) + ". 공격 시 해제되며, 해제하는 공격이 베기면 한 번마다 " + RogueType.STATS.ambushDmg + "의 피해";
@@ -2724,11 +2739,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     hitColor(d) { return "#B07CFF"; }
     get tintsHit() { return true; }
     projectileMesh(g, d) { var services = this.services;
-      var aura = new THREE.Mesh(services.geo.ball, services.models.glowMat("necroGlow", 0x8E4DFF, 0.4)); aura.scale.setScalar(18); g.add(aura);
-      var sphere = new THREE.Mesh(services.geo.ball, services.models.basicMat("necroOrb", 0x7A3BE0, 0.95)); sphere.scale.setScalar(9); g.add(sphere);
-      var heart = new THREE.Mesh(services.geo.ball, services.models.basicMat("necroCore", 0xE6D2FF, 1)); heart.scale.setScalar(4); g.add(heart);
-      var tail = new THREE.Mesh(services.geo.trail, services.models.glowMat("trail-necro", 0x9B5CFF, 0.4)); tail.position.x = -6; tail.scale.set(42, 3.2, 3.2); g.add(tail);
-      g.userData.pulse = sphere;
+      services.arenaFx.orbs.attachTo(g, "necro");
     }
     get hasSkillClip() { return true; }
     playSkillClip(v, E, t) { var services = this.services; services.fighterMotion.playOnce(v, "Ranged_Magic_Summon", 3.2, t); }
@@ -3196,10 +3207,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     get tintsHit() { return true; }
     botUltRange() { return FrostType.ULT.frBzR * 0.8; }
     projectileMesh(g, d) { var services = this.services;
-      var frostHalo = new THREE.Mesh(services.geo.ball, services.models.glowMat("frostGlow", 0x8FD8F0, 0.4)); frostHalo.scale.setScalar(16); g.add(frostHalo);
-      var shard = new THREE.Mesh(services.geo.ball, services.models.basicMat("frostOrb", 0xBFEFFF, 0.95)); shard.scale.set(12, 5, 5); g.add(shard);
-      var frostCore = new THREE.Mesh(services.geo.ball, services.models.basicMat("orbCore", 0xffffff, 1)); frostCore.scale.setScalar(4); g.add(frostCore);
-      var frostTail = new THREE.Mesh(services.geo.trail, services.models.glowMat("trail-frost", 0xBFEFFF, 0.45)); frostTail.position.x = -6; frostTail.scale.set(46, 2.6, 2.6); g.add(frostTail);
+      services.arenaFx.orbs.attachTo(g, "frost");
     }
     get hasSkillClip() { return true; }
     playSkillClip(v, E, t) { var services = this.services;
@@ -3257,7 +3265,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var dancerTrail = new THREE.Mesh(services.geo.trail, services.models.glowMat("trail-dancer", 0xFFD9C8, 0.35)); dancerTrail.position.x = -10; dancerTrail.scale.set(40, 1.3, 1.3); g.add(dancerTrail);
     }
     launchHandOf(model) { return model.getObjectByName("muzzle") || model.getObjectByName("handslotr"); }
-    addMarkers(v, root, body) { var services = this.services; v.bladeRing = services.fighterAuras.makeBladeRing(); root.add(v.bladeRing); }
+    addMarkers(v, root, body) { v.skillAura = this.services.arenaFx.bladeStormAuras.attachTo(root); }
+    skillAuraOn(E, t) { return this.isBladeStorming(E, t); }
     get shotName() { return "단검"; }
     cast(E, ang, reach, t) {
       E.buffUntil = t + DancerType.ULT.bwDur;
@@ -4753,7 +4762,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         r.hp = pos.hp; r.alive = pos.alive; r.gauge = pos.gauge; r.dmg = pos.dmg;
         r.atkAt = pos.atkAt; r.stabAt = pos.stabAt; r.ultUntil = pos.ultUntil; r.leapAt = pos.leapAt; r.buffUntil = pos.buffUntil;
         r.regenUntil = pos.regenUntil; r.skillUntil = pos.skillUntil; r.skillDur = pos.skillDur;
-        if (pos.stealthUntil > r.stealthUntil && pos.stealthUntil > services.clock.now()) services.fxView.smoke(r.x, r.y, services.charTypes.of(r.char).smokeColor);
+        if (pos.stealthUntil > r.stealthUntil && pos.stealthUntil > services.clock.now()) services.charTypes.of(r.char).showStealthStart(r.x, r.y);
         r.stealthUntil = pos.stealthUntil;
         r.slowUntil = pos.slowUntil; r.slowMul = pos.slowMul; r.stunUntil = pos.stunUntil;
         r.summonAt = pos.summonAt;
@@ -8507,7 +8516,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       }
     }
     spareMinionRoots() { var spare = this.spareMinions; return spare.blue.concat(spare.red).map(function (v) { return v.root; }); }
-    dropVis(id) { var services = this.services; var v = services.fighterView.fighters[id]; if (!v) return; v.root.parent.remove(v.root); v.mats.forEach(function (m) { m.dispose(); }); if (v.curse) v.curse.userData.mats.forEach(function (m) { m.dispose(); }); if (v.chainRig) v.chainRig.dispose(); delete services.fighterView.fighters[id]; }
+    dropVis(id) { var services = this.services; var v = services.fighterView.fighters[id]; if (!v) return; if (v.skillAura) v.skillAura.release(); v.root.parent.remove(v.root); v.mats.forEach(function (m) { m.dispose(); }); if (v.curse) v.curse.userData.mats.forEach(function (m) { m.dispose(); }); if (v.chainRig) v.chainRig.dispose(); delete services.fighterView.fighters[id]; }
   }
   class FighterMotion {
     constructor(services) { this.services = services; }
@@ -8608,25 +8617,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   class FighterAuras {
     constructor(services) { this.services = services; }
-    makeShieldAura() { var services = this.services;
-      var g = new THREE.Group();
-      var dome = new THREE.Mesh(services.geo.shieldDome, services.matlib.shieldDomeMat); dome.scale.y = 2.1; g.add(dome);
-      var edge = new THREE.Mesh(services.geo.shieldEdge, services.matlib.shieldEdgeMat); edge.scale.y = 2.15; g.add(edge);
-      var ring = services.arenaView.flatMesh(services.geo.shieldRing, services.matlib.shieldRingMat); ring.position.y = 2; g.add(ring);
-      g.userData.edge = edge; g.userData.ring = ring;
-      g.visible = false;
-      return g;
-    }
-    makeBladeRing() { var services = this.services;
-      var g = new THREE.Group(), spin = new THREE.Group();
-      var fill = services.arenaView.flatMesh(services.geo.disc, services.matlib.bladeRingFillMat); fill.scale.setScalar(DancerType.ULT.bwR); fill.position.y = 1.6; g.add(fill);
-      var edge = services.arenaView.flatMesh(services.geo.poolEdge, services.matlib.bladeRingEdgeMat); edge.scale.setScalar(DancerType.ULT.bwR); edge.position.y = 1.8; g.add(edge);
-      for (var i = 0; i < 3; i++) { var slice = services.arenaView.flatMesh(services.geo.bladeSlice, services.matlib.bladeRingSliceMat); slice.rotation.z = i * Math.PI * 2 / 3; slice.scale.setScalar(DancerType.ULT.bwR); spin.add(slice); }
-      spin.position.y = 2; g.add(spin);
-      g.userData.spin = spin;
-      g.visible = false;
-      return g;
-    }
     makeClericHalo(v, body) { var services = this.services;
       var g = new THREE.Group();
       var shell = new THREE.Mesh(services.geo.clericHalo, services.matlib.clericHaloMat); g.add(shell);
@@ -10433,6 +10423,18 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       u.uSpearRise.value = closing;
     }
   }
+  class GuardBreakBlast extends ImpactBlast {
+    static LIFE_SEC = 0.7;
+    static FRONT_SEC = 0.16;
+    static SPREAD = 0.06;
+    static PUFF_LIFE = 0.46;
+    static PUFF_SIZE = 60;
+    static LIFT = 54;
+    static PUFFS = 14;
+    static CHIPS = 20;
+    static CHIP_SPEED = 170;
+    static TONES = { hot: 0xEAF5FF, mid: 0x6FB1FF, scorch: 0x142238, fireHot: 0xEAF5FF, fire: 0x7DB6FF, smoke: 0x46566E, chip: 0xFFD54A, ember: 0xFFE9A0 };
+  }
   class StarBlast extends ImpactBlast {
     static LIFE_SEC = 0.7;
     static FRONT_SEC = 0.14;
@@ -10488,6 +10490,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     meteor(e) { return this.add(new MeteorBlast(e.x, e.y, e.r, e.team, e.createdAt + e.delay)); }
     thunder(d) { return this.add(new ThunderBlast(d.x, d.y, d.radius + ArenaSize.BODY_R, d.team, d.createdAt)); }
     mace(d) { return this.add(new MaceBlast(this.services, d)); }
+    guardBreak(d) { return this.add(new GuardBreakBlast(d.x, d.y, d.radius + ArenaSize.BODY_R, d.team, d.createdAt)); }
     star(e) { return this.add(new (e.stun ? StunStarBlast : StarBlast)(e.x, e.y, e.r, e.team, this.services.clock.now())); }
     guardianWall(d) { return this.add(new GuardianWallBlast(d.x, d.y, d.radius + ArenaSize.BODY_R, d.team, d.createdAt, d.angle)); }
     drop(blast) { if (!blast.vis) return; this.services.stage.scene.remove(blast.vis.group); this.free.push(blast.vis); blast.vis = null; }
@@ -11368,21 +11371,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         v.glowMats.forEach(function (m) { m.emissive.setHex(glow); });
         if (v.aura) { v.aura.visible = E.alive && (E.isBerserk(t) || E.isRiposting(t)); v.aura.scale.y = 0.9 + 0.15 * Math.sin(nowMs / 90); }
         if (v.guardOrbit) v.guardOrbit.update(E.alive && E.shield, nowMs);
-        if (v.shield) {
-          v.shield.visible = E.alive && E.buffUntil > t;
-          if (v.shield.visible) {
-            v.shield.scale.setScalar(1 + 0.04 * Math.sin(nowMs / 140));
-            v.shield.userData.edge.rotation.y = nowMs / 1400;
-            v.shield.userData.ring.rotation.z = -nowMs / 900;
-          }
-        }
+        if (v.skillAura) v.skillAura.update(E.alive && services.charTypes.of(E.char).skillAuraOn(E, t), nowMs);
         if (v.halo) services.fighterAuras.renderClericHalo(v, E, t, nowMs);
         if (v.stormAura) services.fxView.renderStormAura(v, E, t, nowMs);
         services.domainView.renderCurse(v, E, t, nowMs);
-        if (v.bladeRing) {
-          v.bladeRing.visible = E.alive && E.isBladeStorming(t);
-          if (v.bladeRing.visible) v.bladeRing.userData.spin.rotation.y = -nowMs / 90;
-        }
         v.ring.visible = E.alive;
         if (v.meRing) { v.meRing.visible = E.alive; v.meRing.scale.setScalar(1 + 0.07 * Math.sin(nowMs / 160)); }
         if (v.hulls) { var outlined = E.alive && alpha > 0.99; v.hulls.forEach(function (h) { h.visible = outlined; }); }
@@ -11478,6 +11470,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.revGraceView.renderGraces(t, nowMs);
 
       services.fxView.stepFx(nowMs);
+      services.arenaFx.tick(nowMs);
       services.aimGuide.updateAimGuide();
       services.cameraRig.renderer.render(services.stage.scene, services.stage.camera);
       services.hud.drawOverlay(nowMs);
@@ -12097,10 +12090,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       this.aura = new THREE.CylinderGeometry(30, 22, 84, 18, 1, true);
       this.aura.translate(0, 42, 0);
       this.stormRing = new THREE.TorusGeometry(1, 0.045, 5, 36);
-      this.shieldDome = new THREE.SphereGeometry(46, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2);
-      this.shieldEdge = new THREE.IcosahedronGeometry(47, 1);
-      this.shieldRing = new THREE.RingGeometry(44, 50, 6);
-      this.bladeSlice = new THREE.RingGeometry(0.55, 0.95, 16, 1, 0, Math.PI * 0.35);
       this.chainLink = new THREE.TorusGeometry(DraggedChain.LINK_R, DraggedChain.LINK_TUBE, DraggedChain.LINK_RADIAL, DraggedChain.LINK_TUBULAR);
       this.chainWrap = new THREE.TorusGeometry(1, 0.11, 5, 16);
       this.slamQuad = new THREE.PlaneGeometry(1, 1);
@@ -12115,9 +12104,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       this.stormPlane = new THREE.PlaneGeometry(1, 1);
       this.skyBeam = new THREE.CylinderGeometry(1, 1, 1, 14, 1, true);
       this.skyBeam.translate(0, 0.5, 0);
-      this.domainDome = new THREE.SphereGeometry(1, 40, 16, 0, Math.PI * 2, 0, Math.PI / 2);
-      this.domainShards = new THREE.IcosahedronGeometry(1, 2);
-      this.domainRim = new THREE.RingGeometry(0.975, 1, 72);
       this.boltSeg = new THREE.CylinderGeometry(1, 1, 1, 5, 1, true);
       this.boltSeg.translate(0, 0.5, 0);
     }
@@ -12137,14 +12123,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         blue: new THREE.MeshBasicMaterial({ color: Palette.C_TEAM.blue, transparent: true, opacity: 0.3, depthWrite: false }),
         red: new THREE.MeshBasicMaterial({ color: Palette.C_TEAM.red, transparent: true, opacity: 0.3, depthWrite: false })
       };
-      this.auraMat = new THREE.MeshBasicMaterial({ color: 0xFF3B1F, transparent: true, opacity: 0.3, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
       this.riposteAuraMat = new THREE.MeshBasicMaterial({ color: 0xFFFFFF, transparent: true, opacity: 0.28, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
-      this.shieldDomeMat = new THREE.MeshBasicMaterial({ color: 0x3D8CFF, transparent: true, opacity: 0.32, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
-      this.shieldEdgeMat = new THREE.MeshBasicMaterial({ color: 0x8CCBFF, transparent: true, opacity: 0.5, wireframe: true, depthWrite: false, blending: THREE.AdditiveBlending });
-      this.shieldRingMat = new THREE.MeshBasicMaterial({ color: 0xFFD54A, transparent: true, opacity: 0.85, depthWrite: false, side: THREE.DoubleSide });
-      this.bladeRingFillMat = new THREE.MeshBasicMaterial({ color: 0xB0272C, transparent: true, opacity: 0.12, depthWrite: false });
-      this.bladeRingEdgeMat = new THREE.MeshBasicMaterial({ color: 0xF2F2F2, transparent: true, opacity: 0.55, depthWrite: false });
-      this.bladeRingSliceMat = new THREE.MeshBasicMaterial({ color: 0xFFFFFF, transparent: true, opacity: 0.4, depthWrite: false, side: THREE.DoubleSide });
       this.clericHaloMat = new THREE.MeshBasicMaterial({ color: 0xFFD84A, transparent: true, opacity: 0.32, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
       this.clericRingMat = new THREE.MeshBasicMaterial({ color: 0xFFE9A0, transparent: true, opacity: 0.7, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
       this.clericBookGlowMat = new THREE.MeshBasicMaterial({ color: 0xFFF1B0, transparent: true, opacity: 0.5, depthWrite: false, blending: THREE.AdditiveBlending });
@@ -12263,7 +12242,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class PerfProbe {
-    static BUILD = "lag18";
+    static BUILD = "lag19";
     static PATH = "perfDiag/teambattle/";
     static RTT_KEEP = 50;
     static RECORDS = !Environment.SILENT_RUN;
@@ -12692,14 +12671,14 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var mages = this.castersByTeam("mage"), smiths = this.castersByTeam("blacksmith"), giants = this.castersByTeam("giant"), giantCount = giants.blue + giants.red, mageCount = mages.blue + mages.red;
       var hitmen = this.castersByTeam("hitman"), hitmanCount = hitmen.blue + hitmen.red;
       var snipers = this.castersByTeam("sniper"), sniperCount = snipers.blue + snipers.red, guardians = this.castersByTeam("guardian"), guardianCount = guardians.blue + guardians.red;
-      var throwers = this.castersByTeam("thrower"), shamans = this.castersByTeam("shaman"), stargazers = this.castersByTeam("astrologer"), throwerCount = throwers.blue + throwers.red, starCount = (stargazers.blue + stargazers.red) * 2;
-      services.arenaFx.prefillForMatch({ toxicPools: throwerCount * (ThrowerType.ULT.plMax + 1), domains: shamans.blue + shamans.red, starfalls: starCount });
+      var rogues = this.castersByTeam("rogue"), rangers = this.castersByTeam("ranger"), knights = this.castersByTeam("knight"), throwers = this.castersByTeam("thrower"), shamans = this.castersByTeam("shaman"), stargazers = this.castersByTeam("astrologer"), throwerCount = throwers.blue + throwers.red, starCount = (stargazers.blue + stargazers.red) * 2;
+      services.arenaFx.prefillForMatch({ toxicPools: throwerCount * (ThrowerType.ULT.plMax + 1), domains: shamans.blue + shamans.red, starfalls: starCount, stealthBursts: rogues.blue + rogues.red });
       services.poolView.prefillBottles(throwerCount * 2);
       services.hitmanSlashView.prefill(hitmanCount * 3);
-      services.sniperShots.prefill(sniperCount * 3);
+      services.sniperShots.prefill(sniperCount * 3 + (rangers.blue + rangers.red) * 4);
       services.meteorFall.prefill(mageCount);
       services.galeView.prefill(giantCount);
-      services.impactBlasts.prefill(mageCount + smiths.blue + smiths.red + giantCount * 2 + hitmanCount + sniperCount + guardianCount + starCount);
+      services.impactBlasts.prefill(mageCount + smiths.blue + smiths.red + giantCount * 2 + hitmanCount + sniperCount + guardianCount + starCount + knights.blue + knights.red);
       if (clerics.blue + clerics.red) services.revGraceView.prefillBeams(RevGraceView.MAX_BEAMS);
       ["blue", "red"].forEach(function (team) {
         services.fighterView.prefillMinions(team, necros[team] * NecroType.ULT.smMax);
@@ -13276,7 +13255,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.gargantua = new GargantuaView(services);
       services.galeView = new GolemGaleView(services);
       services.meteorFall = new MeteorFallView(services);
-      services.arenaFx = new ArenaFxViews({ THREE: THREE, noise: function () { return WaterNoise.texture(); }, scene: function () { return services.stage.scene; }, pixelScale: function () { return WaterNoise.pixelScale(services); }, isLite: function () { return services.cameraRig.pix < Environment.PIX_START; }, meteorPath: function () { return { dir: MeteorLook.DIR, top: MeteorLook.TOP }; } });
+      services.arenaFx = new ArenaFxViews({ THREE: THREE, noise: function () { return WaterNoise.texture(); }, scene: function () { return services.stage.scene; }, pixelScale: function () { return WaterNoise.pixelScale(services); }, isLite: function () { return services.cameraRig.pix < Environment.PIX_START; }, meteorPath: function () { return { dir: MeteorLook.DIR, top: MeteorLook.TOP }; }, bladeStormRadius: DancerType.ULT.bwR });
       services.impactBlasts = new ImpactBlastView(services);
       services.hitmanSlashView = new HitmanSlashView(services);
       services.sniperShots = new SniperShotView(services);
