@@ -11337,12 +11337,13 @@ SinglePassMaterials.enable(THREE);
       var spec = !services.match.me, fl = !spec && services.input.flip(), b = services.cameraRig.camBasis(fl);
       var key = services.cameraRig.w + "x" + services.cameraRig.h + (spec ? "s" + services.hud.specPanelW() : "p") + (fl ? "f" : "");
       if (services.cameraRig.view.fitKey !== key) {
-        services.cameraRig.view.fitKey = key; services.cameraRig.view.snap = true;
+        var keepFollowView = spec && services.specFollow.on;
+        services.cameraRig.view.fitKey = key; if (!keepFollowView) services.cameraRig.view.snap = true;
         if (spec) {
           var xMax = Math.max(0.3, 1 - 2 * (services.hud.specPanelW() + 16) / Math.max(1, services.cameraRig.w));
           services.cameraRig.view.specXMax = xMax;
           services.cameraRig.view.fullDist = services.cameraRig.fitDist([[0, 0, ArenaSize.MH], [ArenaSize.MW, 0, ArenaSize.MH], [0, CameraRig.HEAD_Y, 0], [ArenaSize.MW, CameraRig.HEAD_Y, 0]], ArenaSize.MW / 2, ArenaSize.MH / 2, services.cameraRig.view.pitchSpec, xMax);
-          services.cameraRig.view.dist = services.cameraRig.view.fullDist;
+          if (!keepFollowView) services.cameraRig.view.dist = services.cameraRig.view.fullDist;
         } else {
           var half = (CameraRig.VIEW_AHEAD - CameraRig.VIEW_BEHIND) / 2;
           services.cameraRig.view.dist = services.cameraRig.fitDist([[-CameraRig.VIEW_HALF_W, 0, -CameraRig.VIEW_AHEAD], [CameraRig.VIEW_HALF_W, 0, -CameraRig.VIEW_AHEAD], [-CameraRig.VIEW_HALF_W, 0, CameraRig.VIEW_BEHIND], [CameraRig.VIEW_HALF_W, 0, CameraRig.VIEW_BEHIND]],

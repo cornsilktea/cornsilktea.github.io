@@ -2700,6 +2700,20 @@ class ResultCollector {
     } finally { view.fullDist = saved.full; view.specXMax = saved.xMax; F.on = saved.on; F.aliveBounds = saved.bounds; F.paint(); btn.hidden = saved.hidden; }
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "버튼 글자·표시, 범위에 맞춘 거리, 최소·최대 한계, 선수 없을 때 전체 화면");
   });
+  run(FLOWG, "관전 자동 추적 중 화면이 다시 맞춰져도(경기 종료 때 showScreen) 카메라 거리가 전체 화면으로 튀지 않는가", function (done) {
+    var bad = [], F = api.SPEC_FOLLOW, R = api.CAMERA_RIG, view = R.view, saved = { me: api.MATCH.me, on: F.on, dist: view.dist, snap: view.snap };
+    try {
+      api.MATCH.me = null; R.resize(); R.updateCamera(0.016);
+      var full = view.fullDist, followed = full * 0.7;
+      F.on = true; view.dist = followed;
+      R.resize(); R.updateCamera(0.016);
+      if (view.dist > followed * 1.05) bad.push("거리가 튐 " + view.dist + " / 원래 " + followed + " / 전체 " + full);
+      F.on = false; view.dist = followed;
+      R.resize(); R.updateCamera(0.016);
+      if (Math.abs(view.dist - full) > 1) bad.push("전체 화면 모드는 전체 거리로 맞춰져야 함 " + view.dist);
+    } finally { api.MATCH.me = saved.me; F.on = saved.on; view.dist = saved.dist; view.snap = saved.snap; R.resize(); }
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "추적 중에는 다시 맞춰도 거리 유지, 전체 화면 모드는 전체 거리");
+  });
   run(FLOWG, "경기 종료 2초 배너: 선수는 승리(파랑)·패배(빨강), 관전자는 'OO팀 승리!'(흰 글자·팀색 테두리), 무승부, 2초가 지나면 꺼지는가", function (done) {
     var bad = [], B = api.END_BANNER;
     var win = B.wordsFor("blue", "blue"), lose = B.wordsFor("blue", "red"), blueSpec = B.wordsFor("blue", null), redSpec = B.wordsFor("red", null), draw = B.wordsFor("draw", "blue");
