@@ -28,11 +28,11 @@
   [라이브러리] three.js r128 GLTFLoader·SkeletonUtils (MIT) — cdn.jsdelivr.net/npm/three@0.128.0/examples/js/
 -->
 <head>
-<script charset="utf-8" src="firebase-config.js"></script>
-<script charset="utf-8" src="access-guard.js" data-game="fpssurvival"></script>
-<script charset="utf-8" src="fullscreen-keeper.js" data-watch></script>
-<script charset="utf-8" src="world-record.js"></script>
-<script charset="utf-8" src="quality-governor.js"></script>
+<script charset="utf-8" src="common/firebase-config.js"></script>
+<script charset="utf-8" src="common/access-guard.js" data-game="fpssurvival"></script>
+<script charset="utf-8" src="common/fullscreen-keeper.js" data-watch></script>
+<script charset="utf-8" src="common/world-record.js"></script>
+<script charset="utf-8" src="common/quality-governor.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>FPS 서바이벌</title>
@@ -43,7 +43,7 @@
 <meta property="og:url" content="https://cornsilktea.github.io/25.fps-survival.html">
 <meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
 <meta name="twitter:card" content="summary">
-<link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="common/theme.css">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { width: 100%; height: 100%; overflow: hidden; background: #DDE3E8; font-family: var(--sg-font); color: var(--sg-ink); }
@@ -467,12 +467,12 @@
 <button type="button" id="btnGameLeave" hidden>나가기</button>
 
 <script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }</script>
-<script charset="utf-8" src="character-kit.js?v=20261011"></script>
-<script charset="utf-8" src="character-maker.js?v=20261026a"></script>
-<script charset="utf-8" src="room-drop-recovery.js?v=20261106b"></script>
-<script charset="utf-8" src="match-kit.js?v=20261103a"></script>
-<script charset="utf-8" src="account-match-kit.js?v=20261103e"></script>
-<script charset="utf-8" src="25.fps-survival-stats.js?v=20261027b"></script>
+<script charset="utf-8" src="common/character-kit.js?v=20261011"></script>
+<script charset="utf-8" src="common/character-maker.js?v=20261026a"></script>
+<script charset="utf-8" src="common/room-drop-recovery.js?v=20261106b"></script>
+<script charset="utf-8" src="common/match-kit.js?v=20261103a"></script>
+<script charset="utf-8" src="common/account-match-kit.js?v=20261103e"></script>
+<script charset="utf-8" src="games/25.fps-survival/25.fps-survival-stats.js?v=20261027b"></script>
 <script>new CharacterMakerDialog(undefined, false);</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>

@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-<script charset="utf-8" src="firebase-config.js"></script>
-<script charset="utf-8" src="access-guard.js" data-game="freekick"></script>
-<script charset="utf-8" src="world-record.js"></script>
+<script charset="utf-8" src="common/firebase-config.js"></script>
+<script charset="utf-8" src="common/access-guard.js" data-game="freekick"></script>
+<script charset="utf-8" src="common/world-record.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>프리킥 챌린지</title>
@@ -14,7 +14,7 @@
 <meta property="og:url" content="https://cornsilktea.github.io/27.freekick-challenge.html">
 <meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
 <meta name="twitter:card" content="summary">
-<link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="common/theme.css">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { width: 100%; height: 100%; overflow: hidden; background: #DDE3E8; font-family: var(--sg-font); color: var(--sg-ink); }
@@ -453,7 +453,7 @@ const netMat = new THREE.MeshBasicMaterial({ map: netTex, transparent: true, opa
   scene.add(g);
 })();
 
-const STADIUM_IMG = "27.freekick-stadium.jpg";
+const STADIUM_IMG = "img/freekick/27.freekick-stadium.jpg";
 const STADIUM_GRASS = 0.14;
 const STADIUM_R = 45, STADIUM_ARC = 120, STADIUM_BEHIND = 14;
 const standsGroup = new THREE.Group(); scene.add(standsGroup);

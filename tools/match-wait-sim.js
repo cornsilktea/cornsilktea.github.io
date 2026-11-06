@@ -5,7 +5,7 @@ const fs = require("fs"), vm = require("vm"), path = require("path");
 class MatchKitLoader {
   static NAMES = ["MkVersusMatcher", "MkRecentRivals"];
   static load() {
-    const src = fs.readFileSync(path.join(__dirname, "..", "match-kit.js"), "utf8") + "\n;({" + MatchKitLoader.NAMES.join(",") + "})";
+    const src = fs.readFileSync(path.join(__dirname, "..", "common/match-kit.js"), "utf8") + "\n;({" + MatchKitLoader.NAMES.join(",") + "})";
     return vm.runInNewContext(src, { console, Math, Date, JSON, Object, Array, String, Number, Set, Map, Promise, setTimeout, clearTimeout });
   }
 }

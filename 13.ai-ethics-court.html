@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-<script charset="utf-8" src="firebase-config.js"></script>
-<script charset="utf-8" src="access-guard.js" data-game="aiethicscourt"></script>
+<script charset="utf-8" src="common/firebase-config.js"></script>
+<script charset="utf-8" src="common/access-guard.js" data-game="aiethicscourt"></script>
 <meta charset="UTF-8">
-<link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="common/theme.css">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AI판사 체험하기</title>
 <meta property="og:type" content="website">
@@ -250,7 +250,7 @@
   </section>
 </main>
 
-<script charset="utf-8" src="court-cases.js"></script>
+<script charset="utf-8" src="games/13.ai-ethics-court/court-cases.js"></script>
 <script>
 (function(){
   "use strict";
@@ -470,8 +470,8 @@
   joinUrl.textContent = VOTE_URL.replace(/^https?:\/\//, "");
   render();
   if (!ready()){
-    setLink(false, "firebase-config.js 확인");
-    caseText.textContent = "설정 파일(firebase-config.js)의 주소를 읽지 못했습니다.";
+    setLink(false, "common/firebase-config.js 확인");
+    caseText.textContent = "설정 파일(common/firebase-config.js)의 주소를 읽지 못했습니다.";
   } else {
     resumeSession();
     setInterval(function(){ if (!document.hidden) refresh(); }, POLL_MS);

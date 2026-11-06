@@ -1,0 +1,1976 @@
+// 랜덤 매칭 공용 모듈(Mk*). 모든 대전 게임이 같이 쓴다 — 게임마다 복사하지 않는다.
+// 구조와 이유는 docs/common/random-match-prompt.md. 요약:
+//  - 팀 대기실(MkParty): <게임>/parties/<5자리 코드>. 팀원·아군 AI 수·팀장·전적을 둔다.
+//    코드는 일반 방(<게임>/rooms/<코드>)과 겹치지 않게 만들어서, 기존 "방 코드로 입장" 칸 하나로 둘 다 받는다.
+//  - 대기열(MkQueue): matchQueue/<대기열 이름>/<팀 코드>. 팀 하나가 항목 하나.
+//  - 묶기(MkBinder): 대기열에서 가장 먼저 들어온 "준비된" 항목의 팀장만 묶는다. 준비 = 들어온 지 3초가 지남.
+//    여러 명이 동시에 묶지 않게 대기열 전체를 transaction 으로 차지(claim)한다. 차지한 사람이 방을 못 만들고
+//    사라지면 차지는 CLAIM_EXPIRE 뒤 풀린다.
+//  - 묶는 규칙은 MkMatcher 를 이은 클래스(1대1·팀 대 팀 = MkVersusMatcher, 여럿이 한 방 = MkFreeForAllMatcher)가 정한다.
+//    일반 방을 실제로 만드는 일은 게임마다 다르므로 게임이 MkRoomMaker 를 넘긴다.
+//  - 대기열은 on('value') 구독으로만 본다(폴링 없음). 3초 대기는 기기 안 타이머로 다시 계산만 한다.
+// 이 파일은 화면과 무관한 부분(Node 시뮬레이터 tools/match-sim.js 가 그대로 불러 검사)과
+// 계정별 연승(MkPersonalStreak)·연승 표시(MkStreakBadge)로 나뉜다. 모양은 common/theme.css 의 .mk-* .
+
+type MkResult = "win" | "draw" | "lose";
+
+interface MkClock {
+  now(): number;
+}
+
+interface MkMember {
+  nick: string;
+  joinedAt: number;
+  look?: CharacterLook | null;
+  // 계정 누적 승패(사람과 한 랜덤 매칭). 승률 구간 매칭(MkWinBandVersusMatcher)을 쓰는 게임만 넣는다.
+  rate?: MkWinRate | null;
+  // 이 학생이 최근에 한 맵(가장 최근이 앞). 맵을 고르는 게임이 같은 맵이 이어 나오지 않게 쓴다(MkRecentMaps).
+  recentMaps?: string[] | null;
+}
+
+// 랜덤 매칭 맵 고르기(2026-10-28 선생님 요청: 24번 맵이 계속 비슷하게 나온다).
+// 매칭된 모든 사람의 바로 전 맵을 빼고 남은 맵 중에서 plan.seed 로 고른다. 다 빠지면 전체에서 고른다.
+class MkRecentMaps {
+  static readonly KEEP = 2;
+  static readonly AVOID_LAST = 1;
+
+  static clean(list: unknown): string[] | null {
+    if (!Array.isArray(list)) return null;
+    const maps = list.filter((item) => typeof item === "string" && item.length > 0 && item.length <= 40).slice(0, MkRecentMaps.KEEP) as string[];
+    return maps.length ? maps : null;
+  }
+
+  static noted(list: unknown, map: string): string[] {
+    return [map].concat((MkRecentMaps.clean(list) || []).filter((item) => item !== map)).slice(0, MkRecentMaps.KEEP);
+  }
+
+  static avoidOf(plan: MkMatchPlan): string[] {
+    const avoid: string[] = [];
+    plan.groups.forEach((group) => Object.keys(group.entry.people || {}).forEach((id) => {
+      (MkRecentMaps.clean(group.entry.people[id].recentMaps) || []).slice(0, MkRecentMaps.AVOID_LAST).forEach((map) => { if (avoid.indexOf(map) < 0) avoid.push(map); });
+    }));
+    return avoid;
+  }
+
+  static pick(maps: string[], plan: MkMatchPlan): string {
+    const avoid = MkRecentMaps.avoidOf(plan);
+    const fresh = maps.filter((map) => avoid.indexOf(map) < 0);
+    const pool = fresh.length ? fresh : maps;
+    return pool[Math.abs(plan.seed) % pool.length];
+  }
+}
+
+interface MkWinRate {
+  g: number;
+  w: number;
+}
+
+interface MkSearch {
+  since: number;
+}
+
+interface MkTicket {
+  matchId: string;
+  room: string;
+  side: number;
+  host: string;
+  expect: number;
+  at: number;
+  rivals: string[];
+  // 상대 학생 아이디 → 닉네임. 판이 끝났을 때 실제로 경기장에 들어온 상대만 전적에 남기는 데 쓴다.
+  rivalIds?: Record<string, string>;
+  map?: string;
+}
+
+interface MkHistoryLine {
+  n: number;
+  matchId: string;
+  at: number;
+  result: MkResult;
+  rivals: string[];
+  map?: string;
+  rank?: number;
+  of?: number;
+}
+
+interface MkLastMatch {
+  rivals?: string[];
+  ai?: boolean;
+  recent?: string[][];
+}
+
+interface MkPartyRecord {
+  leaderId: string;
+  createdAt: number;
+  members?: Record<string, MkMember>;
+  bots?: number;
+  search?: MkSearch | null;
+  match?: MkTicket | null;
+  history?: Record<string, MkHistoryLine>;
+  last?: MkLastMatch | null;
+  leftAt?: number | null;
+}
+
+interface MkClaim {
+  by: string;
+  at: number;
+  id: string;
+}
+
+// size 0 + busyUntil 인 항목은 "경기 중이라 곧 돌아올 팀" 표지판이다(MkBusySign). 묶이지는 않고,
+// 다른 팀이 같은 상대와 또 붙기 전에 잠깐 기다릴지 정하는 데만 쓴다.
+interface MkQueueEntry {
+  leader: string;
+  people: Record<string, MkMember>;
+  bots: number;
+  size: number;
+  at: number;
+  claim?: MkClaim | null;
+  avoid?: string[];
+  recent?: string[][];
+  owed?: boolean;
+  busyUntil?: number;
+}
+
+type MkQueueMap = Record<string, MkQueueEntry>;
+
+interface MkPlannedEntry {
+  code: string;
+  entry: MkQueueEntry;
+  side: number;
+}
+
+interface MkMatchPlan {
+  matchId: string;
+  seed: number;
+  binder: string;
+  groups: MkPlannedEntry[];
+}
+
+interface MkRoomMade {
+  room: string;
+  host: string;
+  map?: string;
+}
+
+interface MkRoomMaker {
+  create(plan: MkMatchPlan): Promise<MkRoomMade | null>;
+  discard?(made: MkRoomMade): Promise<void>;
+}
+
+interface MkOutcome {
+  result: MkResult;
+  rank?: number;
+  of?: number;
+  // 실제로 함께 달린 상대(빈 배열이면 AI). 표의 상대가 끝내 안 와서 AI 와 했을 때 게임이 알려 준다.
+  rivals?: string[];
+}
+
+// 게임의 계정 통계 창과 이어 주는 고리. 팀 대기실의 "📊 내 통계" 버튼이 open 을 부르고,
+// 계정 통계가 따로 없는 게임(32·34·35)은 recordOutcome 으로 판 결과를 계정에 남긴다(ts/common/account-match-kit.ts 의 RandomMatchAccount).
+interface MkStatsLink {
+  open(): void;
+  recordOutcome?(ticket: MkTicket, outcome: MkOutcome): void;
+  guard?: MkMatchGuard;
+}
+
+// 랜덤 매칭 판을 시작할 때 계정에 패배를 미리 적어 두고(arm), 판이 결과 없이 취소되면 지우고(disarm),
+// 대기실에 들어올 때 지난번에 결과 없이 사라진 판을 패배로 정산한다(settle). 2026-10-27 선생님 요청.
+// arm 이 false 면 게임이 아직 패배 보고를 만들 수 없는 때(경기 전)라 다음 방 변화 때 다시 부른다.
+interface MkMatchGuard {
+  arm(ticket: MkTicket): boolean;
+  disarm(ticket: MkTicket): void;
+  settle(): void;
+}
+
+// p: 시작했지만 아직 결과가 없는 판(미리 적어 둔 패배). 다음에 읽을 때 남아 있으면 그 판은 진 것으로 본다.
+interface MkStreakRecord {
+  n: number;
+  b: number;
+  id: string;
+  p?: string;
+}
+
+interface MkJoinOutcome {
+  ok: boolean;
+  message: string;
+}
+
+interface MkTiming {
+  settleMs: number;
+  claimExpireMs: number;
+  rematchWaitMs?: number;
+  busyMs?: number;
+  returnGraceMs?: number;
+  spreadWaitMs?: number;
+}
+
+interface MkPickContext {
+  now: number;
+  othersComing: boolean;
+  owedComing: boolean;
+  crowded: boolean;
+}
+
+class MkPaths {
+  constructor(readonly queue: string, readonly parties: string, readonly rooms: string) {}
+
+  static forGame(gameRoot: string, queueName: string): MkPaths {
+    return new MkPaths("matchQueue/" + queueName, gameRoot + "/parties", gameRoot + "/rooms");
+  }
+
+  party(code: string): string {
+    return this.parties + "/" + code;
+  }
+
+  entry(code: string): string {
+    return this.queue + "/" + code;
+  }
+}
+
+// 사람과 한 최근 판들의 상대 팀 코드(최신 순, KEEP 판까지). AI 판은 칸을 쓰지 않는다.
+class MkRecentRivals {
+  static readonly KEEP = 2;
+
+  static push(previous: string[][] | undefined, rivals: string[]): string[][] {
+    const kept = MkRecentRivals.lists(previous);
+    return rivals.length ? [rivals.slice()].concat(kept).slice(0, MkRecentRivals.KEEP) : kept;
+  }
+
+  static codes(recent: string[][] | undefined): string[] {
+    const codes: string[] = [];
+    MkRecentRivals.lists(recent).forEach((list) => list.forEach((code) => { if (codes.indexOf(code) < 0) codes.push(code); }));
+    return codes;
+  }
+
+  // Firebase 는 배열을 번호 키 객체로 돌려줄 수 있어 둘 다 받는다.
+  private static lists(value: unknown): string[][] {
+    if (!value || typeof value !== "object") return [];
+    const source = value as Record<string, unknown>;
+    return Object.keys(source).map((key) => {
+      const inner = source[key];
+      return inner && typeof inner === "object" ? Object.keys(inner as object).map((k) => (inner as Record<string, string>)[k]) : [];
+    });
+  }
+}
+
+// 대기열(기다리는 팀 + 경기 중 표지판)이 ON 팀 이상이면 붙는 팀이 충분히 많다고 보고 "최근 2판 상대 피하기"를 켠다.
+// OFF 팀 이하로 줄면 끈다(경계에서 깜빡이지 않게 두 값을 다르게 둠). 2026-11-03 선생님 요청.
+class MkCrowdGuard {
+  static readonly ON = 7;
+  static readonly OFF = 5;
+  static readonly SPREAD_WAIT_MS = 45000;
+  private crowded = false;
+
+  update(entries: MkQueueMap | null, now: number): boolean {
+    const count = Object.keys(entries || {}).filter((code) => {
+      const entry = (entries as MkQueueMap)[code];
+      return !!entry && (entry.size > 0 || (MkMatcher.isSign(entry) && (entry.busyUntil as number) > now));
+    }).length;
+    if (count >= MkCrowdGuard.ON) this.crowded = true;
+    else if (count <= MkCrowdGuard.OFF) this.crowded = false;
+    return this.crowded;
+  }
+}
+
+// 묶기 규칙의 공통 부분: 누가 준비됐는지, 누가 묶을 차례인지, 다음에 언제 다시 볼지.
+// 어떤 항목을 몇 개 고르고 어느 편에 넣는지는 자식 클래스가 정한다.
+// 시간 값의 이유:
+//  - rematchWaitMs(40초): 방금 붙은 두 팀만 대기열에 있고 다른 팀이 경기 중이면, 그 팀이 돌아올 때까지 이만큼 기다렸다가
+//    그래도 없으면 다시 붙인다. AI 와 한 판 한 팀은 AI 대체(30초)만큼 늦게 끝나므로 그보다 길어야 섞인다.
+//  - busyMs(4분): 경기 중 표지판이 스스로 사라지는 시간(30번 드래프트+경기+결과가 3분 남짓).
+//  - returnGraceMs(25초): 판이 끝나 팀 대기실로 돌아온 팀이 "매칭 시작"을 다시 누를 때까지 기다려 주는 시간.
+abstract class MkMatcher {
+  static readonly TIMING: MkTiming = { settleMs: 3000, claimExpireMs: 10000, rematchWaitMs: 40000, busyMs: 240000, returnGraceMs: 25000 };
+
+  private readonly crowd = new MkCrowdGuard();
+
+  constructor(readonly partyLimit: number, protected readonly timing: MkTiming = MkMatcher.TIMING) {}
+
+  protected abstract pick(ready: Array<[string, MkQueueEntry]>, context: MkPickContext): Array<[string, MkQueueEntry]> | null;
+
+  protected abstract sides(count: number, random: () => number): number[];
+
+  // 두 항목이 서로 만나도 되는지. 기본은 누구와도 만난다(승률 구간 매칭이 덮어씀).
+  canMeet(_a: MkQueueEntry, _b: MkQueueEntry): boolean {
+    return true;
+  }
+
+  get rematchWaitMs(): number {
+    return this.timing.rematchWaitMs ?? (MkMatcher.TIMING.rematchWaitMs as number);
+  }
+
+  get busyMs(): number {
+    return this.timing.busyMs ?? (MkMatcher.TIMING.busyMs as number);
+  }
+
+  get returnGraceMs(): number {
+    return this.timing.returnGraceMs ?? (MkMatcher.TIMING.returnGraceMs as number);
+  }
+
+  // 팀이 많을 때 붙는 단계 구분: 처음 spreadWaitMs 동안은 최근 2판 상대까지 피하고, 그 뒤에는 바로 전 상대만 피한다.
+  get spreadWaitMs(): number {
+    return this.timing.spreadWaitMs ?? MkCrowdGuard.SPREAD_WAIT_MS;
+  }
+
+  // 정원이 안 찬 묶음을 이만큼(ms) 더 기다려 준다. 0 이면 기다리지 않는다(자식이 덮어씀).
+  get holdWaitMs(): number {
+    return 0;
+  }
+
+  get avoidWaitMs(): number {
+    return 0;
+  }
+
+  protected isCrowded(entries: MkQueueMap | null, now: number): boolean {
+    return this.crowd.update(entries, now);
+  }
+
+  static metRecently(a: [string, MkQueueEntry], b: [string, MkQueueEntry]): boolean {
+    return (a[1].avoid || []).indexOf(b[0]) >= 0 || (b[1].avoid || []).indexOf(a[0]) >= 0;
+  }
+
+  static metRecentTwo(a: [string, MkQueueEntry], b: [string, MkQueueEntry]): boolean {
+    return MkMatcher.metRecently(a, b) || MkRecentRivals.codes(a[1].recent).indexOf(b[0]) >= 0 || MkRecentRivals.codes(b[1].recent).indexOf(a[0]) >= 0;
+  }
+
+  static isSign(entry: MkQueueEntry): boolean {
+    return !!entry && !(entry.size > 0) && !!entry.busyUntil;
+  }
+
+  anchor(entries: MkQueueMap | null, now: number): string | null {
+    const ready = this.ready(entries, now);
+    return ready.length ? ready[0][0] : null;
+  }
+
+  // 나 말고 지금 묶일 수 있는 팀이 대기열에 있는지. 있으면 AI 대체를 미룬다(사람끼리 붙는 게 먼저).
+  hasCompany(entries: MkQueueMap | null, now: number, myCode: string): boolean {
+    return this.ready(entries, now).some(([code]) => code !== myCode);
+  }
+
+  // 곧 묶일 수 있게 될 팀: 경기 중 표지판, 또는 막 들어와 아직 준비(settleMs) 중인 팀. onlyOwed 면 AI 와 한 판 한 팀만 센다.
+  othersComing(entries: MkQueueMap | null, now: number, onlyOwed: boolean): boolean {
+    return Object.keys(entries || {}).some((code) => {
+      const entry = (entries as MkQueueMap)[code];
+      if (!entry || (onlyOwed && !entry.owed)) return false;
+      if (MkMatcher.isSign(entry)) return (entry.busyUntil as number) > now;
+      return entry.size > 0 && entry.at + this.timing.settleMs > now;
+    });
+  }
+
+  plan(entries: MkQueueMap | null, now: number, random: () => number): MkMatchPlan | null {
+    const ready = this.ready(entries, now);
+    if (!ready.length) return null;
+    const picked = this.pick(ready, { now, othersComing: this.othersComing(entries, now, false), owedComing: this.othersComing(entries, now, true), crowded: this.isCrowded(entries, now) });
+    if (!picked || picked[0][0] !== ready[0][0]) return null;
+    const sides = this.sides(picked.length, random);
+    return {
+      matchId: ready[0][0] + "-" + now.toString(36) + "-" + Math.floor(random() * 1e6).toString(36),
+      seed: Math.floor(random() * 2147483647),
+      binder: ready[0][0],
+      groups: picked.map(([code, entry], index) => ({ code, entry, side: sides[index] })),
+    };
+  }
+
+  isFree(entry: MkQueueEntry, now: number): boolean {
+    return !entry.claim || now - entry.claim.at > this.timing.claimExpireMs;
+  }
+
+  nextCheck(entries: MkQueueMap | null, now: number): number | null {
+    let next: number | null = null;
+    Object.keys(entries || {}).forEach((code) => {
+      const entry = (entries as MkQueueMap)[code];
+      if (!entry) return;
+      const moments = MkMatcher.isSign(entry) ? [(entry.busyUntil as number) + 1] : [entry.at + this.timing.settleMs, entry.at + this.timing.settleMs + this.spreadWaitMs + 1, entry.at + this.timing.settleMs + this.rematchWaitMs + 1];
+      [this.holdWaitMs, this.avoidWaitMs].forEach((wait) => { if (wait > 0) moments.push(entry.at + this.timing.settleMs + wait + 1); });
+      if (entry.claim) moments.push(entry.claim.at + this.timing.claimExpireMs + 1);
+      moments.forEach((moment) => {
+        if (moment > now && (next === null || moment < next)) next = moment;
+      });
+    });
+    return next;
+  }
+
+  // 지난 판을 AI 와 한 팀(owed)이 맨 앞 — 팀 수가 홀수일 때 AI 와 하는 차례가 한 팀에 몰리지 않고 돌아가게.
+  // 나머지는 먼저 온 순서.
+  protected ready(entries: MkQueueMap | null, now: number): Array<[string, MkQueueEntry]> {
+    return Object.keys(entries || {})
+      .map((code) => [code, (entries as MkQueueMap)[code]] as [string, MkQueueEntry])
+      .filter(([, entry]) => entry && entry.size > 0 && entry.at + this.timing.settleMs <= now && this.isFree(entry, now))
+      .sort((a, b) => (a[1].owed ? 0 : 1) - (b[1].owed ? 0 : 1) || a[1].at - b[1].at || (a[0] < b[0] ? -1 : 1));
+  }
+}
+
+// 두 편이 맞붙는 게임(24·25·30·34·35): 맨 앞 팀과 그다음 준비된 팀을 묶고 편은 무작위.
+// 바로 전 판 상대(avoid)는 건너뛰고, 그 상대밖에 없으면 경기 중인 다른 팀(표지판)이 있을 때만 rematchWaitMs 까지 기다린다.
+// AI 와 한 판 한 팀이 곧 돌아오는데 남은 팀이 딱 둘이면, 둘을 묶지 않고 잠깐 기다린다 — 그래야 그 팀이 또 혼자 남아
+// AI 를 연달아 만나지 않고, 대신 남은 둘 중 한 팀이 다음 AI 차례가 된다(팀 수가 홀수일 때 AI 차례 돌리기).
+// 팀이 많을 때(MkCrowdGuard) 최근 2판 상대를 피한다(2026-11-03 선생님 요청): 처음 spreadWaitMs(60초) 동안은 그런 상대가 없으면 기다리고
+// (맞는 상대가 하나도 없는 항목은 "준비된 항목"에서 빼서 다른 팀끼리의 묶기를 막지 않음), 그 뒤에는 바로 전 상대만 피하는 기존 규칙으로 돌아간다.
+class MkVersusMatcher extends MkMatcher {
+  protected ready(entries: MkQueueMap | null, now: number): Array<[string, MkQueueEntry]> {
+    const all = super.ready(entries, now);
+    if (!this.isCrowded(entries, now)) return all;
+    return all.filter((item) => this.waitedOf(item, now) >= this.spreadWaitMs || all.some((other) => other !== item && !MkMatcher.metRecentTwo(item, other)));
+  }
+
+  private waitedOf(item: [string, MkQueueEntry], now: number): number {
+    return now - (item[1].at + this.timing.settleMs);
+  }
+
+  protected pick(ready: Array<[string, MkQueueEntry]>, context: MkPickContext): Array<[string, MkQueueEntry]> | null {
+    const fitting = ready.filter(([, entry]) => entry.size <= this.partyLimit);
+    if (fitting.length < 2 || fitting[0] !== ready[0]) return null;
+    const first = fitting[0];
+    const holding = context.now - (first[1].at + this.timing.settleMs) < this.rematchWaitMs;
+    if (holding && fitting.length === 2 && context.owedComing && !first[1].owed) return null;
+    if (context.crowded) {
+      const spread = fitting.slice(1).find((other) => !MkMatcher.metRecentTwo(first, other));
+      if (spread) return [first, spread];
+      if (this.waitedOf(first, context.now) < this.spreadWaitMs) return null;
+    }
+    const fresh = fitting.slice(1).find((other) => !MkMatcher.metRecently(first, other));
+    if (fresh) return [first, fresh];
+    if (holding && context.othersComing) return null;
+    return [first, fitting[1]];
+  }
+
+  protected sides(count: number, random: () => number): number[] {
+    return random() < 0.5 ? [0, 1] : [1, 0];
+  }
+}
+
+// 승률이 크게 다른 학생끼리 만나지 않게 한다(2026-10-27 선생님 요청, 24번):
+// 승률 35% 미만은 승률 50% 미만인 상대만, 65% 이상은 50% 이상인 상대만(2026-10-29 선생님 요청, 예전 30%·70%) 기다린다(양쪽 모두 만족해야 묶임).
+// 판 수가 적으면 승률이 한두 판에 크게 흔들리므로 MIN_GAMES 판부터 적용하고, 기록이 없는 쪽(로그인 안 함·새 학생)은 누구와도 만난다.
+// 끝내 맞는 상대가 없으면 기존 AI 대체(aiFallbackMs)가 받아 준다. 팀 항목은 팀원 승패를 합쳐 본다.
+class MkWinBand {
+  static readonly LOW = 0.35;
+  static readonly HIGH = 0.65;
+  static readonly MID = 0.5;
+  static readonly MIN_GAMES = 5;
+
+  static rateOf(entry: MkQueueEntry): number | null {
+    let games = 0, wins = 0;
+    Object.keys(entry.people || {}).forEach((id) => {
+      const rate = entry.people[id].rate;
+      if (!rate) return;
+      games += Number(rate.g) || 0;
+      wins += Number(rate.w) || 0;
+    });
+    return games >= MkWinBand.MIN_GAMES ? wins / games : null;
+  }
+
+  static accepts(own: number | null, other: number | null): boolean {
+    if (own === null || other === null) return true;
+    if (own < MkWinBand.LOW) return other < MkWinBand.MID;
+    if (own >= MkWinBand.HIGH) return other >= MkWinBand.MID;
+    return true;
+  }
+
+  static fits(a: MkQueueEntry, b: MkQueueEntry): boolean {
+    const rateA = MkWinBand.rateOf(a), rateB = MkWinBand.rateOf(b);
+    return MkWinBand.accepts(rateA, rateB) && MkWinBand.accepts(rateB, rateA);
+  }
+
+  // Firebase 는 undefined 를 못 쓰므로 없는 값은 null 로, 숫자는 0 이상 정수로.
+  static clean(rate: MkWinRate | null | undefined): MkWinRate | null {
+    if (!rate) return null;
+    const g = Math.max(0, Math.floor(Number(rate.g) || 0));
+    return { g, w: Math.min(g, Math.max(0, Math.floor(Number(rate.w) || 0))) };
+  }
+}
+
+// 1대1·팀 대 팀 묶기에 승률 구간을 더한 것. 맞는 상대가 하나도 없는 항목은 "준비된 항목"에서 빼서
+// 그 항목이 맨 앞에 있어도 다른 학생들끼리의 묶기를 막지 않게 한다(묶는 사람은 준비된 항목 중 맨 앞).
+class MkWinBandVersusMatcher extends MkVersusMatcher {
+  canMeet(a: MkQueueEntry, b: MkQueueEntry): boolean {
+    return MkWinBand.fits(a, b);
+  }
+
+  hasCompany(entries: MkQueueMap | null, now: number, myCode: string): boolean {
+    const mine = entries ? entries[myCode] : null;
+    if (!mine) return super.hasCompany(entries, now, myCode);
+    return this.ready(entries, now).some(([code, entry]) => code !== myCode && this.canMeet(mine, entry));
+  }
+
+  protected ready(entries: MkQueueMap | null, now: number): Array<[string, MkQueueEntry]> {
+    const all = super.ready(entries, now);
+    return all.filter((item) => all.some((other) => other !== item && this.canMeet(item[1], other[1])));
+  }
+
+  protected pick(ready: Array<[string, MkQueueEntry]>, context: MkPickContext): Array<[string, MkQueueEntry]> | null {
+    if (!ready.length) return null;
+    const first = ready[0];
+    return super.pick([first].concat(ready.slice(1).filter((other) => this.canMeet(first[1], other[1]))), context);
+  }
+}
+
+// 여럿이 한 방에 모이는 게임(31·32·38·39): 먼저 온 순서로 정원까지 채우고, 넘치는 항목은 다음 묶음으로.
+// maxEntries: 한 방에 들어갈 수 있는 팀(항목) 수 상한(예: 38번 팀전은 3팀).
+// avoidMs: 바로 전 판에서 만난 사람(entry.avoid)끼리는 맨 앞 항목이 avoidMs 동안만 피해 묶는다(31번: 방금 한 학생을 다시 만나지 않게, 2026-11-03). 그 뒤에는 피하지 않는다.
+// holdFrom/holdMs: holdFrom 명이 모일 때까지 기다리고, 모였어도 정원이 안 차면 마지막 사람이 들어온 뒤 holdMs 까지 더 기다렸다가 시작한다(31번: 4명이 모이면 1분까지 5번째 사람을 기다림, 2026-11-03).
+class MkFreeForAllMatcher extends MkMatcher {
+  constructor(partyLimit: number, readonly capacity: number, timing: MkTiming = MkMatcher.TIMING, readonly maxEntries: number = Infinity, private readonly holdFrom: number = 0, private readonly holdMs: number = 0, private readonly avoidMs: number = 0, private readonly maxRepeat: number = 0) {
+    super(partyLimit, timing);
+  }
+
+  get holdWaitMs(): number {
+    return this.holdMs;
+  }
+
+  get avoidWaitMs(): number {
+    return this.avoidMs;
+  }
+
+  protected pick(ready: Array<[string, MkQueueEntry]>, context: MkPickContext): Array<[string, MkQueueEntry]> | null {
+    const picked: Array<[string, MkQueueEntry]> = [];
+    let people = 0;
+    const strict = this.avoidMs > 0 && context.now - (ready[0][1].at + this.timing.settleMs) < this.avoidMs;
+    const tryAdd = (item: [string, MkQueueEntry]): void => {
+      if (picked.indexOf(item) >= 0) return;
+      if (strict && this.tooManyRepeats(picked, item)) return;
+      if (picked.length < this.maxEntries && item[1].size <= this.partyLimit && people + item[1].size <= this.capacity) {
+        picked.push(item);
+        people += item[1].size;
+      }
+    };
+    // 방금 상대와 겹치지 않는 사람을 먼저 채우고, 모자라면 겹침이 허용되는 사람으로 채운다(대기열이 막히지 않게).
+    if (strict) ready.forEach((item) => { if (picked.length === 0 || !picked.some((other) => MkMatcher.metRecently(other, item))) tryAdd(item); });
+    ready.forEach(tryAdd);
+    if (picked.length < 2 || picked[0] !== ready[0]) return null;
+    if (this.holdMs > 0) {
+      const total = picked.reduce((sum, item) => sum + item[1].size, 0);
+      const gatheredAt = Math.max(...picked.map((item) => item[1].at)) + this.timing.settleMs;
+      if (total < this.holdFrom) return null;
+      if (total < this.capacity && context.now - gatheredAt < this.holdMs) return null;
+    }
+    return picked;
+  }
+
+  // 새로 넣으면 바로 전 판 상대를 maxRepeat 명보다 많이 만나는 사람이 생기는지(31번: 같은 방에 최대 2명 = maxRepeat 1).
+  private tooManyRepeats(picked: Array<[string, MkQueueEntry]>, item: [string, MkQueueEntry]): boolean {
+    const group = picked.concat([item]);
+    return group.some((member) => group.filter((other) => other !== member && MkMatcher.metRecently(member, other)).length > this.maxRepeat);
+  }
+
+  protected sides(count: number): number[] {
+    const sides: number[] = [];
+    for (let index = 0; index < count; index++) sides.push(index);
+    return sides;
+  }
+}
+
+// 전적에서 합계·연승을 계산한다. 연승은 따로 저장하지 않고 전적 끝에서부터 센다(진실은 한 곳).
+class MkRecordBook {
+  readonly lines: MkHistoryLine[];
+
+  constructor(history: Record<string, MkHistoryLine> | null | undefined) {
+    this.lines = Object.keys(history || {}).map((key) => (history as Record<string, MkHistoryLine>)[key]).sort((a, b) => a.n - b.n);
+  }
+
+  count(result: MkResult): number {
+    return this.lines.filter((line) => line.result === result).length;
+  }
+
+  // 무승부는 연승을 끊지도 늘리지도 않는다(2026-10-22 선생님 요청). 패배를 만나면 거기서 멈춘다.
+  streak(): number {
+    let wins = 0;
+    for (let index = this.lines.length - 1; index >= 0 && this.lines[index].result !== "lose"; index--) {
+      if (this.lines[index].result === "win") wins++;
+    }
+    return wins;
+  }
+
+  summary(): string {
+    return this.lines.length + "전 " + this.count("win") + "승 " + this.count("draw") + "무 " + this.count("lose") + "패";
+  }
+
+  streakLabel(): string {
+    const streak = this.streak();
+    return streak > 0 ? "🔥 " + streak + "연승" : "연승 없음";
+  }
+
+  has(matchId: string): boolean {
+    return this.lines.some((line) => line.matchId === matchId);
+  }
+}
+
+// 팀 대기실 만들기·들어가기. 코드는 일반 방 코드와 겹치지 않게 고른다.
+class MkPartyDirectory {
+  private static readonly CODE_ATTEMPTS = 12;
+  // 사람이 없는 대기실은 대부분 연결이 잠깐 끊긴 것이라 곧 돌아온다(MkParty.restore). 오래된 것만 치운다.
+  private static readonly ABANDONED_MS = 3 * 3600000;
+
+  constructor(
+    private readonly database: FirebaseDatabase,
+    private readonly clock: MkClock,
+    private readonly paths: MkPaths,
+    private readonly limit: number
+  ) {}
+
+  async create(myId: string, member: MkMember): Promise<string | null> {
+    await this.sweep();
+    for (let attempt = 0; attempt < MkPartyDirectory.CODE_ATTEMPTS; attempt++) {
+      const code = String(10000 + Math.floor(Math.random() * 90000));
+      const room = await this.database.ref(this.paths.rooms + "/" + code + "/status").once("value");
+      if (room.exists()) continue;
+      const record: MkPartyRecord = { leaderId: myId, createdAt: this.clock.now(), members: { [myId]: member }, bots: 0 };
+      // 사람이 비어 있는 대기실도 건드리지 않는다. 잠깐 끊긴 학생이 곧 돌아올(MkParty.restore) 자리라,
+      // 덮어쓰면 그 학생의 전적이 사라지고 다른 학생 전적과 섞인다.
+      const result = await this.database.ref(this.paths.party(code)).transaction((current) => (current === null ? record : undefined));
+      if (result.committed) return code;
+    }
+    return null;
+  }
+
+  // 이 기기가 쓰던 대기실로 돌아간다(MkPartyMemory). 다른 사람이 들어 있으면 실패 — 친구가 남아 있는 팀은 팀 코드로 다시 들어간다.
+  // 새로고침하면 아이디가 바뀌고 예전 페이지 자리는 onDisconnect 가 지울 때까지 잠깐 남으므로, 이 기기의 직전 아이디(previousId) 자리는 내 것으로 본다.
+  // (닉네임으로 보면 이름이 같은 친구를 밀어낼 수 있다.)
+  // 전적(history)과 바로 전 상대(last)는 그대로 두고, 남아 있던 찾기·표는 지운다(지난 판 방으로 다시 들어가지 않게).
+  async reclaim(code: string, myId: string, member: MkMember, previousId: string = ""): Promise<boolean> {
+    let reclaimed = false;
+    await this.database.ref(this.paths.party(code)).transaction((current) => {
+      reclaimed = false;
+      const record = current as MkPartyRecord | null;
+      if (record === null) return null;
+      const members = record.members || {};
+      if (!record.leaderId || Object.keys(members).some((id) => id !== myId && id !== previousId)) return undefined;
+      record.members = { [myId]: member };
+      record.leaderId = myId;
+      record.search = null;
+      record.match = null;
+      record.leftAt = null;
+      reclaimed = true;
+      return record;
+    }).catch(() => undefined);
+    return reclaimed;
+  }
+
+  async exists(code: string): Promise<boolean> {
+    const snapshot = await this.database.ref(this.paths.party(code) + "/members").once("value");
+    return snapshot.exists();
+  }
+
+  // transaction 은 처음에 기기 캐시(비어 있으면 null)로 한 번 돌기 때문에, null 일 때 그만두면(undefined)
+  // 서버에 있는 팀을 못 찾는다. null 은 null 로 돌려줘서 서버 값으로 다시 돌게 하고, 실제로 넣었는지는 joined 로 본다.
+  async join(code: string, myId: string, member: MkMember): Promise<MkJoinOutcome> {
+    let joined = false;
+    let message = "그런 팀이 없어요. 코드를 확인해 주세요.";
+    await this.database.ref(this.paths.party(code)).transaction((current) => {
+      joined = false;
+      message = "그런 팀이 없어요. 코드를 확인해 주세요.";
+      const record = current as MkPartyRecord | null;
+      if (record === null) return null;
+      if (!MkPartyDirectory.isAlive(record)) return undefined;
+      const members = record.members as Record<string, MkMember>;
+      if (members[myId]) {
+        joined = true;
+        return record;
+      }
+      if (record.search) {
+        message = "이 팀은 지금 상대를 찾는 중이에요. 잠시 뒤에 다시 해 주세요.";
+        return undefined;
+      }
+      const humans = Object.keys(members).length;
+      if (humans >= this.limit) {
+        message = "팀 자리가 가득 찼어요.";
+        return undefined;
+      }
+      members[myId] = member;
+      record.bots = Math.min(record.bots || 0, this.limit - humans - 1);
+      joined = true;
+      return record;
+    });
+    return joined ? { ok: true, message: "" } : { ok: false, message };
+  }
+
+  static isAlive(record: MkPartyRecord | null): boolean {
+    return !!record && !!record.members && Object.keys(record.members).length > 0;
+  }
+
+  private async sweep(): Promise<void> {
+    try {
+      const snapshot = await this.database.ref(this.paths.parties).once("value");
+      const all = snapshot.val<Record<string, MkPartyRecord>>() || {};
+      const updates: Record<string, null> = {};
+      const now = this.clock.now();
+      Object.keys(all).forEach((code) => {
+        const record = all[code];
+        const lastActive = Math.max((record && record.createdAt) || 0, (record && record.leftAt) || 0);
+        if (!MkPartyDirectory.isAlive(record) && !(now - lastActive < MkPartyDirectory.ABANDONED_MS)) updates[code] = null;
+      });
+      if (Object.keys(updates).length) await this.database.ref(this.paths.parties).update(updates);
+    } catch (error) {
+      return;
+    }
+  }
+}
+
+// 팀 대기실 하나에 붙어 있는 동안의 상태. 판 중에도 연결을 유지해서 끝나면 같은 대기실로 돌아온다.
+class MkParty {
+  record: MkPartyRecord | null = null;
+  onChange: () => void = () => undefined;
+  onTicket: (ticket: MkTicket) => void = () => undefined;
+  onClosed: (message: string) => void = () => undefined;
+  private readonly ref: FirebaseRef;
+  private readonly handled = new Set<string>();
+  private listener: ((snapshot: FirebaseSnapshot) => void) | null = null;
+  private leaving = false;
+  private handingOff = false;
+  private restoring = false;
+  private lastMe: MkMember | null = null;
+
+  constructor(
+    private readonly database: FirebaseDatabase,
+    private readonly clock: MkClock,
+    readonly paths: MkPaths,
+    readonly code: string,
+    readonly myId: string,
+    readonly limit: number
+  ) {
+    this.ref = database.ref(paths.party(code));
+  }
+
+  connect(): void {
+    this.ref.child("members/" + this.myId).onDisconnect().remove();
+    this.listener = this.ref.on("value", (snapshot) => this.apply(snapshot.val<MkPartyRecord>()));
+  }
+
+  isLeader(): boolean {
+    return !!this.record && this.record.leaderId === this.myId;
+  }
+
+  members(): Array<[string, MkMember]> {
+    const members = (this.record && this.record.members) || {};
+    return Object.keys(members).map((id) => [id, members[id]] as [string, MkMember]).sort((a, b) => a[1].joinedAt - b[1].joinedAt || (a[0] < b[0] ? -1 : 1));
+  }
+
+  bots(): number {
+    return (this.record && this.record.bots) || 0;
+  }
+
+  size(): number {
+    return this.members().length + this.bots();
+  }
+
+  searching(): MkSearch | null {
+    return (this.record && this.record.search) || null;
+  }
+
+  searchSeconds(): number {
+    const search = this.searching();
+    return search ? Math.max(0, Math.floor((this.clock.now() - search.since) / 1000)) : 0;
+  }
+
+  ticket(): MkTicket | null {
+    return (this.record && this.record.match) || null;
+  }
+
+  book(): MkRecordBook {
+    return new MkRecordBook(this.record && this.record.history);
+  }
+
+  lastMatch(): MkLastMatch {
+    return (this.record && this.record.last) || {};
+  }
+
+  setBots(count: number): void {
+    if (!this.isLeader() || this.searching()) return;
+    const allowed = Math.max(0, Math.min(count, this.limit - this.members().length));
+    this.ref.child("bots").set(allowed);
+  }
+
+  updateMe(member: Pick<MkMember, "nick" | "look" | "rate" | "recentMaps">): void {
+    if (this.record && this.record.members && this.record.members[this.myId]) this.ref.child("members/" + this.myId).update({ nick: member.nick, look: member.look || null, rate: MkWinBand.clean(member.rate), recentMaps: MkRecentMaps.clean(member.recentMaps) });
+  }
+
+  markSearching(since: number | null): Promise<void> {
+    return this.ref.child("search").set(since === null ? null : { since });
+  }
+
+  // 판 결과를 전적에 한 줄 쌓는다. 팀장만 쓰고, 같은 판 아이디는 한 번만 들어간다.
+  async report(ticket: MkTicket, outcome: MkOutcome): Promise<boolean> {
+    if (!this.isLeader()) return false;
+    let added = false;
+    const at = this.clock.now();
+    await this.ref.child("history").transaction((current) => {
+      added = false;
+      const history = (current as Record<string, MkHistoryLine> | null) || {};
+      if (new MkRecordBook(history).has(ticket.matchId)) return undefined;
+      const line: MkHistoryLine = { n: Object.keys(history).length + 1, matchId: ticket.matchId, at, result: outcome.result, rivals: outcome.rivals || ticket.rivals || [] };
+      if (ticket.map) line.map = ticket.map;
+      if (outcome.rank !== undefined) line.rank = outcome.rank;
+      if (outcome.of !== undefined) line.of = outcome.of;
+      history[MkParty.historyKey(ticket.matchId)] = line;
+      added = true;
+      return history;
+    });
+    const match = this.ticket();
+    if (match && match.matchId === ticket.matchId) await this.ref.child("match").set(null);
+    return added;
+  }
+
+  // 표를 받았는데 그 방에 못 들어갔을 때(방장이 사라짐 등) 팀장이 표를 지워 다시 매칭할 수 있게 한다.
+  clearTicket(matchId: string): void {
+    const match = this.ticket();
+    if (this.isLeader() && match && match.matchId === matchId) this.ref.child("match").set(null);
+  }
+
+  // keepRecord: 혼자 하는 게임에서 나갈 때 대기실(전적)을 지우지 않고 남겨 둔다. 다시 들어오면 reclaim 으로 이어 쓰고,
+  // 안 오면 sweep 이 leftAt 기준으로 몇 시간 뒤에 치운다.
+  async leave(keepRecord: boolean = false): Promise<void> {
+    this.leaving = true;
+    this.stopListening();
+    try { this.ref.child("members/" + this.myId).onDisconnect().cancel(); } catch (error) { /* 이미 끊긴 연결 */ }
+    const wasLeader = this.isLeader();
+    const at = this.clock.now();
+    await this.ref.transaction((current) => {
+      const record = current as MkPartyRecord | null;
+      if (!record || !record.members || !record.members[this.myId]) return record === null ? null : undefined;
+      delete record.members[this.myId];
+      if (!Object.keys(record.members).length) {
+        if (!keepRecord) return null;
+        record.search = null;
+        record.match = null;
+        record.leftAt = at;
+        return record;
+      }
+      if (record.leaderId === this.myId) {
+        record.leaderId = MkParty.firstMember(record.members);
+        record.search = null;
+      }
+      return record;
+    });
+    if (wasLeader) await this.database.ref(this.paths.entry(this.code)).remove();
+  }
+
+  silentClose(): void {
+    this.leaving = true;
+    this.stopListening();
+  }
+
+  static historyKey(matchId: string): string {
+    return "m" + matchId.replace(/[^A-Za-z0-9_-]/g, "_");
+  }
+
+  static firstMember(members: Record<string, MkMember>): string {
+    return Object.keys(members).sort((a, b) => members[a].joinedAt - members[b].joinedAt || (a < b ? -1 : 1))[0];
+  }
+
+  private apply(record: MkPartyRecord | null): void {
+    if (this.leaving || this.restoring) return;
+    const mine = record && record.members ? record.members[this.myId] : undefined;
+    if (!mine && record && this.lastMe) {
+      this.restore(this.lastMe);
+      return;
+    }
+    if (!MkPartyDirectory.isAlive(record) || !mine) {
+      this.close();
+      return;
+    }
+    this.lastMe = mine;
+    this.record = record;
+    this.handOffIfLeaderGone();
+    this.onChange();
+    const ticket = this.ticket();
+    if (ticket && !this.handled.has(ticket.matchId) && !this.book().has(ticket.matchId)) {
+      this.handled.add(ticket.matchId);
+      this.onTicket(ticket);
+    }
+  }
+
+  // 팀장이 끊기면 가장 먼저 들어온 사람이 팀장을 이어받는다. 연승(전적)은 대기실에 있으니 그대로 이어진다.
+  private handOffIfLeaderGone(): void {
+    const record = this.record as MkPartyRecord;
+    const members = record.members as Record<string, MkMember>;
+    if (members[record.leaderId] || this.handingOff || MkParty.firstMember(members) !== this.myId) return;
+    this.handingOff = true;
+    this.ref.transaction((current) => {
+      const latest = current as MkPartyRecord | null;
+      if (!MkPartyDirectory.isAlive(latest)) return undefined;
+      const party = latest as MkPartyRecord;
+      if (party.members![party.leaderId]) return undefined;
+      party.leaderId = MkParty.firstMember(party.members as Record<string, MkMember>);
+      party.search = null;
+      return party;
+    }).then(() => { this.handingOff = false; }, () => { this.handingOff = false; });
+  }
+
+  private close(): void {
+    this.record = null;
+    this.lastMe = null;
+    this.stopListening();
+    this.onClosed("팀 대기실에서 나왔어요.");
+  }
+
+  // 태블릿이 잠깐 잠들거나 와이파이가 끊기면 서버의 onDisconnect 가 내 자리를 지운다.
+  // 스스로 나간 게 아니고 대기실이 아직 남아 있으면 그 자리를 되살려 전적·연승을 지킨다.
+  private restore(me: MkMember): void {
+    this.restoring = true;
+    let back = false;
+    this.ref.transaction((current) => {
+      back = false;
+      const record = current as MkPartyRecord | null;
+      if (!record || !record.leaderId) return undefined;
+      const members = record.members || {};
+      if (members[this.myId]) {
+        back = true;
+        return undefined;
+      }
+      if (Object.keys(members).length >= this.limit) return undefined;
+      members[this.myId] = me;
+      record.members = members;
+      back = true;
+      return record;
+    }).then(() => back, () => false).then((ok) => {
+      this.restoring = false;
+      if (this.leaving) return;
+      if (!ok) {
+        this.close();
+        return;
+      }
+      this.ref.child("members/" + this.myId).onDisconnect().remove();
+      this.ref.once("value").then((snapshot) => this.apply(snapshot.val<MkPartyRecord>()), () => undefined);
+    });
+  }
+
+  private stopListening(): void {
+    if (!this.listener) return;
+    try { this.ref.off("value", this.listener); } catch (error) { /* 이미 끊긴 연결 */ }
+    this.listener = null;
+  }
+}
+
+// 팀장 기기에서만 돈다: 대기열 항목 올리기·내리기와, 내 차례면 묶어서 일반 방을 만들고 각 팀에 표를 나눠 주기.
+class MkQueue {
+  private static readonly RETRY_MS = 250;
+  private static readonly LOST_GRACE_MS = 4000;
+  private entries: MkQueueMap | null = null;
+  private listener: ((snapshot: FirebaseSnapshot) => void) | null = null;
+  private timer: ReturnType<typeof setTimeout> | null = null;
+  private binding = false;
+  private restUntil = 0;
+  private active = false;
+  private cancelling = false;
+  private since = 0;
+  onBound: (plan: MkMatchPlan) => void = () => undefined;
+  onError: (message: string) => void = () => undefined;
+  onEntries: () => void = () => undefined;
+
+  constructor(
+    private readonly database: FirebaseDatabase,
+    private readonly clock: MkClock,
+    private readonly paths: MkPaths,
+    private readonly matcher: MkMatcher,
+    private readonly maker: MkRoomMaker,
+    private readonly random: () => number = Math.random
+  ) {}
+
+  // me: 내 기기가 지금 아는 내 정보(승률처럼 팀 대기실 기록보다 새로울 수 있는 값)를 내 자리에 덮어쓴다.
+  async enter(party: MkParty, me: MkMember | null = null): Promise<void> {
+    const since = this.clock.now();
+    this.since = since;
+    const people: Record<string, MkMember> = {};
+    party.members().forEach(([id, member]) => {
+      people[id] = { nick: member.nick, joinedAt: member.joinedAt, look: member.look || null };
+      const rate = MkWinBand.clean(id === party.myId && me && me.rate !== undefined ? me.rate : member.rate);
+      if (rate) people[id].rate = rate;
+      const recentMaps = MkRecentMaps.clean(id === party.myId && me && me.recentMaps !== undefined ? me.recentMaps : member.recentMaps);
+      if (recentMaps) people[id].recentMaps = recentMaps;
+    });
+    const last = party.lastMatch();
+    const entry: MkQueueEntry = { leader: party.myId, people, bots: party.bots(), size: party.size(), at: since, claim: null };
+    if (last.rivals && last.rivals.length) entry.avoid = last.rivals.slice();
+    if (last.recent && Object.keys(last.recent).length) entry.recent = MkRecentRivals.push(last.recent, []);
+    if (last.ai) entry.owed = true;
+    const ref = this.database.ref(this.paths.entry(party.code));
+    ref.onDisconnect().remove();
+    await ref.set(entry);
+    await party.markSearching(since);
+    this.watch(party);
+  }
+
+  // 내 항목을 실제로 뺐을 때만 true. 누가 묶어 가는 중(claim)이거나 이미 묶여 빠졌으면 false — 곧 표가 온다.
+  async cancel(party: MkParty): Promise<boolean> {
+    const ref = this.database.ref(this.paths.entry(party.code));
+    let removed = false;
+    // 실제 Firebase 는 transaction 을 부르는 순간 내 기기 구독에 "항목 없음"을 먼저 보여 준다.
+    // 그걸 "표 없이 사라짐"으로 오해해 복구 타이머를 걸면, 4초 안에 다시 매칭했을 때 새 '찾는 중'을 지워
+    // 대기열에 항목이 남은 채 또 매칭하게 되고 표가 두 번 온다(24번 "방이 두 번 잡힘" 보고).
+    this.cancelling = true;
+    let result: FirebaseTransactionResult;
+    try {
+      result = await ref.transaction((current) => {
+        removed = false;
+        const entry = current as MkQueueEntry | null;
+        if (!entry) return null;
+        if (!this.matcher.isFree(entry, this.clock.now())) return undefined;
+        removed = true;
+        return null;
+      });
+    } finally {
+      this.cancelling = false;
+    }
+    if (!result.committed) return false;
+    this.stop();
+    try { ref.onDisconnect().cancel(); } catch (error) { /* 이미 끊긴 연결 */ }
+    if (removed) await party.markSearching(null);
+    else this.recoverIfLost(party);
+    return removed;
+  }
+
+  hasCompany(myCode: string): boolean {
+    return this.matcher.hasCompany(this.entries, this.clock.now(), myCode);
+  }
+
+  // 대기 화면의 "지금 n개 팀이 기다리는 중"(개인전은 n명 — 항목 하나가 한 사람). 이미 보고 있는 대기열 구독 값만 세므로 요청이 늘지 않는다.
+  // 누가 묶어 가는 중(차지된) 항목은 곧 빠지므로 세지 않는다. 대기열을 아직 못 받았으면 null.
+  othersWaiting(myCode: string): number | null {
+    if (!this.active || !this.entries) return null;
+    const entries = this.entries, now = this.clock.now(), mine = entries[myCode];
+    return Object.keys(entries)
+      .filter((code) => code !== myCode && !!entries[code] && entries[code].size > 0 && this.matcher.isFree(entries[code], now) && (!mine || this.matcher.canMeet(mine, entries[code]))).length;
+  }
+
+  stop(): void {
+    this.active = false;
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = null;
+    if (this.listener) {
+      try { this.database.ref(this.paths.queue).off("value", this.listener); } catch (error) { /* 이미 끊긴 연결 */ }
+      this.listener = null;
+    }
+  }
+
+  private watch(party: MkParty): void {
+    const myCode = party.code;
+    this.stop();
+    this.active = true;
+    this.listener = this.database.ref(this.paths.queue).on("value", (snapshot) => {
+      this.entries = snapshot.val<MkQueueMap>();
+      if (!this.entries || !this.entries[myCode]) {
+        if (this.cancelling) return;
+        this.stop();
+        this.recoverIfLost(party);
+        this.onEntries();
+        return;
+      }
+      this.consider(myCode);
+      this.onEntries();
+    });
+  }
+
+  // 내 항목이 표 없이 사라지면(묶던 사람이 표를 못 나눠 줌·연결 끊김) "찾는 중"에 갇히지 않게 잠시 뒤 풀어 준다.
+  // 그 사이 다시 매칭을 눌렀으면(찾기 시작 시각이 다름) 새 매칭이므로 건드리지 않는다.
+  private recoverIfLost(party: MkParty): void {
+    const since = this.since;
+    setTimeout(() => {
+      const search = party.searching();
+      if (this.active || !search || search.since !== since || party.ticket()) return;
+      party.markSearching(null).catch(() => undefined);
+      this.onError("매칭이 끊겼어요. 다시 매칭 시작을 눌러 주세요.");
+    }, MkQueue.LOST_GRACE_MS);
+  }
+
+  private consider(myCode: string): void {
+    if (!this.active) return;
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = null;
+    const now = this.clock.now();
+    if (this.binding) return;
+    if (now < this.restUntil) {
+      this.timer = setTimeout(() => this.consider(myCode), this.restUntil - now + 5);
+      return;
+    }
+    if (this.matcher.anchor(this.entries, now) === myCode && this.matcher.plan(this.entries, now, this.random)) {
+      this.bind(myCode);
+      return;
+    }
+    const next = this.matcher.nextCheck(this.entries, now);
+    if (next !== null) this.timer = setTimeout(() => this.consider(myCode), next - now + 5);
+  }
+
+  private async bind(myCode: string): Promise<void> {
+    this.binding = true;
+    let plan: MkMatchPlan | null = null;
+    try {
+      const result = await this.database.ref(this.paths.queue).transaction((current) => {
+        plan = null;
+        const entries = current as MkQueueMap | null;
+        const now = this.clock.now();
+        if (!entries || this.matcher.anchor(entries, now) !== myCode) return undefined;
+        plan = this.matcher.plan(entries, now, this.random);
+        if (!plan) return undefined;
+        const claim: MkClaim = { by: myCode, at: now, id: plan.matchId };
+        plan.groups.forEach((group) => { entries[group.code].claim = claim; });
+        return entries;
+      });
+      const claimed = plan as MkMatchPlan | null;
+      if (result.committed && claimed && (await this.deliver(claimed))) {
+        this.binding = false;
+        this.consider(myCode);
+        return;
+      }
+    } catch (error) {
+      this.onError("매칭 중 연결이 끊겼어요. 다시 시도해 주세요.");
+    }
+    this.retryLater(myCode);
+  }
+
+  // 오래 기다려도 상대가 없을 때(aiFallbackMs): 내 항목만 차지해 우리 팀만 든 방을 만든다(상대 편은 게임이 AI 로 채움).
+  // 그 사이 다른 팀장이 나를 묶어 가는 중(claim)이면 그만두고 사람끼리 매칭을 따른다.
+  async goSolo(myCode: string): Promise<boolean> {
+    if (this.binding) return false;
+    this.binding = true;
+    let plan: MkMatchPlan | null = null;
+    let delivered = false;
+    try {
+      const result = await this.database.ref(this.paths.queue).transaction((current) => {
+        plan = null;
+        const entries = current as MkQueueMap | null;
+        const now = this.clock.now();
+        const mine = entries ? entries[myCode] : null;
+        if (!entries || !mine || !this.matcher.isFree(mine, now)) return undefined;
+        const solo: MkMatchPlan = {
+          matchId: myCode + "-ai-" + now.toString(36),
+          seed: Math.floor(this.random() * 2147483647),
+          binder: myCode,
+          groups: [{ code: myCode, entry: mine, side: this.random() < 0.5 ? 0 : 1 }]
+        };
+        mine.claim = { by: myCode, at: now, id: solo.matchId };
+        plan = solo;
+        return entries;
+      });
+      const claimed = plan as MkMatchPlan | null;
+      delivered = result.committed && !!claimed && (await this.deliver(claimed));
+    } catch (error) {
+      delivered = false;
+    }
+    this.binding = false;
+    if (!delivered) this.consider(myCode);
+    return delivered;
+  }
+
+  // 묶기가 그만둬졌다는 건 내 기기가 본 대기열이 서버보다 늦다는 뜻이다. 바로 다시 하면
+  // 같은 판단을 끝없이 되풀이하므로, 잠깐 쉬었다가(그 사이 새 대기열 값이 오면 그걸로) 다시 본다.
+  private retryLater(myCode: string): void {
+    this.binding = false;
+    this.restUntil = this.clock.now() + MkQueue.RETRY_MS;
+    this.consider(myCode);
+  }
+
+  // 방을 만드는 사이 차지가 만료돼 다른 사람이 가져갔거나 취소됐을 수 있다. 그래서 표를 나눠 주기 전에
+  // 내 차지가 그대로인 항목만 transaction 으로 대기열에서 한꺼번에 빼고, 하나라도 빠졌으면 방을 버리고 다시 한다.
+  private async deliver(plan: MkMatchPlan): Promise<boolean> {
+    const made = await this.maker.create(plan).catch(() => null);
+    if (!made) {
+      await this.release(plan);
+      return false;
+    }
+    let confirmed = false;
+    const sealed = await this.database.ref(this.paths.queue).transaction((current) => {
+      confirmed = false;
+      const entries = current as MkQueueMap | null;
+      if (!entries) return undefined;
+      const held = plan.groups.every((group) => {
+        const entry = entries[group.code];
+        return !!entry && !!entry.claim && entry.claim.id === plan.matchId;
+      });
+      if (!held) return undefined;
+      plan.groups.forEach((group) => { delete entries[group.code]; });
+      confirmed = true;
+      return entries;
+    }).catch(() => null);
+    if (!sealed || !sealed.committed || !confirmed) {
+      if (this.maker.discard) await this.maker.discard(made).catch(() => undefined);
+      await this.release(plan);
+      return false;
+    }
+    const at = this.clock.now();
+    const expect = plan.groups.reduce((sum, group) => sum + Object.keys(group.entry.people || {}).length, 0);
+    const updates: Record<string, unknown> = {};
+    plan.groups.forEach((group) => {
+      const rivals: string[] = [], rivalIds: Record<string, string> = {};
+      plan.groups.forEach((other) => {
+        if (other !== group) Object.keys(other.entry.people || {}).forEach((id) => { rivals.push(other.entry.people[id].nick); rivalIds[id] = other.entry.people[id].nick; });
+      });
+      const ticket: MkTicket = { matchId: plan.matchId, room: made.room, side: group.side, host: made.host, expect, at, rivals };
+      if (rivals.length) ticket.rivalIds = rivalIds;
+      if (made.map) ticket.map = made.map;
+      updates[this.paths.party(group.code) + "/match"] = ticket;
+      updates[this.paths.party(group.code) + "/search"] = null;
+      const rivalCodes = plan.groups.filter((other) => other !== group).map((other) => other.code);
+      const last: MkLastMatch = { rivals: rivalCodes, ai: plan.groups.length === 1 };
+      const recent = MkRecentRivals.push(group.entry.recent, rivalCodes);
+      if (recent.length) last.recent = recent;
+      updates[this.paths.party(group.code) + "/last"] = last;
+    });
+    // 실제 Firebase 는 ref("") 를 잘못된 경로로 거절한다. 루트는 "/" 로 연다.
+    try {
+      await this.database.ref("/").update(updates);
+    } catch (error) {
+      if (this.maker.discard) await this.maker.discard(made).catch(() => undefined);
+      this.onError("상대에게 경기장을 알리지 못했어요. 다시 매칭해 주세요.");
+      return true;
+    }
+    this.onBound(plan);
+    return true;
+  }
+
+  private async release(plan: MkMatchPlan): Promise<void> {
+    await this.database.ref(this.paths.queue).transaction((current) => {
+      const entries = current as MkQueueMap | null;
+      if (!entries) return undefined;
+      plan.groups.forEach((group) => {
+        const entry = entries[group.code];
+        if (entry && entry.claim && entry.claim.id === plan.matchId) entry.claim = null;
+      });
+      return entries;
+    });
+  }
+}
+
+// 경기 중인 팀이 대기열 자기 자리에 세워 두는 표지판(size 0, busyUntil). 다른 팀이 "방금 붙은 상대와 또 붙을지,
+// 곧 돌아올 팀을 잠깐 기다릴지" 판단하는 데 쓴다. 팀장 기기만 세우고, 끊기면 onDisconnect 로 사라지며,
+// 시간이 지나면 스스로 무시된다. 진짜 대기 항목(매칭 시작)이 이미 있으면 덮어쓰지 않는다.
+class MkBusySign {
+  constructor(private readonly database: FirebaseDatabase, private readonly clock: MkClock, private readonly paths: MkPaths) {}
+
+  // owed: AI 와 하는 판이면 true. 돌아오는 이 팀이 또 혼자 남지 않게 다른 팀이 잠깐 기다려 준다.
+  async put(party: MkParty, forMs: number, owed: boolean): Promise<void> {
+    if (!party.isLeader()) return;
+    const ref = this.database.ref(this.paths.entry(party.code));
+    const now = this.clock.now();
+    const sign: MkQueueEntry = { leader: party.myId, people: {}, bots: 0, size: 0, at: now, claim: null, busyUntil: now + forMs };
+    if (owed) sign.owed = true;
+    try {
+      ref.onDisconnect().remove();
+      await ref.transaction((current) => {
+        const entry = current as MkQueueEntry | null;
+        if (entry && entry.size > 0) return undefined;
+        return sign;
+      });
+    } catch (error) { /* 표지판은 없어도 매칭은 된다 */ }
+  }
+}
+
+// ───── 게임에 붙이는 부분: 팀 대기실 화면(MkPartyPanel)과 흐름(MkRandomFlow) ─────
+// 게임마다 다른 것(방 만들기·표로 입장·경기 시작·화면 전환)은 MkGameHooks 로 받고, 나머지
+// (팀 대기실 만들기·들어가기, 매칭 시작/취소, 표 받기, 모이면 시작, 결과 반영, 팀 대기실로 돌아오기)는 여기 한 곳에 둔다.
+
+interface MkGameHooks extends MkRoomMaker {
+  member(): MkMember;
+  enterRoom(ticket: MkTicket, hosting: boolean): Promise<boolean>;
+  leaveRoom(): void;
+  startMatch(): void;
+  showParty(): void;
+  showStart(message: string): void;
+  // 지금 일반 방에 있는 사람(AI 제외) 아이디. 주면 전적의 상대를 "실제로 들어온 학생"으로 적는다(없으면 표의 상대 그대로).
+  presentIds?(): string[];
+}
+
+interface MkFlowOptions {
+  gameRoot: string;
+  queue: string;
+  partyLimit: number;
+  matcher: MkMatcher;
+  intro: string;
+  showRank?: boolean;
+  solo?: boolean;
+  allowBots?: boolean;
+  startWaitMs?: number;
+  aiFallbackMs?: number;
+  stats?: MkStatsLink;
+  // 게임 쪽 "내 닉네임 · 닉네임 설정" 줄. 주면 팀 코드 줄 오른쪽으로 옮겨 자리가 되면 한 줄, 모자라면 팀 코드 아래 둘째 줄이 된다.
+  headExtra?: HTMLElement | null;
+}
+
+interface MkPartyLookup {
+  handled: boolean;
+  message: string;
+}
+
+// 편(side)마다 자리 번호를 정해 준다. 일반 방에 assign/<id> 로 넣어 두면 들어오는 사람이 그 자리에 앉는다.
+class MkSeatAssign {
+  static bySide(plan: MkMatchPlan, perSide: number): Record<string, number> {
+    const assign: Record<string, number> = {};
+    plan.groups.forEach((group) => {
+      MkSeatAssign.peopleOf(group).slice(0, perSide).forEach((id, index) => { assign[id] = group.side * perSide + index; });
+    });
+    return assign;
+  }
+
+  static peopleOf(group: MkPlannedEntry): string[] {
+    const people = group.entry.people || {};
+    return Object.keys(people).sort((a, b) => people[a].joinedAt - people[b].joinedAt || (a < b ? -1 : 1));
+  }
+
+  static sideOf(plan: MkMatchPlan, id: string): number {
+    const group = plan.groups.find((item) => !!(item.entry.people || {})[id]);
+    return group ? group.side : -1;
+  }
+}
+
+class MkPartyPanel {
+  onMatch: () => void = () => undefined;
+  onLeave: () => void = () => undefined;
+  onAddBot: () => void = () => undefined;
+  onRemoveBot: () => void = () => undefined;
+  onAiNow: () => void = () => undefined;
+  private readonly code: HTMLSpanElement;
+  private readonly crowd: HTMLDivElement;
+  private readonly aiNowButton: HTMLButtonElement;
+  private readonly head: HTMLHeadingElement;
+  private readonly seats: HTMLDivElement;
+  private readonly notice: HTMLDivElement;
+  private readonly matchButton: HTMLButtonElement;
+  private readonly hint: HTMLDivElement;
+  private readonly streak: MkStreakBadge;
+  private readonly statsButton: HTMLButtonElement;
+  private streakCount = 0;
+
+  constructor(screen: HTMLElement, mount: HTMLElement, private readonly options: MkFlowOptions) {
+    const openStats = () => { if (options.stats) options.stats.open(); };
+    this.streak = new MkStreakBadge();
+    this.statsButton = MkPartyPanel.button("mk-stats", "📊 내 통계 · 최근 20매치", openStats);
+    this.statsButton.hidden = !options.stats || !!(options.headExtra && options.headExtra.querySelector("[data-account-open]"));
+    this.head = document.createElement("h2");
+    this.head.className = "mk-head";
+    this.code = document.createElement("span");
+    this.code.className = "mk-code";
+    if (options.solo) this.head.append("랜덤 매칭 ", this.streak.element, this.statsButton);
+    else this.head.append("팀 코드 ", this.code, this.streak.element, this.statsButton);
+    this.seats = document.createElement("div");
+    this.seats.className = "mk-team";
+    this.seats.addEventListener("click", (event) => {
+      const seat = (event.target as HTMLElement).closest("[data-mk-seat]") as HTMLButtonElement | null;
+      if (!seat || seat.disabled) return;
+      if (seat.dataset.mkSeat === "bot") this.onRemoveBot();
+      if (seat.dataset.mkSeat === "empty") this.onAddBot();
+    });
+    this.notice = document.createElement("div");
+    this.notice.className = "mk-notice";
+    this.crowd = document.createElement("div");
+    this.crowd.className = "mk-crowd";
+    this.matchButton = MkPartyPanel.button("st-btn primary mk-match", "매칭 시작", () => this.onMatch());
+    this.aiNowButton = MkPartyPanel.button("st-btn primary mk-ai-now", "🤖 AI와 바로 시작", () => this.onAiNow());
+    this.aiNowButton.hidden = true;
+    this.hint = document.createElement("div");
+    this.hint.className = "st-hint mk-hint";
+    // 30번 대기실처럼 나가기는 카드 오른쪽 위 작은 빨간 버튼(2026-10-27 선생님 요청, 모든 랜덤 매칭 대기실 공통).
+    const leave = MkPartyPanel.button("mk-leave", options.solo ? "나가기" : "팀 나가기", () => this.onLeave());
+    mount.textContent = "";
+    mount.classList.add("mk-panel");
+    const top = document.createElement("div");
+    top.className = "mk-top";
+    top.append(this.head);
+    if (options.headExtra) top.append(options.headExtra);
+    const buttons = document.createElement("div");
+    buttons.className = "st-row mk-buttons";
+    buttons.append(this.aiNowButton, this.matchButton);
+    mount.append(leave, top, this.seats, this.notice, this.crowd, buttons, this.hint);
+  }
+
+  setNotice(text: string): void {
+    if (this.notice.textContent !== text) this.notice.textContent = text;
+  }
+
+  setStreak(count: number): void {
+    this.streakCount = count;
+    this.streak.render(count);
+  }
+
+  streakNote(): string {
+    return this.streakCount > 0 ? " · 지금 " + this.streakCount + "연승 중" : "";
+  }
+
+  setBusy(busy: boolean): void {
+    this.matchButton.disabled = busy;
+    this.aiNowButton.disabled = busy;
+  }
+
+  // waitingForOthers: 대기열에 상대가 있는데 바로 전 판 상대라, 경기 중인 다른 팀이 돌아오길 잠깐 기다리는 중.
+  // waiting: 대기열에서 나 말고 기다리는 학생 수(찾는 중이 아니거나 아직 모르면 null).
+  render(party: MkParty, waitingForOthers: boolean = false, waiting: number | null = null): void {
+    const leader = party.isLeader();
+    const searching = !!party.searching();
+    this.code.textContent = party.code;
+    this.streak.render(this.streakCount);
+    this.seats.textContent = "";
+    if (!this.options.solo) {
+      const title = document.createElement("h3");
+      title.textContent = "우리 팀";
+      this.seats.appendChild(title);
+    }
+    const leaderId = party.record ? party.record.leaderId : "";
+    party.members().forEach(([id, member]) => {
+      const tags = id === leaderId && !this.options.solo ? "팀장" : "";
+      this.seats.appendChild(MkPartyPanel.seat("div", "mk-seat" + (id === party.myId ? " me" : ""), member.nick, tags, ""));
+    });
+    const editable = leader && !searching;
+    if (this.options.allowBots) {
+      for (let index = 0; index < party.bots(); index++) {
+        const seat = MkPartyPanel.seat("button", "mk-seat bot", "🤖 AI", editable ? "눌러서 빼기" : "", "bot") as HTMLButtonElement;
+        seat.disabled = !editable;
+        this.seats.appendChild(seat);
+      }
+    }
+    for (let count = party.members().length + (this.options.allowBots ? party.bots() : 0); count < this.options.partyLimit; count++) {
+      if (this.options.allowBots && editable) this.seats.appendChild(MkPartyPanel.seat("button", "mk-seat empty", "🤖 AI 추가", "", "empty"));
+      else this.seats.appendChild(MkPartyPanel.seat("div", "mk-seat empty", "빈 자리", "", ""));
+    }
+    this.matchButton.textContent = searching ? "매칭 취소" : "매칭 시작";
+    this.matchButton.classList.toggle("primary", !searching);
+    this.matchButton.classList.toggle("cancel", searching);
+    this.matchButton.disabled = !leader;
+    this.aiNowButton.hidden = !this.options.aiFallbackMs || !searching || !leader;
+    this.aiNowButton.disabled = false;
+    const unit = this.options.solo ? { some: "명이", none: "학생이" } : { some: "개 팀이", none: "팀이" };
+    const crowdText = !searching || waiting === null ? "" : waiting > 0 ? "👥 지금 " + waiting + unit.some + " 기다리는 중" : "👥 지금 기다리는 " + unit.none + " 없어요";
+    if (this.crowd.textContent !== crowdText) this.crowd.textContent = crowdText;
+    this.crowd.classList.toggle("alone", searching && waiting === 0);
+    const streakNote = this.streakNote();
+    const fallback = this.options.aiFallbackMs ? Math.ceil(this.options.aiFallbackMs / 1000) - party.searchSeconds() : 0;
+    const fallbackNote = waitingForOthers ? " · 다른 팀 경기가 끝나길 기다리는 중(같은 상대와 연달아 만나지 않게)"
+      : !this.options.aiFallbackMs ? "" : fallback > 0 ? " · " + fallback + "초 뒤 AI와 시작해요" : " · AI와 시작하는 중…";
+    const hint = searching ? "상대를 찾는 중… " + party.searchSeconds() + "초" + fallbackNote + streakNote : leader ? "" : "팀장이 매칭을 시작하길 기다리는 중이에요…";
+    if (this.hint.textContent !== hint) this.hint.textContent = hint;
+  }
+
+  private static button(className: string, text: string, onClick: () => void): HTMLButtonElement {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = className;
+    button.textContent = text;
+    button.addEventListener("click", () => { button.blur(); onClick(); });
+    return button;
+  }
+
+  private static seat(tag: "div" | "button", className: string, name: string, note: string, kind: string): HTMLElement {
+    const seat = document.createElement(tag);
+    seat.className = className;
+    if (tag === "button") (seat as HTMLButtonElement).type = "button";
+    if (kind) seat.dataset.mkSeat = kind;
+    const bold = document.createElement("b");
+    bold.textContent = name;
+    const small = document.createElement("small");
+    small.textContent = note;
+    seat.append(bold, small);
+    return seat;
+  }
+}
+
+class MkRandomFlow {
+  private static readonly START_WAIT_MS = 15000;
+  // 사람 상대가 대기열에 있어 AI 대체를 미뤄도, 묶는 팀장 기기가 잠들어 묶지 못할 수 있으니 이만큼 더 지나면 AI 와 시작한다.
+  private static readonly COMPANY_GRACE_MS = 15000;
+
+  readonly paths: MkPaths;
+  private readonly directory: MkPartyDirectory;
+  private readonly memory: MkPartyMemory;
+  private readonly sign: MkBusySign;
+  private party: MkParty | null = null;
+  private queue: MkQueue | null = null;
+  private current: MkTicket | null = null;
+  private startTimer: ReturnType<typeof setTimeout> | null = null;
+  private secondsTimer: ReturnType<typeof setInterval> | null = null;
+  private startedFor = "";
+  private reported = false;
+  private fallbackFor = 0;
+  private streakArmedFor = "";
+  private statsArmedFor = "";
+  private readonly seenRivals = new Set<string>();
+  private readonly streak: MkPersonalStreak;
+
+  constructor(
+    private readonly database: FirebaseDatabase,
+    private readonly clock: MkClock,
+    private readonly myId: string,
+    private readonly options: MkFlowOptions,
+    private readonly hooks: MkGameHooks,
+    private readonly panel: MkPartyPanel
+  ) {
+    this.paths = MkPaths.forGame(options.gameRoot, options.queue);
+    this.directory = new MkPartyDirectory(database, clock, this.paths, options.partyLimit);
+    this.memory = new MkPartyMemory(options.queue);
+    this.sign = new MkBusySign(database, clock, this.paths);
+    this.streak = new MkPersonalStreak(options.gameRoot);
+    panel.onMatch = () => this.toggleSearch();
+    panel.onLeave = () => this.leaveParty();
+    panel.onAddBot = () => { if (this.party) this.party.setBots(this.party.bots() + 1); };
+    panel.onRemoveBot = () => { if (this.party) this.party.setBots(this.party.bots() - 1); };
+    panel.onAiNow = () => this.startWithAiNow();
+  }
+
+  inParty(): boolean {
+    return !!this.party;
+  }
+
+  ticket(): MkTicket | null {
+    return this.current;
+  }
+
+  // 여럿이 한 방에 모이는 게임에서 "우리 팀 누군가 1등"을 판단할 때 쓴다.
+  memberIds(): string[] {
+    return this.party ? this.party.members().map(([id]) => id) : [];
+  }
+
+  hasTicket(): boolean {
+    return !!this.current;
+  }
+
+  async create(): Promise<string> {
+    const member = this.hooks.member();
+    const kept = this.memory.recall(member.nick);
+    if (kept && (await this.directory.reclaim(kept.code, this.myId, member, kept.id))) {
+      this.memory.remember(kept.code, member.nick, this.myId);
+      this.attach(kept.code);
+      return "";
+    }
+    const code = await this.directory.create(this.myId, member);
+    if (!code) return "랜덤 매칭 방을 만들지 못했어요. 다시 눌러 주세요.";
+    this.memory.remember(code, member.nick, this.myId);
+    this.attach(code);
+    return "";
+  }
+
+  async tryJoin(code: string): Promise<MkPartyLookup> {
+    if (this.options.solo || !(await this.directory.exists(code))) return { handled: false, message: "" };
+    const outcome = await this.directory.join(code, this.myId, this.hooks.member());
+    if (outcome.ok) this.attach(code);
+    return { handled: true, message: outcome.message };
+  }
+
+  async codeTaken(code: string): Promise<boolean> {
+    return this.directory.exists(code);
+  }
+
+  updateMe(): void {
+    if (this.party) this.party.updateMe(this.hooks.member());
+  }
+
+  render(): void {
+    if (!this.party) return;
+    const searching = !!this.queue && !!this.party.searching();
+    this.panel.render(this.party, searching && this.queue!.hasCompany(this.party.code), this.queue ? this.queue.othersWaiting(this.party.code) : null);
+  }
+
+  setNotice(text: string): void {
+    this.panel.setNotice(text);
+  }
+
+  // 방장 기기에서 일반 방 사람 수가 바뀔 때마다 부른다. 표에 적힌 사람이 다 모이면 바로 시작한다.
+  roomChanged(humans: number, hosting: boolean, inLobby: boolean): void {
+    this.notePresentRivals();
+    this.armMatch();
+    if (this.current && hosting && inLobby && humans >= this.current.expect) this.startNow();
+  }
+
+  // 경기장에 들어온 판은 결과가 나기 전에 사라져도(← 목록으로·탭 닫기) 패배로 남게 미리 적어 둔다.
+  // 경기 화면을 따로 알리는 게임은 판이 시작될 때 이것도 부른다(같은 판은 한 번만 적힌다).
+  armMatch(): void {
+    const ticket = this.current;
+    if (!ticket || !this.party || this.reported) return;
+    if (this.streakArmedFor !== ticket.matchId) {
+      this.streakArmedFor = ticket.matchId;
+      this.streak.arm(ticket.matchId);
+    }
+    const guard = this.guard();
+    if (guard && this.statsArmedFor !== ticket.matchId && guard.arm(ticket)) this.statsArmedFor = ticket.matchId;
+  }
+
+  private disarmMatch(ticket: MkTicket): void {
+    if (this.streakArmedFor === ticket.matchId) this.streak.disarm(ticket.matchId);
+    const guard = this.guard();
+    if (guard && this.statsArmedFor === ticket.matchId) guard.disarm(ticket);
+    this.streakArmedFor = this.statsArmedFor = "";
+  }
+
+  private guard(): MkMatchGuard | null {
+    return (this.options.stats && this.options.stats.guard) || null;
+  }
+
+  // 매칭된 상대가 끝내 경기장에 안 들어오면 게임이 그 자리를 AI 로 채운다. 그 판 전적에 그 학생 이름이 남지 않게,
+  // 방에 한 번이라도 들어온 상대만 모아 둔다(경기 중에 나간 상대는 함께 한 것으로 본다).
+  private notePresentRivals(): void {
+    const ticket = this.current;
+    if (!ticket || !ticket.rivalIds || !this.hooks.presentIds) return;
+    const rivalIds = ticket.rivalIds;
+    this.hooks.presentIds().forEach((id) => { if (rivalIds[id] !== undefined) this.seenRivals.add(id); });
+  }
+
+  private actualRivals(ticket: MkTicket): string[] | undefined {
+    if (!ticket.rivalIds || !this.hooks.presentIds) return undefined;
+    this.notePresentRivals();
+    const rivalIds = ticket.rivalIds;
+    return Object.keys(rivalIds).filter((id) => this.seenRivals.has(id)).map((id) => rivalIds[id]);
+  }
+
+  // 판이 끝났을 때 팀원 모두가 부른다. 연승은 각자 자기 계정에 남긴다(같은 판은 한 번만).
+  // 화면의 연승은 2026-10-27 선생님 결정으로 팀 대기실 전적이 아니라 아이디 단위다. 팀 대기실 전적(MkParty.report, 팀장만)은
+  // 화면에 보이지 않지만 "이미 끝난 판의 표로 다시 들어가지 않기"(MkParty 의 book().has)에 쓰여서 그대로 남긴다.
+  matchEnded(outcome: MkOutcome, onStreak: () => void = () => undefined): void {
+    const ticket = this.current;
+    if (!ticket || !this.party || this.reported) return;
+    this.reported = true;
+    const rivals = outcome.rivals || this.actualRivals(ticket);
+    const final = rivals ? { ...outcome, rivals } : outcome;
+    this.party.report(ticket, final);
+    if (this.options.stats && this.options.stats.recordOutcome) this.options.stats.recordOutcome(ticket, final);
+    // 진 판이 아니면 미리 적은 패배를 치운다. 게임이 결과를 계정에 남기지 못하고 화면을 떠나도 거짓 패배가 되지 않게.
+    const guard = this.guard();
+    if (guard && final.result !== "lose" && this.statsArmedFor === ticket.matchId) guard.disarm(ticket);
+    this.streak.apply(ticket.matchId, final.result).then(() => {
+      this.panel.setStreak(this.streak.current());
+      onStreak();
+    });
+  }
+
+  // 랜덤 매칭 판에서는 경기 중 언제 나가도 나간 쪽은 패(2026-10-27 선생님 요청, 예전에는 절반 뒤에만).
+  // progress 는 예전 호출 모양을 지키려고 받기만 한다. 판이 이미 끝나 결과를 기록했으면 해당 없음.
+  forfeitApplies(progress: number = 0): boolean {
+    return !!this.current && !!this.party && !this.reported && progress >= 0;
+  }
+
+  forfeitIfLate(progress: number = 0): boolean {
+    if (!this.forfeitApplies(progress)) return false;
+    this.matchEnded({ result: "lose" });
+    return true;
+  }
+
+  endHint(): string {
+    return this.party ? "지금 " + this.streak.label().replace("🔥 ", "") : "";
+  }
+
+  backToParty(message: string): void {
+    const note = this.reported ? "" : message;
+    this.clearStartTimer();
+    if (this.current && !this.reported) this.disarmMatch(this.current);
+    if (this.current && this.party) this.party.clearTicket(this.current.matchId);
+    this.current = null;
+    this.reported = false;
+    this.hooks.leaveRoom();
+    if (this.party) {
+      if (!this.party.searching()) this.sign.put(this.party, this.options.matcher.returnGraceMs, !!this.party.lastMatch().ai);
+      this.hooks.showParty();
+      this.panel.setNotice(note);
+      this.render();
+    } else this.hooks.showStart(note);
+  }
+
+  private attach(code: string): void {
+    const party = new MkParty(this.database, this.clock, this.paths, code, this.myId, this.options.partyLimit);
+    this.party = party;
+    party.onChange = () => {
+      this.render();
+      this.tickSeconds(!!party.searching());
+    };
+    party.onTicket = (ticket) => this.receiveTicket(ticket);
+    party.onClosed = (message) => this.dropParty(message);
+    party.connect();
+    this.panel.setNotice("");
+    this.panel.setStreak(this.streak.current());
+    this.streak.load().then(() => { this.panel.setStreak(this.streak.current()); this.render(); });
+    const guard = this.guard();
+    if (guard) guard.settle();
+    this.hooks.showParty();
+  }
+
+  private async toggleSearch(): Promise<void> {
+    const party = this.party;
+    if (!party || !party.isLeader()) return;
+    this.panel.setBusy(true);
+    try {
+      if (party.searching()) {
+        const cancelled = this.queue ? await this.queue.cancel(party) : (await party.markSearching(null), true);
+        if (!cancelled) this.panel.setNotice("상대를 찾았어요! 곧 경기장으로 가요.");
+      } else {
+        this.panel.setNotice("");
+        if (this.queue) this.queue.stop();
+        this.queue = new MkQueue(this.database, this.clock, this.paths, this.options.matcher, this.hooks);
+        this.queue.onError = (message) => this.panel.setNotice(message);
+        this.queue.onEntries = () => this.render();
+        await this.queue.enter(party, this.hooks.member());
+      }
+    } catch (error) {
+      this.panel.setNotice("매칭 서버에 연결하지 못했어요. (인터넷·데이터베이스 규칙 확인)");
+    }
+    this.render();
+  }
+
+  private async receiveTicket(ticket: MkTicket): Promise<void> {
+    if (this.queue) this.queue.stop();
+    this.tickSeconds(false);
+    this.hooks.leaveRoom();
+    this.current = ticket;
+    this.reported = false;
+    this.seenRivals.clear();
+    if (this.party) this.sign.put(this.party, this.options.matcher.busyMs, !(ticket.rivals || []).length);
+    const hosting = ticket.host === this.myId;
+    const entered = await this.hooks.enterRoom(ticket, hosting).catch(() => false);
+    if (!entered) {
+      this.current = null;
+      if (this.party) this.party.clearTicket(ticket.matchId);
+      this.hooks.showParty();
+      this.panel.setNotice("경기장에 들어가지 못했어요. 다시 매칭해 주세요.");
+      return;
+    }
+    this.armMatch();
+    if (hosting) {
+      this.clearStartTimer();
+      this.startTimer = setTimeout(() => this.startNow(), this.options.startWaitMs || MkRandomFlow.START_WAIT_MS);
+    }
+  }
+
+  private startNow(): void {
+    this.clearStartTimer();
+    if (!this.current || this.startedFor === this.current.matchId) return;
+    this.startedFor = this.current.matchId;
+    this.hooks.startMatch();
+  }
+
+  private clearStartTimer(): void {
+    if (this.startTimer) clearTimeout(this.startTimer);
+    this.startTimer = null;
+  }
+
+  private tickSeconds(on: boolean): void {
+    if (on && !this.secondsTimer) this.secondsTimer = setInterval(() => { this.render(); this.checkAiFallback(); }, 1000);
+    if (!on && this.secondsTimer) {
+      clearInterval(this.secondsTimer);
+      this.secondsTimer = null;
+    }
+  }
+
+  private checkAiFallback(): void {
+    const party = this.party, wait = this.options.aiFallbackMs;
+    const search = party ? party.searching() : null;
+    if (!wait || !party || !search || !party.isLeader() || !this.queue || this.fallbackFor === search.since) return;
+    const waited = this.clock.now() - search.since;
+    if (waited < wait) return;
+    if (this.queue.hasCompany(party.code) && waited < wait + this.options.matcher.rematchWaitMs + MkRandomFlow.COMPANY_GRACE_MS) return;
+    this.fallbackFor = search.since;
+    this.queue.goSolo(party.code);
+  }
+
+  // 기다리기 싫으면 aiFallbackMs 를 기다리지 않고 바로 AI 대전. 그 사이 사람과 묶이는 중이면 사람 매칭을 따른다.
+  private async startWithAiNow(): Promise<void> {
+    const party = this.party;
+    const search = party ? party.searching() : null;
+    if (!party || !search || !party.isLeader() || !this.queue) return;
+    this.fallbackFor = search.since;
+    this.panel.setBusy(true);
+    const started = await this.queue.goSolo(party.code).catch(() => false);
+    if (!started && !party.ticket()) this.panel.setNotice("다른 학생과 연결되는 중이에요. 잠시만 기다려 주세요.");
+    this.render();
+  }
+
+  private async leaveParty(): Promise<void> {
+    const party = this.party;
+    if (!party) return;
+    if (this.queue) this.queue.stop();
+    this.tickSeconds(false);
+    this.party = null;
+    await party.leave(true).catch(() => undefined);
+    this.hooks.showStart("");
+  }
+
+  private dropParty(message: string): void {
+    if (this.queue) this.queue.stop();
+    this.tickSeconds(false);
+    this.party = null;
+    if (!this.current) this.hooks.showStart(message);
+  }
+}
+
+// 새로고침·나가기를 해도 같은 대기실(전적·연승·바로 전 상대)을 이어 쓰게 이 기기에 대기실 코드와 내 아이디를 적어 둔다
+// (24번에서 먼저 쓰다가 2026-10-22 모든 게임으로 넓힘). 같은 태블릿을 다른 학생이 쓸 수 있으니 닉네임이 같을 때만 돌아가고,
+// 오래 안 쓴 대기실은 서버에서 치워지므로(MkPartyDirectory.sweep) 다음 날까지 이어지지는 않는다.
+// 랜덤 매칭 중간 이탈 규칙(24번에서 먼저 쓰다가 2026-10-22 모든 게임으로). 확인 문구를 게임마다 같게 쓴다.
+class MkForfeit {
+  static readonly AT = 0.5;
+  static readonly QUESTION = "지금 나가면 패배로 기록됩니다. 나갈까요?";
+  static readonly TAP_AGAIN = "한 번 더 누르면 패배로 나가요";
+
+  static clamp(progress: number): number {
+    return Number.isFinite(progress) ? Math.max(0, Math.min(1, progress)) : 0;
+  }
+}
+
+class MkPartyMemory {
+  private readonly key: string;
+  private readonly oldKey: string;
+
+  constructor(queueName: string) {
+    this.key = "mk_party_" + queueName + "_v1";
+    this.oldKey = "mk_solo_party_" + queueName + "_v1";
+  }
+
+  recall(nick: string): { code: string; id: string } | null {
+    const saved = this.read(this.key) || this.read(this.oldKey);
+    return saved && saved.code && saved.nick === nick ? { code: saved.code, id: saved.id || "" } : null;
+  }
+
+  remember(code: string, nick: string, id: string): void {
+    try { localStorage.setItem(this.key, JSON.stringify({ code, nick, id })); } catch (error) { /* 저장 못 하는 기기 */ }
+  }
+
+  private read(key: string): { code?: string; nick?: string; id?: string } | null {
+    try {
+      return JSON.parse(localStorage.getItem(key) || "null") as { code?: string; nick?: string; id?: string } | null;
+    } catch (error) {
+      return null;
+    }
+  }
+}
+
+// 연승 표시 버튼(🔥 n연승 / 연승 없음). 누르면 게임의 계정 통계 창을 연다.
+// 내 계정의 랜덤 매칭 연승(MkPersonalStreak, 팀 대기실 전적이 아님)을 보여 주기만 한다. 누르는 기능은 없앴다(2026-10-27 선생님 요청).
+class MkStreakBadge {
+  readonly element: HTMLSpanElement;
+
+  constructor() {
+    this.element = document.createElement("span");
+    this.element.className = "mk-streak";
+    this.render(0);
+  }
+
+  render(count: number): void {
+    const label = MkStreakMath.label(count);
+    if (this.element.textContent !== label) this.element.textContent = label;
+    this.element.classList.toggle("hot", count > 0);
+  }
+}
+
+// 연승 계산(화면·통신 없음, tools/match-sim.js 가 검사). 이기면 +1, 지면 0, 비기면 그대로. 상한 없음(2026-10-27 선생님 요청).
+class MkStreakMath {
+  static readonly EMPTY: MkStreakRecord = { n: 0, b: 0, id: "" };
+  static readonly KEY_MAX = 60;
+
+  static normalize(raw: unknown): MkStreakRecord {
+    const value = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+    const n = MkStreakMath.count(value.n);
+    const record: MkStreakRecord = { n, b: Math.max(n, MkStreakMath.count(value.b)), id: typeof value.id === "string" ? value.id : "" };
+    if (typeof value.p === "string" && value.p && value.p !== record.id) record.p = value.p;
+    return record;
+  }
+
+  // 결과 없이 사라진 판(p)을 진 것으로 정리한다. 남은 판이 없으면 그대로.
+  static settle(before: MkStreakRecord): MkStreakRecord {
+    return before.p ? { n: 0, b: before.b, id: before.p } : { n: before.n, b: before.b, id: before.id };
+  }
+
+  static arm(before: MkStreakRecord, matchId: string): MkStreakRecord | null {
+    const id = MkStreakMath.key(matchId);
+    if (!id || before.id === id || before.p === id) return null;
+    return { ...MkStreakMath.settle(before), p: id };
+  }
+
+  static disarm(before: MkStreakRecord, matchId: string): MkStreakRecord | null {
+    const id = MkStreakMath.key(matchId);
+    return id && before.p === id ? { n: before.n, b: before.b, id: before.id } : null;
+  }
+
+  static next(before: MkStreakRecord, matchId: string, result: MkResult): MkStreakRecord | null {
+    const id = MkStreakMath.key(matchId);
+    if (!id || before.id === id) return null;
+    const base = before.p === id ? MkStreakMath.disarm(before, matchId)! : MkStreakMath.settle(before);
+    if (base.id === id) return null;
+    const n = result === "win" ? base.n + 1 : result === "lose" ? 0 : base.n;
+    return { n, b: Math.max(base.b, n), id };
+  }
+
+  static key(matchId: string): string {
+    return String(matchId || "").replace(/[.#$\[\]\/\s]/g, "_").slice(0, MkStreakMath.KEY_MAX);
+  }
+
+  static label(count: number): string {
+    return count > 0 ? "🔥 " + count + "연승" : "연승 없음";
+  }
+
+  private static count(value: unknown): number {
+    const number = Number(value);
+    return isFinite(number) && number > 0 ? Math.floor(number) : 0;
+  }
+}
+
+// 연승은 팀 대기실이 아니라 아이디(로그인 계정)마다 센다(2026-10-27 선생님 요청).
+// 로그인했으면 users/<uid>/streak/<게임 루트> = {n 지금 연승, b 최고 연승, id 마지막 판}, 로그인 전(배포용 링크)은 이 기기 localStorage.
+// 요청: 대기실에 들어갈 때 읽기 1번, 판을 시작할 때 미리 패배 적기 1번, 판이 끝날 때 쓰기 1번(자기 계정에만). 폴링 없음.
+class MkPersonalStreak {
+  private value: MkStreakRecord = MkStreakMath.EMPTY;
+  private pending: Promise<void> = Promise.resolve();
+
+  constructor(private readonly game: string) {}
+
+  current(): number {
+    return this.value.n;
+  }
+
+  label(): string {
+    return MkStreakMath.label(this.value.n);
+  }
+
+  // 읽었을 때 결과 없는 판이 남아 있으면 그 판은 이 화면에서 진행 중이 아니니(새로 연 화면) 패배로 정산해 둔다.
+  load(): Promise<void> {
+    this.pending = this.pending.then(() => this.read()).then((raw) => {
+      const stored = MkStreakMath.normalize(raw);
+      this.value = MkStreakMath.settle(stored);
+      return stored.p ? this.save(this.value).catch(() => undefined) : undefined;
+    }, () => undefined);
+    return this.pending;
+  }
+
+  arm(matchId: string): Promise<void> {
+    return this.change((before) => MkStreakMath.arm(before, matchId));
+  }
+
+  disarm(matchId: string): Promise<void> {
+    return this.change((before) => MkStreakMath.disarm(before, matchId));
+  }
+
+  apply(matchId: string, result: MkResult): Promise<void> {
+    return this.change((before) => MkStreakMath.next(before, matchId, result));
+  }
+
+  private change(step: (before: MkStreakRecord) => MkStreakRecord | null): Promise<void> {
+    this.pending = this.pending.then(() => {
+      const next = step(this.value);
+      if (!next) return undefined;
+      this.value = next;
+      return this.save(next).catch(() => undefined);
+    });
+    return this.pending;
+  }
+
+  private account(): AccountDatabase | null {
+    if (typeof window === "undefined" || !window.PORTAL_USER || typeof AccountDatabase !== "function") return null;
+    return new AccountDatabase(window.PORTAL_USER);
+  }
+
+  private path(): string {
+    return "streak/" + this.game;
+  }
+
+  private localKey(): string {
+    return "mk_streak_" + this.game + "_v1";
+  }
+
+  private read(): Promise<unknown> {
+    const database = this.account();
+    if (database) return database.read<unknown>(this.path());
+    try {
+      return Promise.resolve(typeof localStorage === "undefined" ? null : JSON.parse(localStorage.getItem(this.localKey()) || "null"));
+    } catch (error) {
+      return Promise.resolve(null);
+    }
+  }
+
+  private save(record: MkStreakRecord): Promise<void> {
+    const database = this.account();
+    if (database) return database.write(this.path(), record);
+    try { if (typeof localStorage !== "undefined") localStorage.setItem(this.localKey(), JSON.stringify(record)); } catch (error) { /* 저장 못 하는 기기 */ }
+    return Promise.resolve();
+  }
+}

@@ -18,7 +18,7 @@ const results = [];
 function check(name, ok, detail) { results.push(ok); console.log((ok ? "PASS " : "FAIL ") + name + (detail ? "  " + detail : "")); }
 
 function volleyball() {
-  const A = load("34.volleyball-rules.js", ["VbConfig", "VbRallyEngine", "VolleyballBot"]);
+  const A = load("games/34.volleyball/34.volleyball-rules.js", ["VbConfig", "VbRallyEngine", "VolleyballBot"]);
   const random = seededRandom(7);
   const makeEngine = () => {
     const bots = [0, 1, 2, 3].map((slot) => new A.VolleyballBot(slot, random));
@@ -59,7 +59,7 @@ function volleyball() {
 }
 
 function soccer() {
-  const A = load("35.soccer-rules.js", ["SocConfig", "SocEngine", "SocBot"]);
+  const A = load("games/35.soccer/35.soccer-rules.js", ["SocConfig", "SocEngine", "SocBot"]);
   const random = seededRandom(11);
   const bots = [0, 1, 2, 3].map((slot) => new A.SocBot(slot, random));
   const engine = new A.SocEngine(bots, random);

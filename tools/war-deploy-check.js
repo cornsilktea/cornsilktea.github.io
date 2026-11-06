@@ -7,7 +7,7 @@ class DeployCheck {
   static SITE = "https://cornsilktea.github.io/";
   static WAIT_MS = 8 * 60 * 1000;
   static POLL_MS = 15 * 1000;
-  static FILES = ["37.space-war.html", "37.war-data.js", "37.war-rules.js", "37.war-views.js", "37.war-hud.js", "37.space-war.js"];
+  static FILES = ["37.space-war.html", "games/37.space-war/37.war-data.js", "games/37.space-war/37.war-rules.js", "games/37.space-war/37.war-views.js", "games/37.space-war/37.war-hud.js", "games/37.space-war/37.space-war.js"];
 
   constructor(root) {
     this.root = root;

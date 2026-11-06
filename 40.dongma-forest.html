@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-<script charset="utf-8" src="firebase-config.js"></script>
-<script charset="utf-8" src="access-guard.js" data-game="dongmaforest"></script>
-<script charset="utf-8" src="fullscreen-keeper.js" data-watch></script>
-<script charset="utf-8" src="quality-governor.js"></script>
+<script charset="utf-8" src="common/firebase-config.js"></script>
+<script charset="utf-8" src="common/access-guard.js" data-game="dongmaforest"></script>
+<script charset="utf-8" src="common/fullscreen-keeper.js" data-watch></script>
+<script charset="utf-8" src="common/quality-governor.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>모여봐요 동마의 숲</title>
@@ -15,7 +15,7 @@
 <meta property="og:url" content="https://cornsilktea.github.io/40.dongma-forest.html">
 <meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
 <meta name="twitter:card" content="summary">
-<link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="common/theme.css">
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 <script async src="https://cdn.jsdelivr.net/npm/es-module-shims@1.10.1/dist/es-module-shims.js"></script>
@@ -257,43 +257,43 @@
     </div>
   </div>
 </div>
-<script charset="utf-8" src="character-kit.js?v=20261011"></script>
-<script charset="utf-8" src="fold-card.js"></script>
-<script charset="utf-8" src="40.forest-furniture.js?v=12"></script>
-<script charset="utf-8" src="40.forest-data.js?v=12"></script>
-<script charset="utf-8" src="40.forest-rules.js?v=13"></script>
-<script charset="utf-8" src="40.forest-clock.js?v=12"></script>
-<script charset="utf-8" src="40.forest-minigame.js?v=13"></script>
-<script charset="utf-8" src="40.forest-terrain.js?v=12"></script>
-<script charset="utf-8" src="room-kit.js?v=12"></script>
-<script charset="utf-8" src="40.forest-stream.js?v=12"></script>
-<script charset="utf-8" src="40.forest-net.js?v=12"></script>
-<script charset="utf-8" src="40.forest-blocks.js?v=12"></script>
-<script charset="utf-8" src="40.forest-farm.js?v=12"></script>
-<script charset="utf-8" src="40.forest-village.js?v=12"></script>
-<script charset="utf-8" src="40.forest-world.js?v=12"></script>
-<script charset="utf-8" src="40.forest-save.js?v=12"></script>
-<script charset="utf-8" src="40.forest-session.js?v=13"></script>
-<script charset="utf-8" src="40.forest-sync.js?v=12"></script>
-<script charset="utf-8" src="40.forest-input.js?v=13"></script>
-<script charset="utf-8" src="40.forest-nature.js?v=12"></script>
-<script charset="utf-8" src="40.forest-blocklayer.js?v=12"></script>
-<script charset="utf-8" src="40.forest-views.js?v=13"></script>
-<script charset="utf-8" src="40.forest-village-view.js?v=12"></script>
-<script charset="utf-8" src="40.forest-icons.js?v=12"></script>
-<script charset="utf-8" src="40.forest-fx.js?v=12"></script>
-<script charset="utf-8" src="40.forest-feed.js?v=13"></script>
-<script charset="utf-8" src="40.forest-quest.js?v=14"></script>
-<script charset="utf-8" src="40.forest-hud.js?v=14"></script>
-<script charset="utf-8" src="40.forest-admin.js?v=12"></script>
-<script charset="utf-8" src="40.forest-play.js?v=13"></script>
-<script charset="utf-8" src="40.forest-areas.js?v=12"></script>
-<script charset="utf-8" src="40.forest-areaview.js?v=12"></script>
-<script charset="utf-8" src="40.forest-areaplay.js?v=13"></script>
-<script charset="utf-8" src="40.forest-fishing.js?v=12"></script>
-<script charset="utf-8" src="40.forest-dungeon.js?v=13"></script>
-<script charset="utf-8" src="40.forest-monsters.js?v=12"></script>
-<script charset="utf-8" src="40.dongma-forest.js?v=16"></script>
+<script charset="utf-8" src="common/character-kit.js?v=20261011"></script>
+<script charset="utf-8" src="common/fold-card.js"></script>
+<script charset="utf-8" src="games/40.dongma-forest/40.forest-furniture.js?v=12"></script>
+<script charset="utf-8" src="games/40.dongma-forest/40.forest-data.js?v=12"></script>
+<script charset="utf-8" src="games/40.dongma-forest/40.forest-rules.js?v=13"></script>
+<script charset="utf-8" src="games/40.dongma-forest/40.forest-clock.js?v=12"></script>
+<script charset="utf-8" src="games/40.dongma-forest/40.forest-minigame.js?v=13"></script>
+<script charset="utf-8" src="games/40.dongma-forest/40.forest-terrain.js?v=12"></script>
+<script charset="utf-8" src="common/room-kit.js?v=12"></script>
+<script charset="utf-8" src="games/40.dongma-forest/40.forest-stream.js?v=12"></script>
+<script charset="utf-8" src="games/40.dongma-forest/40.forest-net.js?v=12"></script>
+<script charset="utf-8" src="games/40.dongma-forest/40.forest-blocks.js?v=12"></script>
+<script charset="utf-8" src="games/40.dongma-forest/40.forest-farm.js?v=12"></script>
+<script charset="utf-8" src="games/40.dongma-forest/40.forest-village.js?v=12"></script>
+<script charset="utf-8" src="games/40.dongma-forest/40.forest-world.js?v=12"></script>
+<script charset="utf-8" src="games/40.dongma-forest/40.forest-save.js?v=12"></script>
+<script charset="utf-8" src="games/40.dongma-forest/40.forest-session.js?v=13"></script>
+<script charset="utf-8" src="games/40.dongma-forest/40.forest-sync.js?v=12"></script>
+<script charset="utf-8" src="games/40.dongma-forest/40.forest-input.js?v=13"></script>
+<script charset="utf-8" src="games/40.dongma-forest/40.forest-nature.js?v=12"></script>
+<script charset="utf-8" src="games/40.dongma-forest/40.forest-blocklayer.js?v=12"></script>
+<script charset="utf-8" src="games/40.dongma-forest/40.forest-views.js?v=13"></script>
+<script charset="utf-8" src="games/40.dongma-forest/40.forest-village-view.js?v=12"></script>
+<script charset="utf-8" src="games/40.dongma-forest/40.forest-icons.js?v=12"></script>
+<script charset="utf-8" src="games/40.dongma-forest/40.forest-fx.js?v=12"></script>
+<script charset="utf-8" src="games/40.dongma-forest/40.forest-feed.js?v=13"></script>
+<script charset="utf-8" src="games/40.dongma-forest/40.forest-quest.js?v=14"></script>
+<script charset="utf-8" src="games/40.dongma-forest/40.forest-hud.js?v=14"></script>
+<script charset="utf-8" src="games/40.dongma-forest/40.forest-admin.js?v=12"></script>
+<script charset="utf-8" src="games/40.dongma-forest/40.forest-play.js?v=13"></script>
+<script charset="utf-8" src="games/40.dongma-forest/40.forest-areas.js?v=12"></script>
+<script charset="utf-8" src="games/40.dongma-forest/40.forest-areaview.js?v=12"></script>
+<script charset="utf-8" src="games/40.dongma-forest/40.forest-areaplay.js?v=13"></script>
+<script charset="utf-8" src="games/40.dongma-forest/40.forest-fishing.js?v=12"></script>
+<script charset="utf-8" src="games/40.dongma-forest/40.forest-dungeon.js?v=13"></script>
+<script charset="utf-8" src="games/40.dongma-forest/40.forest-monsters.js?v=12"></script>
+<script charset="utf-8" src="games/40.dongma-forest/40.dongma-forest.js?v=16"></script>
 <script type="module">
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";

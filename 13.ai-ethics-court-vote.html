@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-<script charset="utf-8" src="firebase-config.js"></script>
-<script charset="utf-8" src="access-guard.js"></script>
+<script charset="utf-8" src="common/firebase-config.js"></script>
+<script charset="utf-8" src="common/access-guard.js"></script>
 <meta charset="UTF-8">
-<link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="common/theme.css">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>AI판사 체험하기 — 판결하기</title>
 <style>
@@ -164,7 +164,7 @@
   <div class="note" id="note"></div>
 </main>
 
-<script charset="utf-8" src="court-cases.js"></script>
+<script charset="utf-8" src="games/13.ai-ethics-court/court-cases.js"></script>
 <script>
 (function(){
   "use strict";
@@ -339,7 +339,7 @@
 
   if (!ready()){
     setStatus(false, "설정 확인");
-    askCode("설정 파일(firebase-config.js)을 읽지 못했어요.");
+    askCode("설정 파일(common/firebase-config.js)을 읽지 못했어요.");
     return;
   }
 

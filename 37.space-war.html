@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-<script charset="utf-8" src="firebase-config.js"></script>
-<script charset="utf-8" src="access-guard.js" data-game="spacewar"></script>
-<script charset="utf-8" src="quality-governor.js"></script>
+<script charset="utf-8" src="common/firebase-config.js"></script>
+<script charset="utf-8" src="common/access-guard.js" data-game="spacewar"></script>
+<script charset="utf-8" src="common/quality-governor.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <!-- 링크 미리보기(제어판 제목) 시작 — 링크제목맞추기.ps1 이 채웁니다. 손으로 고치지 마세요. -->
@@ -16,7 +16,7 @@
 <meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
 <meta name="twitter:card" content="summary">
 <!-- 링크 미리보기 끝 -->
-<link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="common/theme.css">
 <script async src="https://cdn.jsdelivr.net/npm/es-module-shims@1.10.1/dist/es-module-shims.js"></script>
 <script type="importmap">
 { "imports": {
@@ -206,14 +206,14 @@
   </div>
 </div>
 
-<script charset="utf-8" src="character-kit.js?v=20261011"></script>
-<script charset="utf-8" src="37.war-data.js?v=20261010i"></script>
-<script charset="utf-8" src="37.war-rules.js?v=20261010i"></script>
-<script charset="utf-8" src="37.war-bot.js?v=20261010i"></script>
-<script charset="utf-8" src="37.war-scenery.js?v=20261010i"></script>
-<script charset="utf-8" src="37.war-views.js?v=20261010i"></script>
-<script charset="utf-8" src="37.war-hud.js?v=20261010i"></script>
-<script charset="utf-8" src="37.space-war.js?v=20261010i"></script>
+<script charset="utf-8" src="common/character-kit.js?v=20261011"></script>
+<script charset="utf-8" src="games/37.space-war/37.war-data.js?v=20261010i"></script>
+<script charset="utf-8" src="games/37.space-war/37.war-rules.js?v=20261010i"></script>
+<script charset="utf-8" src="games/37.space-war/37.war-bot.js?v=20261010i"></script>
+<script charset="utf-8" src="games/37.space-war/37.war-scenery.js?v=20261010i"></script>
+<script charset="utf-8" src="games/37.space-war/37.war-views.js?v=20261010i"></script>
+<script charset="utf-8" src="games/37.space-war/37.war-hud.js?v=20261010i"></script>
+<script charset="utf-8" src="games/37.space-war/37.space-war.js?v=20261010i"></script>
 <script type="module">
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";

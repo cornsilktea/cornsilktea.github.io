@@ -8,10 +8,10 @@ class ForestTestPages {
 
   withoutGuard() {
     return this.html
-      .replace(/<script charset="utf-8" src="firebase-config.js"><\/script>\r?\n/, "")
-      .replace(/<script charset="utf-8" src="access-guard.js" data-game="dongmaforest"><\/script>\r?\n/, "")
-      .replace(/<script charset="utf-8" src="fullscreen-keeper.js" data-watch><\/script>\r?\n/, "")
-      .replace(/<script charset="utf-8" src="quality-governor.js"><\/script>\r?\n/, "");
+      .replace(/<script charset="utf-8" src="common\/firebase-config.js"><\/script>\r?\n/, "")
+      .replace(/<script charset="utf-8" src="common\/access-guard.js" data-game="dongmaforest"><\/script>\r?\n/, "")
+      .replace(/<script charset="utf-8" src="common\/fullscreen-keeper.js" data-watch><\/script>\r?\n/, "")
+      .replace(/<script charset="utf-8" src="common\/quality-governor.js"><\/script>\r?\n/, "");
   }
 
   restMockScript() {

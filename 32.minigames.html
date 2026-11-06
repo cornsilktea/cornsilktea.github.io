@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-<script charset="utf-8" src="firebase-config.js"></script>
-<script charset="utf-8" src="access-guard.js" data-game="minigames"></script>
+<script charset="utf-8" src="common/firebase-config.js"></script>
+<script charset="utf-8" src="common/access-guard.js" data-game="minigames"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>미니게임 모음</title>
@@ -13,8 +13,8 @@
 <meta property="og:url" content="https://cornsilktea.github.io/32.minigames.html">
 <meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
 <meta name="twitter:card" content="summary">
-<link rel="stylesheet" href="theme.css">
-<script src="quality-governor.js"></script>
+<link rel="stylesheet" href="common/theme.css">
+<script src="common/quality-governor.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 <script async src="https://cdn.jsdelivr.net/npm/es-module-shims@1.10.1/dist/es-module-shims.js"></script>
@@ -341,64 +341,64 @@
   </div>
 </div>
 
-<script charset="utf-8" src="character-kit.js?v=20261011"></script>
-<script charset="utf-8" src="fold-card.js"></script>
-<script charset="utf-8" src="32.minigames/last-tile/10-foundation.js"></script>
-<script charset="utf-8" src="32.minigames/last-tile/15-browser-env.js"></script>
-<script charset="utf-8" src="32.minigames/last-tile/20-rules.js"></script>
-<script charset="utf-8" src="32.minigames/last-tile/30-board.js"></script>
-<script charset="utf-8" src="32.minigames/last-tile/40-fighter-parts.js"></script>
-<script charset="utf-8" src="32.minigames/last-tile/50-snapshots.js"></script>
-<script charset="utf-8" src="32.minigames/last-tile/55-fall-trajectory.js"></script>
-<script charset="utf-8" src="32.minigames/last-tile/60-fighter-phases.js"></script>
-<script charset="utf-8" src="32.minigames/last-tile/65-fighter.js"></script>
-<script charset="utf-8" src="32.minigames/last-tile/70-ai-brain.js"></script>
-<script charset="utf-8" src="32.minigames/last-tile/75-controllers.js"></script>
-<script charset="utf-8" src="32.minigames/last-tile/80-match.js"></script>
-<script charset="utf-8" src="32.minigames/last-tile/90-scenery.js"></script>
-<script charset="utf-8" src="32.minigames/last-tile/92-board-view.js"></script>
-<script charset="utf-8" src="32.minigames/last-tile/94-fighter-view.js"></script>
-<script charset="utf-8" src="32.minigames/last-tile/95-world-view.js"></script>
-<script charset="utf-8" src="32.minigames/last-tile/98-scores.js"></script>
-<script charset="utf-8" src="32.minigames/last-tile/100-hud-views.js"></script>
-<script charset="utf-8" src="32.minigames/last-tile/105-screen-views.js"></script>
-<script charset="utf-8" src="32.minigames/last-tile/110-network.js"></script>
-<script charset="utf-8" src="32.minigames/last-tile/125-match-runtime.js"></script>
-<script charset="utf-8" src="32.minigames/last-tile/130-phases.js"></script>
-<script charset="utf-8" src="32.minigames/10-contracts.js"></script>
-<script charset="utf-8" src="32.minigames/20-render-host.js"></script>
-<script charset="utf-8" src="32.minigames/30-input.js"></script>
-<script charset="utf-8" src="room-drop-recovery.js?v=20261106b"></script>
-<script charset="utf-8" src="match-kit.js?v=20261103a"></script>
-<script charset="utf-8" src="account-match-kit.js?v=20261103e"></script>
-<script charset="utf-8" src="32.minigames/40-session.js?v=20261029"></script>
-<script charset="utf-8" src="32.minigames/45-random-match.js?v=20261029"></script>
-<script charset="utf-8" src="32.minigames/46-versus.js?v=20261103a"></script>
-<script charset="utf-8" src="32.minigames/50-last-tile-game.js"></script>
-<script charset="utf-8" src="32.minigames/55-bomb-pass-game.js"></script>
-<script charset="utf-8" src="32.minigames/56-nunchi-rules.js"></script>
-<script charset="utf-8" src="32.minigames/57-nunchi-network.js"></script>
-<script charset="utf-8" src="32.minigames/58-nunchi-table.js"></script>
-<script charset="utf-8" src="32.minigames/59-nunchi-card-game.js"></script>
-<script charset="utf-8" src="32.minigames/61-territory-rules.js"></script>
-<script charset="utf-8" src="32.minigames/62-territory-play.js"></script>
-<script charset="utf-8" src="32.minigames/63-territory-view.js"></script>
-<script charset="utf-8" src="32.minigames/64-territory-game.js"></script>
-<script charset="utf-8" src="32.minigames/65-freeze-rules.js"></script>
-<script charset="utf-8" src="32.minigames/66-freeze-play.js"></script>
-<script charset="utf-8" src="32.minigames/67-freeze-view.js"></script>
-<script charset="utf-8" src="32.minigames/68-freeze-game.js"></script>
-<script charset="utf-8" src="32.minigames/71-glassbridge-rules.js"></script>
-<script charset="utf-8" src="32.minigames/72-glassbridge-play.js"></script>
-<script charset="utf-8" src="32.minigames/73-glassbridge-view.js"></script>
-<script charset="utf-8" src="32.minigames/74-glassbridge-game.js"></script>
-<script charset="utf-8" src="32.minigames/75-mole-rules.js"></script>
-<script charset="utf-8" src="32.minigames/76-mole-play.js"></script>
-<script charset="utf-8" src="32.minigames/77-mole-view.js"></script>
-<script charset="utf-8" src="32.minigames/78-mole-game.js"></script>
-<script charset="utf-8" src="32.minigames/60-views.js?v=20261021"></script>
-<script charset="utf-8" src="32.minigames/70-flow.js?v=20261106b"></script>
-<script charset="utf-8" src="32.minigames/80-app.js?v=20261106b"></script>
+<script charset="utf-8" src="common/character-kit.js?v=20261011"></script>
+<script charset="utf-8" src="common/fold-card.js"></script>
+<script charset="utf-8" src="games/32.minigames/last-tile/10-foundation.js"></script>
+<script charset="utf-8" src="games/32.minigames/last-tile/15-browser-env.js"></script>
+<script charset="utf-8" src="games/32.minigames/last-tile/20-rules.js"></script>
+<script charset="utf-8" src="games/32.minigames/last-tile/30-board.js"></script>
+<script charset="utf-8" src="games/32.minigames/last-tile/40-fighter-parts.js"></script>
+<script charset="utf-8" src="games/32.minigames/last-tile/50-snapshots.js"></script>
+<script charset="utf-8" src="games/32.minigames/last-tile/55-fall-trajectory.js"></script>
+<script charset="utf-8" src="games/32.minigames/last-tile/60-fighter-phases.js"></script>
+<script charset="utf-8" src="games/32.minigames/last-tile/65-fighter.js"></script>
+<script charset="utf-8" src="games/32.minigames/last-tile/70-ai-brain.js"></script>
+<script charset="utf-8" src="games/32.minigames/last-tile/75-controllers.js"></script>
+<script charset="utf-8" src="games/32.minigames/last-tile/80-match.js"></script>
+<script charset="utf-8" src="games/32.minigames/last-tile/90-scenery.js"></script>
+<script charset="utf-8" src="games/32.minigames/last-tile/92-board-view.js"></script>
+<script charset="utf-8" src="games/32.minigames/last-tile/94-fighter-view.js"></script>
+<script charset="utf-8" src="games/32.minigames/last-tile/95-world-view.js"></script>
+<script charset="utf-8" src="games/32.minigames/last-tile/98-scores.js"></script>
+<script charset="utf-8" src="games/32.minigames/last-tile/100-hud-views.js"></script>
+<script charset="utf-8" src="games/32.minigames/last-tile/105-screen-views.js"></script>
+<script charset="utf-8" src="games/32.minigames/last-tile/110-network.js"></script>
+<script charset="utf-8" src="games/32.minigames/last-tile/125-match-runtime.js"></script>
+<script charset="utf-8" src="games/32.minigames/last-tile/130-phases.js"></script>
+<script charset="utf-8" src="games/32.minigames/10-contracts.js"></script>
+<script charset="utf-8" src="games/32.minigames/20-render-host.js"></script>
+<script charset="utf-8" src="games/32.minigames/30-input.js"></script>
+<script charset="utf-8" src="common/room-drop-recovery.js?v=20261106b"></script>
+<script charset="utf-8" src="common/match-kit.js?v=20261103a"></script>
+<script charset="utf-8" src="common/account-match-kit.js?v=20261103e"></script>
+<script charset="utf-8" src="games/32.minigames/40-session.js?v=20261029"></script>
+<script charset="utf-8" src="games/32.minigames/45-random-match.js?v=20261029"></script>
+<script charset="utf-8" src="games/32.minigames/46-versus.js?v=20261103a"></script>
+<script charset="utf-8" src="games/32.minigames/50-last-tile-game.js"></script>
+<script charset="utf-8" src="games/32.minigames/55-bomb-pass-game.js"></script>
+<script charset="utf-8" src="games/32.minigames/56-nunchi-rules.js"></script>
+<script charset="utf-8" src="games/32.minigames/57-nunchi-network.js"></script>
+<script charset="utf-8" src="games/32.minigames/58-nunchi-table.js"></script>
+<script charset="utf-8" src="games/32.minigames/59-nunchi-card-game.js"></script>
+<script charset="utf-8" src="games/32.minigames/61-territory-rules.js"></script>
+<script charset="utf-8" src="games/32.minigames/62-territory-play.js"></script>
+<script charset="utf-8" src="games/32.minigames/63-territory-view.js"></script>
+<script charset="utf-8" src="games/32.minigames/64-territory-game.js"></script>
+<script charset="utf-8" src="games/32.minigames/65-freeze-rules.js"></script>
+<script charset="utf-8" src="games/32.minigames/66-freeze-play.js"></script>
+<script charset="utf-8" src="games/32.minigames/67-freeze-view.js"></script>
+<script charset="utf-8" src="games/32.minigames/68-freeze-game.js"></script>
+<script charset="utf-8" src="games/32.minigames/71-glassbridge-rules.js"></script>
+<script charset="utf-8" src="games/32.minigames/72-glassbridge-play.js"></script>
+<script charset="utf-8" src="games/32.minigames/73-glassbridge-view.js"></script>
+<script charset="utf-8" src="games/32.minigames/74-glassbridge-game.js"></script>
+<script charset="utf-8" src="games/32.minigames/75-mole-rules.js"></script>
+<script charset="utf-8" src="games/32.minigames/76-mole-play.js"></script>
+<script charset="utf-8" src="games/32.minigames/77-mole-view.js"></script>
+<script charset="utf-8" src="games/32.minigames/78-mole-game.js"></script>
+<script charset="utf-8" src="games/32.minigames/60-views.js?v=20261021"></script>
+<script charset="utf-8" src="games/32.minigames/70-flow.js?v=20261106b"></script>
+<script charset="utf-8" src="games/32.minigames/80-app.js?v=20261106b"></script>
 <script type="module">
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";

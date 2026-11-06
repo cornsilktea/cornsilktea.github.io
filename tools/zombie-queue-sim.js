@@ -1,8 +1,8 @@
 // 31번 랜덤 매칭 대기 시간 시뮬레이션: node tools/zombie-queue-sim.js
 // 학생 N명이 "대기열 → 매칭 → 한 판(3분 + 결과·대기실 1분) → 다시 대기열"을 반복할 때 대기열에서 기다린 시간을 잰다.
-// 진짜 match-kit.js 의 MkFreeForAllMatcher 를 그대로 쓴다. 방금 판의 상대는 entry.avoid 로 넘긴다(앱의 MkQueue 와 같은 방식).
+// 진짜 common/match-kit.js 의 MkFreeForAllMatcher 를 그대로 쓴다. 방금 판의 상대는 entry.avoid 로 넘긴다(앱의 MkQueue 와 같은 방식).
 const fs = require("fs"), vm = require("vm"), path = require("path");
-const K = vm.runInNewContext(fs.readFileSync(path.join(__dirname, "..", "match-kit.js"), "utf8") + ";({MkFreeForAllMatcher,MkMatcher})",
+const K = vm.runInNewContext(fs.readFileSync(path.join(__dirname, "..", "common/match-kit.js"), "utf8") + ";({MkFreeForAllMatcher,MkMatcher})",
   { console, Math, Date, Set, Map, Object, Array, JSON, Number, String, window: {}, document: {} });
 
 class Rng {

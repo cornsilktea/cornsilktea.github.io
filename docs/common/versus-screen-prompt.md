@@ -16,8 +16,8 @@
 - docs/common/random-match-prompt.md 의 "★ 새 게임 매칭 화면" 절(언제·무엇을·데이터·모양·처음 그리는 값·일반 방·표시 자료 기준)
 - docs/common/account-stats-prompt.md 의 "★ 새 게임을 만들 때"와 "모든 게임 공통 규칙", 그리고 이 게임 절
 - 이 게임의 노트(<번호>.*-notes.md 가 있으면 그것, 없으면 docs/common/account-stats-prompt.md·docs/common/random-match-prompt.md 의 이 게임 절)
-- 기준 구현: 24번 ts/24.turbo-lap-stats.ts 의 TurboLapVersusView·TurboLapRates, 24.turbo-lap.html 의 VersusCurtain·TurboRoomVersus,
-  30번 ts/30.team-battle-versus.ts 와 30.team-battle-arena.html 의 ArenaVersusCurtain(docs/30.team-battle/30.team-battle-notes.md 5-2c)
+- 기준 구현: 24번 ts/games/24.turbo-lap/24.turbo-lap-stats.ts 의 TurboLapVersusView·TurboLapRates, 24.turbo-lap.html 의 VersusCurtain·TurboRoomVersus,
+  30번 ts/games/30.team-battle/30.team-battle-versus.ts 와 30.team-battle-arena.html 의 ArenaVersusCurtain(docs/30.team-battle/30.team-battle-notes.md 5-2c)
 
 만들 것
 1. 랜덤 매칭으로 방에 들어가면 화면 전체를 덮는 어두운 막에 양쪽(팀)을 VS 로 마주 세운다.

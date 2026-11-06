@@ -12,7 +12,7 @@
   }catch(e){}
 })();
 </script>
-<link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="common/theme.css">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>수업 자료 제어판</title>
 <link rel="manifest" href="admin-manifest.json">
@@ -24,7 +24,7 @@
 <link rel="icon" type="image/png" sizes="512x512" href="admin-icon-512.png">
 <link rel="apple-touch-icon" href="admin-icon-512-maskable.png">
 <style>
-  /* 크기·간격·색은 theme.css 의 --sg-* 단계만 씁니다(목록 화면과 같은 톤, 다크 모드를 얹을 때 그대로 쓰려고). */
+  /* 크기·간격·색은 common/theme.css 의 --sg-* 단계만 씁니다(목록 화면과 같은 톤, 다크 모드를 얹을 때 그대로 쓰려고). */
   * { box-sizing: border-box; }
   body {
     margin: 0; padding: var(--sg-s6);
@@ -195,7 +195,7 @@
   .tool-sheet { padding: var(--sg-s6); border: 1px solid var(--sg-line-strong); border-radius: var(--sg-radius); background: var(--tool-lit); box-shadow: var(--sg-shadow-sm); }
   .tool-box.first-on .tool-sheet { border-top-left-radius: 0; }
   .tool-sheet .hint:first-child { margin-top: 0; }
-  /* 패치노트 미리 보기: 학생 화면 창(patch-notes.js 의 PatchNoteDialog)과 같은 어두운 판 */
+  /* 패치노트 미리 보기: 학생 화면 창(games/30.team-battle/patch-notes.js 의 PatchNoteDialog)과 같은 어두운 판 */
   .patch-note-preview:not(:empty) { margin-top: var(--sg-s3); padding: 16px 20px; border-radius: 12px; background: rgba(16,24,19,.96); border-top: 3px solid #D97B4F; color: #EEF2EE; }
   .patch-note-preview .pn-tag { font-size: 13px; font-weight: 800; color: #D97B4F; }
   .patch-note-preview .pn-title { margin-top: 4px; font-size: 20px; font-weight: 800; }
@@ -276,7 +276,7 @@
   }
   .stats-box .msg { margin: 0 0 var(--sg-s1); font-size: var(--sg-fs-md); color: var(--sg-ink-mid); }
   .stats-box ul.hint { margin: var(--sg-s1) 0 var(--sg-s3); padding-left: var(--sg-s5); font-size: var(--sg-fs-sm); line-height: 1.7; color: var(--sg-ink-soft); }
-  /* 30번 학생 개인 통계 표: 학생이 게임에서 보는 표(30.team-battle-arena.css 의 .board.statsTable)와 같은 모양. 위 .stats-box 규칙을 이기도록 선택자를 길게 쓴다(2026-11-04 선생님 요청) */
+  /* 30번 학생 개인 통계 표: 학생이 게임에서 보는 표(games/30.team-battle/30.team-battle-arena.css 의 .board.statsTable)와 같은 모양. 위 .stats-box 규칙을 이기도록 선택자를 길게 쓴다(2026-11-04 선생님 요청) */
   .tb-mine { margin: var(--sg-s3) 0; padding: 14px 16px; border-radius: 10px; background: #18221B; overflow-x: auto; }
   .stats-box table.tb-mine-table { margin: 0; border-collapse: collapse; font-size: 15px; line-height: normal; white-space: nowrap; }
   .stats-box table.tb-mine-table th { position: static; padding: 4px; line-height: normal; background: transparent; color: #A3B0A6; font-size: 12px; font-weight: 700; text-align: center; white-space: nowrap; border-right: 0; border-bottom: 2px solid rgba(255,255,255,.16); }
@@ -430,7 +430,7 @@
         <button id="copyTestLink" type="button" title="일반배포용 목록 링크를 클립보드에 복사합니다">일반배포용 링크 복사</button>
         <button id="copyStudentLink" type="button" title="학생배포용 목록 링크를 클립보드에 복사합니다">학생배포용 링크 복사</button>
       </div>
-      <!-- 대회서버: 반 고르기 화면 맨 아래의 '대회서버'(contest.html). 대회용 자료(data.js 의 CONTEST_GAMES)만 나옵니다 -->
+      <!-- 대회서버: 반 고르기 화면 맨 아래의 '대회서버'(contest.html). 대회용 자료(common/data.js 의 CONTEST_GAMES)만 나옵니다 -->
       <p class="class-grade">대회서버</p>
       <div class="class-grid class-grid-test" id="classGridContest">
         <button id="copyContestLink" type="button" title="대회서버 링크를 클립보드에 복사합니다">대회서버 링크 복사</button>
@@ -545,14 +545,14 @@
           <div class="class-grid" id="rankGames"></div>
           <hr class="rank-divider">
           <div class="class-grid" id="rankGrid"></div>
-          <!-- 🔄 새로고침 = 통계 정상화 + 다시 읽기(2026-11-03): 누를 때마다 그 게임에서 한 학생 기기만 결과를 못 쓴 판을, 같은 판 다른 학생의 최근 20매치 결과표로 바로 채운 뒤 표를 읽는다. 계산은 account-stats-repair.js -->
+          <!-- 🔄 새로고침 = 통계 정상화 + 다시 읽기(2026-11-03): 누를 때마다 그 게임에서 한 학생 기기만 결과를 못 쓴 판을, 같은 판 다른 학생의 최근 20매치 결과표로 바로 채운 뒤 표를 읽는다. 계산은 common/account-stats-repair.js -->
           <div class="actions rank-bar"><button id="rankRefresh" type="button" disabled>🔄 새로고침</button><p class="msg" id="rankMsg"></p><p class="msg" id="rankRepairMsg"></p></div>
           <div id="rankRepairBox" class="stats-box"></div>
           <div id="rankTable" class="stats-box"></div>
         </div>
 
         <!-- 패치노트(2026-10-29): 게임별 패치노트를 portal/patchNotes/<게임> 에 쓰면 로그인한 학생이 그 게임에 처음 들어올 때 한 번 창으로 본다.
-             펼칠 때 지금 게시된 글을 한 번 읽는다. 동작은 patch-notes.js 의 PatchNoteEditor·PatchNoteNotice -->
+             펼칠 때 지금 게시된 글을 한 번 읽는다. 동작은 games/30.team-battle/patch-notes.js 의 PatchNoteEditor·PatchNoteNotice -->
         <div id="patchNoteBody" hidden>
           <p class="hint">게시하면 로그인한 학생이 그 게임에 처음 들어올 때 한 번 창으로 보고, 확인을 누르면 다시 뜨지 않습니다(기기마다 기억).</p>
           <div class="actions">
@@ -570,7 +570,7 @@
         </div>
 
         <!-- 30번 팀 구성(2026-11-02): 고른 반의 classStats/<반> 을 불러올 때 한 번만 읽고(폴링 없음) MVP율 순으로 티어를 나눠 조를 짠다.
-             다른 학생의 통계를 읽으므로 교사 제어판에만 있다. 동작은 ts/30.team-formation.ts -->
+             다른 학생의 통계를 읽으므로 교사 제어판에만 있다. 동작은 ts/games/30.team-battle/30.team-formation.ts -->
         <div id="teamFormBody" hidden>
           <p class="hint">
             반을 고르고 불러오면 MVP율 순으로 <b>티어 1·2·3</b>(8명씩)이 나뉩니다. 티어 1 은 MVP율 순서대로 1~8조에 자리를 잡고,
@@ -608,7 +608,7 @@
 
         <!-- 사용량(2026-11-07): 학생 기기가 한 판이 끝날 때(판 종료 신호가 없는 화면은 떠날 때) 그 사이 쓴 Firebase 바이트를
              usageDaily/<YYYYMMDD>/<자료> 에 서버 increment 로 더합니다(로그인한 기기만). 불러오기를 누를 때 usageDaily 전체를 한 번만 읽습니다(폴링 없음).
-             동작은 스크립트의 UsagePanel, 재는 쪽은 ts/usage-meter.ts. -->
+             동작은 스크립트의 UsagePanel, 재는 쪽은 ts/common/usage-meter.ts. -->
         <div id="usageBody" hidden>
           <p class="hint">
             학생 기기가 <b>한 판이 끝날 때마다</b> 그 사이에 쓴 Firebase 데이터를 재서 날짜별·게임별로 더합니다.
@@ -696,22 +696,22 @@
 
 </div>
 
-<script charset="utf-8" src="firebase-config.js"></script>
-<script charset="utf-8" src="data.js"></script>
+<script charset="utf-8" src="common/firebase-config.js"></script>
+<script charset="utf-8" src="common/data.js"></script>
 <!-- 반 별 통계에서 학생 이름을 누르면 여는 개인 통계 창이 게임과 같은 계산·되살리기·표 클래스를 쓰려고 불러온다.
-     30번은 StudentStatsWindow(account-stats.js), 나머지는 각 게임 통계 모듈의 Profile·View + AccountStatsDialog(StudentAccountWindow).
+     30번은 StudentStatsWindow(common/account-stats.js), 나머지는 각 게임 통계 모듈의 Profile·View + AccountStatsDialog(StudentAccountWindow).
      통계가 있는 새 게임을 만들면 그 게임의 통계 .js 를 여기 한 줄 더하고 ClassRankPanel.GAMES 에 account 를 넘긴다. -->
-<script charset="utf-8" src="account-match-kit.js?v=20261104a"></script>
-<script charset="utf-8" src="account-stats.js?v=20261104c"></script>
-<script charset="utf-8" src="teambattle-stats-repair.js?v=20261106a"></script>
-<script charset="utf-8" src="patch-notes.js?v=20261029b"></script>
-<script charset="utf-8" src="30.team-formation.js?v=20261102b"></script>
-<script charset="utf-8" src="24.turbo-lap-stats.js?v=20261029c"></script>
-<script charset="utf-8" src="25.fps-survival-stats.js?v=20261028c"></script>
-<script charset="utf-8" src="31.zombie-outbreak-stats.js?v=20261104a"></script>
-<script charset="utf-8" src="38.snow-account.js?v=20261028c"></script>
-<script charset="utf-8" src="39.balloon-account.js?v=20261028c"></script>
-<script charset="utf-8" src="account-stats-repair.js?v=20261106a"></script>
+<script charset="utf-8" src="common/account-match-kit.js?v=20261104a"></script>
+<script charset="utf-8" src="common/account-stats.js?v=20261104c"></script>
+<script charset="utf-8" src="games/30.team-battle/teambattle-stats-repair.js?v=20261106a"></script>
+<script charset="utf-8" src="games/30.team-battle/patch-notes.js?v=20261029b"></script>
+<script charset="utf-8" src="games/30.team-battle/30.team-formation.js?v=20261102b"></script>
+<script charset="utf-8" src="games/24.turbo-lap/24.turbo-lap-stats.js?v=20261029c"></script>
+<script charset="utf-8" src="games/25.fps-survival/25.fps-survival-stats.js?v=20261028c"></script>
+<script charset="utf-8" src="games/31.zombie-outbreak/31.zombie-outbreak-stats.js?v=20261104a"></script>
+<script charset="utf-8" src="games/38.snow-royale/38.snow-account.js?v=20261028c"></script>
+<script charset="utf-8" src="games/39.water-balloon/39.balloon-account.js?v=20261028c"></script>
+<script charset="utf-8" src="common/account-stats-repair.js?v=20261106a"></script>
 <script>
 /* 밝기 전환 버튼: <html data-theme> 를 바꾸고 localStorage('portal_theme')에 남긴다(index.html 과 같은 키).
    주소창 색(theme-color)도 배경색에 맞춘다. */
@@ -751,7 +751,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 const cfg = window.PORTAL_CONFIG;
-const D = window.PORTAL_DATA;      /* 단원 구조는 data.js 한 곳에만 있습니다 */
+const D = window.PORTAL_DATA;      /* 단원 구조는 common/data.js 한 곳에만 있습니다 */
 const $ = (id) => document.getElementById(id);
 
 let games = [];
@@ -880,7 +880,7 @@ async function write(path, value) {
 
 /* ---------------- 세계 신기록 ----------------
    records/<게임>/<항목> = { score, name, grade, cls, at }.
-   작을수록 좋은 기록(lower)은 world-record.js 와 같이 score = 10억 - 값 으로 저장돼 있습니다.
+   작을수록 좋은 기록(lower)은 common/world-record.js 와 같이 score = 10억 - 값 으로 저장돼 있습니다.
    아래 표는 게임별 저장 단위와 표시 방법(각 게임 파일의 WorldRecord(...) format 과 맞춤). */
 const REC_BASE = 1000000000;
 const REC_GAMES = {
@@ -902,7 +902,7 @@ const REC_GAMES = {
   freekick:     { title: "프리킥 챌린지",        unit: "단계×1000+km/h", fmt: (v) => Math.floor(v / 1000) + "단계 · " + (v % 1000) + " km/h" }
 };
 
-/* 항목(key) 이름 풀이. 반 신기록은 <key>cls<학년글자><반글자> (world-record.js 와 같은 규칙) */
+/* 항목(key) 이름 풀이. 반 신기록은 <key>cls<학년글자><반글자> (common/world-record.js 와 같은 규칙) */
 function keyLabel(game, key) {
   const m = REC_GAMES[game];
   const cm = /^([a-z]+)cls([abc])([a-e])$/.exec(key);
@@ -977,7 +977,7 @@ function recWho(rec) {
   return p.join(" ");
 }
 
-/* 반 신기록 key 의 꼬리: "cls" + 학년 글자 + 반 글자 (world-record.js 와 같은 규칙) */
+/* 반 신기록 key 의 꼬리: "cls" + 학년 글자 + 반 글자 (common/world-record.js 와 같은 규칙) */
 function classSuffix(cid) {
   const c = D.classById(cid);
   return "cls" + "abc".charAt(c.grade - 1) + "abcde".charAt(c.cls - 1);
@@ -1124,7 +1124,7 @@ function recCard(r, msgId) {
 function isOpen(cid, slug) {
   return !!(classes[cid] && classes[cid][slug] === true);
 }
-/* 반에 보여 줄 자료: 대회서버는 대회용 자료(data.js 의 CONTEST_GAMES)만, 나머지 반은 전부 */
+/* 반에 보여 줄 자료: 대회서버는 대회용 자료(common/data.js 의 CONTEST_GAMES)만, 나머지 반은 전부 */
 function gamesOf(cid) {
   const c = D.classById(cid);
   return games.filter((g) => D.classHasGame(c, g.slug));
@@ -1508,7 +1508,7 @@ class ClassRankPanel {
 
 /* 30번 학생 개인 통계 창(2026-10-28 선생님 요청): 반 별 통계 표에서 이름을 누르면 그 학생이 로그인해서 보는 "내 통계 · 최근 20매치"와 같은 내용을 보인다.
    users/<uid>/stats/teambattle 과 users/<uid>/recent/teambattle 을 창을 열 때 한 번씩 읽는다(교사 계정은 규칙상 users 전체 읽기 가능).
-   값 해석은 게임과 같은 클래스(account-stats.js 의 AccountStatsMath·AccountStatsTable·TeamBattleRing)를 써서 학생 화면과 어긋나지 않게 한다. */
+   값 해석은 게임과 같은 클래스(common/account-stats.js 의 AccountStatsMath·AccountStatsTable·TeamBattleRing)를 써서 학생 화면과 어긋나지 않게 한다. */
 class StudentStatsWindow {
   static GAME = "teambattle";
   static TEAMS = ["블루", "레드"];
@@ -1590,7 +1590,7 @@ class StudentStatsWindow {
     this.frame("stats");
     const n = this.stats;
     this.msg.textContent = "유효한 경기 " + n.g + "판 · " + n.w + "승 " + n.l + "패 · 진영 승률: 블루 " + pct(n.bw, n.bg) + " · 레드 " + pct(n.rw, n.rg) + " · MVP율 " + pct(n.m, n.g);
-    /* 표는 게임의 내 통계 창과 같은 렌더러(account-stats.js 의 TeamBattleMyStatsTable)로 그린다 — 직업군 순서·플레이한 캐릭터만·칸 모양이 학생 화면과 어긋나지 않게 */
+    /* 표는 게임의 내 통계 창과 같은 렌더러(common/account-stats.js 의 TeamBattleMyStatsTable)로 그린다 — 직업군 순서·플레이한 캐릭터만·칸 모양이 학생 화면과 어긋나지 않게 */
     const panel = el("div", "tb-mine");
     panel.innerHTML = '<table class="tb-mine-table"><thead>' + TeamBattleMyStatsTable.headHtml() + "</thead><tbody>" + TeamBattleMyStatsTable.rowsHtml(AccountStatsTable.legacyRows(n), StudentStatsWindow.tableChars()) + "</tbody></table>";
     this.box.appendChild(panel);
@@ -1598,7 +1598,7 @@ class StudentStatsWindow {
     this.closeRow();
   }
 
-  /* 최근 20매치: 블록은 게임 창과 같은 TeamBattleRecentBlock(account-stats.js), 누르면 그 아래에 게임 결과 창과 같은 결과표가 펼쳐진다 */
+  /* 최근 20매치: 블록은 게임 창과 같은 TeamBattleRecentBlock(common/account-stats.js), 누르면 그 아래에 게임 결과 창과 같은 결과표가 펼쳐진다 */
   showRecent() {
     this.frame("recent");
     this.msg.textContent = this.entries.length ? "최근 " + this.entries.length + "경기 · " + TeamBattleRecentDigest.text(this.entries) + " · 블록을 누르면 그 경기 결과표" : "아직 기록된 대회모드 경기가 없습니다.";
@@ -2063,8 +2063,8 @@ function field(labelText, value) {
 
 /* 자료 파일 이름 → 공략 이미지. 새 공략을 만들면 여기에 한 줄 추가 */
 const GUIDE_IMAGES = {
-  "18.greedy-tower-defense.html": { src: "18.greedy-tower-defense-build.png", caption: "최적 빌드 배치 (숫자 = 설치한 웨이브)" },
-  "4.function.html": { src: "4.function-build.png", caption: "10단계 최소 블록 답안" }
+  "18.greedy-tower-defense.html": { src: "img/towerdefense/18.greedy-tower-defense-build.png", caption: "최적 빌드 배치 (숫자 = 설치한 웨이브)" },
+  "4.function.html": { src: "img/function/4.function-build.png", caption: "10단계 최소 블록 답안" }
 };
 function showGuide(src, caption) {
   const box = el("div", "lightbox");
@@ -2448,7 +2448,7 @@ async function allOff() {
 }
 
 /* ---------------- 예전 오타 아이디 정리 ----------------
-   data.js 의 LEGACY_SLUGS 에 적힌 예전 이름이 데이터베이스에 남아 있으면
+   common/data.js 의 LEGACY_SLUGS 에 적힌 예전 이름이 데이터베이스에 남아 있으면
    새 이름으로 옮기고 예전 기록을 지웁니다. */
 function legacyGames() {
   return games.filter((g) => g.slug !== g.canonical);
@@ -2751,7 +2751,7 @@ new PatchNotePanel(new PatchNoteEditor(new AdminRestIo(), { game: "patchNoteGame
 
 /* 새 학년도 시작(2026-10-29 선생님 요청): 학생 반(profile.cls)은 반 링크로 처음 로그인할 때 한 번만 적히고 규칙상 교사만 바꿀 수 있어서,
    진급하면 저절로 바뀌지 않는다. 해마다 새 학기 전에 한 번 모든 학생의 반을 비우면, 학생이 새 반 링크로 처음 로그인할 때
-   새 반이 다시 적힌다(personal-records.js 의 AccountClassClaim — 기기 표시는 반 이름을 기억하므로 다른 반 링크면 다시 적는다).
+   새 반이 다시 적힌다(common/personal-records.js 의 AccountClassClaim — 기기 표시는 반 이름을 기억하므로 다른 반 링크면 다시 적는다).
    반 별 통계 요약(classStats·gameRanks)은 옛 반 칸에 남으면 새 반 칸과 겹치므로 archive/<보관 이름>/ 에 통째로 옮겨 두고 지운다.
    요약 값은 계정 누적이라 학생이 새 학년에 첫 판을 하면 누적 값 그대로 새 반 칸에 다시 생긴다. 개인 통계·최근 매치·신기록은 건드리지 않는다.
    요청: 읽기 3번(users 아이디 목록·classStats·gameRanks) → 보관 쓰기 1번 → 반 비우기·요약 지우기 PATCH(몇 백 줄씩 나눔). 보관이 실패하면 아무것도 지우지 않는다. */
@@ -3079,7 +3079,7 @@ new ForestAdminPanel(new AdminRestIo()).bind();
 
 window.__portalBooted = true;
 if (!cfg.isAdminReady()) {
-  showLogin("설정이 아직 끝나지 않았어요. firebase-config.js 의 세 줄을 먼저 채워 주세요.");
+  showLogin("설정이 아직 끝나지 않았어요. common/firebase-config.js 의 세 줄을 먼저 채워 주세요.");
 } else {
   startAuth();
 }

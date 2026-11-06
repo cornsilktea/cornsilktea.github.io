@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-<script charset="utf-8" src="firebase-config.js"></script>
-<script charset="utf-8" src="access-guard.js" data-game="volleyball"></script>
-<script charset="utf-8" src="quality-governor.js"></script>
+<script charset="utf-8" src="common/firebase-config.js"></script>
+<script charset="utf-8" src="common/access-guard.js" data-game="volleyball"></script>
+<script charset="utf-8" src="common/quality-governor.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>2대2 3D 배구</title>
@@ -14,7 +14,7 @@
 <meta property="og:url" content="https://cornsilktea.github.io/34.volleyball.html">
 <meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
 <meta name="twitter:card" content="summary">
-<link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="common/theme.css">
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 <script async src="https://cdn.jsdelivr.net/npm/es-module-shims@1.10.1/dist/es-module-shims.js"></script>
@@ -195,14 +195,14 @@
   </div>
 </div>
 
-<script charset="utf-8" src="character-kit.js?v=20261011"></script>
-<script charset="utf-8" src="fold-card.js"></script>
-<script charset="utf-8" src="match-kit.js?v=20261103a"></script>
-<script charset="utf-8" src="account-match-kit.js?v=20261103e"></script>
-<script charset="utf-8" src="34.volleyball-rules.js?v=20261106d"></script>
-<script charset="utf-8" src="34.volleyball-party.js?v=20261027a"></script>
-<script charset="utf-8" src="room-drop-recovery.js?v=20261106c"></script>
-<script charset="utf-8" src="34.volleyball.js?v=20261106d"></script>
+<script charset="utf-8" src="common/character-kit.js?v=20261011"></script>
+<script charset="utf-8" src="common/fold-card.js"></script>
+<script charset="utf-8" src="common/match-kit.js?v=20261103a"></script>
+<script charset="utf-8" src="common/account-match-kit.js?v=20261103e"></script>
+<script charset="utf-8" src="games/34.volleyball/34.volleyball-rules.js?v=20261106d"></script>
+<script charset="utf-8" src="games/34.volleyball/34.volleyball-party.js?v=20261027a"></script>
+<script charset="utf-8" src="common/room-drop-recovery.js?v=20261106c"></script>
+<script charset="utf-8" src="games/34.volleyball/34.volleyball.js?v=20261106d"></script>
 <script type="module">
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";

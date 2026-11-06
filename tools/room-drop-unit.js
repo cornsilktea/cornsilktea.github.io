@@ -21,7 +21,7 @@ function build(statusValue, failSets) {
     exit: (m) => { state.exited = m; }, subscribe: (r, e, l) => r.on(e, l),
     returnRecord: (saved) => saved, afterReturn: () => { state.afterReturn++; },
   };
-  const source = fs.readFileSync(path.join(__dirname, "..", "room-drop-recovery.js"), "utf8") + "\nthis.RoomDropRecovery = RoomDropRecovery;";
+  const source = fs.readFileSync(path.join(__dirname, "..", "common/room-drop-recovery.js"), "utf8") + "\nthis.RoomDropRecovery = RoomDropRecovery;";
   const sandbox = { setTimeout: (fn) => fn() };
   vm.createContext(sandbox);
   vm.runInContext(source, sandbox);
@@ -78,7 +78,7 @@ const tick = () => new Promise((r) => setImmediate(r));
     Date,
   };
   vm.createContext(resumeSandbox);
-  vm.runInContext(fs.readFileSync(path.join(__dirname, "..", "room-drop-recovery.js"), "utf8") + "\nthis.RoomResumeStore = RoomResumeStore;", resumeSandbox);
+  vm.runInContext(fs.readFileSync(path.join(__dirname, "..", "common/room-drop-recovery.js"), "utf8") + "\nthis.RoomResumeStore = RoomResumeStore;", resumeSandbox);
   const Store = resumeSandbox.RoomResumeStore;
   const store = new Store("fps");
   const firstId = store.identity();
@@ -102,7 +102,7 @@ const tick = () => new Promise((r) => setImmediate(r));
   const timers = [];
   const hostSandbox = { window: { setTimeout: (fn) => { timers.push(fn); return timers.length; }, clearTimeout: (id) => { timers[id - 1] = null; } } };
   vm.createContext(hostSandbox);
-  vm.runInContext(fs.readFileSync(path.join(__dirname, "..", "room-drop-recovery.js"), "utf8") + "\nthis.RoomHostSuccession = RoomHostSuccession;", hostSandbox);
+  vm.runInContext(fs.readFileSync(path.join(__dirname, "..", "common/room-drop-recovery.js"), "utf8") + "\nthis.RoomHostSuccession = RoomHostSuccession;", hostSandbox);
   const Succession = hostSandbox.RoomHostSuccession;
   const roster = (entries) => new Map(Object.entries(entries));
   const makePort = (me, entries, hostId) => {

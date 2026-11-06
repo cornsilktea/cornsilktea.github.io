@@ -7,7 +7,7 @@ class ZombieHudUnit {
     this.failed = 0;
     this.context = vm.createContext({ Math, JSON });
     const read = (file) => fs.readFileSync(path.join(__dirname, "..", file), "utf8");
-    this.api = vm.runInContext(read("31.zombie-hud.js") + "\n" + read("31.zombie-missions.js") + "\n;({ ZombieRoundClock, ZombieHumanPing, ZombieRosterOrder, ZombieFloorSlab, ZombieBodySight, ZombieNameTagRule, ZombieMissionSites })", this.context);
+    this.api = vm.runInContext(read("games/31.zombie-outbreak/31.zombie-hud.js") + "\n" + read("games/31.zombie-outbreak/31.zombie-missions.js") + "\n;({ ZombieRoundClock, ZombieHumanPing, ZombieRosterOrder, ZombieFloorSlab, ZombieBodySight, ZombieNameTagRule, ZombieMissionSites })", this.context);
   }
 
   missionRoom() {

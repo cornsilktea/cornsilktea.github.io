@@ -12,7 +12,7 @@
   }catch(e){}
 })();
 </script>
-<link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="common/theme.css">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>대회서버</title>
 <meta property="og:type" content="website">
@@ -208,10 +208,10 @@
 
 <div class="toast" id="toast" hidden></div>
 
-<script charset="utf-8" src="firebase-config.js"></script>
-<script charset="utf-8" src="account-login.js" data-account-chip="always"></script>
-<script charset="utf-8" src="data.js"></script>
-<script charset="utf-8" src="qrcode.js"></script>
+<script charset="utf-8" src="common/firebase-config.js"></script>
+<script charset="utf-8" src="common/account-login.js" data-account-chip="always"></script>
+<script charset="utf-8" src="common/data.js"></script>
+<script charset="utf-8" src="common/qrcode.js"></script>
 <script>
 /* 밝기 전환 버튼: index.html 과 같은 동작(localStorage 'portal_theme') */
 (function () {
@@ -234,8 +234,8 @@
 </script>
 <script>
 /* 대회서버 화면
-   반 화면(index.html?c=1-1)과 같은 방식이지만 학급 대신 "대회서버"(data.js 의 CONTEST_CLASS) 하나를 씁니다.
-   - 보이는 자료는 data.js 의 CONTEST_GAMES 뿐입니다(제어판에 등록된 것만).
+   반 화면(index.html?c=1-1)과 같은 방식이지만 학급 대신 "대회서버"(common/data.js 의 CONTEST_CLASS) 하나를 씁니다.
+   - 보이는 자료는 common/data.js 의 CONTEST_GAMES 뿐입니다(제어판에 등록된 것만).
    - 잠금은 Firebase portal/classes/contest/<자료> 를 봅니다(제어판의 '대회서버' 버튼).
    - 자료 링크에는 ?c=contest 를 붙여 게임 안의 잠금 확인도 대회서버 기준으로 합니다. */
 (function () {
@@ -332,7 +332,7 @@
 
   function load() {
     if (!cfg.isReady()) {
-      setNotice("설정이 아직 끝나지 않았어요. firebase-config.js 를 먼저 채워 주세요.");
+      setNotice("설정이 아직 끝나지 않았어요. common/firebase-config.js 를 먼저 채워 주세요.");
       render();
       return;
     }

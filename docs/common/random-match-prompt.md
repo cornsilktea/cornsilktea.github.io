@@ -1,11 +1,11 @@
 # 랜덤 매칭 노트 — 24·25·30·31·32·34·35·38·39번
 
-랜덤 매칭(공용 `ts/match-kit.ts`)의 구조·게임별 규칙·바뀐 기록이다. 랜덤 매칭을 고치거나 새 게임에 붙이기 전에 읽는다.
+랜덤 매칭(공용 `ts/common/match-kit.ts`)의 구조·게임별 규칙·바뀐 기록이다. 랜덤 매칭을 고치거나 새 게임에 붙이기 전에 읽는다.
 모든 게임에 붙이는 작업은 2026-10-21 에 끝났다(아래 "게임별 붙인 곳" 표).
 
 ## ★ 새 게임 매칭 화면(대결 화면) — 대전이 있는 모든 새 게임(2026-10-29 선생님 요청)
 
-앞으로 만드는 대전 게임은 랜덤 매칭 대결 화면을 처음부터 넣는다. 기준 구현은 24번(`TurboLapVersusView`·`VersusCurtain`, `ts/24.turbo-lap-stats.ts`)과 30번(`ArenaVersusCurtain` + `ts/30.team-battle-versus.ts` 의 `TeamBattleVersusCards`·`TeamBattleVersusView`, `docs/30.team-battle/30.team-battle-notes.md` 5-2c).
+앞으로 만드는 대전 게임은 랜덤 매칭 대결 화면을 처음부터 넣는다. 기준 구현은 24번(`TurboLapVersusView`·`VersusCurtain`, `ts/games/24.turbo-lap/24.turbo-lap-stats.ts`)과 30번(`ArenaVersusCurtain` + `ts/games/30.team-battle/30.team-battle-versus.ts` 의 `TeamBattleVersusCards`·`TeamBattleVersusView`, `docs/30.team-battle/30.team-battle-notes.md` 5-2c).
 - **일반 방에서도 띄운다**(2026-10-29 선생님 요청, 24·30번 적용): 방장이 일반 방(방 만들기·코드 입장)에서 시작을 누르면 방에 `vsAt`(서버 시각)을 쓰고 몇 초 뒤 진짜로 시작한다. 모두 `vsAt` 을 구독해 같은 막을 띄우고, `vsAt` 뒤 (보여 주는 시간 + 3초)가 지나면 저절로 닫는다(시작 실패 대비 — `vsAt` 은 지우지 않고 시각으로 판단해 지울 때 화면이 깜빡이지 않게). 연습·혼자 하기는 띄우지 않는다. 제목은 "상대를 찾았어요" 대신 "곧 대결이 시작돼요" 같은 말, 일반 방의 빈 자리는 `빈 자리`(AI 로 채워 보이지 않음). 24번 `TurboRoomVersus`, 30번 `ArenaVersusCurtain.hostStart` 참고.
 - **표시 자료는 랜덤 매칭에서 생긴 것만**(2026-10-29 선생님 결정, 앞으로 만드는 매칭 화면 모두): 막에 보이는 승률·개인 기록은 일반 방에서 띄울 때도 **랜덤 매칭 판만 센 값**이다. 계정 통계가 일반 방 판까지 섞어 세는 게임이면 랜덤 매칭 판만 세는 칸을 따로 둔다(예: `stats/<게임키>/rm` = `{g, w, …}`, 결과 보고서에 `random` 표시 → `applyStats` 가 그때만 +1, `statsPatch` 에 `rm` 경로, DB 규칙·`tools/account-stats-unit.js` 검사 추가). 24·32·34·35번은 계정 통계가 원래 랜덤 매칭 판만 센다.
   **예외: 30번**은 일반 방 대회모드 판까지 섞인 계정 누적 통계를 그대로 보여 준다(2026-10-29 선생님 결정 — 같은 대회 규칙이라). 다른 게임도 예외가 필요해 보이면 칸을 만들기 전에 선생님께 묻는다.
@@ -25,9 +25,9 @@
 (매칭 = 일반 방을 자동으로 만들어 주는 앞단계. 게임 안 로직은 건드리지 않는다.)
 개인전 랜덤 매칭은 자기 설정(닉네임·캐릭터·차 등)을 그대로 가지고 매칭된다.
 
-## 공용 매칭 모듈 — ts/match-kit.ts (새 공용 모듈, 선생님 승인됨 2026-10-20)
+## 공용 매칭 모듈 — ts/common/match-kit.ts (새 공용 모듈, 선생님 승인됨 2026-10-20)
 - 모든 게임이 같이 쓴다. 게임마다 복사하지 않는다. import/export 없는 스크립트 모양,
-  컴파일 결과 match-kit.js 를 각 HTML 이 <script src> 로 불러온다(인라인 게임 24·25·30·31 포함).
+  컴파일 결과 common/match-kit.js 를 각 HTML 이 <script src> 로 불러온다(인라인 게임 24·25·30·31 포함).
 - 클래스 예시(이름은 바꿔도 됨):
   - MkParty: 랜덤 매칭용 "팀 대기실". 5자리 팀 코드, 팀원 목록, 아군 AI 수, 팀장.
     친구는 기존 "방 코드로 입장" 칸에 팀 코드를 넣어 들어온다(코드 종류는 Firebase 에서 구분).
@@ -115,18 +115,18 @@
   **방금 한 학생 다시 안 만나기(2026-11-03)**: `MkFreeForAllMatcher` 의 `avoidMs`(31번 180000) — 맨 앞 항목이 180초까지는 바로 전 판 상대(`entry.avoid`)를 빼고 묶고, 그 뒤에는 피하지 않는다. 시뮬레이션(`node tools/zombie-queue-sim.js`, 20·25명이 4분짜리 판을 2시간 반복): 피하지 않으면 같은 5명이 다시 만나는 비율이 84~86%(같이 끝난 사람이 같이 다시 줄을 서서), 180초 피하기는 0%. 평균 대기는 25명 18→26초, 20명 19→54초(평균 인원 4.4명, 최대 134초).
   **완료 미션 통계(2026-11-03)**: 방 `players/<id>/missions`(내가 끝낸 미션 수, 판마다 0으로 시작) → 결과 표 `미션`·`감염` 열, 계정 통계 `ms`(누적)·최근 매치 칸 7번째 값, 교사 반 표 `y` 열(`gameRanks/zombieoutbreak/<반>/<uid>/y`). DB 규칙에 `ms`·`y` 추가했으니 선생님이 다시 게시해야 한다.
   **지도 점·숙주 명찰(2026-11-03)**: 지도에 남은 시간 2분 30초에 처음, 이후 20초마다 3초간 좀비에게는 살아있는 인간이, 인간에게는 좀비가 빨간 점으로 나온다(체육관 위 쿨타임 숫자도 양쪽 모두)(`ZombieHumanPing`). 숙주는 매칭 화면 시작 때 정해져(`originPick`) 그 사람 명찰이 빨갛게 빛난다. 판정 반경 시뮬레이션: `node tools/zombie-hit-sim.js`.
-  **미션 탈출(2026-11-03)**: 인간은 판마다 미션 3개를 하나씩 받는다(`ts/31.zombie-missions.ts`: `ZombieMissionCatalog` 10종 중 서로 다른 3개, 장소는 방의 앞쪽 가운데 벽 = 칠판 벽 x0 쪽, 숲 미니게임 연타·가운데 맞추기·줄어드는 원 중 하나를 2번 성공). 방장이 시작할 때 `missions`·`missionDone` 을 방에 쓰고(씨앗은 시작 시각), 인간 누구나 끝내면 `missionDone` 이 트랜잭션으로 +1(모두 같은 진행). 좀비·관전자는 미션 UI 가 없다.
+  **미션 탈출(2026-11-03)**: 인간은 판마다 미션 3개를 하나씩 받는다(`ts/games/31.zombie-outbreak/31.zombie-missions.ts`: `ZombieMissionCatalog` 10종 중 서로 다른 3개, 장소는 방의 앞쪽 가운데 벽 = 칠판 벽 x0 쪽, 숲 미니게임 연타·가운데 맞추기·줄어드는 원 중 하나를 2번 성공). 방장이 시작할 때 `missions`·`missionDone` 을 방에 쓰고(씨앗은 시작 시각), 인간 누구나 끝내면 `missionDone` 이 트랜잭션으로 +1(모두 같은 진행). 좀비·관전자는 미션 UI 가 없다.
   승패: 3분이 지났을 때 인간이 살아 있고 `missionDone` 이 3이어야 인간 승리, 아니면 좀비 승리(결과에 `missionCleared`). 모두 감염되면 좀비 승리. 위쪽 안내 글씨는 `ZombieTopMessages` 큐로 차례대로 나온다.
   숙주 판정 반경 1.365(=1.05×1.3)와 벽 막힘 검사(`InfectionSight`). 같은 방 최대 2명(`maxRepeat 1`, 90초) — `node tools/zombie-queue-sim.js`(20명 평균 대기 50초, 25명 40초).
   **지도·미션·Space(2026-11-04 선생님 요청)**: 지도 불빛은 생존자 초록·좀비 빨강·미션 노랑(`ZombieMapLight`). 좀비는 아군 좀비를 항상 보고, 인간 위치는 `ZombieHumanPing` 공유 시간 3초에만 본다. 인간은 공유 시간에만 좀비를 본다. 미션은 시작 15초 뒤(`ZombieMissionController.OPEN_AFTER_MS`)부터 나오고 층 순서는 2층→1층→2층(`ZombieMissionCatalog.FLOOR_ORDER`).
   랜덤 매칭 방은 `다시하기` 버튼을 CSS 로 숨겨도 Space 가 살아 있어, 미션 연타 중 판이 끝나면 방이 대기로 돌아가고 방장이 또 누르면 새 판이 시작됐다 → `ZombieSpaceKey` 가 매칭 방의 대기실·결과 화면에서 Space 를 무시하고, 일반 방 결과 화면은 1.5초 뒤부터 받는다. 판정은 인간 기기(1.365m)와 좀비 기기(1.0m) 양쪽(`ZombieTouchJudge`).
   다른 학생 위치 보간은 150→100ms(`REMOTE_LERP_MS`, 2026-11-04 선생님 승인, 전송 주기 `NET_MS` 100ms 와 데이터량은 그대로). 다음 후보는 위치 예측, 그다음 전송 66ms(데이터 +50%) — 전송 빈도는 선생님 승인 사항.
-  **경기 시간·명단·닉네임(2026-11-06 선생님 요청, `ts/31.zombie-hud.ts`, 검사 `node tools/zombie-hud-unit.js`)**: 판 2분 30초, 좀비 대기 10초(`ZombieRoundClock`, 미션도 10초에 열림). 위 글의 3분·15초·2분 30초 공개 시각은 옛값이고 지금은 이 줄이 맞다. 지도 위치 공유는 풀려난 15초 뒤(남은 2:05)부터 20초마다 3초, 마지막 10초는 내내(`ZombieHumanPing`). 종은 남은 2:00·1:00, 좀비 강화는 마지막 30초 그대로.
+  **경기 시간·명단·닉네임(2026-11-06 선생님 요청, `ts/games/31.zombie-outbreak/31.zombie-hud.ts`, 검사 `node tools/zombie-hud-unit.js`)**: 판 2분 30초, 좀비 대기 10초(`ZombieRoundClock`, 미션도 10초에 열림). 위 글의 3분·15초·2분 30초 공개 시각은 옛값이고 지금은 이 줄이 맞다. 지도 위치 공유는 풀려난 15초 뒤(남은 2:05)부터 20초마다 3초, 마지막 10초는 내내(`ZombieHumanPing`). 종은 남은 2:00·1:00, 좀비 강화는 마지막 30초 그대로.
   위쪽 안내 글씨(`#centerMsg`)는 처치 알림(`#feed`, 항상 빨간 블록) 4줄 아래에 놓는다. 왼쪽 위는 명단(`ZombieRosterView`): 숙주좀비 → 좀비(감염 순서) → 인간, 관전자는 기존 `specList` 를 본다.
   머리 위 닉네임(`ZombieNameTags`, 좀비 빨강·인간 초록, 자기 캐릭터와 관전 대상은 없음)은 **카메라 기준**으로 판정한다. ① 화면 안 ② 거리는 안개 시작~끝의 50% 안쪽(`ZombieNameTagRule`, 표시 중이면 60%까지 유지) ③ 몸의 7점(머리·가슴·양팔·허리·양다리)에서 카메라까지 충돌 상자·2층 바닥에 막히지 않은 점이 5개 이상(표시 중이면 4개). 한 프레임에 한 명씩만 검사한다. 충돌 상자가 없는 나뭇잎과, 창문이 있어도 막힌 상자로 치는 벽은 가림 판정이 실제 그림과 다를 수 있다.
   **미션은 지정된 방 안에서만(2026-11-06 선생님 요청)**: 장소가 벽에서 0.3m 지점이고 반경이 2.6m 라 옆방·계단실에서도 되던 것을, `ZombieMissionSites.within` 에 방 범위(`site.room`) 조건을 더해 막았다. 26개 장소 모두 방 문에서 걸어 들어가 수행할 수 있음을 충돌 지도로 확인했다.
   주의: 사람이 4명 모일 때까지 시작하지 않으므로 혼자 있는 시험(`tools/match-result-check.js` 의 31번 `winJoined`)은 끝나지 않는다.
-  **매칭 화면(2026-11-03)**: 랜덤 매칭으로 방에 들어가면 `#versusCurtain` 막(`ZombieVersusCurtain`, `ts/31.zombie-versus.ts` 의 `ZombieVersusView`)에 사람 칸(닉네임·좀비 승률·시민 승률)·`입장하는 중…`·`🤖 AI` 를 5칸으로 보여 주고 방장은 4.5초 뒤 시작한다. **일반 방은 혼자 + AI 로 시작해도 같은 막을 띄운다**(2026-11-04, 전에는 사람 2명 이상일 때만 띄웠음, AI 채우기가 켜져 있으면 빈 자리는 `🤖 AI`). 결과 화면에 남아 있는 학생에게도 막이 뜬다.
+  **매칭 화면(2026-11-03)**: 랜덤 매칭으로 방에 들어가면 `#versusCurtain` 막(`ZombieVersusCurtain`, `ts/games/31.zombie-outbreak/31.zombie-versus.ts` 의 `ZombieVersusView`)에 사람 칸(닉네임·좀비 승률·시민 승률)·`입장하는 중…`·`🤖 AI` 를 5칸으로 보여 주고 방장은 4.5초 뒤 시작한다. **일반 방은 혼자 + AI 로 시작해도 같은 막을 띄운다**(2026-11-04, 전에는 사람 2명 이상일 때만 띄웠음, AI 채우기가 켜져 있으면 빈 자리는 `🤖 AI`). 결과 화면에 남아 있는 학생에게도 막이 뜬다.
   일반 방은 방장이 시작을 누르면 방에 `vsAt` 를 쓰고 4.5초 뒤 시작(2명 미만 혼자 하기는 바로), 빈 자리는 `빈 자리`. 막의 자료는 **랜덤 매칭 판만 센 `stats/zombieoutbreak/rm`**(`g·w·hg·hw·zg·zw`)이고, AI 가 섞인 랜덤 매칭 판도 rm 에만 셈(39번과 같은 방식, 누적 칸은 AI 없는 판만).
   rm 은 2026-11-03 부터 쌓이고 DB 규칙 게시 전에는 rm 저장이 거부될 수 있다. 검사: `node tools/account-stats-unit.js`(rm 규칙·순번·카드·자리), 사본 `tools/match-result-check.js` 의 `__mkCheck.run("zombie", [...])`.
 - 32 미니게임 모음: 팀 구분 없는 최대 6명 게임이므로, 3초 뒤 대기열의 여러 팀을
@@ -141,14 +141,14 @@
   브라우저(?c=test)로 한 번 확인해 두고, 고친 뒤 똑같이 되는지 다시 본다.
 - 새 코드는 TypeScript·객체지향. 인라인 게임(24·25·30·31)에도 새 전역 변수·맨몸 함수를
   만들지 않고, 필요한 연결은 클래스로 만들어 붙인다. 기존 인라인 스크립트를 TS 로 옮기지는 않는다.
-- 게임 파일에는 주석을 달지 않는다(match-kit.ts 는 공용 모듈이니 "왜" 주석 가능).
+- 게임 파일에는 주석을 달지 않는다(ts/common/match-kit.ts 는 공용 모듈이니 "왜" 주석 가능).
 - .ts 를 고치면 npx tsc -p . 로 컴파일하고 .ts·.js 를 같이 커밋한다.
   .js 를 고친 게임에 ?v= 버전 값이 있으면 함께 올린다.
 - 각 게임의 노트 파일에 랜덤 매칭 구조·Firebase 경로·검사 방법을 적는다.
 
 ## 공용 모듈 사용법(새 게임도 이대로 붙인다)
-- 불러오기: HTML 에 `<script src="match-kit.js"></script>`(three·room-kit 과 무관, 인라인 게임도 같은 줄).
-  모양은 `theme.css` 의 `.mk-*`(연승 버튼·전적 창).
+- 불러오기: HTML 에 `<script src="common/match-kit.js"></script>`(three·room-kit 과 무관, 인라인 게임도 같은 줄).
+  모양은 `common/theme.css` 의 `.mk-*`(연승 버튼·전적 창).
 - 경로: `MkPaths.forGame("<게임 루트>", "<대기열 이름>")` → 대기열 `matchQueue/<대기열 이름>`,
   팀 대기실 `<게임 루트>/parties/<코드>`, 일반 방 `<게임 루트>/rooms/<코드>`(팀 코드는 방 코드와 안 겹치게 만든다).
   38·39 는 개인전·팀전 대기열 이름을 나눈다(예: `snowroyale_solo`·`snowroyale_team`).
@@ -209,7 +209,7 @@
     Rk 게임은 `RkMatchPort.presentIds`(`RkMatchHooks.humanIds(session.players)`), 32 는 `session.humanIds()`, 34 는 앱의 `presentIds()`, 25·30·31 은 각 `…RandomMatch.presentIds()`.
   - 24번도 같은 `MkVersusMatcher` 라 "바로 전 상대 피하기"가 그대로 적용된다(가짜 Firebase 탭 3개로 A·B 판 뒤 C 가 들어오자 A–C 로 묶이고 B 는 기다림 확인).
 - 검사: `node tools/match-sim.js`(가짜 Firebase, 약 45초). 동시 입장·취소·끊김·방 만들기 실패·묶던 사람 끊김·
-  정원 넘김·연승(승·무·패, 중복 반영, 팀장 교체·끊김, 다시 매칭)·잠깐 끊김 복구·취소 뒤 다시 매칭·같은 상대 피하기·AI 차례 돌리기·대기 인원·전적 보존·무승부 연승 유지 190개. match-kit.ts 를 고치면 꼭 돌린다.
+  정원 넘김·연승(승·무·패, 중복 반영, 팀장 교체·끊김, 다시 매칭)·잠깐 끊김 복구·취소 뒤 다시 매칭·같은 상대 피하기·AI 차례 돌리기·대기 인원·전적 보존·무승부 연승 유지 190개. ts/common/match-kit.ts 를 고치면 꼭 돌린다.
   "섞어서 2대2/6인"(무작위 지연·끊김) 검사는 원래부터 10번에 1~2번꼴로 하나가 시간 안에 안 끝나 실패한다 — 다시 돌려 같은 항목이 계속 실패할 때만 문제로 본다.
 - **게임별 결과 → 전적 검사**(2026-10-22): `node tools/match-result-check.js` 가 9개 게임의 가짜 Firebase 사본 `.claude/mk-check-<파일>` 을 만든다
   (진짜 Firebase SDK 줄은 빼고, 도구는 진짜에 연결돼 있으면 시작하지 않는다). `?c=test` 로 열고 콘솔에서
@@ -222,7 +222,7 @@
   match-kit 에 있다. 게임은 `MkGameHooks`(member·create(plan)·discard·enterRoom(표, 방장?)·leaveRoom·startMatch·showParty·showStart)만 만든다.
   게임 쪽에서 부르는 것: `create()`·`tryJoin(코드)`·`codeTaken(코드)`·`roomChanged(사람 수, 방장?, 대기 중?)`·`matchEnded({result, rank?, of?}, 연승 갱신 콜백)`·
   `endHint()`·`backToParty(메시지)`·`updateMe()`·`render()`·`ticket()`. 자리 배정은 `MkSeatAssign.bySide(plan, 편당 자리)`.
-- **Rk 방 게임(35·38·39)**: `room-kit.ts` 의 `RkRandomSetup.create({backend, directory, rules, myId, options, assign, port, screen, mount})` 한 줄로 흐름을 만든다.
+- **Rk 방 게임(35·38·39)**: `ts/common/room-kit.ts` 의 `RkRandomSetup.create({backend, directory, rules, myId, options, assign, port, screen, mount})` 한 줄로 흐름을 만든다.
   `RkDirectory.create(내id, 기록, extra, 코드사용중?)`·`join(…, useAssigned)` 가 `assign/<id>` 자리를 쓴다. HTML 은 `#partyScreen > #partyMount`, `#lobbyScreen.matched`.
 - 게임에 붙이는 모양(34번이 기준, 공용 흐름으로 바꾼 뒤의 설명은 위): 게임별 파일 `ts/<번호>.<이름>-party.ts` 에 `…RandomFlow`(팀 대기실·대기열·표 받기·자동 시작·결과 반영),
   `…PartyView`(팀 대기실 화면), `…RandomRoomMaker`(MkRoomMaker: 편에 맞춰 `assign/<id>=자리` 를 넣은 일반 방 만들기)를 두고,
@@ -234,27 +234,27 @@
 ## 게임별 붙인 곳(2026-10-21)
 | 순서 | 게임 | 붙인 곳·결정 |
 |---|---|---|
-| 1 | ts/match-kit.ts(연승 버튼·전적 창 포함) + tools/ 매칭 시뮬레이터 | 완료(2026-10-21) — `node tools/match-sim.js` 143개 통과, 연승 버튼·전적 창 브라우저 확인 |
+| 1 | ts/common/match-kit.ts(연승 버튼·전적 창 포함) + tools/ 매칭 시뮬레이터 | 완료(2026-10-21) — `node tools/match-sim.js` 143개 통과, 연승 버튼·전적 창 브라우저 확인 |
 | 2 | 34 배구 | 완료(2026-10-21) — 가짜 Firebase 창 2~3개로 매칭·편 배정·자동 시작·결과·연승·전적 창·팀 코드 입장·팀장 교체·취소 확인. 규칙 게시 뒤 실제 Firebase(?c=test, 탭 2개)로 매칭·시작·결과·연승·정리까지 확인. 실제 Firebase 는 ref("") 를 거절하므로 루트는 ref("/") |
 | 3 | 35 축구 | 완료(2026-10-21) — room-kit 의 공용 연결 `RkRandomSetup`/`RkMatchHooks`(Rk 방 게임 공용) + `SocRandomSetup`. 가짜 Firebase 탭 2개로 매칭·경기 시작·결과·연승 확인 |
 | 4 | 38 눈싸움 배틀로얄 | 완료(2026-10-21) — 대기열 `snowroyale_duos`(2명 팀, 한 방 최대 3팀: `MkFreeForAllMatcher` 의 `maxEntries`)·`snowroyale_solo`(6명). `SnRandomSetup`, 패널 칸이 모드마다 따로(`partyMountDuos`·`partyMountSolo`). 순위 `end.ranks[내 팀]` 1위만 승, 전적에 `n위/팀 수`. 가짜 Firebase 로 팀전·개인전 매칭·결과 확인 |
 | 5 | 39 물풍선 대작전 | 완료(2026-10-21) — 대기열 `waterballoon_team`(2명 팀, 최대 4팀)·`waterballoon_solo`(8명). `WbRandomSetup`. 순위는 선수별 `end.ranks[내 번호]`. `balloon-unit` 113 통과·`balloon-sim` 200판 위반 0. 가짜 Firebase 로 팀전 매칭·결과 확인 |
-| 6 | 32 미니게임 모음 | 완료(2026-10-21) — `ts/32.minigames/45-random-match.ts`(`CollectionRandomMatch`), 팀 최대 3명·한 방 6명(`MkFreeForAllMatcher`), 모이면 바로 모음 시작(종목은 기존대로 무작위 5개), 최종 누적 1등이 팀원 중에 있으면 승(`memberIds`). `last-tile/` 폴더는 그대로. 가짜 Firebase 로 매칭·최종 결과·연승 확인 |
+| 6 | 32 미니게임 모음 | 완료(2026-10-21) — `ts/games/32.minigames/45-random-match.ts`(`CollectionRandomMatch`), 팀 최대 3명·한 방 6명(`MkFreeForAllMatcher`), 모이면 바로 모음 시작(종목은 기존대로 무작위 5개), 최종 누적 1등이 팀원 중에 있으면 승(`memberIds`). `last-tile/` 폴더는 그대로. 가짜 Firebase 로 매칭·최종 결과·연승 확인 |
 | 7 | 25 FPS 서바이벌 | 완료(2026-10-21) — 인라인 `FpsRandomMatch`(MkGameHooks). 팀 대전 화면에 `랜덤 매칭 방 만들기`, 최대 2대2, 편 무작위, 빈자리는 AI(한쪽이 비면 AI 1명을 넣고 시작). 결과는 `quitTeam` 이 늦게 올 수 있어 1초 뒤 승자를 다시 읽어 기록(24번도 같은 방식으로 고침). 가짜 Firebase 로 매칭·결과·연승 확인 |
 | 8 | 31 좀비 아웃브레이크 | 완료(2026-10-21) — 인라인 `ZombieRandomMatch`. 팀 최대 3명·한 방 5명(`MkFreeForAllMatcher`), 좀비는 기존대로 시작 때 무작위, 모자란 자리는 AI. 팀원이 모두 이긴 쪽(인간 승리면 생존, 좀비 승리면 감염·숙주)일 때만 승. `winner` 가 `status` 보다 늦게 오므로 결과 화면을 다시 그릴 때 기록. 가짜 Firebase 로 확인 |
 | 9 | 24 터보 랩 | 완료(2026-10-21, 선생님 요청으로 30번과 함께 먼저) — 인라인 클로저 안 `TurboRandomMatch`(MkGameHooks). 1대1 개인전(`solo`), 코스는 `plan.seed`, 좌우는 편으로 무작위. 가짜 Firebase 탭 2개로 매칭·출발·결과·연승·기존 방 코드 흐름 확인 |
 | 10 | 30 팀 배틀 아레나 | 완료(2026-10-21, 선생님 요청으로 24번과 함께 먼저) — `ArenaRandomMatch`(services.randomMatch). 대회모드·랜덤 맵·편 무작위, 모자란 자리는 AI 로 3명까지, 모이면 바로 드래프트. `&test` 265·0·0, `&sim` 3373110270(길이 735673) 그대로. 가짜 Firebase 탭 2개로 매칭·드래프트·경기 시작·결과·연승·기존 흐름 확인 |
-| 11 | 데이터베이스규칙.json 정리·선생님 게시 안내 | 완료(2026-10-21) — `matchQueue/$queue` 와 게임 9개의 `parties/$party`(volleyball·turbolap·teambattle·soccer·snowroyale·waterballoon·minigames·fpsbattle·zombieoutbreak). 모든 페이지의 `match-kit.js?v=20261021f` 로 통일. 선생님께 콘솔 게시 요청 |
+| 11 | 데이터베이스규칙.json 정리·선생님 게시 안내 | 완료(2026-10-21) — `matchQueue/$queue` 와 게임 9개의 `parties/$party`(volleyball·turbolap·teambattle·soccer·snowroyale·waterballoon·minigames·fpsbattle·zombieoutbreak). 모든 페이지의 `common/match-kit.js?v=20261021f` 로 통일. 선생님께 콘솔 게시 요청 |
 
 ## 2026-10-27 선생님 요청으로 바뀐 것(로그아웃·반별 순위·랜덤 매칭 패배·아이디 연승·최근 20매치)
 
-- **로그아웃 버튼은 목록 화면에서만**(2026-10-29 선생님 요청으로 바꿈, 그 전은 게임 시작 화면에도 있었음): `account-login.ts` 의 `AccountChipPlacement.onListPage()`. 목록 화면(index.html "정보 수업용 링크 모음"·contest.html 대회서버 목록, script 에 `data-account-chip="always"`)에서만 버튼을 만들고, 게임·퀴즈에서는 아예 만들지 않는다.
+- **로그아웃 버튼은 목록 화면에서만**(2026-10-29 선생님 요청으로 바꿈, 그 전은 게임 시작 화면에도 있었음): `ts/common/account-login.ts` 의 `AccountChipPlacement.onListPage()`. 목록 화면(index.html "정보 수업용 링크 모음"·contest.html 대회서버 목록, script 에 `data-account-chip="always"`)에서만 버튼을 만들고, 게임·퀴즈에서는 아예 만들지 않는다.
   게임 시작 화면의 `data-account-home` 표시는 남아 있지만 이제 아무 일도 하지 않는다(새 게임에 달 필요 없음). 0.4초마다 확인하던 것도 없앴다.
 - **최근 매치 20칸**: `RecentMatchRing.SLOTS = 20`, 경로 `users/<uid>/recent/<게임키>/<0~19>`, 규칙 `$slot` 은 `^([0-9]|1[0-9])$`. 버튼·탭 이름도 "최근 20매치".
 - **랜덤 매칭은 언제 나가도 패배**: `MkRandomFlow.forfeitApplies` 가 진행도를 보지 않는다(문구 `MkForfeit.QUESTION` = "지금 나가면 패배로 기록됩니다. 나갈까요?").
   계정 통계도 같은 판단: 게임이 나갈 때 보고서의 진행도를 `AccountForfeit.progressOnLeave(랜덤 매칭?, 진행도)` 로 넘긴다(랜덤 매칭이면 1 → 절반 규칙에 안 걸림).
   방 만들기·코드 입장 방은 예전처럼 절반 규칙. 상대가 나가서 끝난 판은 각 게임의 기존 판정대로 남은 쪽 승리로 기록된다. "← 목록으로"·탭 닫기는 아래 "미리 패배로 적어 두기"로 센다.
-- **연승은 아이디 단위, 상한 없음**: `match-kit.ts` 의 `MkPersonalStreak`·`MkStreakMath`. 로그인하면 `users/<uid>/streak/<게임 루트>` = `{n 지금 연승, b 최고 연승, id 마지막 판}`,
+- **연승은 아이디 단위, 상한 없음**: `ts/common/match-kit.ts` 의 `MkPersonalStreak`·`MkStreakMath`. 로그인하면 `users/<uid>/streak/<게임 루트>` = `{n 지금 연승, b 최고 연승, id 마지막 판}`,
   로그인 전(배포용)은 기기 `mk_streak_<게임>_v1`. 대기실에 들어갈 때 읽기 1번, 판이 끝날 때 각자 자기 계정에 쓰기 1번. 이기면 +1, 지면 0, 비기면 그대로.
   팀 대기실 전적 창(MkHistoryDialog)은 없앴다. 팀 대기실 전적(`MkParty.report`, 팀장만)은 화면에 안 보이지만 "끝난 판의 표로 다시 들어가지 않기"에 쓰여 그대로 둔다.
 - **팀 대기실 `📊 내 통계` 버튼**: `MkFlowOptions.stats`(`MkStatsLink`). 연승 버튼을 눌러도 같은 창. 24·25·30·31·38·39 는 `AccountStatsOpener(() => 게임 통계 창 열기)`,
@@ -299,7 +299,7 @@
 ## 2026-10-28 추가: 24번 맵 고르기·대결 화면·출발
 
 - **맵이 계속 비슷하게 나온다는 말 확인**: 예전에는 `COURSES[plan.seed % 3]`(`plan.seed` 는 `Math.random`)이라 매 판 1/3 씩 고르게 나왔다. 치우침은 없지만 바로 전 판과 같은 맵이 1/3 확률로 또 나와서 "계속 같다"고 느끼기 쉽다.
-  지금은 공용 `MkRecentMaps`(match-kit.ts)가 **매칭된 모든 사람의 바로 전 맵을 빼고** 남은 맵에서 `plan.seed` 로 고른다. 1대1이면 두 사람 모두 바로 전 판과 다른 맵을 탄다.
+  지금은 공용 `MkRecentMaps`(ts/common/match-kit.ts)가 **매칭된 모든 사람의 바로 전 맵을 빼고** 남은 맵에서 `plan.seed` 로 고른다. 1대1이면 두 사람 모두 바로 전 판과 다른 맵을 탄다.
   각 기기는 끝난 판의 맵을 `turbolap_recent_courses_v1`(최근 2개)에 적고 대기열에 들어갈 때 `MkMember.recentMaps` 로 올린다(쓰기 횟수는 그대로). 맵을 고르는 다른 게임도 `member()` 에 `recentMaps` 를 넣고 `MkRecentMaps.pick(맵 목록, plan)` 을 쓰면 된다.
 - **대결 화면(`VersusCurtain`)**: 상대 승률·맵 승률 카드가 화면 전체를 덮는 막(`#versusCurtain`, 글자 크기는 화면 너비에 맞춤). 경기가 시작돼 카드가 닫혀도 막이 뜬 지 2초(`MIN_MS`)가 안 됐으면 2초를 채운 뒤 사라진다(출발 시각 `BT.startAt` 이 먼저 오면 그때). 다른 카드(시작 화면 등)로 가면 바로 닫힌다.
   출발 카운트다운이 3.6초라 늦게 들어온 학생도 출발 전에 2초는 본다.
@@ -310,25 +310,25 @@
 
 ## 2026-10-29 추가: 30번 대결 화면
 
-- 30번도 매칭되면 24번 같은 대결 화면(`ArenaVersusCurtain`, 그리기는 `ts/30.team-battle-versus.ts`)을 4.5초 띄운 뒤 드래프트를 시작한다. 팀별 3줄: 닉네임·총 승률·많이 고른 캐릭터 3종(판 수 / 승률). 자세한 것은 `docs/30.team-battle/30.team-battle-notes.md` 5-2c.
+- 30번도 매칭되면 24번 같은 대결 화면(`ArenaVersusCurtain`, 그리기는 `ts/games/30.team-battle/30.team-battle-versus.ts`)을 4.5초 띄운 뒤 드래프트를 시작한다. 팀별 3줄: 닉네임·총 승률·많이 고른 캐릭터 3종(판 수 / 승률). 자세한 것은 `docs/30.team-battle/30.team-battle-notes.md` 5-2c.
 
 ## 2026-10-29 추가: 32번 대결 화면
 
-- 32번 미니게임 모음도 매칭되면(그리고 일반 방에서 방장이 시작하면) 대결 화면을 4.5초 띄운 뒤 모음을 시작한다(`ts/32.minigames/46-versus.ts` 의 `CollectionVersusCurtain`).
+- 32번 미니게임 모음도 매칭되면(그리고 일반 방에서 방장이 시작하면) 대결 화면을 4.5초 띄운 뒤 모음을 시작한다(`ts/games/32.minigames/46-versus.ts` 의 `CollectionVersusCurtain`).
   팀 구분 없는 최대 6명 순위전이라 참가자 카드를 왼쪽·오른쪽 반씩 놓고 가운데 VS, 내 팀(파티)이 먼저·금색 테두리, 다른 학생은 붉은 테두리.
   카드: 닉네임·총 승률(○승 ○패)·`🥇 1등 n회`·`🏅 3위 안 nn%`(선생님 결정). 값은 원래 랜덤 매칭 판만 세는 계정 통계 `stats/minigames` 의 `g·w·t` 그대로라 DB 규칙·통계 칸은 바꾸지 않았다(1등 = 승 = 우리 팀에 누적 1등).
   자기 요약은 페이지당 1번 + 랜덤 매칭 판 끝마다 1번 읽고 방에 들어갈 때 `players/<id>/vs` 에 함께 쓴다. 자세한 것은 `docs/32.minigames/32.minigames-notes.md` 1절 "대결 화면".
 
 ## 2026-10-29 추가: 38번 대결 화면
 
-- 38번도 랜덤 매칭으로 방에 들어가면 대결 화면(`SnVersusCurtain`, 그리기는 `ts/38.snow-versus.ts`)을 띄우고 방장은 4.5초 뒤 경기를 시작한다. 일반 방도 `vsAt` 으로 같은 막(4.5초 뒤 시작, 7.5초 뒤 저절로 닫힘).
+- 38번도 랜덤 매칭으로 방에 들어가면 대결 화면(`SnVersusCurtain`, 그리기는 `ts/games/38.snow-royale/38.snow-versus.ts`)을 띄우고 방장은 4.5초 뒤 경기를 시작한다. 일반 방도 `vsAt` 으로 같은 막(4.5초 뒤 시작, 7.5초 뒤 저절로 닫힘).
 - 배틀로얄이라 양쪽 VS 대신 **팀 기둥 나란히**(팀전 2~3팀 사이에 VS, 개인전은 4~6칸 격자) — 선생님이 시안 중 A안을 고름.
 - 칸마다 닉네임, `1위 비율 nn% · n승 m패`, `판당 처치·평균 순위`. 자료는 랜덤 매칭 판만 센 새 칸 `stats/snowroyale/rm`(2026-10-29 부터 쌓임). 모드는 고른 대기열, 안 들어온 사람은 방 `assign` 으로 `입장하는 중…`.
 - 자세한 것은 `docs/38.snow-royale/38.snow-royale-notes.md` 23절.
 
 ## 2026-10-29 추가: 39번 대결 화면
 
-- 39번도 랜덤 매칭으로 방에 들어가면 대결 화면(`WbVersusStage`, 그리기는 `ts/39.balloon-versus.ts`)을 띄우고 방장은 막이 뜬 지 4초 뒤 경기를 시작한다(사람이 덜 모이면 기존대로 15초 기다림). 일반 방도 방장이 시작을 누르면 `vsAt` 을 쓰고 4초 뒤 시작, 모두 같은 막(7초 뒤 저절로 닫힘). 혼자 하기는 띄우지 않는다.
+- 39번도 랜덤 매칭으로 방에 들어가면 대결 화면(`WbVersusStage`, 그리기는 `ts/games/39.water-balloon/39.balloon-versus.ts`)을 띄우고 방장은 막이 뜬 지 4초 뒤 경기를 시작한다(사람이 덜 모이면 기존대로 15초 기다림). 일반 방도 방장이 시작을 누르면 `vsAt` 을 쓰고 4초 뒤 시작, 모두 같은 막(7초 뒤 저절로 닫힘). 혼자 하기는 띄우지 않는다.
 - 모양(선생님이 시안 중 고름): **개인전은 카드 격자**(VS 없음, 4칸씩 2줄), **팀전은 팀 상자 가로 줄 + 팀 사이 VS**. 760px 아래는 개인전 2칸 격자, 팀전은 팀 상자를 위아래로 쌓음.
 - 카드: 닉네임, `1위 비율 nn% · n승 m패`, `판당 처치`(팀전은 `· 구출` — 팀전 판당). 자료는 랜덤 매칭 판만 센 새 칸 `stats/waterballoon/rm` = `{g, w, gt, kl, rs}`. **봇이 섞인 랜덤 매칭 판도 센다**(선생님 결정 — 사람이 4명보다 적으면 봇이 늘 끼어서). **2026-10-29 부터 쌓인다.**
 - 맵 이름은 막에 없다(39번은 맵을 경기 시작 때 정하므로 막이 뜰 때는 아직 모름). 자세한 것은 `docs/39.water-balloon/39.water-balloon-notes.md` 22절.

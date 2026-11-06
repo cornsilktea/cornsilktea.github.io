@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-<script charset="utf-8" src="firebase-config.js"></script>
-<script charset="utf-8" src="access-guard.js" data-game="teambattle"></script>
-<script charset="utf-8" src="quality-governor.js"></script>
-<script charset="utf-8" src="fullscreen-keeper.js"></script>
-<script charset="utf-8" src="match-kit.js?v=20261103a"></script>
+<script charset="utf-8" src="common/firebase-config.js"></script>
+<script charset="utf-8" src="common/access-guard.js" data-game="teambattle"></script>
+<script charset="utf-8" src="common/quality-governor.js"></script>
+<script charset="utf-8" src="common/fullscreen-keeper.js"></script>
+<script charset="utf-8" src="common/match-kit.js?v=20261103a"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>3v3 팀 배틀 아레나</title>
@@ -16,7 +16,7 @@
 <meta property="og:url" content="https://cornsilktea.github.io/30.team-battle-arena.html">
 <meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
 <meta name="twitter:card" content="summary">
-<link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="common/theme.css">
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 <script async src="https://cdn.jsdelivr.net/npm/es-module-shims@1.10.1/dist/es-module-shims.js"></script>
@@ -26,7 +26,7 @@
   "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
 } }
 </script>
-<link rel="stylesheet" href="30.team-battle-arena.css?v=20261106c">
+<link rel="stylesheet" href="games/30.team-battle/30.team-battle-arena.css?v=20261106c">
 </head>
 <body>
 <canvas id="cv"></canvas>
@@ -287,14 +287,14 @@
   </div>
 </div>
 
-<script charset="utf-8" src="character-kit.js?v=20261011"></script>
-<script charset="utf-8" src="character-maker.js?v=20261026a"></script>
+<script charset="utf-8" src="common/character-kit.js?v=20261011"></script>
+<script charset="utf-8" src="common/character-maker.js?v=20261026a"></script>
 <script>new CharacterMakerDialog(undefined, false);</script>
-<script charset="utf-8" src="account-match-kit.js?v=20261103e"></script>
-<script charset="utf-8" src="account-stats.js?v=20261104c"></script>
-<script charset="utf-8" src="30.team-battle-versus.js?v=20261104a"></script>
-<script charset="utf-8" src="30.team-battle-fx.js?v=20261106h"></script>
-<script charset="utf-8" src="patch-notes.js?v=20261029b"></script>
+<script charset="utf-8" src="common/account-match-kit.js?v=20261103e"></script>
+<script charset="utf-8" src="common/account-stats.js?v=20261104c"></script>
+<script charset="utf-8" src="games/30.team-battle/30.team-battle-versus.js?v=20261104a"></script>
+<script charset="utf-8" src="games/30.team-battle/30.team-battle-fx.js?v=20261106h"></script>
+<script charset="utf-8" src="games/30.team-battle/patch-notes.js?v=20261029b"></script>
 <script type="module">
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
@@ -1011,7 +1011,7 @@ SinglePassMaterials.enable(THREE);
       }).catch(function () {});
     }
     createRoom() { var services = this.services;
-      if (!services.backend.db) { services.lobby.startMsg("온라인 연결을 할 수 없어요. (firebase-config.js·인터넷 확인)"); return; }
+      if (!services.backend.db) { services.lobby.startMsg("온라인 연결을 할 수 없어요. (common/firebase-config.js·인터넷 확인)"); return; }
       Dom.$("btnCreate").disabled = true; services.lobby.startMsg("");
       services.session.sweep().then(function () { tryCode(0); });
       function tryCode(n) {
@@ -13005,8 +13005,8 @@ SinglePassMaterials.enable(THREE);
   class TestBridge {
     constructor(services) { this.services = services; }
     start() { var services = this.services;
-      if (/[?&]test(&|$)/.test(location.search)) import("./30.team-battle-tests.js?t=" + Date.now()).then(function (m) { m.runTeamBattleTests(services.testBridge.hooks()); });
-      if (/[?&]sim(&|$)/.test(location.search)) import("./30.team-battle-sim.js?t=" + Date.now()).then(function (m) {
+      if (/[?&]test(&|$)/.test(location.search)) import("./games/30.team-battle/30.team-battle-tests.js?t=" + Date.now()).then(function (m) { m.runTeamBattleTests(services.testBridge.hooks()); });
+      if (/[?&]sim(&|$)/.test(location.search)) import("./games/30.team-battle/30.team-battle-sim.js?t=" + Date.now()).then(function (m) {
         window.TB_SIM = m.createSim(services.testBridge.hooks()); window.TB_SIM.mapTopShot = services.testBridge.hooks().mapTopShot; new m.SimLauncher(window.TB_SIM, location.search).start();
       });
     }
@@ -13147,7 +13147,7 @@ SinglePassMaterials.enable(THREE);
     ticket() { return this.flow ? this.flow.ticket() : null; }
     inParty() { return !!this.flow && this.flow.inParty(); }
     open() { var services = this.services, flow = this.ready();
-      if (!flow) { services.lobby.startMsg("온라인 연결을 할 수 없어요. (firebase-config.js·인터넷 확인)"); return; }
+      if (!flow) { services.lobby.startMsg("온라인 연결을 할 수 없어요. (common/firebase-config.js·인터넷 확인)"); return; }
       Dom.$("btnRandom").disabled = true; services.lobby.startMsg("");
       flow.create().then(function (msg) { services.lobby.startMsg(msg); }, function () { services.lobby.startMsg("랜덤 매칭 방을 만들지 못했어요. (데이터베이스 규칙을 확인해 주세요)"); })
         .then(function () { Dom.$("btnRandom").disabled = false; });

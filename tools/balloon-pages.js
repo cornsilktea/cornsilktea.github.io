@@ -7,7 +7,7 @@ const root = path.join(__dirname, "..");
 const out = path.join(root, ".claude");
 fs.mkdirSync(out, { recursive: true });
 const page = fs.readFileSync(path.join(root, "39.water-balloon.html"), "utf8")
-  .replace('<script charset="utf-8" src="access-guard.js" data-game="waterballoon"></script>', "")
+  .replace('<script charset="utf-8" src="common/access-guard.js" data-game="waterballoon"></script>', "")
   .replace("<head>", '<head><base href="/">');
 fs.writeFileSync(path.join(out, "balloon-test.html"), page);
 const mock = page

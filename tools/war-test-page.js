@@ -58,7 +58,7 @@ class WarTestPageBuilder {
 
   build() {
     let html = fs.readFileSync(path.join(this.root, "37.space-war.html"), "utf8");
-    html = html.replace('<script charset="utf-8" src="access-guard.js" data-game="spacewar"></script>', "");
+    html = html.replace('<script charset="utf-8" src="common/access-guard.js" data-game="spacewar"></script>', "");
     html = html.replace("<head>", '<head><base href="/"><script>window.requestAnimationFrame=function(cb){return setTimeout(function(){cb(performance.now())},16)}</script><script>' + WarTestHelper.SOURCE + "</script>");
     const entry = "new WarGameApp({ THREE, GLTFLoader, SkeletonUtils });";
     if (!html.includes(entry)) throw new Error("시작 줄을 찾지 못했어요");

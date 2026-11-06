@@ -93,7 +93,7 @@ class EncodingCheck {
 }
 
 class AssetCheck {
-  static SOURCES = ["ts/37.war-views.ts", "ts/37.war-scenery.ts", "ts/37.war-hud.ts", "ts/37.space-war.ts"];
+  static SOURCES = ["ts/games/37.space-war/37.war-views.ts", "ts/games/37.space-war/37.war-scenery.ts", "ts/games/37.space-war/37.war-hud.ts", "ts/games/37.space-war/37.space-war.ts"];
   static ROOT = "assets/kaykit/war";
 
   run(root) {
@@ -128,7 +128,7 @@ class BalanceTextCheck {
     const problems = [];
     const sandbox = {};
     vm.createContext(sandbox);
-    vm.runInContext(fs.readFileSync(path.join(root, "37.war-data.js"), "utf8") + "\nthis.WarBalance = WarBalance;", sandbox);
+    vm.runInContext(fs.readFileSync(path.join(root, "games/37.space-war/37.war-data.js"), "utf8") + "\nthis.WarBalance = WarBalance;", sandbox);
     const html = fs.readFileSync(path.join(root, "37.space-war.html"), "utf8");
     for (const match of html.matchAll(/data-balance="([A-Z_]+)"/g)) {
       if (match[1] !== "MATCH_MINUTES" && typeof sandbox.WarBalance[match[1]] !== "number") problems.push("37.space-war.html: data-balance=" + match[1] + " 에 맞는 수치가 없어요");
@@ -140,9 +140,9 @@ class BalanceTextCheck {
 class ScriptVersionCheck {
   run(root) {
     const html = fs.readFileSync(path.join(root, "37.space-war.html"), "utf8");
-    const versions = new Set([...html.matchAll(/src="37\.[a-z\-]+\.js\?v=([A-Za-z0-9]+)"/g)].map((match) => match[1]));
-    const count = [...html.matchAll(/src="37\.[a-z\-]+\.js/g)].length;
-    const withVersion = [...html.matchAll(/src="37\.[a-z\-]+\.js\?v=/g)].length;
+    const versions = new Set([...html.matchAll(/src="games\/37\.space-war\/37\.[a-z\-]+\.js\?v=([A-Za-z0-9]+)"/g)].map((match) => match[1]));
+    const count = [...html.matchAll(/src="games\/37\.space-war\/37\.[a-z\-]+\.js/g)].length;
+    const withVersion = [...html.matchAll(/src="games\/37\.space-war\/37\.[a-z\-]+\.js\?v=/g)].length;
     const problems = [];
     if (versions.size !== 1) problems.push("37번 스크립트의 버전 값이 서로 달라요: " + [...versions].join(", "));
     if (count !== withVersion) problems.push("버전 값이 없는 37번 스크립트가 있어요");

@@ -5,7 +5,7 @@
 ## ★ 새 게임을 만들 때: 통계 저장까지 처음부터 함께 만든다 (2026-10-28 선생님 결정, 기준은 24번 터보 랩)
 
 대전(방 만들기·코드 입장·랜덤 매칭)이 있는 새 게임은 **게임을 처음 만드는 커밋에 계정 통계까지 넣는다.** 나중에 따로 붙이지 않는다.
-개인전(혼자 기록 경쟁) 게임은 기존 규칙대로 최고 기록·세계 신기록(`world-record.js`)·`WorldRecord.syncBest` 를 쓴다.
+개인전(혼자 기록 경쟁) 게임은 기존 규칙대로 최고 기록·세계 신기록(`common/world-record.js`)·`WorldRecord.syncBest` 를 쓴다.
 
 **입구는 버튼 하나**: 시작 화면의 실행 버튼(만들기·랜덤 매칭·참여) 바로 아래에 넓은 버튼 한 개를 둔다.
 ```html
@@ -31,7 +31,7 @@
 - `admin.html` `RankGame.GAMES` 에 `new RankGame("<게임키>", "<이름>(<번호>)", { label: "x 칸 이름" } 또는 null, "무엇을 세는지")` — 번호 순서 자리에.
 - `admin.html`: 그 게임 통계 `.js` 를 `<script>` 로 불러오고(30번 줄 아래), `RankGame` 다섯째 인자로 `() => ({ profile: new 게임Profile(), view: new 게임View() })` 를 넘긴다 → 반 별 통계에서 학생 이름을 누르면 학생이 보는 것과 같은 개인 통계 창(`StudentAccountWindow` = `AccountStatsDialog` + `AccountTeacherReader`)이 열린다(2026-10-28 선생님 요청). 승패만 남기는 게임은 `RandomMatchProfile`·`RandomMatchView`.
 - `tools/account-stats-unit.js` 에 그 게임의 `GameCase`(저장 → 되살리기 왕복·집계 판정·규칙 통과)와 미리 적기(`pendingCase`) 한 줄씩.
-- HTML 에 `match-kit.js`·`account-match-kit.js`·`<번호>.<이름>-stats.js` 를 `?v=` 와 함께 불러온다(시작 화면 `data-account-home` 은 2026-10-29 부터 필요 없음).
+- HTML 에 `common/match-kit.js`·`common/account-match-kit.js`·`<번호>.<이름>-stats.js` 를 `?v=` 와 함께 불러온다(시작 화면 `data-account-home` 은 2026-10-29 부터 필요 없음).
 
 **공통 규칙은 이 파일 위의 "모든 게임 공통 규칙"을 그대로 따른다**(로그인한 학생만, 판 끝 쓰기 1번·창 열 때 읽기 1번, 사람끼리 판만 누적, 랜덤 매칭은 언제 나가도 패배, 미리 적는 패배, 파생값 저장 안 함).
 끝나면 `npx tsc -p .` → `node tools/account-stats-unit.js` → `node tools/match-sim.js` → `?c=test` 화면에서 버튼·로그인 안내 확인 → 커밋·푸시.
@@ -59,11 +59,11 @@
 
 ## 게임별 구현과 결정 (2026-10-26)
 
-- 새 파일: `ts/account-match-kit.ts`(공용, 선생님이 파일 분리를 막지 않아 진행), 게임별 `ts/24.turbo-lap-stats.ts`·`ts/25.fps-survival-stats.ts`·`ts/31.zombie-outbreak-stats.ts`·`ts/38.snow-account.ts`·`ts/39.balloon-account.ts`.
+- 새 파일: `ts/common/account-match-kit.ts`(공용, 선생님이 파일 분리를 막지 않아 진행), 게임별 `ts/games/24.turbo-lap/24.turbo-lap-stats.ts`·`ts/games/25.fps-survival/25.fps-survival-stats.ts`·`ts/games/31.zombie-outbreak/31.zombie-outbreak-stats.ts`·`ts/games/38.snow-royale/38.snow-account.ts`·`ts/games/39.water-balloon/39.balloon-account.ts`.
 - 결과 창은 게임의 경기 끝 DOM 을 그대로 다시 그리지 않고, 공용 창 안에 같은 항목의 표를 그린다(게임마다 `resultHtml`). 각 게임의 경기 끝 화면은 건드리지 않았다.
 - 24번: 실제 랜덤 매칭은 1대1이라 순위는 "1위/2명". 승 = 먼저 완주(상대 이탈 승 포함), 무승부는 기록 안 함. 평균 순위는 의미가 없어 뺐다.
   - 완주 시간 동점(2026-10-29 분석·선생님 결정): 순위는 0.001초(ms) 단위로 정해지고 화면은 0.01초까지라, 0.01초까지 같으면 같은 시간으로 보이는데 승패가 갈렸다.
-    그래서 결과 화면(`renderResult`)과 최근 매치 결과 창은 0.01초까지 같은 완주 기록끼리만 0.001초까지 보인다(`TurboLapClock`, `ts/24.turbo-lap-stats.ts`).
+    그래서 결과 화면(`renderResult`)과 최근 매치 결과 창은 0.01초까지 같은 완주 기록끼리만 0.001초까지 보인다(`TurboLapClock`, `ts/games/24.turbo-lap/24.turbo-lap-stats.ts`).
     0.001초까지 완전히 같으면 무승부가 아니라 결과표 키 순서(접속 아이디)가 앞선 쪽이 1위 — 모든 기기가 같은 결과표를 읽어 판정이 어긋나지는 않는다. 개인·세계 신기록도 0.001초로 비교(같은 시간은 신기록 아님).
 - 25번: 어시스트가 없어 KDA = 처치 ÷ 쓰러짐, 쓰러짐 0 이면 "Perfect". 방 만들기·코드 입장·랜덤 매칭의 팀 대전을 모두 센다(AI 대전은 제외).
 - 31번: 랜덤 매칭 파티 1명(`PARTY_LIMIT = 1`, `solo: true`). 감염 수는 `room.players[].infectedBy` 로 센다.
@@ -74,13 +74,13 @@
 
 ## 2026-10-27 선생님 요청으로 바뀐 것(로그아웃·반별 순위·랜덤 매칭 패배·아이디 연승·최근 20매치)
 
-- **로그아웃 버튼은 목록 화면에서만**(2026-10-29 선생님 요청으로 바꿈, 그 전은 게임 시작 화면에도 있었음): `account-login.ts` 의 `AccountChipPlacement.onListPage()`. 목록 화면(index.html "정보 수업용 링크 모음"·contest.html 대회서버 목록, script 에 `data-account-chip="always"`)에서만 버튼을 만들고, 게임·퀴즈에서는 아예 만들지 않는다.
+- **로그아웃 버튼은 목록 화면에서만**(2026-10-29 선생님 요청으로 바꿈, 그 전은 게임 시작 화면에도 있었음): `ts/common/account-login.ts` 의 `AccountChipPlacement.onListPage()`. 목록 화면(index.html "정보 수업용 링크 모음"·contest.html 대회서버 목록, script 에 `data-account-chip="always"`)에서만 버튼을 만들고, 게임·퀴즈에서는 아예 만들지 않는다.
   게임 시작 화면의 `data-account-home` 표시는 남아 있지만 이제 아무 일도 하지 않는다(새 게임에 달 필요 없음). 0.4초마다 확인하던 것도 없앴다.
 - **최근 매치 20칸**: `RecentMatchRing.SLOTS = 20`, 경로 `users/<uid>/recent/<게임키>/<0~19>`, 규칙 `$slot` 은 `^([0-9]|1[0-9])$`. 버튼·탭 이름도 "최근 20매치".
 - **랜덤 매칭은 언제 나가도 패배**: `MkRandomFlow.forfeitApplies` 가 진행도를 보지 않는다(문구 `MkForfeit.QUESTION` = "지금 나가면 패배로 기록됩니다. 나갈까요?").
   계정 통계도 같은 판단: 게임이 나갈 때 보고서의 진행도를 `AccountForfeit.progressOnLeave(랜덤 매칭?, 진행도)` 로 넘긴다(랜덤 매칭이면 1 → 절반 규칙에 안 걸림).
   방 만들기·코드 입장 방은 예전처럼 절반 규칙. 상대가 나가서 끝난 판은 각 게임의 기존 판정대로 남은 쪽 승리로 기록된다. "← 목록으로"·탭 닫기는 아래 "미리 패배로 적어 두기"로 센다.
-- **연승은 아이디 단위, 상한 없음**: `match-kit.ts` 의 `MkPersonalStreak`·`MkStreakMath`. 로그인하면 `users/<uid>/streak/<게임 루트>` = `{n 지금 연승, b 최고 연승, id 마지막 판}`,
+- **연승은 아이디 단위, 상한 없음**: `ts/common/match-kit.ts` 의 `MkPersonalStreak`·`MkStreakMath`. 로그인하면 `users/<uid>/streak/<게임 루트>` = `{n 지금 연승, b 최고 연승, id 마지막 판}`,
   로그인 전(배포용)은 기기 `mk_streak_<게임>_v1`. 대기실에 들어갈 때 읽기 1번, 판이 끝날 때 각자 자기 계정에 쓰기 1번. 이기면 +1, 지면 0, 비기면 그대로.
   팀 대기실 전적 창(MkHistoryDialog)은 없앴다. 팀 대기실 전적(`MkParty.report`, 팀장만)은 화면에 안 보이지만 "끝난 판의 표로 다시 들어가지 않기"에 쓰여 그대로 둔다.
 - **팀 대기실 `📊 내 통계` 버튼**: `MkFlowOptions.stats`(`MkStatsLink`). 연승 버튼을 눌러도 같은 창. 24·25·30·31·38·39 는 `AccountStatsOpener(() => 게임 통계 창 열기)`,
@@ -97,7 +97,7 @@
 - **증상**: A 패·B 승인 랜덤 매칭 판이 A 최근 매치에는 있고 B 에는 없음.
 - **원인**: 상대가 경기 중에 사라졌는데 방장이 "나간 편"(`quitSide`)으로 판정하지 못하면(경기 시작 때 센 사람 수 `humansAtStart` 가 어긋나는 등) 결과표에 승자 한 줄만 남았다. 승자의 보고는 `TurboLapPlan` 의 "2명 이상인 판만"에 걸려 기록되지 않고, 같은 판의 미리 적기 칸까지 지워졌다(`write` 의 skip). 나간 A 는 미리 적어 둔 패배가 그대로 남아 한쪽만 기록됐다.
   아무도 완주하지 못한 채 상대만 나간 판도 "무승부"로 판정돼 같은 일이 생길 수 있었다.
-- **고침**: `ts/24.turbo-lap-stats.ts` 의 `TurboLapOutcome`. 방장은 경기 중에 본 선수(`RaceRoster.seen`) 중 결과표에 없는 사람을 `quitSide` 와 상관없이 "나감" 줄로 넣고, 각 기기도 결과를 볼 때 자기가 본 선수로 한 번 더 채운다(옛 방장이 쓴 결과도 고쳐짐). 승자는 완주 1위, 없으면 상대 편이 모두 나갔을 때 남은 편(`TurboLapOutcome.winner`).
+- **고침**: `ts/games/24.turbo-lap/24.turbo-lap-stats.ts` 의 `TurboLapOutcome`. 방장은 경기 중에 본 선수(`RaceRoster.seen`) 중 결과표에 없는 사람을 `quitSide` 와 상관없이 "나감" 줄로 넣고, 각 기기도 결과를 볼 때 자기가 본 선수로 한 번 더 채운다(옛 방장이 쓴 결과도 고쳐짐). 승자는 완주 1위, 없으면 상대 편이 모두 나갔을 때 남은 편(`TurboLapOutcome.winner`).
 - **이미 빠진 판**: B 의 미리 적기 칸도 지워져 기기·서버 어디에도 남아 있지 않아 되살릴 수 없다(필요하면 선생님이 정하면 교사 도구로 손으로 넣는다).
 - 검사: `node tools/account-stats-unit.js` 의 "24번 결과표·24번 승자" 항목(통과 167), 가짜 Firebase 사본으로 승·패 판 정상.
 
@@ -106,7 +106,7 @@
 - 판이 끝나고 기록을 쓰기 전(2.5초 + 요청 시간)에 화면이 닫히면 그 학생만 기록이 빠졌다. 30번은 끝나는 순간 `AccountMatchSender.stash(진짜 보고)` 로 미리 적기 칸을 덮어 두고, 방에 들어올 때 남은 것을 정산한다. 다른 게임에 붙일 때도 같은 방법(`stash` → 늦게 `record`, 입장 때 `settle`).
 - 24·25번도 판 끝에 1초 기다렸다 써서 같은 문제(랜덤 매칭 승자에게 거짓 패배)가 있어 끝나는 순간 `AccountGameAccount.stash(보고)` 를 부르게 했다. 결과를 기다렸다 쓰는 새 게임은 같은 방법을 쓴다.
 - `AccountMatchStore` 가 남은 보고를 정산하다 규칙에 거부되면(400·401·403) 그 보고를 지우고 이번 판을 기록한다.
-- 이미 빠진 30번 판은 교사 제어판 "30번 팀 배틀 통계 정상화"(`ts/teambattle-stats-repair.ts`)로 채웠다(2026-10-29 선생님 결정: 할 일을 마쳐 제어판에서 지웠다 — 코드는 git 기록에 있음). 자세한 것은 `docs/common/계정로그인.md` 맨 아래 절.
+- 이미 빠진 30번 판은 교사 제어판 "30번 팀 배틀 통계 정상화"(`ts/games/30.team-battle/teambattle-stats-repair.ts`)로 채웠다(2026-10-29 선생님 결정: 할 일을 마쳐 제어판에서 지웠다 — 코드는 git 기록에 있음). 자세한 것은 `docs/common/계정로그인.md` 맨 아래 절.
 
 ## 2026-10-27 추가: 랜덤 매칭 판은 미리 패배로 적어 두기(← 목록으로·탭 닫기도 패배)
 

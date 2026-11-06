@@ -28,7 +28,7 @@ class ZombieZFightPage {
     html = html.replace(ZombieZFightPage.HOOK_FROM, ZombieZFightPage.HOOK_TO);
     if (!html.includes(ZombieZFightPage.CAMERA_FROM)) throw new Error("카메라 훅 자리를 찾지 못함");
     html = html.replace(ZombieZFightPage.CAMERA_FROM, ZombieZFightPage.CAMERA_TO);
-    html = html.replace('<script charset="utf-8" src="access-guard.js" data-game="zombieoutbreak"></script>', "");
+    html = html.replace('<script charset="utf-8" src="common/access-guard.js" data-game="zombieoutbreak"></script>', "");
     html = html.replace("<head>", '<head>\n<base href="../">\n<script src="tools/fbmock.js"></script>\n<script>firebase.apps = [];</script>');
     html = html.replace("</body>", "<script>\n" + ZombieZFightPage.detectorSource() + "\n</script>\n</body>");
     fs.writeFileSync(path.join(ZombieZFightPage.ROOT, this.output), html, "utf8");

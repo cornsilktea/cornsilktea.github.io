@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-<script charset="utf-8" src="firebase-config.js"></script>
-<script charset="utf-8" src="access-guard.js" data-game="zombieoutbreak"></script>
-<script charset="utf-8" src="fullscreen-keeper.js" data-watch></script>
-<script charset="utf-8" src="quality-governor.js"></script>
+<script charset="utf-8" src="common/firebase-config.js"></script>
+<script charset="utf-8" src="common/access-guard.js" data-game="zombieoutbreak"></script>
+<script charset="utf-8" src="common/fullscreen-keeper.js" data-watch></script>
+<script charset="utf-8" src="common/quality-governor.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>미드나잇 좀비 아웃브레이크</title>
@@ -15,7 +15,7 @@
 <meta property="og:url" content="https://cornsilktea.github.io/31.zombie-outbreak.html">
 <meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
 <meta name="twitter:card" content="summary">
-<link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="common/theme.css">
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 <script type="importmap">
@@ -435,8 +435,8 @@
   </div>
 </section>
 
-<script charset="utf-8" src="character-kit.js?v=20261011"></script>
-<script charset="utf-8" src="character-maker.js?v=20261026a"></script>
+<script charset="utf-8" src="common/character-kit.js?v=20261011"></script>
+<script charset="utf-8" src="common/character-maker.js?v=20261026a"></script>
 <div id="versusCurtain" class="zv-curtain" hidden>
   <div class="zv-in">
     <div class="zv-head">🧟 곧 시작해요!</div>
@@ -444,14 +444,14 @@
     <div class="zv-hint">곧 게임이 시작돼요. 잠시만 기다려 주세요.</div>
   </div>
 </div>
-<script charset="utf-8" src="room-drop-recovery.js?v=20261106b"></script>
-<script charset="utf-8" src="match-kit.js?v=20261103d"></script>
-<script charset="utf-8" src="account-match-kit.js?v=20261104a"></script>
-<script charset="utf-8" src="31.zombie-outbreak-stats.js?v=20261104a"></script>
-<script charset="utf-8" src="31.zombie-versus.js?v=20261104a"></script>
-<script charset="utf-8" src="40.forest-minigame.js?v=13"></script>
-<script charset="utf-8" src="31.zombie-missions.js?v=20261106b"></script>
-<script charset="utf-8" src="31.zombie-hud.js?v=20261106a"></script>
+<script charset="utf-8" src="common/room-drop-recovery.js?v=20261106b"></script>
+<script charset="utf-8" src="common/match-kit.js?v=20261103d"></script>
+<script charset="utf-8" src="common/account-match-kit.js?v=20261104a"></script>
+<script charset="utf-8" src="games/31.zombie-outbreak/31.zombie-outbreak-stats.js?v=20261104a"></script>
+<script charset="utf-8" src="games/31.zombie-outbreak/31.zombie-versus.js?v=20261104a"></script>
+<script charset="utf-8" src="games/40.dongma-forest/40.forest-minigame.js?v=13"></script>
+<script charset="utf-8" src="games/31.zombie-outbreak/31.zombie-missions.js?v=20261106b"></script>
+<script charset="utf-8" src="games/31.zombie-outbreak/31.zombie-hud.js?v=20261106a"></script>
 <script>new CharacterMakerDialog(undefined, false);</script>
 <div id="loading">3D 학교를 준비하는 중입니다…</div>
 
@@ -5151,7 +5151,7 @@ $("btnLobbyLeave").onclick = blurAfter(leaveRoom);
 $("btnAgain").onclick = blurAfter(playAgain);
 $("btnResultLeave").onclick = blurAfter(leaveRoom);
 $("btnGameLeave").onclick = blurAfter(() => { if (confirm(zombieRandom.forfeitApplies() || zombieReporter.forfeitApplies() ? MkForfeit.QUESTION : "방을 나가시겠습니까?")) { zombieRandom.forfeitIfLate(); zombieReporter.leaving(); leaveRoom(); } });
-if (!db) startMsg("온라인 연결 설정을 불러오지 못했습니다. (firebase-config.js·인터넷 연결 확인)");
+if (!db) startMsg("온라인 연결 설정을 불러오지 못했습니다. (common/firebase-config.js·인터넷 연결 확인)");
 
 class ZombieResumeStarter {
   static run() {

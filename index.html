@@ -12,7 +12,7 @@
   }catch(e){}
 })();
 </script>
-<link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="common/theme.css">
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}</script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- 링크 미리보기(제어판 제목) 시작 — 링크제목맞추기.ps1 이 채웁니다. 손으로 고치지 마세요. -->
@@ -34,7 +34,7 @@
 <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
 <link rel="apple-touch-icon" href="icon-512-maskable.png">
 <style>
-  /* 크기·간격·색은 theme.css 의 --sg-* 단계만 씁니다(다크 모드를 얹을 때 그대로 쓰려고). */
+  /* 크기·간격·색은 common/theme.css 의 --sg-* 단계만 씁니다(다크 모드를 얹을 때 그대로 쓰려고). */
   * { box-sizing: border-box; }
   body {
     margin: 0; padding: var(--sg-s6);
@@ -328,12 +328,12 @@
 
 <div class="toast" id="toast" hidden></div>
 
-<script charset="utf-8" src="firebase-config.js"></script>
-<script charset="utf-8" src="account-login.js" data-account-chip="always"></script>
-<script charset="utf-8" src="data.js"></script>
-<script charset="utf-8" src="qrcode.js"></script>
-<script charset="utf-8" src="character-kit.js?v=20261011"></script>
-<script charset="utf-8" src="character-maker.js?v=20261026a"></script>
+<script charset="utf-8" src="common/firebase-config.js"></script>
+<script charset="utf-8" src="common/account-login.js" data-account-chip="always"></script>
+<script charset="utf-8" src="common/data.js"></script>
+<script charset="utf-8" src="common/qrcode.js"></script>
+<script charset="utf-8" src="common/character-kit.js?v=20261011"></script>
+<script charset="utf-8" src="common/character-maker.js?v=20261026a"></script>
 <script>new CharacterMakerDialog();</script>
 <script>
 /* 밝기 전환 버튼: <html data-theme> 를 바꾸고 localStorage('portal_theme')에 남긴다(admin.html 과 같은 키).
@@ -358,7 +358,7 @@
 </script>
 <script>
 /* 수업 자료 목록은 선생님 화면(admin.html)에서 관리합니다.
-   단원 구조와 학급 목록은 data.js 에 있습니다. 이 파일은 고칠 필요가 없습니다.
+   단원 구조와 학급 목록은 common/data.js 에 있습니다. 이 파일은 고칠 필요가 없습니다.
 
    주소에 ?c=1-1 (학년-반) 이 없으면 학년·반 고르기 화면을,
    있으면 그 반의 QR 코드와 자료 목록을 보여 줍니다.
@@ -654,7 +654,7 @@
      열림·잠김은 games 의 값이 아니라 이 반의 classes/<반>/<자료> 값을 봅니다. */
   function load() {
     if (!cfg.isReady()) {
-      setNotice("설정이 아직 끝나지 않았어요. firebase-config.js 를 먼저 채워 주세요.");
+      setNotice("설정이 아직 끝나지 않았어요. common/firebase-config.js 를 먼저 채워 주세요.");
       games = [];
       render();
       return;

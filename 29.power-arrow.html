@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-<script charset="utf-8" src="firebase-config.js"></script>
-<script charset="utf-8" src="access-guard.js" data-game="powerarrow"></script>
-<script charset="utf-8" src="world-record.js"></script>
+<script charset="utf-8" src="common/firebase-config.js"></script>
+<script charset="utf-8" src="common/access-guard.js" data-game="powerarrow"></script>
+<script charset="utf-8" src="common/world-record.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>파워 애로우 챌린지</title>
@@ -14,7 +14,7 @@
 <meta property="og:url" content="https://cornsilktea.github.io/29.power-arrow.html">
 <meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
 <meta name="twitter:card" content="summary">
-<link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="common/theme.css">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body { width: 100%; height: 100%; overflow: hidden; background: var(--sg-bg); font-family: var(--sg-font); color: var(--sg-ink); }
@@ -286,7 +286,7 @@ const SFX = {
 };
 
 const IMG = {};
-[["far", "29.bg-far.jpg"], ["mid", "29.bg-mid.jpg"], ["near", "29.bg-near.jpg"], ["arrow", "29.arrow.png"], ["target", "29.target.png"]].forEach(([k, src]) => {
+[["far", "img/powerarrow/29.bg-far.jpg"], ["mid", "img/powerarrow/29.bg-mid.jpg"], ["near", "img/powerarrow/29.bg-near.jpg"], ["arrow", "img/powerarrow/29.arrow.png"], ["target", "img/powerarrow/29.target.png"]].forEach(([k, src]) => {
   const im = new Image(); im.onload = () => { IMG[k] = im; if (k === "mid" || k === "near") LAYER[k] = null; }; im.src = src;
 });
 const ARROW_IMG = { w: 480, h: 809, tipX: 240, tipY: 55 };
