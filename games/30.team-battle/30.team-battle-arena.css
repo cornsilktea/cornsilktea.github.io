@@ -222,6 +222,8 @@
   #btnSpecFollow[hidden] { display: none; }
   #btnSpecFollow.on { background: #D97B4F; border-color: #D97B4F; color: #fff; }
   #killFeed { position: absolute; top: 56px; right: 8px; display: grid; grid-template-columns: max-content; row-gap: 6px; justify-items: end; pointer-events: none; }
+  #scrGame.spec #killFeed { right: auto; left: calc(100% - 348px); justify-items: start; }
+  @media (max-width: 900px) { #scrGame.spec #killFeed { left: calc(100% - 158px); } }
   #endBanner { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 6; padding: 14px 72px 18px; border: 4px solid transparent; border-radius: 14px; background: rgba(0,0,0,.62); font-size: 84px; font-weight: 800; line-height: 1.15; white-space: nowrap; pointer-events: none; animation: endBannerIn .25s ease-out; }
   #endBanner[hidden] { display: none; }
   #scrGame.spec #endBanner { font-size: 64px; padding: 12px 48px 16px; }
@@ -377,6 +379,7 @@
   .endBtns button { flex: 1 1 0; height: 56px; font-size: 19px; font-weight: 800; border-radius: 8px; border: 2px solid rgba(255,255,255,.3); background: rgba(255,255,255,.06); color: #F4F1E8; }
   .endBtns .primary { background: #3E8E5E; border-color: #3E8E5E; color: #fff; }
 
+  .mvpBox + .endBtns { margin-top: 16px; }
   .mvpBox { margin-top: 16px; padding: 12px 10px; border-radius: 8px; border: 2px solid rgba(242,208,107,.5); background: rgba(242,208,107,.1); }
   .mvpBox .mvpLab { font-size: 14px; font-weight: 800; color: #F2D06B; letter-spacing: .08em; }
   .mvpBox .mvpName { font-size: 24px; font-weight: 800; margin-top: 2px; }
