@@ -2672,6 +2672,34 @@ class ResultCollector {
     } finally { scr.hidden = saved.hidden; scr.className = saved.cls; feed.innerHTML = saved.feed; specR.hidden = saved.specHidden; }
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "화살표·피해자·연속 킬 세로줄 정렬, 선수 4줄·높이 절반 이하, 관전은 카드 위까지");
   });
+  run(FLOWG, "관전 자동 추적: 버튼이 관전 때만 보이고 '자동 추적'↔'전체 화면'으로 바뀌며, 살아 있는 선수 범위만큼 가까워지되 전체 화면보다 멀어지지 않는가", function (done) {
+    var bad = [], F = api.SPEC_FOLLOW, R = api.CAMERA_RIG, btn = document.getElementById("btnSpecFollow"), view = R.view;
+    var saved = { full: view.fullDist, xMax: view.specXMax, on: F.on, bounds: F.aliveBounds, hidden: btn.hidden };
+    try {
+      view.specXMax = 0.6;
+      view.fullDist = R.fitDist([[0, 0, 1350], [900, 0, 1350], [0, 110, 0], [900, 110, 0]], 450, 675, view.pitchSpec, 0.6);
+      F.on = false; F.paint();
+      if (btn.textContent !== "자동 추적") bad.push("처음 글자 " + btn.textContent);
+      F.sync(true); if (btn.hidden) bad.push("관전인데 버튼이 숨겨짐");
+      F.toggle(); if (!F.on || btn.textContent !== "전체 화면") bad.push("켠 뒤 글자 " + btn.textContent);
+      F.aliveBounds = function () { return { x0: 300, x1: 420, z0: 600, z1: 760 }; };
+      var near = F.frame();
+      F.aliveBounds = function () { return { x0: 0, x1: 900, z0: 0, z1: 1350 }; };
+      var wide = F.frame();
+      F.aliveBounds = function () { return null; };
+      var none = F.frame();
+      if (!(near.dist < wide.dist)) bad.push("가까이 모인 쪽이 더 가깝지 않음 " + near.dist + " / " + wide.dist);
+      if (near.dist < view.fullDist * F.constructor.MIN_DIST_RATIO - 0.01) bad.push("최소 거리보다 가까움");
+      if (wide.dist > view.fullDist + 0.01) bad.push("전체 화면보다 멀어짐");
+      if (Math.abs(near.lx - 360) > 1 || near.lz < 600 || near.lz > 760) bad.push("중심이 선수 범위 밖 " + near.lx + "," + near.lz);
+      if (none.dist !== view.fullDist) bad.push("살아 있는 선수가 없으면 전체 화면이어야 함");
+      F.toggle(); F.aliveBounds = function () { return { x0: 300, x1: 420, z0: 600, z1: 760 }; };
+      if (F.frame().dist !== view.fullDist) bad.push("전체 화면 상태인데 추적함");
+      F.toggle(); F.sync(false);
+      if (F.on || !btn.hidden) bad.push("선수 화면으로 가면 꺼지고 숨겨져야 함");
+    } finally { view.fullDist = saved.full; view.specXMax = saved.xMax; F.on = saved.on; F.aliveBounds = saved.bounds; F.paint(); btn.hidden = saved.hidden; }
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "버튼 글자·표시, 범위에 맞춘 거리, 최소·최대 한계, 선수 없을 때 전체 화면");
+  });
   run(FLOWG, "경기 종료 2초 배너: 선수는 승리(파랑)·패배(빨강), 관전자는 'OO팀 승리!'(흰 글자·팀색 테두리), 무승부, 2초가 지나면 꺼지는가", function (done) {
     var bad = [], B = api.END_BANNER;
     var win = B.wordsFor("blue", "blue"), lose = B.wordsFor("blue", "red"), blueSpec = B.wordsFor("blue", null), redSpec = B.wordsFor("red", null), draw = B.wordsFor("draw", "blue");
