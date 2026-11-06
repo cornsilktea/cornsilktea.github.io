@@ -555,6 +555,7 @@
 
 <script charset="utf-8" src="character-kit.js?v=20261011"></script>
 <script charset="utf-8" src="character-maker.js?v=20261026a"></script>
+<script charset="utf-8" src="room-drop-recovery.js?v=20261106b"></script>
 <script charset="utf-8" src="match-kit.js?v=20261103a"></script>
 <script charset="utf-8" src="account-match-kit.js?v=20261103e"></script>
 <script charset="utf-8" src="24.turbo-lap-stats.js?v=20261029c"></script>
@@ -4576,7 +4577,7 @@ const SIDES = ["left", "right"];
 const SIDE_NAME = { left: "왼쪽", right: "오른쪽", spec: "관전" };
 const SIDE_COLOR = { left: "#24402F", right: "#D97B4F" };
 const BT = {
-  db: null, ref: null, code: "", myId: "p" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4),
+  db: null, ref: null, code: "", resume: new RoomResumeStore("turbo"), myId: new RoomResumeStore("turbo").identity(),
   players: {}, status: "", host: null, hostLoaded: false, course: "seoul", startAt: 0, result: null,
   subs: [], leaving: false, spec: false, match: null, ents: {}, raw: {}, sent: "", lastNet: 0, forceNet: false, statusSent: "",
   viewId: null, viewKey: "", serverOffset: 0, hitSeq: 0, rankRows: {}, rankNums: 0, lobbyCarSig: "", queued: false
@@ -4741,8 +4742,9 @@ function enterRoom(code) {
   roomPresence.arm(ref);
   quitGrace.reset();
   const pref = ref.child("players");
-  sub(pref, "child_added", s => { BT.players[s.key] = s.val(); playersChanged(); });
-  sub(pref, "child_changed", s => { BT.players[s.key] = s.val(); playersChanged(); });
+  BT.resume.keepFresh(() => BT.ref ? { code: BT.code, myId: BT.myId, record: BT.players[BT.myId] || null } : null);
+  sub(pref, "child_added", s => { BT.players[s.key] = s.val(); if (s.key === BT.myId) BT.resume.save(BT.code, BT.myId, s.val()); playersChanged(); });
+  sub(pref, "child_changed", s => { BT.players[s.key] = s.val(); if (s.key === BT.myId) BT.resume.save(BT.code, BT.myId, s.val()); playersChanged(); });
   sub(pref, "child_removed", s => {
     delete BT.players[s.key]; removeEnt(s.key); delete BT.raw[s.key];
     if (s.key === BT.myId && !BT.leaving) { roomPresence.rejoin(ref, s.val()); return; }
@@ -4794,7 +4796,7 @@ function leaveRoom() {
   if (!BT.ref) return;
   const ref = BT.ref, me = BT.myId;
   roomPresence.sayBye(ref);
-  BT.leaving = true; unsubAll();
+  BT.leaving = true; unsubAll(); BT.resume.clear();
   roomPresence.disarm(ref);
   ref.child("st/" + me).remove().catch(() => {}); ref.child("hit/" + me).remove().catch(() => {});
   ref.child("players/" + me).remove().then(() => ref.child("players").once("value")).then(s => {
@@ -4809,7 +4811,7 @@ function leaveRoom() {
 }
 function exitRoom(msg) {
   if (BT.ref) {
-    BT.leaving = true; unsubAll();
+    BT.leaving = true; unsubAll(); BT.resume.clear();
     roomPresence.disarm(BT.ref);
   }
   closeRoomLocal(msg);
@@ -4822,7 +4824,7 @@ function closeRoomLocal(msg) {
   scene.remove(car); car = makeCar(garage.key); scene.add(car); resetCar(); updateCar(0);
   refreshNick(); turboRandom.roomClosed(msg);
 }
-window.addEventListener("pagehide", () => { if (BT.ref) { try { BT.ref.child("players/" + BT.myId).remove(); BT.ref.child("st/" + BT.myId).remove(); } catch (e) {} } });
+window.addEventListener("pagehide", () => { if (BT.ref) { BT.resume.save(BT.code, BT.myId, BT.players[BT.myId] || null); try { BT.ref.child("players/" + BT.myId).remove(); BT.ref.child("st/" + BT.myId).remove(); } catch (e) {} } });
 
 function playersChanged() {
   if (BT.queued) return;
@@ -5837,6 +5839,17 @@ $("viewBtns").onclick = e => {
 window.TL = { keys, P, CFG, camera, scene, renderer, tick, makeCar, CAR_MODELS, BT, get S() { return S; }, setTrack: k => { course = k; courseShelf.show(TRACKS[k]); resetCar(); } };
 COURSES.forEach(k => { if (WRS[k]) WRS[k].onChange(renderRecords); });
 courseShelf.show(TRACKS[course]); resetCar(); updateCar(0); showMenu();
+class TurboResumeStarter {
+  static run() {
+    if (!BT.resume.read()) return;
+    bMsg("이어서 들어가는 중…");
+    connectDb()
+      .then(() => BT.resume.rejoin(BT.db, BATTLE.root))
+      .then(code => { bMsg(""); if (code) enterRoom(code); else BT.resume.clear(); })
+      .catch(() => { bMsg(""); BT.resume.clear(); });
+  }
+}
+TurboResumeStarter.run();
 requestAnimationFrame(frame);
 })();
 </script>

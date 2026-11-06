@@ -244,6 +244,7 @@ class CollectionFlow {
         this.services = services;
         this.current = null;
         this.director = null;
+        this.resume = new RoomResumeStore("minigames");
         this.random = new CollectionRandomMatch(services.backend.database, services.backend.clock, services.localId, {
             member: () => { const record = this.myRecord(0, false); return { nick: record.nick, joinedAt: record.joinedAt, look: record.look }; },
             createMatchedRoom: (matchId) => services.directory.create(services.localId, this.myRecord(0, false), false, (code) => this.random.codeTaken(code), { matchId }),
@@ -285,8 +286,32 @@ class CollectionFlow {
         services.resultView.onLeave(() => this.leaveRoom());
         services.resultView.onToLobby(() => { if (this.director)
             this.director.backToLobby(); });
-        services.env.onPageHide(() => { if (this.current)
+        services.env.onPageHide(() => { this.saveResume(); if (this.current)
             this.current.removeMineOnUnload(); });
+    }
+    saveResume() {
+        const session = this.current;
+        if (!session || session.practice || !session.hasPlayer(session.myId))
+            return;
+        this.resume.save(session.code, session.myId, session.player(session.myId));
+    }
+    async resumeAfterReload() {
+        const database = this.services.backend.database;
+        if (!database || !this.resume.read())
+            return;
+        this.services.startView.showMessage("이어서 들어가는 중…");
+        try {
+            const code = await this.resume.rejoin(database, CollectionRules.ROOM_ROOT);
+            this.services.startView.showMessage("");
+            if (code)
+                this.enterRoom(code, false);
+            else
+                this.resume.clear();
+        }
+        catch (error) {
+            this.services.startView.showMessage("");
+            this.resume.clear();
+        }
     }
     session() {
         return this.current;
@@ -317,6 +342,7 @@ class CollectionFlow {
         session.pushProfile(this.services.profile.nick || session.player(session.myId).nick, this.services.profile.look);
     }
     playersChanged() {
+        this.saveResume();
         this.services.lobbyPhase.refresh();
         const session = this.current;
         if (session && this.random.flow)
@@ -392,6 +418,7 @@ class CollectionFlow {
         return true;
     }
     leaveRoomQuietly() {
+        this.resume.clear();
         if (this.current)
             this.current.leave();
         this.current = null;
@@ -454,6 +481,7 @@ class CollectionFlow {
         this.current = session;
         this.director = new CollectionDirector(session, this.services.catalog, this.services.random);
         session.connect();
+        this.resume.keepFresh(() => { this.saveResume(); return null; });
         this.services.lobbyView.showCode(code);
         const roomCodeTag = document.getElementById("hudRoomCode");
         if (roomCodeTag)
@@ -468,11 +496,13 @@ class CollectionFlow {
             this.random.flow.backToParty("");
             return;
         }
+        this.resume.clear();
         if (this.current)
             this.current.leave();
         this.returnToStart("");
     }
     exitToStart(message) {
+        this.resume.clear();
         if (this.current)
             this.current.silentClose();
         if (this.random.inParty() && this.random.flow) {

@@ -2688,7 +2688,8 @@ class CastleSpyGame {
   private readonly lobbyView = new LobbyView();
   private readonly endView = new EndView();
   private readonly editor: ProfileEditor;
-  private readonly myId = "p" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+  private readonly resume = new RoomResumeStore("castlespy");
+  private readonly myId = this.resume.identity();
   private session: RoomSession | null = null;
   private match: Match | null = null;
   private assetsReady = false;
@@ -2722,7 +2723,27 @@ class CastleSpyGame {
     this.loadAssets();
     requestAnimationFrame(this.loop);
     window.setInterval(() => { if (document.hidden) this.step(performance.now()); }, 250);
-    window.addEventListener("pagehide", () => { if (this.session) this.session.removeMineOnUnload(); });
+    window.addEventListener("pagehide", () => { this.saveResume(); if (this.session) this.session.removeMineOnUnload(); });
+  }
+
+  private saveResume(): void {
+    const session = this.session;
+    if (!session) return;
+    this.resume.save(session.code, this.myId, (session.players.get(this.myId) as unknown as Record<string, unknown>) || null);
+  }
+
+  private async resumeAfterReload(): Promise<void> {
+    if (!this.backend.database || !this.resume.read()) return;
+    this.showStartMessage("이어서 들어가는 중…");
+    try {
+      const code = await this.resume.rejoin(this.backend.database as FirebaseDatabase, CastleSpyConfig.ROOT);
+      this.showStartMessage("");
+      if (code) this.enterRoom(code);
+      else this.resume.clear();
+    } catch (error) {
+      this.showStartMessage("");
+      this.resume.clear();
+    }
   }
 
   private async loadAssets(): Promise<void> {
@@ -2737,6 +2758,7 @@ class CastleSpyGame {
       this.editor.setActive(true);
       this.editor.onChange(() => this.pushProfile());
       this.updateStartButtons();
+      this.resumeAfterReload();
     } catch (error) {
       Dom.setText(Dom.byId("loadNote"), "캐릭터를 불러오지 못했어요. 새로고침해 주세요.");
     }
@@ -2815,6 +2837,7 @@ class CastleSpyGame {
     session.onRemoteState = (id, state) => { if (this.match) this.match.receiveRemote(id, state); };
     session.onClosed = (message) => this.exitToStart(message);
     session.connect();
+    this.resume.keepFresh(() => this.session ? { code: this.session.code, myId: this.myId, record: (this.session.players.get(this.myId) as unknown as Record<string, unknown>) || null } : null);
     this.showLobby();
   }
 
@@ -2835,6 +2858,7 @@ class CastleSpyGame {
   private onSessionChange(kind: ChangeKind): void {
     const session = this.session;
     if (!session) return;
+    if (kind === "players") this.saveResume();
     if (this.screens.current === "lobby" && (kind === "players" || kind === "host" || kind === "map" || kind === "status")) this.lobbyView.render(session);
     if (kind === "status" || kind === "match" || kind === "end") this.syncPhase();
     if (this.match) this.match.applyChange(kind);
@@ -2913,6 +2937,7 @@ class CastleSpyGame {
   }
 
   private leaveRoom(): void {
+    this.resume.clear();
     if (this.session) this.session.leave();
     this.session = null;
     this.disposeMatch();
@@ -2920,6 +2945,7 @@ class CastleSpyGame {
   }
 
   private exitToStart(message: string): void {
+    this.resume.clear();
     if (this.session) this.session.silentClose();
     this.session = null;
     this.disposeMatch();

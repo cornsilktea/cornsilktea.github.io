@@ -315,6 +315,7 @@ interface CollectionFlowServices {
 class CollectionFlow implements CollectionListener, HostGate, CollectionSessionAccess, ParticipantDirectory {
   private current: CollectionSession | null = null;
   private director: CollectionDirector | null = null;
+  private readonly resume = new RoomResumeStore("minigames");
   private readonly statusHandlers: Readonly<Record<CollectionStatus, () => void>>;
   readonly random: CollectionRandomMatch;
   private readonly rates: CollectionVersusRates;
@@ -357,7 +358,28 @@ class CollectionFlow implements CollectionListener, HostGate, CollectionSessionA
     services.lobbyView.onLeave(() => this.leaveRoom());
     services.resultView.onLeave(() => this.leaveRoom());
     services.resultView.onToLobby(() => { if (this.director) this.director.backToLobby(); });
-    services.env.onPageHide(() => { if (this.current) this.current.removeMineOnUnload(); });
+    services.env.onPageHide(() => { this.saveResume(); if (this.current) this.current.removeMineOnUnload(); });
+  }
+
+  private saveResume(): void {
+    const session = this.current;
+    if (!session || session.practice || !session.hasPlayer(session.myId)) return;
+    this.resume.save(session.code, session.myId, session.player(session.myId) as unknown as Record<string, unknown>);
+  }
+
+  async resumeAfterReload(): Promise<void> {
+    const database = this.services.backend.database;
+    if (!database || !this.resume.read()) return;
+    this.services.startView.showMessage("이어서 들어가는 중…");
+    try {
+      const code = await this.resume.rejoin(database, CollectionRules.ROOM_ROOT);
+      this.services.startView.showMessage("");
+      if (code) this.enterRoom(code, false);
+      else this.resume.clear();
+    } catch (error) {
+      this.services.startView.showMessage("");
+      this.resume.clear();
+    }
   }
 
   session(): CollectionSession | null {
@@ -391,6 +413,7 @@ class CollectionFlow implements CollectionListener, HostGate, CollectionSessionA
   }
 
   playersChanged(): void {
+    this.saveResume();
     this.services.lobbyPhase.refresh();
     const session = this.current;
     if (session && this.random.flow) this.random.flow.roomChanged(session.playingHumanCount(), session.isHost(), session.status === "lobby");
@@ -467,6 +490,7 @@ class CollectionFlow implements CollectionListener, HostGate, CollectionSessionA
   }
 
   private leaveRoomQuietly(): void {
+    this.resume.clear();
     if (this.current) this.current.leave();
     this.current = null;
     this.director = null;
@@ -523,6 +547,7 @@ class CollectionFlow implements CollectionListener, HostGate, CollectionSessionA
     this.current = session;
     this.director = new CollectionDirector(session, this.services.catalog, this.services.random);
     session.connect();
+    this.resume.keepFresh(() => { this.saveResume(); return null; });
     this.services.lobbyView.showCode(code);
     const roomCodeTag = document.getElementById("hudRoomCode");
     if (roomCodeTag) roomCodeTag.textContent = practice ? "" : "방 코드 " + code;
@@ -536,11 +561,13 @@ class CollectionFlow implements CollectionListener, HostGate, CollectionSessionA
       this.random.flow.backToParty("");
       return;
     }
+    this.resume.clear();
     if (this.current) this.current.leave();
     this.returnToStart("");
   }
 
   private exitToStart(message: string): void {
+    this.resume.clear();
     if (this.current) this.current.silentClose();
     if (this.random.inParty() && this.random.flow) {
       this.current = null;

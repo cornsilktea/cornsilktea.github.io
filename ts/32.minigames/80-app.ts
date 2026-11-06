@@ -11,7 +11,7 @@ class MiniGamesApp {
   private readonly backend = new RoomBackend(this.env);
   private readonly randomSource = new MathRandomSource();
   private readonly tokens = new TokenSource(new RandomRange(this.randomSource));
-  private readonly localId = "p" + this.tokens.token(8) + new SystemClock().now().toString(36).slice(-4);
+  private readonly localId = new RoomResumeStore("minigames").identity();
   private readonly assets: CharacterAssets;
   private readonly factory: CharacterModelFactory;
   private readonly catalog: GameCatalog;
@@ -99,6 +99,7 @@ class MiniGamesApp {
       this.startView.showLoadNote("");
       this.profilePanel.markReady();
       this.updateStartButtons();
+      this.flow.resumeAfterReload();
     } catch (error) {
       this.startView.showLoadNote("캐릭터를 불러오지 못했어요. 새로고침해 주세요.");
     }

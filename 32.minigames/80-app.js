@@ -8,7 +8,7 @@ class MiniGamesApp {
         this.backend = new RoomBackend(this.env);
         this.randomSource = new MathRandomSource();
         this.tokens = new TokenSource(new RandomRange(this.randomSource));
-        this.localId = "p" + this.tokens.token(8) + new SystemClock().now().toString(36).slice(-4);
+        this.localId = new RoomResumeStore("minigames").identity();
         this.startView = new StartView(this.page);
         this.practiceEntry = new PracticeEntryView(this.page);
         this.randomEntry = new RandomEntryView(this.page);
@@ -88,6 +88,7 @@ class MiniGamesApp {
             this.startView.showLoadNote("");
             this.profilePanel.markReady();
             this.updateStartButtons();
+            this.flow.resumeAfterReload();
         }
         catch (error) {
             this.startView.showLoadNote("캐릭터를 불러오지 못했어요. 새로고침해 주세요.");
