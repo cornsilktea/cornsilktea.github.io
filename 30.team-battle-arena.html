@@ -293,6 +293,7 @@
 <script charset="utf-8" src="account-match-kit.js?v=20261103e"></script>
 <script charset="utf-8" src="account-stats.js?v=20261104c"></script>
 <script charset="utf-8" src="30.team-battle-versus.js?v=20261104a"></script>
+<script charset="utf-8" src="30.team-battle-fx.js?v=20261106a"></script>
 <script charset="utf-8" src="patch-notes.js?v=20261029b"></script>
 <script type="module">
 import * as THREE from "three";
@@ -387,6 +388,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     gargantua;
     galeView;
     meteorFall;
+    arenaFx;
     impactBlasts;
     hitmanSlashView;
     sniperShots;
@@ -2382,6 +2384,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     cannotAttack(E, t) { return false; }
     get keepsLowHp() { return false; }
     get meleeColor() { return Object.prototype.hasOwnProperty.call(this.constructor, "MELEE") ? this.constructor.MELEE.color : undefined; }
+    get meleeTrail() { return 30; }
     get meleeSpark() { return Object.prototype.hasOwnProperty.call(this.constructor, "MELEE") ? this.constructor.MELEE.spark : undefined; }
     cast(E, ang, reach, t) {}
     overrideBasic(E, ang, reach, t) { return false; }
@@ -2486,6 +2489,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class WarriorType extends ArcMeleeType {
+    get meleeTrail() { return 50; }
     static MELEE = { color: 0xFF9A3C, spark: "#FF9A3C" };
     static MODEL = { file: "Barbarian", right: "axe_1handed" };
     static ULT = {
@@ -2557,6 +2561,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class KnightType extends ArcMeleeType {
+    get meleeTrail() { return 36; }
     static MELEE = { color: 0xFFFFFF, spark: "#FFFFFF" };
     static MODEL = { file: "Knight", right: "sword_1handed", left: "shield_badge_color" };
     static ULT = {
@@ -2667,6 +2672,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class RogueType extends CharacterType {
+    get meleeTrail() { return 22; }
     static MELEE = { color: 0xC9D6E6, spark: "#DCE3EC" };
     static MODEL = { file: "Rogue_Hooded", right: "dagger", left: "dagger",
                recolor: [[1, 0, 1, "#3B2A55", "#150D22"], [1, 1, 1, "#241A38", "#0C0814"], [2, 1, 1, "#241A38", "#0C0814"], [2, 2, 1, "#6A3FA0", "#2A1250"]] };
@@ -2855,6 +2861,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class LancerType extends CharacterType {
+    get meleeTrail() { return 22; }
     static MELEE = { color: 0xFFD27A, spark: "#FFD27A" };
     static MODEL = { file: "Barbarian", portraitPlant: true, right: "spear_A", rightScale: 1.35, hide: ["Barbarian_BearHat"], wear: { from: "knight", part: "Knight_Helmet" },
                recolor: [[0, 1, 1, "#8A5A38", "#4A2C1A"], [0, 7, 1, "#5B7FB0", "#2E4468"]] };
@@ -3144,6 +3151,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class GuardianType extends ArcMeleeType {
+    get meleeTrail() { return 42; }
     static MELEE = { color: 0x8FD9A8, spark: "#8FD9A8" };
     static MODEL = { file: "Knight", portraitPlant: true, right: "halberd", rightScale: 1.2, rightTilt: Math.PI / 2, left: "Skeleton_Shield_Large_A", leftScale: 0.8, leftRot: [-0.266, 0, -1.588],
                 recolor: [[0, 3, 1, "#1F4A2E", "#0E2417"], [1, 0, 1, "#1F4A2E", "#0E2417"], [2, 2, 1, "#1F4A2E", "#0E2417"], [1, 1, 1, "#E4EAEF", "#9AA4AC"], [1, 2, 2, "#C7D1D9", "#6E7880"]] };
@@ -3512,6 +3520,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class GiantType extends ArcMeleeType {
+    get meleeTrail() { return 52; }
     static FORM_MODELS = { giantGolem: { file: "Skeleton_Golem", right: "Skeleton_Mace_Large", scale: 0.85 } };
     static MODEL = { file: "Barbarian_Large", right: "Skeleton_Mace_Large", scale: 0.85, portraitFit: 0.94, portraitShiftX: 0.12 };
     static ULT = {
@@ -9441,19 +9450,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return g;
     }
     dropProjVis(id) { var services = this.services; var g = services.effectView.projectiles[id]; if (!g) return; services.stage.scene.remove(g); services.effectView.projPool.give(g); delete services.effectView.projectiles[id]; }
-    makeStabVis(d) { var services = this.services;
-      var g = new THREE.Group();
-      var coreM = services.fxMats.acquire("basic", { color: 0xFF2A2A, transparent: true, opacity: 0.95, depthTest: false, depthWrite: false });
-      var glowM = services.fxMats.acquire("basic", { color: 0xFF3B3B, transparent: true, opacity: 0.35, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending });
-      var core = new THREE.Mesh(services.geo.stabLine, coreM), glow = new THREE.Mesh(services.geo.stabLine, glowM);
-      core.scale.set(1, 3, 3); glow.scale.set(1, 9, 9);
-      core.renderOrder = glow.renderOrder = 5;
-      g.add(glow); g.add(core);
-      g.visible = false;
-      g.userData = { fill: glowM, edge: coreM, stab: true, core: core, glow: glow };
-      services.stage.scene.add(g);
-      return g;
-    }
+    makeStabVis(d) { return this.services.arenaFx.stabs.start().root; }
     placeStabLine(g, d, f) { var services = this.services;
       var A = services.fighterView.fighters[d.owner], B = services.fighterView.fighters[d.tgt] || services.fighterView.minions[d.tgt];
       g.visible = !!(d.tgt && A && B && A.root.visible && B.root.visible);
@@ -9462,15 +9459,15 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.effectView.stabTo.set(B.root.position.x, EffectView.STAB_CHEST_Y, B.root.position.z);
       services.effectView.stabDir.subVectors(services.effectView.stabTo, services.effectView.stabFrom);
       var len = services.effectView.stabDir.length(); if (len < 1) { g.visible = false; return; }
-      g.position.copy(services.effectView.stabFrom).addScaledVector(services.effectView.stabDir, 0.5);
+      g.position.copy(services.effectView.stabFrom);
       g.quaternion.setFromUnitVectors(services.effectView.stabAxis, services.effectView.stabDir.divideScalar(len));
-      g.userData.core.scale.x = g.userData.glow.scale.x = len;
-      g.userData.edge.opacity = 0.95 * (1 - f * f);
-      g.userData.fill.opacity = 0.35 * (1 - f);
+      services.arenaFx.stabs.paint(g.userData.fxVis, len, f);
     }
     makeMeleeVis(d) { var services = this.services;
       if (d.stab) return services.effectView.makeStabVis(d);
-      var g = new THREE.Group(), who = services.session.players[d.owner] ? services.session.players[d.owner].characterType : "", col = d.zap ? Palette.ZAP_GLOW : d.u ? 0xFF6A3D : (services.charTypes.of(who).meleeColor || 0xFFFFFF);
+      var who = services.session.players[d.owner] ? services.session.players[d.owner].characterType : "";
+      if (!d.zap && !services.charTypes.of(who).hidesBasicEdge && !(d.len && services.charTypes.waveOf(who))) return this.makeBladeVis(d, services.charTypes.of(who));
+      var g = new THREE.Group(), col = d.zap ? Palette.ZAP_GLOW : d.u ? 0xFF6A3D : (services.charTypes.of(who).meleeColor || 0xFFFFFF);
       var fillM = services.fxMats.acquire("basic", { color: col, transparent: true, opacity: 0.2, depthWrite: false });
       var darkWave = services.charTypes.of(who).hasDarkWave && !d.u;
       if (darkWave) fillM.opacity = 0.35;
@@ -9499,6 +9496,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.stage.scene.add(g);
       return g;
     }
+    makeBladeVis(d, type) { var fx = this.services.arenaFx, look = { blade: d.u ? 0xFF6A3D : (type.meleeColor || 0xFFFFFF), trail: d.u ? 40 : type.meleeTrail }, seed = (d.createdAt || 0) % 997 / 97;
+      if (d.len) return fx.thrustBlades.thrust(d.x, d.y, d.angle, d.len + ArenaSize.BODY_R, d.width, look, seed).root;
+      return fx.arcBlades.swing(d.x, d.y, d.angle, d.radius + ArenaSize.BODY_R, d.arc || Math.PI * 2, look, seed).root;
+    }
     makeLungeVis(d) { var services = this.services;
       var m = services.arenaView.flatMesh(services.geo.strip, services.fxMats.acquire("basic", MaterialLibrary.LUNGE));
       m.scale.set(d.len + ArenaSize.BODY_R, d.width, 1);
@@ -9508,7 +9509,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return g;
     }
     dropLungeVis(l) { var services = this.services; if (!l.vis) return; services.stage.scene.remove(l.vis); services.fxMats.release(l.vis.userData.mat); l.vis = null; }
-    releaseMeleeVis(g) { var services = this.services; services.stage.scene.remove(g); services.fxMats.release(g.userData.fill); services.fxMats.release(g.userData.edge); }
+    releaseMeleeVis(g) { var services = this.services; if (g.userData.fxVis) { g.userData.fxPool.give(g.userData.fxVis); return; } services.stage.scene.remove(g); services.fxMats.release(g.userData.fill); services.fxMats.release(g.userData.edge); }
     dropMelee(k) { var services = this.services; var g = services.effectView.melees[k]; if (!g) return; services.effectView.releaseMeleeVis(g); delete services.effectView.melees[k]; }
     stormGrain() {
       if (this.stormGrainTex) return this.stormGrainTex;
@@ -11528,6 +11529,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         if (!g) g = services.effectView.melees[k] = services.effectView.makeMeleeVis(m.d);
         var f = age / life;
         if (g.userData.stab) { services.effectView.placeStabLine(g, m.d, f); return; }
+        if (g.userData.fxVis) { g.userData.fxPool.paint(g.userData.fxVis, f); return; }
         g.userData.fill.opacity = 0.2 * (1 - f);
         g.userData.edge.opacity = 0.9 * (1 - (wave ? f * f : f));
         if (wave) {
@@ -12339,7 +12341,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class PerfProbe {
-    static BUILD = "lag16";
+    static BUILD = "lag17";
     static PATH = "perfDiag/teambattle/";
     static RTT_KEEP = 50;
     static RECORDS = !Environment.SILENT_RUN;
@@ -12671,9 +12673,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         function () { return services.fxView.fxMesh({ k: "bolt", x: P, y: P }); },
         function () { return services.fxView.fxMesh({ k: "chain", pts: [[P, P], [P + 60, P]], over: 0 }); },
         function () { return services.fxView.fxMesh({ k: "bladeZone", x: P, y: P, r: 60 }); },
-        function () { return services.effectView.makeMeleeVis({ x: P, y: P, angle: 0, radius: 60, arc: 1.5, owner: "" }); },
-        function () { return services.effectView.makeMeleeVis({ x: P, y: P, angle: 0, len: 120, width: 40, owner: "", u: 1 }); },
-        function () { var g = services.effectView.makeStabVis({}); g.visible = true; return g; },
+        function () { return services.effectView.makeMeleeVis({ x: P, y: P, angle: 0, radius: 60, arc: 1.5, owner: "", zap: 1 }); },
+        function () { return services.effectView.makeMeleeVis({ x: P, y: P, angle: 0, len: 120, width: 40, owner: "", u: 1, zap: 1 }); },
         function () { return services.effectView.makeLungeVis({ x: P, y: P, angle: 0, len: 120, width: 40 }); },
         function () { return services.meteorFall.warmSample(); },
         function () { return services.impactBlasts.warmSample(); },
@@ -12707,6 +12708,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         } catch (err) { return null; }
       }).filter(Boolean);
     }
+    sampleArenaFx() { var services = this.services, P = ShaderWarmup.PROBE_SPOT;
+      return services.arenaFx.warmSamples().map(function (root) { root.position.set(P, root.position.y, P); services.stage.scene.add(root); return root; });
+    }
     sharedGeometryMakers() { var services = this.services, P = ShaderWarmup.PROBE_SPOT;
       return Object.keys(services.geo).filter(function (k) { return services.geo[k] && services.geo[k].isBufferGeometry; }).map(function (k) {
         return function () { var m = new THREE.Mesh(services.geo[k], services.models.basicMat("warmGeometry", 0xFFFFFF, 1)); m.position.y = P; return m; };
@@ -12715,7 +12719,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     warmEffects() { var services = this.services;
       if (this.effectsWarmed || !services.cameraRig.renderer) return;
       this.effectsWarmed = true;
-      var keep = this.kept = this.sampleViews().concat(this.sampleShots());
+      var keep = this.kept = this.sampleViews().concat(this.sampleShots(), this.sampleArenaFx());
       var cleanUp = function () { keep.forEach(function (obj) { if (obj.parent) obj.parent.remove(obj); }); };
       var renderer = services.cameraRig.renderer;
       if (renderer.compileAsync) renderer.compileAsync(services.stage.scene, services.stage.camera).then(cleanUp, cleanUp);
@@ -12771,6 +12775,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var mages = this.castersByTeam("mage"), smiths = this.castersByTeam("blacksmith"), giants = this.castersByTeam("giant"), giantCount = giants.blue + giants.red, mageCount = mages.blue + mages.red;
       var hitmen = this.castersByTeam("hitman"), hitmanCount = hitmen.blue + hitmen.red;
       var snipers = this.castersByTeam("sniper"), sniperCount = snipers.blue + snipers.red, guardians = this.castersByTeam("guardian"), guardianCount = guardians.blue + guardians.red;
+      services.arenaFx.prefillForMatch();
       services.hitmanSlashView.prefill(hitmanCount * 3);
       services.sniperShots.prefill(sniperCount * 3);
       services.meteorFall.prefill(mageCount);
@@ -12784,7 +12789,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (services.models.kit.propsReady) services.groves.prefill(druids.blue + druids.red);
     }
     warmObjects() { var services = this.services;
-      return (this.kept || []).concat(services.fighterView.spareMinionRoots(), services.turrets.spareRoots(), services.groves.spare, services.revGraceView.spareBeamRoots(), services.meteorFall.spareRoots(), services.galeView.spareRoots(), services.impactBlasts.spareRoots(), services.hitmanSlashView.spareRoots(), services.sniperShots.spareRoots());
+      return (this.kept || []).concat(services.fighterView.spareMinionRoots(), services.turrets.spareRoots(), services.groves.spare, services.revGraceView.spareBeamRoots(), services.meteorFall.spareRoots(), services.galeView.spareRoots(), services.impactBlasts.spareRoots(), services.hitmanSlashView.spareRoots(), services.sniperShots.spareRoots(), services.arenaFx.spareRoots(ShaderWarmup.PROBE_SPOT));
     }
   }
   class FramePhaseMeter {
@@ -13352,6 +13357,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.gargantua = new GargantuaView(services);
       services.galeView = new GolemGaleView(services);
       services.meteorFall = new MeteorFallView(services);
+      services.arenaFx = new ArenaFxViews({ THREE: THREE, noise: function () { return WaterNoise.texture(); }, scene: function () { return services.stage.scene; }, pixelScale: function () { return WaterNoise.pixelScale(services); }, isLite: function () { return services.cameraRig.pix < Environment.PIX_START; } });
       services.impactBlasts = new ImpactBlastView(services);
       services.hitmanSlashView = new HitmanSlashView(services);
       services.sniperShots = new SniperShotView(services);
