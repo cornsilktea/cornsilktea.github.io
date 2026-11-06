@@ -2580,7 +2580,7 @@ class ResultCollector {
   function filledMatch() {
     var m = api.MATCH, f = api.FIELD, mark = { marker: true };
     m.game = { mark: 1 }; m.me = mark; m.bots = { a: mark }; m.remotes = { b: mark }; m.remoteShots = { c: 1 }; m.shots = [mark]; m.melee = { d: 1 }; m.fx = [mark];
-    m.handled = { e: 1 }; m.ccPending = { f: 1 }; m.stateByKey = { g: "s" }; m.hitSubs = { h: 1 }; m.lastHp = { i: 5 }; m.hudShown = { k: 9, d: 9, a: 9, dmg: 9 };
+    m.handled = { e: 1 }; m.ccPending = { f: 1 }; m.stateByKey = { g: "s" }; m.hitSubs = { h: 1 }; m.lastHp = { i: 5 };
     f.storms.push(mark); f.pools.push(mark); f.holes.push(mark); f.revs.push(mark); f.graces.push(mark); f.domains.push(mark); f.bursts.push(mark); f.lunges.push(mark); f.waves.push(mark); f.bladeSpins.push(mark);
     f.curses.x = mark; f.poolHit.y = 1;
   }
@@ -2607,23 +2607,44 @@ class ResultCollector {
       filledMatch(); api.MATCH.startRound();
       var m = api.MATCH;
       ["bots", "remotes", "fx", "ccPending", "handled"].forEach(function (k) { if (!isEmpty(m[k])) bad.push(k + " 가 안 비워짐"); });
-      if (JSON.stringify(m.hudShown) !== JSON.stringify({ k: -1, d: -1, a: -1, dmg: -1 })) bad.push("hudShown " + JSON.stringify(m.hudShown));
       if (!fieldEmpty()) bad.push("지속 효과(FIELD)가 안 비워짐");
       if (!m.game || !m.me) bad.push("game·me 가 지워짐");
       ["shots", "remoteShots", "melee", "stateByKey", "hitSubs", "lastHp"].forEach(function (k) { if (isEmpty(m[k])) bad.push(k + " 는 유지돼야 하는데 비워짐(현재 동작)"); });
     } finally { api.MATCH.reset(); api.FIELD.reset(); }
-    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "5개 목록·hudShown·FIELD 비움, game·me·shots·melee·stateByKey·hitSubs·lastHp 유지");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "5개 목록·FIELD 비움, game·me·shots·melee·stateByKey·hitSubs·lastHp 유지");
   });
-  run(FLOWG, "MATCH.reset(): 모든 칸이 처음 상태로 돌아오고 처치 크레딧·HUD 기록도 초기값인가", function (done) {
+  run(FLOWG, "MATCH.reset(): 모든 칸이 처음 상태로 돌아오고 처치 크레딧도 초기값인가", function (done) {
     var bad = [];
     try {
       filledMatch(); api.MATCH.reset();
       var m = api.MATCH;
       if (m.game !== null || m.me !== null) bad.push("game·me");
       ["bots", "remotes", "remoteShots", "shots", "melee", "fx", "handled", "ccPending", "stateByKey", "hitSubs", "lastHp"].forEach(function (k) { if (!isEmpty(m[k])) bad.push(k); });
-      if (m.hudShown.k !== -1) bad.push("hudShown");
     } finally { api.FIELD.reset(); }
     done(bad.length ? "fail" : "pass", bad.length ? "안 비워진 칸: " + bad.join(", ") : "13개 칸이 모두 초기값");
+  });
+  run(FLOWG, "실시간 표(좌측 상단): 두 팀 6명의 처치·쓰러짐·어시스트·입힌 피해를 그리고, 숨길 때는 숨기며, 값이 같으면 다시 그리지 않는가", function (done) {
+    var bad = [], roster = api.RESULT_BOARD.roster, realRows = roster.rows, board = api.LIVE_BOARD, box = document.getElementById("liveBoard"), body = document.getElementById("liveBoardBody");
+    function row(id, team, nick, char, kills, deaths, assists, dmg) { return { id: id, left: false, player: { team: team, nickname: nick }, ent: { char: char, kills: kills, deaths: deaths, assists: assists, dmg: dmg } }; }
+    var rows = [row("a", "blue", "가", "mage", 3, 0, 6, 999.4), row("b", "blue", "나", "knight", 1, 4, 8, 1007), row("c", "blue", "다", "marina", 0, 0, 0, 0), row("d", "red", "라", "giant", 3, 4, 2, 1144), row("e", "red", "마", "frost", 1, 3, 4, 513), row("f", "red", "바", "wraith", 2, 4, 3, 769)];
+    try {
+      roster.rows = function () { return rows; };
+      board.update(true);
+      if (box.hidden) bad.push("표가 숨겨져 있음");
+      if (body.rows.length !== 6) bad.push("행 수 " + body.rows.length);
+      if (body.rows[0].cells.length !== 7) bad.push("열 수 " + body.rows[0].cells.length);
+      var first = Array.prototype.map.call(body.rows[0].cells, function (c) { return c.textContent; }).join("|");
+      if (first.indexOf("|가|") !== 0 || first.indexOf("|3|0|6|999") < 0) bad.push("첫 행 " + first);
+      if (body.querySelectorAll("tr.teamSplit").length !== 1 || !body.rows[3].classList.contains("teamSplit")) bad.push("팀 구분선 위치");
+      var node = body.rows[0];
+      board.lastAt = 0; board.update(true);
+      if (body.rows[0] !== node) bad.push("값이 같은데 다시 그림");
+      rows[0].ent.kills = 4; board.lastAt = 0; board.update(true);
+      if (body.rows[0].cells[3].textContent !== "4") bad.push("바뀐 처치 수가 반영 안 됨");
+      board.update(false);
+      if (!box.hidden) bad.push("숨기지 않음");
+    } finally { roster.rows = realRows; board.update(false); }
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "6행·7열·팀 구분선·변경 때만 다시 그림·숨김");
   });
   run(FLOWG, "로비 → 드래프트: 지난 판 결과(로스터·승패·통계 메모·투사체)를 지우고 방 상태가 draft 로 바뀌는가", function (done) {
     withDraft([], function (S) {

@@ -258,15 +258,33 @@
   @keyframes kfIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
   #hudCount .b { color: #6FA8FF; }
   #hudCount .r { color: #FF7A70; }
-  #hudMe { position: absolute; top: 48px; right: 8px; display: flex; gap: 12px; padding: 5px 12px; border-radius: 8px; pointer-events: none; white-space: nowrap;
-           background: rgba(14,20,17,.8); color: #F4F1E8; border: 1px solid rgba(255,255,255,.16); border-top: 2px solid #D97B4F; font-size: 12px; font-weight: 800; }
-  #hudMe span { display: flex; flex-direction: column; align-items: center; line-height: 1.1; color: #A3B0A6; }
-  #hudMe b { font-size: 18px; color: #F4F1E8; font-variant-numeric: tabular-nums; }
+  #liveBoard { position: absolute; top: 8px; left: 8px; padding: 3px 8px 4px; border-radius: 8px; pointer-events: none; white-space: nowrap;
+               background: rgba(14,20,17,.72); color: #F4F1E8; border: 1px solid rgba(255,255,255,.16); border-top: 2px solid #D97B4F; }
+  #liveBoard[hidden] { display: none; }
+  #liveBoard table { border-collapse: collapse; font-size: 12px; line-height: 1.2; }
+  #liveBoard th { padding: 1px 5px; font-size: 10px; font-weight: 700; color: #A3B0A6; border-bottom: 1px solid rgba(255,255,255,.18); }
+  #liveBoard td { padding: 2px 5px; font-weight: 800; text-align: center; font-variant-numeric: tabular-nums; border-bottom: 1px solid rgba(255,255,255,.07); }
+  #liveBoard th.nm, #liveBoard td.nm, #liveBoard td.job { text-align: left; }
+  #liveBoard td.nm { max-width: 92px; overflow: hidden; text-overflow: ellipsis; }
+  #liveBoard td.job { font-size: 11px; font-weight: 700; color: #A3B0A6; }
+  #liveBoard tr.mine td { background: rgba(242,208,107,.16); }
+  #liveBoard tr.teamSplit td { border-top: 2px solid rgba(255,255,255,.7); }
+  #liveBoard .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; vertical-align: middle; }
+  #liveBoard .dot.blue { background: #2F6FD6; }
+  #liveBoard .dot.red { background: #D6453D; }
+  @media (max-width: 900px) { #liveBoard th.job, #liveBoard td.job { display: none; } }
+  @media (max-width: 700px) {
+    #liveBoard { padding: 2px 4px 3px; }
+    #liveBoard table { font-size: 10px; }
+    #liveBoard th { font-size: 9px; padding: 1px 3px; }
+    #liveBoard td { padding: 1px 3px; }
+    #liveBoard td.nm { max-width: 44px; }
+    #liveBoard .dot { width: 6px; height: 6px; }
+  }
   #btnLeaveGame { position: absolute; top: 8px; right: 8px; height: 34px; padding: 0 12px; font-size: 14px; font-weight: 800; border-radius: 6px; border: 1px solid rgba(255,138,138,.6); background: rgba(14,20,17,.8); color: #FF9A9A; }
   #practiceBar { position: absolute; top: 8px; right: 8px; display: flex; gap: 6px; pointer-events: auto; }
   #practiceBar button { height: 34px; padding: 0 12px; font-size: 14px; font-weight: 800; border-radius: 6px; border: 1px solid rgba(255,255,255,.28); border-bottom: 2px solid #D97B4F; background: rgba(14,20,17,.82); color: #F4F1E8; white-space: nowrap; }
   #practiceBar #btnPracExit { border-color: rgba(255,138,138,.6); color: #FF9A9A; }
-  #scrGame.practice #hudMe { top: 48px; }
   #practiceInfo { position: absolute; top: 8px; left: 8px; width: 200px; max-height: calc(100% - 200px); overflow: hidden; padding: 6px 8px; border-radius: 8px; pointer-events: none;
                   background: rgba(14,20,17,.6); color: #F4F1E8; border: 1px solid rgba(255,255,255,.16); border-top: 2px solid #D97B4F; }
   #practiceInfo .dfName { font-size: 14px; margin-bottom: 2px; }
@@ -280,7 +298,6 @@
   #practiceInfo .ultDesc b { font-size: 10.5px; color: #FFB38A; }
   @media (max-width: 1100px) {
     #practiceBar { flex-direction: column; align-items: stretch; }
-    #scrGame.practice #hudMe { top: 128px; }
   }
   .modalBox.pcBox { max-width: 1060px; max-height: calc(100vh - 32px); overflow-y: auto; overscroll-behavior: contain; }
   .pcBody { display: flex; gap: 16px; align-items: flex-start; }
@@ -512,8 +529,6 @@
     .hdSide b { font-size: 17px; }
     #hudMid { padding: 0 6px; }
     #btnLeaveGame { padding: 0 8px; font-size: 13px; }
-    #hudMe { gap: 8px; padding: 3px 8px; font-size: 11px; }
-    #hudMe b { font-size: 15px; }
     #killBanner { font-size: 15px; padding: 4px 12px; }
     .kf { font-size: 12px; padding: 3px 8px; gap: 5px; }
     .dfTitle, .dfMap { font-size: 19px; }

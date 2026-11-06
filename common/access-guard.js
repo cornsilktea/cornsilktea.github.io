@@ -288,7 +288,8 @@
      학생 태블릿에서 자료가 부드럽게 도는지 수업 전에 확인하려고 둡니다.
      1초 평균과 그 1초 동안 가장 느렸던 순간을 함께 보여 줍니다.
      30 아래로 자주 떨어지면 그 기기에서는 버벅인다고 느낍니다. */
-  if (/[?&]fps(?:[=&]|$)/.test(location.search)) {
+  /* 일반배포용 주소(?c=test)는 &fps 를 붙이지 않아도 항상 보여 줍니다(2026-11-07 선생님 요청). 다른 반 주소는 &fps 가 있어야 합니다. */
+  if (/[?&]fps(?:[=&]|$)/.test(location.search) || /^\?c=test(?:&|$)/.test(location.search)) {
     var addFpsMeter = function () {
       var meter = document.createElement("div");
       meter.setAttribute("data-fps-meter", "");
@@ -306,15 +307,18 @@
         "pointer-events:none"
       ].join(";");
       document.body.appendChild(meter);
-      /* 로비와 게임 화면에서 자리가 바뀌지 않도록 항상 위쪽 가운데의 왼쪽에 둡니다.
-         data-fps-beside 가 붙은 칸(30번 블루 팀 점수)이 화면에 있으면 그 왼쪽에 정확히 맞춥니다. */
+      /* 로비와 게임 화면에서 자리가 바뀌지 않도록 기본은 위쪽 가운데의 왼쪽에 둡니다.
+         data-fps-beside 가 붙은 칸(30번 레드 팀 점수)이 화면에 있으면 그 오른쪽, 곧 점수와 방 나가기 버튼 사이에 맞춥니다.
+         가로가 좁아 그 사이에 들어가지 않으면 오른쪽 끝(방 나가기 버튼) 앞에서 멈춥니다. */
       var placeMeter = function () {
         var tag = document.querySelector("[data-fps-beside]"), rect = tag ? tag.getBoundingClientRect() : null;
         if (rect && rect.width > 0) {
           meter.style.top = (rect.top + (rect.height - 24) / 2) + "px";
-          meter.style.right = (window.innerWidth - rect.left + 6) + "px";
+          meter.style.right = "auto";
+          meter.style.left = (rect.right + 10) + "px";
         } else {
           meter.style.top = "8px";
+          meter.style.left = "auto";
           meter.style.right = "calc(50% + 109px)";
         }
       };
@@ -327,11 +331,13 @@
       var tailLabel = null;
       var placeTail = function () {
         if (!testedTail) return;
-        if (!tailLabel) { tailLabel = document.createElement("div"); document.body.appendChild(tailLabel); }
+        if (!tailLabel) { tailLabel = document.createElement("div"); tailLabel.setAttribute("data-fps-tail", ""); document.body.appendChild(tailLabel); }
         tailLabel.style.cssText = meter.style.cssText;
         tailLabel.textContent = testedTail;
         var rect = meter.getBoundingClientRect();
-        tailLabel.style.right = (window.innerWidth - rect.left + 6) + "px";
+        tailLabel.style.top = (rect.bottom + 2) + "px";
+        tailLabel.style.right = "auto";
+        tailLabel.style.left = rect.left + "px";
       };
       var frames = 0, worst = 0, last = performance.now(), windowStart = last;
       var tick = function (now) {

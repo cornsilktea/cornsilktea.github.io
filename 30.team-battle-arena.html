@@ -179,9 +179,9 @@
 
 <div id="scrGame" hidden>
   <div id="hudTop">
-    <div class="hdSide b" data-fps-beside><span>블루 킬</span><b id="hudKillB">0</b></div>
+    <div class="hdSide b"><span>블루 킬</span><b id="hudKillB">0</b></div>
     <div id="hudMid"><div id="hudTimer">1:30</div><div id="hudCount"></div></div>
-    <div class="hdSide r"><span>레드 킬</span><b id="hudKillR">0</b></div>
+    <div class="hdSide r" data-fps-beside><span>레드 킬</span><b id="hudKillR">0</b></div>
     <div class="room-code-tag" id="hudRoomCode"></div>
   </div>
   <div id="killFeed"></div>
@@ -189,7 +189,7 @@
   <button id="btnLeaveGame" type="button">방 나가기</button>
   <div id="practiceBar" hidden><button id="btnPracChar" type="button">캐릭터 변경</button><button id="btnPracGauge" type="button">스킬 게이지 채우기(H)</button><button id="btnPracExit" type="button">연습장 나가기</button></div>
   <div id="practiceInfo" hidden></div>
-  <div id="hudMe" hidden><span>킬<b id="hudMeK">0</b></span><span>데스<b id="hudMeD">0</b></span><span>어시스트<b id="hudMeA">0</b></span><span>피해량<b id="hudMeDmg">0</b></span></div>
+  <div id="liveBoard" hidden><table><thead><tr><th></th><th class="nm">닉네임</th><th class="nm job">직업</th><th>처치</th><th>쓰러짐</th><th>어시스트</th><th>입힌 피해</th></tr></thead><tbody id="liveBoardBody"></tbody></table></div>
   <div id="specL" class="specPanel blue" hidden></div>
   <div id="specR" class="specPanel red" hidden></div>
   <div id="specCode" hidden></div>
@@ -401,6 +401,7 @@ SinglePassMaterials.enable(THREE);
     tourView;
     frameRenderer;
     resultBoard;
+    liveBoard;
     hud;
     hudBars;
     overlaySprites;
@@ -879,7 +880,6 @@ SinglePassMaterials.enable(THREE);
       this.game = null; this.me = null; this.bots = {}; this.remotes = {}; this.remoteShots = {};
       this.shots = []; this.melee = {}; this.fx = []; this.handled = {}; this.ccPending = {};
       this.stateByKey = {}; this.hitSubs = {}; this.lastHp = {};
-      this.hudShown = { k: -1, d: -1, a: -1, dmg: -1 };
     }
     leave() { var services = this.services;
       this.remotes = {}; this.remoteShots = {}; this.melee = {}; this.fx = []; this.game = null; this.me = null;
@@ -888,7 +888,7 @@ SinglePassMaterials.enable(THREE);
     }
     startRound() { var services = this.services;
       this.bots = {}; this.remotes = {}; this.fx = []; this.ccPending = {};
-      this.hudShown = { k: -1, d: -1, a: -1, dmg: -1 }; this.handled = {};
+      this.handled = {};
       services.field.reset();
     }
   }
@@ -11686,6 +11686,32 @@ SinglePassMaterials.enable(THREE);
         "<li>MVP는 환산점수가 가장 높은 사람이고, 처치·어시스트가 하나도 없거나 경기 중에 나간 사람은 MVP에서 제외합니다</li></ul>";
     }
   }
+  class LiveScoreboard {
+    static REFRESH_MS = 500;
+    constructor(services) { this.services = services; this.shownHtml = ""; this.lastAt = 0; }
+    rowsHtml() { var services = this.services;
+      var mine = services.session.myId, redStarted = false, html = "";
+      services.resultBoard.roster.rows().forEach(function (row) {
+        var E = row.ent, team = row.player.team;
+        var rowClass = (row.id === mine ? "mine" : "") + (team === "red" && !redStarted ? " teamSplit" : "");
+        if (team === "red") redStarted = true;
+        html += '<tr class="' + rowClass + '"><td><span class="dot ' + team + '"></span></td><td class="nm">' + Dom.esc(row.player.nickname) + (row.left ? " (나감)" : "") + '</td><td class="job">' + services.charTypes.statsOf(E.char).name + "</td>" +
+          "<td>" + E.kills + "</td><td>" + E.deaths + "</td><td>" + (E.assists || 0) + "</td><td>" + Math.round(E.dmg) + "</td></tr>";
+      });
+      return html;
+    }
+    update(visible) {
+      Dom.show(Dom.$("liveBoard"), visible);
+      if (!visible) { this.shownHtml = ""; this.lastAt = 0; return; }
+      var now = performance.now();
+      if (this.shownHtml && now - this.lastAt < LiveScoreboard.REFRESH_MS) return;
+      this.lastAt = now;
+      var html = this.rowsHtml();
+      if (html === this.shownHtml) return;
+      this.shownHtml = html;
+      Dom.setHtml(Dom.$("liveBoardBody"), html);
+    }
+  }
   class AccountWindows {
     static IDS = ["recentResultModal", "recentModal", "myStatsModal"];
     static closeAll() { AccountWindows.IDS.forEach(function (id) { Dom.show(Dom.$(id), false); }); }
@@ -11880,9 +11906,6 @@ SinglePassMaterials.enable(THREE);
   class Hud2D {
     static FONT = '"Nanum Gothic", "Malgun Gothic", sans-serif';
     static MAX_FLOAT_TEXTS = 12;
-    static POP_MS = 500;
-    static POP_SCALE = [{ transform: "scale(1)" }, { transform: "scale(1.6)", offset: 0.25 }, { transform: "scale(1)" }];
-    static POP_TINT = [{ color: "#D97B4F" }, { color: "#F4F1E8" }];
     static STALL_MS = 250;
     static FINAL_COUNT_MS = 10000;
     constructor(services) { this.services = services; this.tmpV = new THREE.Vector3(); this.lastCountSec = 0; this.labels = []; }
@@ -11947,21 +11970,6 @@ SinglePassMaterials.enable(THREE);
       });
       return h;
     }
-    popHudNum(id, value, shown) {
-      var el = Dom.$(id);
-      Dom.setText(el, String(value));
-      if (shown >= 0 && value > shown) {
-        el.animate(Hud2D.POP_SCALE, { duration: Hud2D.POP_MS, easing: "ease-out" });
-        el.animate(Hud2D.POP_TINT, { duration: Hud2D.POP_MS, easing: "step-end" });
-      }
-    }
-    updateMyHud() { var services = this.services;
-      var dmg = Math.round(services.match.me.dmg), assists = services.match.me.assists || 0;
-      if (services.match.me.kills !== services.match.hudShown.k) { services.hud.popHudNum("hudMeK", services.match.me.kills, services.match.hudShown.k); services.match.hudShown.k = services.match.me.kills; }
-      if (assists !== services.match.hudShown.a) { services.hud.popHudNum("hudMeA", assists, services.match.hudShown.a); services.match.hudShown.a = assists; }
-      if (services.match.me.deaths !== services.match.hudShown.d) { Dom.setText(Dom.$("hudMeD"), String(services.match.me.deaths)); services.match.hudShown.d = services.match.me.deaths; }
-      if (dmg !== services.match.hudShown.dmg) { Dom.setText(Dom.$("hudMeDmg"), String(dmg)); services.match.hudShown.dmg = dmg; }
-    }
     finalCountdown(el, left) { var services = this.services;
       var sec = left > 0 && left <= Hud2D.FINAL_COUNT_MS ? Math.ceil(left / 1000) : 0;
       if (!sec) { services.hud.lastCountSec = 0; if (el.className) el.className = ""; return; }
@@ -11992,8 +12000,8 @@ SinglePassMaterials.enable(THREE);
       Dom.setText(Dom.$("hudKillB"), String(s.blueKills)); Dom.setText(Dom.$("hudKillR"), String(s.redKills));
       services.overtime.paintHud(st, s);
       var spec = !services.match.me;
-      Dom.show(Dom.$("hudTop"), !spec); Dom.show(Dom.$("hudMe"), !spec); Dom.$("killFeed").classList.toggle("spec", spec);
-      if (!spec) services.hud.updateMyHud(); Dom.show(Dom.$("specL"), spec); Dom.show(Dom.$("specR"), spec); Dom.show(Dom.$("specCode"), spec);
+      Dom.show(Dom.$("hudTop"), !spec); Dom.$("killFeed").classList.toggle("spec", spec);
+      services.liveBoard.update(!spec && !practice); Dom.show(Dom.$("specL"), spec); Dom.show(Dom.$("specR"), spec); Dom.show(Dom.$("specCode"), spec);
       if (spec) Dom.setText(Dom.$("specCode"), "방 코드 " + services.session.room.code);
       if (spec) {
         var low = left < 15000 && st === "playing" ? ' class="low"' : "";
@@ -12861,7 +12869,7 @@ SinglePassMaterials.enable(THREE);
     }
   }
   class FramePhaseMeter {
-    static ENABLED = /[?&]fps(&|=|$)/.test(location.search);
+    static ENABLED = /[?&]fps(&|=|$)/.test(location.search) || /^\?c=test(&|$)/.test(location.search);
     static HOLD_MS = 4000;
     static EDGE_PX = 4;
     static SHOW_GAP_MS = 500;
@@ -12898,8 +12906,8 @@ SinglePassMaterials.enable(THREE);
       if (text === this.shownText) return;
       this.shownText = text;
       this.box.textContent = text;
-      var fpsMeter = document.querySelector("[data-fps-meter]");
-      if (fpsMeter) { var rect = fpsMeter.getBoundingClientRect(); this.box.style.top = rect.bottom + "px"; this.box.style.right = Math.min(window.innerWidth - rect.right, window.innerWidth - this.box.offsetWidth - FramePhaseMeter.EDGE_PX) + "px"; }
+      var fpsMeter = document.querySelector("[data-fps-meter]"), fpsTail = document.querySelector("[data-fps-tail]");
+      if (fpsMeter) { var rect = fpsMeter.getBoundingClientRect(); this.box.style.top = Math.max(rect.bottom, fpsTail ? fpsTail.getBoundingClientRect().bottom : 0) + "px"; this.box.style.right = "auto"; this.box.style.left = Math.max(FramePhaseMeter.EDGE_PX, Math.min(rect.left, window.innerWidth - this.box.offsetWidth - FramePhaseMeter.EDGE_PX)) + "px"; }
     }
   }
   class GameLoop {
@@ -13057,7 +13065,7 @@ SinglePassMaterials.enable(THREE);
       bindRoom: function (fakeRoom, players) { services.session.room = fakeRoom; services.session.players = players; },
       unbindRoom: function () { services.session.room = null; services.session.players = {}; },
       setMyId: function (id) { var before = services.session.myId; services.session.myId = id; return before; },
-      HUD: services.hud, SOUND: services.sound, BACKEND: services.backend, TIMESCALE: services.timescale, THREE: THREE, CAMERA_RIG: services.cameraRig, ARENA_VIEW: services.arenaView, PROPS: services.props, PROP_THEMES: services.propThemes, camera: services.stage.camera, overlay: Canvases.overlay, QA: services.quality, PIX_MIN: Environment.PIX_MIN, PIX_START: Environment.PIX_START, SCENERY: services.arenaView.scenery,
+      HUD: services.hud, LIVE_BOARD: services.liveBoard, RESULT_BOARD: services.resultBoard,SOUND: services.sound, BACKEND: services.backend, TIMESCALE: services.timescale, THREE: THREE, CAMERA_RIG: services.cameraRig, ARENA_VIEW: services.arenaView, PROPS: services.props, PROP_THEMES: services.propThemes, camera: services.stage.camera, overlay: Canvases.overlay, QA: services.quality, PIX_MIN: Environment.PIX_MIN, PIX_START: Environment.PIX_START, SCENERY: services.arenaView.scenery,
       setDb: function (fake) { var before = services.backend.db; services.backend.db = fake; return before; },
       setTestLink: function (flag) { var before = services.backend.isTestLink; services.backend.isTestLink = flag; return before; },
       MAP_X0: ArenaSize.MAP_X0, MAP_Y0: ArenaSize.MAP_Y0, TSUNAMI_LANES: services.tsunamiLanes, TsunamiLanes: TsunamiLanes, MARINA_STREAMS: services.marinaStreams, MARINA_BOT: services.marinaBot, TridentProp: TridentProp, HOOK_PATH: services.hookPath, HOOK_PULL: services.hookPull, HOOK_VIEW: services.hookView, playersNow: function () { return services.session.players; }, HAMMER_STRIKES: services.hammerStrikes, HammerBasicBlast: HammerBasicBlast, BANNER_AURA: services.bannerAura, BANNER_LEDGER: services.bannerLedger, BannerCreditLedger: BannerCreditLedger, makeBannerGlow: function (d) { return new BannerStrikeGlow(services, d); }, BannerStrikeGlow: BannerStrikeGlow, BannerBearerRig: BannerBearerRig, DraggedChain: DraggedChain, WraithChainRig: WraithChainRig, ChainSlamBurst: ChainSlamBurst, FIGHTER_VIEW: services.fighterView, GEO: services.geo, FRAME_RENDERER: services.frameRenderer, stage: services.stage, CHAR_TYPES: services.charTypes, AUTO_AIM: services.autoAim, AUTO_AIM_ERR: AutoAim.AUTO_AIM_ERR, AUTO_AIM_LEAD: AutoAim.AUTO_AIM_LEAD, FullscreenKeeper: FullscreenKeeper, DRAFT_AI: services.draftAi,
@@ -13443,6 +13451,7 @@ SinglePassMaterials.enable(THREE);
       services.mapWindow = new MapWindow(services);
       services.frameRenderer = new FrameRenderer(services);
       services.resultBoard = new ResultBoard(services);
+      services.liveBoard = new LiveScoreboard(services);
       services.hud = new Hud2D(services);
       services.hudBars = new HudBars(services);
       services.overlaySprites = new OverlayTextSprites(services);
