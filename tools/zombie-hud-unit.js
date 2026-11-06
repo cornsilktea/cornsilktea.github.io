@@ -6,8 +6,21 @@ class ZombieHudUnit {
   constructor() {
     this.failed = 0;
     this.context = vm.createContext({ Math, JSON });
-    const source = fs.readFileSync(path.join(__dirname, "..", "31.zombie-hud.js"), "utf8");
-    this.api = vm.runInContext(source + "\n;({ ZombieRoundClock, ZombieHumanPing, ZombieRosterOrder, ZombieFloorSlab, ZombieBodySight, ZombieNameTagRule })", this.context);
+    const read = (file) => fs.readFileSync(path.join(__dirname, "..", file), "utf8");
+    this.api = vm.runInContext(read("31.zombie-hud.js") + "\n" + read("31.zombie-missions.js") + "\n;({ ZombieRoundClock, ZombieHumanPing, ZombieRosterOrder, ZombieFloorSlab, ZombieBodySight, ZombieNameTagRule, ZombieMissionSites })", this.context);
+  }
+
+  missionRoom() {
+    const { ZombieMissionSites: M } = this.api;
+    const plans = [{ N: [["stairs", 0, 0], ["class", 1, 1, "1반"], ["library", 2, 3, "도서실"]], S: [["art", 1, 1, "미술실"]] }];
+    const sites = M.build(plans, 54, 12, 3, 18);
+    const [cls, library, art] = sites;
+    this.check("지정된 방 안이면 수행 가능", M.within(cls, cls.x + 1.5, cls.z));
+    this.check("벽 너머 옆방은 가까워도 불가", !M.within(library, library.x - 1, library.z));
+    this.check("벽 너머 계단실은 가까워도 불가", !M.within(cls, cls.x - 1, cls.z));
+    this.check("방 안이어도 먼 곳은 불가", !M.within(cls, cls.x + 5, cls.z));
+    this.check("두 칸짜리 방은 범위도 두 칸", library.room.x1 - library.room.x0 === 24);
+    this.check("남쪽 방 범위는 복도 남쪽", art.room.z0 === -18 && art.room.z1 === -3 && M.within(art, art.x + 1, art.z));
   }
 
   check(name, passed) {
@@ -68,6 +81,7 @@ class ZombieHudUnit {
     this.clock();
     this.roster();
     this.sight();
+    this.missionRoom();
     console.log(this.failed ? "실패 " + this.failed + "건" : "모두 통과");
     process.exit(this.failed ? 1 : 0);
   }

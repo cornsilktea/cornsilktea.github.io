@@ -13,6 +13,14 @@ interface ZombieMissionSite {
   z: number;
   type: string;
   label: string;
+  room: ZombieMissionRoom;
+}
+
+interface ZombieMissionRoom {
+  x0: number;
+  x1: number;
+  z0: number;
+  z1: number;
 }
 
 interface ZombieMissionKind {
@@ -66,15 +74,22 @@ class ZombieMissionSites {
           const x0 = -buildingX + bayW * Number(spec[1]);
           const dir = side === "N" ? 1 : -1;
           const zMid = dir * (corridorZ + buildingZ - 0.2) / 2;
-          sites.push({ floor, x: x0 + ZombieMissionSites.STAND_FROM_WALL, z: zMid, type, label: String(spec[3] || "") });
+          const x1 = -buildingX + bayW * (Number(spec[2]) + 1);
+          const room = { x0, x1, z0: Math.min(dir * corridorZ, dir * buildingZ), z1: Math.max(dir * corridorZ, dir * buildingZ) };
+          sites.push({ floor, x: x0 + ZombieMissionSites.STAND_FROM_WALL, z: zMid, type, label: String(spec[3] || ""), room });
         });
       });
     });
     return sites;
   }
 
+  static inRoom(site: ZombieMissionSite, x: number, z: number): boolean {
+    const room = site.room;
+    return x >= room.x0 && x <= room.x1 && z >= room.z0 && z <= room.z1;
+  }
+
   static within(site: ZombieMissionSite, x: number, z: number, reach: number = ZombieMissionSites.REACH): boolean {
-    return Math.hypot(site.x - x, site.z - z) <= reach;
+    return ZombieMissionSites.inRoom(site, x, z) && Math.hypot(site.x - x, site.z - z) <= reach;
   }
 }
 
