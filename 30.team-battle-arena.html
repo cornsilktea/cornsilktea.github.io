@@ -5609,7 +5609,7 @@ SinglePassMaterials.enable(THREE);
           if (T.team === e.team) { if (e.u && !T.minion) services.fieldFx.healInFog(T, e, t); return; }
           if (T.isProtected(t)) return;
           if (e.u && !T.minion) services.status.slowWhileInside(T, t, e.owner, ThrowerType.ULT.fgSlowMul, ThrowerType.ULT.fgSlowMs);
-          var key = e.owner + ">" + T.id;
+          var key = e.owner + (e.u ? ">fog>" : ">") + T.id;
           if (services.field.poolHit[key] && t - services.field.poolHit[key] < ThrowerType.ULT.plTick) return;
           services.field.poolHit[key] = t;
           if (e.u) services.damage.damage(T, e.dmg, e.owner, false, "fog");
