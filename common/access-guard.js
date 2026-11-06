@@ -303,25 +303,18 @@
         "background:rgba(0,0,0,0.72)",
         "color:#fff",
         "border-radius:4px 4px 0 0",
-        "font:600 11px/18px monospace",
+        "font:600 11px/18px 'Nanum Gothic','NanumGothic','나눔고딕','Malgun Gothic','맑은 고딕',sans-serif",
+        "font-variant-numeric:tabular-nums",
         "pointer-events:none"
       ].join(";");
       document.body.appendChild(meter);
-      /* 로비와 게임 화면에서 자리가 바뀌지 않도록 기본은 위쪽 가운데의 왼쪽에 둡니다.
-         data-fps-beside 가 붙은 칸(30번 레드 팀 점수)이 화면에 있으면 그 오른쪽, 곧 점수와 방 나가기 버튼 사이에 맞춥니다.
-         가로가 좁아 그 사이에 들어가지 않으면 오른쪽 끝(방 나가기 버튼) 앞에서 멈춥니다. */
-      var placeMeter = function () {
-        var tag = document.querySelector("[data-fps-beside]"), rect = tag ? tag.getBoundingClientRect() : null;
-        if (rect && rect.width > 0) {
-          meter.style.top = (tag.parentElement.getBoundingClientRect().top + 2) + "px";
-          meter.style.right = "auto";
-          meter.style.left = (rect.right + 10) + "px";
-        } else {
-          meter.style.top = "8px";
-          meter.style.left = "auto";
-          meter.style.right = "calc(50% + 109px)";
-        }
-      };
+      /* 자리는 화면이 바뀌어도 움직이지 않게 한 번만 정합니다.
+         data-fps-beside 가 문서에 있는 자료(30번)는 위쪽 가운데 점수판(너비 260px 고정) 오른쪽, 곧 레드 점수와 방 나가기 버튼 사이에
+         로비·대기실·경기 내내 같은 자리에 둡니다(그 칸이 숨겨져 있어도 자리는 같습니다). 그런 칸이 없는 자료는 위쪽 가운데의 왼쪽입니다. */
+      var fixedBesideScoreboard = !!document.querySelector("[data-fps-beside]");
+      meter.style.top = fixedBesideScoreboard ? "2px" : "8px";
+      meter.style.left = fixedBesideScoreboard ? "calc(50% + 138px)" : "auto";
+      meter.style.right = fixedBesideScoreboard ? "auto" : "calc(50% + 109px)";
       /* 주소에 반 표시(?c=…)와 &fps 말고 다른 것이 붙어 있으면(&ov=1 같은 실험 값) 프레임 칸 왼쪽에 "&반&fps&ov=1" 꼴로 보여 줍니다. */
       var testedTail = (function () {
         var m = /^\?c=([^&]*)(.*)$/.exec(location.search), rest = m ? m[2] : location.search.replace(/^\?/, "&");
@@ -348,7 +341,6 @@
         if (now - windowStart >= 1000) {
           var fps = Math.round(frames * 1000 / (now - windowStart));
           meter.textContent = "FPS " + fps + " · 최저 " + Math.round(1000 / worst);   /* · 최저 */
-          placeMeter();
           meter.style.color = fps >= 50 ? "#7CFC9A" : fps >= 30 ? "#FFE27A" : "#FF7A7A";
           placeTail();
           frames = 0; worst = 0; windowStart = now;

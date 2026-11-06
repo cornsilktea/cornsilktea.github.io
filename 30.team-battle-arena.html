@@ -187,7 +187,7 @@
   <div id="killFeed"></div>
   <div id="killBanner"></div>
   <button id="btnLeaveGame" type="button">방 나가기</button>
-  <div id="practiceBar" hidden><button id="btnPracChar" type="button">캐릭터 변경</button><button id="btnPracGauge" type="button">스킬 게이지 채우기(H)</button><button id="btnPracExit" type="button">연습장 나가기</button></div>
+  <div id="practiceBar" hidden><button id="btnPracExit" type="button">연습장 나가기</button><button id="btnPracChar" type="button">캐릭터 변경</button><button id="btnPracGauge" type="button">스킬 게이지 채우기(H)</button></div>
   <div id="practiceInfo" hidden></div>
   <div id="liveBoard" hidden><table><thead><tr><th></th><th class="nm">닉네임</th><th class="nm job">직업</th><th>처치</th><th>쓰러짐</th><th>어시스트</th><th>입힌 피해</th></tr></thead><tbody id="liveBoardBody"></tbody></table></div>
   <div id="specL" class="specPanel blue" hidden></div>
@@ -11949,18 +11949,17 @@ SinglePassMaterials.enable(THREE);
       Canvases.overlayCtx.globalAlpha = 1;
       services.hud.drawJoystick();
     }
-    specPanelW() { var services = this.services; return services.cameraRig.w > 900 ? 300 : 150; }
-    specPanel(team, s) { var services = this.services;
+    specPanelW() { var services = this.services; return services.cameraRig.w > 900 ? 340 : 150; }
+    specPanel(team) { var services = this.services;
       var ids = services.targets.participants().filter(function (id) { return services.session.players[id].team === team; })
         .sort(function (a, b) { return (services.session.players[a].slot || 0) - (services.session.players[b].slot || 0); });
-      var h = '<div class="spHead">' + (team === "blue" ? "블루팀" : "레드팀") + " · 생존 " + s[team + "Alive"] + "/" + s[team + "N"] +
-              "<small>킬 " + s[team + "Kills"] + " · 누적 피해 " + Math.round(s[team]) + "</small></div>";
+      var h = "";
       ids.forEach(function (id) {
         var E = services.targets.ent(id); if (!E) return;
         var hp = Math.max(0, Math.round(E.hp)), ratio = MathKit.clamp(E.hp / E.maxHp, 0, 1);
         var g = Math.min(MatchRules.GAUGE_MAX, Math.floor(E.gauge)), full = g >= MatchRules.GAUGE_MAX, tn = services.clock.now(), act = E.alive && E.hasSkillActive(tn);
         h += '<div class="spCard' + (E.alive ? "" : " dead") + '"><img alt="" src="' + services.catalog.charImgSrc(E.char, team) + '">' +
-          '<div class="spInfo"><div class="spName">' + Dom.esc(E.nickname) + '<span class="spK">' + (E.kills || 0) + "킬</span><small>" + services.charTypes.statsOf(E.char).name + "</small></div>" +
+          '<div class="spInfo"><div class="spName">' + Dom.esc(E.nickname) + "<small>" + services.charTypes.statsOf(E.char).name + "</small></div>" +
           '<div class="spBar hp' + (ratio < 0.3 ? " low" : "") + '"><i style="width:' + Math.round(ratio * 100) + '%"></i><span>' +
             (E.alive ? "HP " + hp + " / " + E.maxHp : "부활까지 " + Math.max(1, Math.ceil((E.diedAt + services.timescale.respawnMs - services.clock.now()) / services.clock.scale / 1000)) + "초") + "</span></div>" +
           (act ? '<div class="spBar ult act"><i style="width:' + Math.round(E.skillLeft(tn) * 100) + '%"></i><span>' +
@@ -11996,17 +11995,16 @@ SinglePassMaterials.enable(THREE);
       if (practice && services.match.me && services.practice.infoShown !== services.match.me.char) { services.practice.infoShown = services.match.me.char; Dom.setHtml(Dom.$("practiceInfo"), services.practice.practiceInfoHtml()); }
       Dom.show(Dom.$("btnLeaveGame"), !practice);
       var s = services.flow.teamTotals();
-      if (!(services.overtime.active() && st === "playing")) Dom.setHtml(Dom.$("hudCount"), '<span class="b">🔵 ' + s.blueAlive + '</span> vs <span class="r">🔴 ' + s.redAlive + "</span>");
+      if (!(services.overtime.active() && st === "playing")) Dom.setHtml(Dom.$("hudCount"), "");
       Dom.setText(Dom.$("hudKillB"), String(s.blueKills)); Dom.setText(Dom.$("hudKillR"), String(s.redKills));
       services.overtime.paintHud(st, s);
       var spec = !services.match.me;
-      Dom.show(Dom.$("hudTop"), !spec); Dom.$("killFeed").classList.toggle("spec", spec);
-      services.liveBoard.update(!spec && !practice); Dom.show(Dom.$("specL"), spec); Dom.show(Dom.$("specR"), spec); Dom.show(Dom.$("specCode"), spec);
+      Dom.$("scrGame").classList.toggle("spec", spec); Dom.$("killFeed").classList.toggle("spec", spec);
+      services.liveBoard.update(!practice); Dom.show(Dom.$("specL"), spec); Dom.show(Dom.$("specR"), spec); Dom.show(Dom.$("specCode"), spec);
       if (spec) Dom.setText(Dom.$("specCode"), "방 코드 " + services.session.room.code);
       if (spec) {
-        var low = left < 15000 && st === "playing" ? ' class="low"' : "";
-        Dom.setHtml(Dom.$("specL"), '<div class="spTime"><b' + low + ">" + services.hud.fmtTime(left) + "</b><small>생존 🔵 " + s.blueAlive + " vs 🔴 " + s.redAlive + "</small></div>" + services.hud.specPanel("blue", s));
-        Dom.setHtml(Dom.$("specR"), '<div class="spTime"><b><span style="color:#2F6FD6">' + s.blueKills + '</span> : <span style="color:#D6453D">' + s.redKills + "</span></b><small>킬 스코어 (블루 : 레드)</small></div>" + services.hud.specPanel("red", s));
+        Dom.setHtml(Dom.$("specL"), services.hud.specPanel("blue"));
+        Dom.setHtml(Dom.$("specR"), services.hud.specPanel("red"));
       }
 
       var alive = services.match.me && services.match.me.alive, playing = st === "playing" && t >= services.session.room.startAt;
@@ -12895,7 +12893,7 @@ SinglePassMaterials.enable(THREE);
     }
     makeBox() {
       var box = document.createElement("div");
-      box.style.cssText = "position:fixed;z-index:2147483000;padding:2px 8px;background:rgba(0,0,0,0.72);color:#fff;border-radius:0 4px 4px 4px;font:600 11px/14px monospace;white-space:pre;pointer-events:none";
+      box.style.cssText = "position:fixed;z-index:2147483000;padding:2px 8px;background:rgba(0,0,0,0.72);color:#fff;border-radius:0 4px 4px 4px;font:600 11px/14px 'Nanum Gothic','NanumGothic','나눔고딕','Malgun Gothic','맑은 고딕',sans-serif;white-space:pre;pointer-events:none";
       document.body.appendChild(box);
       return box;
     }
