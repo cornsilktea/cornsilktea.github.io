@@ -5978,7 +5978,7 @@ SinglePassMaterials.enable(THREE);
     static MUZZLE_HEIGHT = 39;
     static MUZZLE_FORWARD = 24;
     static TARGET_HEIGHT = 34;
-    constructor(services) { this.services = services; this.rangeRing = null; this.spare = { blue: [], red: [] }; }
+    constructor(services) { this.services = services; this.rangeRing = null; this.spare = { blue: [], red: [] }; this.shellShelf = new SpareShelf(this.buildShell.bind(this)); }
     isOwnerLocal(owner) { var services = this.services;
       var A = services.targets.ent(owner);
       return !!A && (A === services.match.me || (services.session.isHost() && !!services.match.bots[owner]));
@@ -6047,17 +6047,22 @@ SinglePassMaterials.enable(THREE);
       });
     }
     makeShellVis(s) { var services = this.services;
-      var e = s.e, g = new THREE.Group(), r = e.heavy ? 8 : 5;
-      g.userData.r = r;
-      var core = new THREE.Mesh(services.geo.ball, services.models.glowMat(e.heavy ? "shell-heavy" : "shell-light", e.heavy ? 0xFF7A2A : 0xFFD866, 0.95)); core.scale.setScalar(r); g.add(core);
-      var tail = new THREE.Mesh(services.geo.trail, services.models.glowMat("trail-shell", 0xFFC46A, 0.4)); tail.scale.set(0.01, r * 0.5, r * 0.5); g.add(tail); g.userData.tail = tail;
+      var e = s.e, g = this.shellShelf.take(services.stage.scene), r = e.heavy ? 8 : 5, ud = g.userData;
+      ud.r = r;
+      ud.core.material = services.models.glowMat(e.heavy ? "shell-heavy" : "shell-light", e.heavy ? 0xFF7A2A : 0xFFD866, 0.95); ud.core.scale.setScalar(r);
+      ud.tail.scale.set(0.01, r * 0.5, r * 0.5);
       g.rotation.y = -Math.atan2(e.ty - e.my, e.tx - e.mx);
-      services.stage.scene.add(g);
+      return g;
+    }
+    buildShell() { var services = this.services, g = new THREE.Group();
+      var core = new THREE.Mesh(services.geo.ball, services.models.glowMat("shell-light", 0xFFD866, 0.95)); g.add(core);
+      var tail = new THREE.Mesh(services.geo.trail, services.models.glowMat("trail-shell", 0xFFC46A, 0.4)); g.add(tail);
+      g.userData = { r: 5, core: core, tail: tail };
       return g;
     }
     dropShellVis(s) { var services = this.services;
       if (!s.vis) return;
-      services.stage.scene.remove(s.vis); s.vis = null;
+      s.vis.userData.shelf.give(s.vis); s.vis = null;
     }
     renderShell(s, t) { var services = this.services;
       if (!s.shown) return;
@@ -8854,6 +8859,55 @@ SinglePassMaterials.enable(THREE);
     }
     dispose() { this.rightMesh.dispose(); this.leftMesh.dispose(); }
   }
+  class SpareShelf {
+    static MAX_SPARE = 24;
+    constructor(build) { this.build = build; this.free = []; }
+    prefill(count) { while (this.free.length < count) this.free.push(this.build()); }
+    take(scene) { var root = this.free.pop() || this.build(); root.position.set(0, 0, 0); root.scale.setScalar(1); root.visible = true; root.userData.shelf = this; scene.add(root); return root; }
+    give(root) { if (root.parent) root.parent.remove(root); if (this.free.length < SpareShelf.MAX_SPARE) this.free.push(root); }
+    spareRoots() { return this.free.map(function (root) { root.position.set(ShaderWarmup.PROBE_SPOT, 0, ShaderWarmup.PROBE_SPOT); return root; }); }
+  }
+  class CloudWavePool {
+    static OPACITY = 0.9;
+    constructor(services) { this.services = services; this.shelf = new SpareShelf(this.build.bind(this)); this.matrix = new THREE.Matrix4(); }
+    build() { var g = new THREE.Group(), count = EffectView.CLOUD_PUFFS, lanes = EffectView.CLOUD_LANES, puffs = [];
+      var mat = new THREE.MeshBasicMaterial({ color: 0x0E0A14, transparent: true, opacity: CloudWavePool.OPACITY, depthWrite: false }), mesh = new THREE.InstancedMesh(this.services.geo.ball, mat, count);
+      mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage); mesh.frustumCulled = false; g.add(mesh);
+      for (var i = 0; i < count; i++) puffs.push({ u: (i + 0.5) / count, lane: lanes[i % lanes.length], r: 18 + (i * 7) % 9, phase: i * 1.7 });
+      g.userData = { cloud: this, mat: mat, mesh: mesh, puffs: puffs, line: 0, laneWidth: 0, outline: null };
+      return g;
+    }
+    spawn(d, outline) { var g = this.shelf.take(this.services.stage.scene), ud = g.userData;
+      g.position.set(d.x, 0, d.y); g.rotation.y = -d.angle;
+      ud.line = d.len + ArenaSize.BODY_R; ud.laneWidth = d.width * 0.22; ud.outline = outline;
+      return g;
+    }
+    paint(g, reach, f, nowMs) { var ud = g.userData, grow = (0.7 + 0.3 * reach) * (0.8 + 0.5 * f), matrix = this.matrix;
+      ud.mat.opacity = CloudWavePool.OPACITY * (1 - f * f);
+      ud.puffs.forEach(function (p, i) {
+        var size = p.r * grow;
+        matrix.makeScale(size, size * 0.75, size).setPosition(p.u * ud.line * reach, 16 + 4 * Math.sin(nowMs / 170 + p.phase), p.lane * ud.laneWidth + 4 * Math.sin(nowMs / 140 + p.phase));
+        ud.mesh.setMatrixAt(i, matrix);
+      });
+      ud.mesh.instanceMatrix.needsUpdate = true;
+    }
+  }
+  class FirstUseRehearsal {
+    constructor(services) { this.services = services; this.roots = []; this.closers = []; }
+    finish() { this.closers.forEach(function (close) { close(); }); this.roots = []; this.closers = []; }
+    keep(root, close) { var spot = ShaderWarmup.PROBE_SPOT; root.position.set(spot, root.position.y, spot); this.roots.push(root); this.closers.push(close); }
+    shots(charId, team, isSkill, count) { var pool = this.services.effectView.projPool, spot = ShaderWarmup.PROBE_SPOT;
+      for (var i = 0; i < count; i++) (function (rehearsal, g) { rehearsal.keep(g, function () { if (g.parent) g.parent.remove(g); pool.give(g); }); })(this, pool.takeOrBuild({ x: spot, y: spot, team: team, owner: "", ownerCharacterType: charId, isSkill: isSkill, r: 8, createdAt: 0 }));
+    }
+    fxPiece(f) { var fxView = this.services.fxView; f.mesh = fxView.fxMesh(f); this.keep(f.mesh, function () { fxView.dropFxMesh(f); }); }
+    overcharge() { var services = this.services, ring = [], points = StormbowType.ULT.ocRingPts, r = StormbowType.ULT.ocR + ArenaSize.BODY_R;
+      var melee = services.effectView.makeMeleeVis({ x: 0, y: 0, angle: 0, radius: StormbowType.ULT.ocR, arc: Math.PI * 2, owner: "", u: 1, zap: 1 });
+      this.keep(melee, function () { services.effectView.releaseMeleeVis(melee); });
+      for (var i = 0; i <= points; i++) ring.push([Math.cos(i / points * Math.PI * 2) * r, Math.sin(i / points * Math.PI * 2) * r]);
+      this.fxPiece({ k: "chain", pts: ring, over: 1, segs: FxView.BARRIER_SEGS });
+      this.fxPiece({ k: "chain", pts: [[0, 0], [60, 0], [120, 0]], over: 1 });
+    }
+  }
   class ChainSlamBurst {
     static TEXTURES = null;
     static LIFE_SEC = 0.85;
@@ -8922,7 +8976,7 @@ SinglePassMaterials.enable(THREE);
     }
     aim(d) {
       this.d = d; this.seed = (d.createdAt || 0) % 97; this.ca = Math.cos(d.angle); this.sa = Math.sin(d.angle);
-      this.group.position.set(0, 0, 0); this.group.visible = true;
+      this.group.position.set(0, 0, 0); this.group.scale.setScalar(1); this.group.visible = true;
       this.aimCracks(); this.aimFlash(); this.aimDust(); this.aimBits(); this.aimEmbers();
       this.update(0);
     }
@@ -9040,9 +9094,14 @@ SinglePassMaterials.enable(THREE);
     constructor(services, d) {
       this.group = new THREE.Group();
       this.mat = new THREE.MeshBasicMaterial({ map: ChainSlamBurst.textures().soft, color: BannerBearerRig.GOLD, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
-      var strip = services.arenaView.flatMesh(services.geo.strip, this.mat);
-      strip.scale.set(d.len + 30, d.width * 1.1, 1); strip.position.set(-15, 2.4, 0);
-      this.group.add(strip); this.group.position.set(d.x, 0, d.y); this.group.rotation.y = -d.angle;
+      this.strip = services.arenaView.flatMesh(services.geo.strip, this.mat);
+      this.strip.position.set(-15, 2.4, 0);
+      this.group.add(this.strip);
+      this.aim(d);
+    }
+    aim(d) {
+      this.strip.scale.set(d.len + 30, d.width * 1.1, 1);
+      this.group.position.set(d.x, 0, d.y); this.group.scale.setScalar(1); this.group.rotation.y = -d.angle; this.group.visible = true;
       this.update(0);
     }
     update(sec) { this.mat.opacity = BannerStrikeGlow.OPACITY * MathKit.clamp(1 - sec / BannerStrikeGlow.FADE_SEC, 0, 1); }
@@ -9143,10 +9202,13 @@ SinglePassMaterials.enable(THREE);
   }
   class HammerStrikeView {
     static LIFE_SEC = 0.6;
-    constructor(services) { this.services = services; }
+    constructor(services) { this.services = services; this.spare = []; }
     add(d, burstType) { this.services.field.hammerStrikes.push({ d: d, burstType: burstType, burst: null }); }
+    prefill(count) { while (this.spare.length < count) this.spare.push(new BannerStrikeGlow(this.services, { x: 0, y: 0, angle: 0, len: 120, width: 60, createdAt: 0 })); }
+    spareRoots() { return this.spare.map(function (burst) { burst.group.position.set(ShaderWarmup.PROBE_SPOT, 0, ShaderWarmup.PROBE_SPOT); return burst.group; }); }
+    takeBurst(item) { var burst = this.spare.pop(); if (!burst) return new item.burstType(this.services, item.d); burst.aim(item.d); return burst; }
     lifeMs() { return HammerStrikeView.LIFE_SEC * 1000 * this.services.clock.scale; }
-    drop(item) { if (item.burst) { item.burst.dispose(); item.burst = null; } }
+    drop(item) { var services = this.services; if (item.burst) { services.stage.scene.remove(item.burst.group); services.hammerStrikes.spare.push(item.burst); item.burst = null; } }
     step(t) { var view = this, services = this.services, life = this.lifeMs();
       services.field.hammerStrikes = services.field.hammerStrikes.filter(function (item) {
         if (t < item.d.createdAt + life) return true;
@@ -9156,7 +9218,7 @@ SinglePassMaterials.enable(THREE);
     }
     render(t) { var services = this.services;
       services.field.hammerStrikes.forEach(function (item) {
-        if (!item.burst) { item.burst = new item.burstType(services, item.d); services.stage.scene.add(item.burst.group); }
+        if (!item.burst) { item.burst = services.hammerStrikes.takeBurst(item); services.stage.scene.add(item.burst.group); }
         item.burst.update(Math.max(0, t - item.d.createdAt) / services.clock.scale / 1000);
       });
     }
@@ -9195,7 +9257,7 @@ SinglePassMaterials.enable(THREE);
     }
     makeChainVis(withBlade, withWrap) { var services = this.services;
       var spare = this.spare[this.chainKey(withBlade, withWrap)], vis = (spare && spare.pop()) || this.buildChainVis(withBlade, withWrap);
-      vis.mat.opacity = 1; vis.group.visible = true; vis.group.position.set(0, 0, 0); vis.links.mesh.count = 0;
+      vis.mat.opacity = 1; vis.group.visible = true; vis.group.position.set(0, 0, 0); vis.group.scale.setScalar(1); vis.links.mesh.count = 0;
       services.stage.scene.add(vis.group);
       return vis;
     }
@@ -9475,24 +9537,15 @@ SinglePassMaterials.enable(THREE);
       var meleeType = services.charTypes.of(who), rolling = d.len && services.charTypes.waveOf(who);
       if (!d.zap && meleeType.hidesBasicEdge && !d.u) return this.makeOutlineVis(d, meleeType).root;
       if (!d.zap && !meleeType.hidesBasicEdge && !rolling) return this.makeBladeVis(d, meleeType);
+      if (rolling && meleeType.hasDarkWave && !d.u) return services.cloudWaves.spawn(d, d.zap ? null : this.makeOutlineVis(d, meleeType));
       var g = new THREE.Group(), col = d.zap ? Palette.ZAP_GLOW : d.u ? 0xFF6A3D : (services.charTypes.of(who).meleeColor || 0xFFFFFF);
       var fillM = services.fxMats.acquire("basic", { color: col, transparent: true, opacity: 0.2, depthWrite: false });
-      var darkWave = services.charTypes.of(who).hasDarkWave && !d.u;
-      if (darkWave) fillM.opacity = 0.35;
-      var edgeM = services.fxMats.acquire("basic", { color: darkWave ? 0x0E0A14 : col, transparent: true, opacity: 0.9, depthWrite: false, blending: darkWave ? THREE.NormalBlending : THREE.AdditiveBlending });
-      var fill, edge, puffs = [];
+      var edgeM = services.fxMats.acquire("basic", { color: col, transparent: true, opacity: 0.9, depthWrite: false, blending: THREE.AdditiveBlending });
+      var fill, edge;
       if (d.len) {
         fill = services.arenaView.flatMesh(services.geo.strip, fillM); fill.scale.set(d.len + ArenaSize.BODY_R, d.width, 1);
         edge = services.arenaView.flatMesh(services.geo.strip, edgeM); edge.scale.set(d.len + ArenaSize.BODY_R, Math.max(6, d.width * 0.22), 1);
         if (services.charTypes.of(who).hidesBasicEdge && !d.u) edge.visible = false;
-        if (darkWave) {
-          fill.visible = edge.visible = false;
-          for (var pi = 0; pi < EffectView.CLOUD_PUFFS; pi++) {
-            var puff = new THREE.Mesh(services.geo.ball, edgeM);
-            puffs.push({ mesh: puff, u: (pi + 0.5) / EffectView.CLOUD_PUFFS, lane: EffectView.CLOUD_LANES[pi % EffectView.CLOUD_LANES.length] * d.width * 0.22, r: 18 + (pi * 7) % 9, phase: pi * 1.7 });
-            g.add(puff);
-          }
-        }
       } else {
         var ringRadius = d.radius + ArenaSize.BODY_R;
         fill = services.arenaView.flatMesh(services.models.sectorGeo(ringRadius, d.arc), fillM);
@@ -9500,7 +9553,7 @@ SinglePassMaterials.enable(THREE);
       }
       fill.position.y = 2; edge.position.y = 24;
       g.add(fill); g.add(edge); g.position.set(d.x, 0, d.y); g.rotation.y = -d.angle;
-      g.userData = { fill: fillM, edge: edgeM, edgeMesh: edge, fillMesh: fill, line: d.len ? d.len + ArenaSize.BODY_R : 0, puffs: puffs, outline: rolling && !d.zap && !d.u ? this.makeOutlineVis(d, meleeType) : null };
+      g.userData = { fill: fillM, edge: edgeM, edgeMesh: edge, fillMesh: fill, line: d.len ? d.len + ArenaSize.BODY_R : 0, outline: rolling && !d.zap && !d.u ? this.makeOutlineVis(d, meleeType) : null };
       services.stage.scene.add(g);
       return g;
     }
@@ -9511,7 +9564,7 @@ SinglePassMaterials.enable(THREE);
     }
     makeLungeVis(d) { return this.services.arenaFx.lungeBands.spawn(d.x, d.y, d.angle, d.len + ArenaSize.BODY_R, d.width); }
     dropLungeVis(l) { if (!l.vis) return; this.services.arenaFx.lungeBands.give(l.vis); l.vis = null; }
-    releaseMeleeVis(g) { var services = this.services; if (g.userData.fxVis) { g.userData.fxPool.give(g.userData.fxVis); return; } if (g.userData.outline) services.arenaFx.thrustBlades.give(g.userData.outline); services.stage.scene.remove(g); services.fxMats.release(g.userData.fill); services.fxMats.release(g.userData.edge); }
+    releaseMeleeVis(g) { var services = this.services; if (g.userData.fxVis) { g.userData.fxPool.give(g.userData.fxVis); return; } if (g.userData.outline) services.arenaFx.thrustBlades.give(g.userData.outline); if (g.userData.cloud) { g.userData.shelf.give(g); return; } services.stage.scene.remove(g); services.fxMats.release(g.userData.fill); services.fxMats.release(g.userData.edge); }
     dropMelee(k) { var services = this.services; var g = services.effectView.melees[k]; if (!g) return; services.effectView.releaseMeleeVis(g); delete services.effectView.melees[k]; }
     stormGrain() {
       if (this.stormGrainTex) return this.stormGrainTex;
@@ -9559,7 +9612,7 @@ SinglePassMaterials.enable(THREE);
       services.stage.scene.add(g);
       return g;
     }
-    dropHoleVis(h) { var services = this.services; if (!h.vis) return; services.stage.scene.remove(h.vis); h.vis.userData.mats.forEach(function (m) { m.dispose(); }); h.vis = null; }
+    dropHoleVis(h) { var services = this.services; if (!h.vis) return; if (h.vis.userData.shelf) { h.vis.userData.shelf.give(h.vis); h.vis = null; return; } services.stage.scene.remove(h.vis); h.vis.userData.mats.forEach(function (m) { m.dispose(); }); h.vis = null; }
     renderHole(h, t, nowMs) { var services = this.services;
       var e = h.e, start = e.createdAt + e.delay;
       if (t < start) return;
@@ -9720,9 +9773,16 @@ SinglePassMaterials.enable(THREE);
   }
   class StormView {
     static FLAKE_MATRIX = new THREE.Matrix4();
-    constructor(services) { this.services = services; }
+    constructor(services) { this.services = services; this.shelf = new SpareShelf(this.buildStormVis.bind(this)); }
     makeStormVis(e) { var services = this.services;
-      var g = new THREE.Group();
+      var g = this.shelf.take(services.stage.scene), ud = g.userData, u = ud.floor.uniforms;
+      u.center.value.set(e.x, e.y); u.radius.value = e.r; u.time.value = 0; u.fade.value = 0; u.teamCol.value.set(Palette.C_FX[e.team]); u.mask.value = services.effectView.stormMask(); u.maskRect.value.set(ArenaSize.MAP_X0, ArenaSize.MAP_Y0, services.arenaMap.cols * ArenaSize.TILE, services.arenaMap.rowCount * ArenaSize.TILE);
+      ud.floorMesh.scale.set(e.r * 2, e.r * 2, 1); ud.flakes.rotation.y = 0;
+      ud.flakeList.forEach(function (f, j) { var rr = e.r * (0.12 + 0.82 * ((j * 0.618) % 1)), a = j * 2.4; f.x = Math.cos(a) * rr; f.z = Math.sin(a) * rr; });
+      return g;
+    }
+    buildStormVis() { var services = this.services;
+      var e = { x: 0, y: 0, r: 60, team: "blue" }, g = new THREE.Group();
       var floorMat = new THREE.ShaderMaterial({
         uniforms: { center: { value: new THREE.Vector2(e.x, e.y) }, radius: { value: e.r }, time: { value: 0 }, fade: { value: 0 },
                     teamCol: { value: new THREE.Color(Palette.C_FX[e.team]) }, mask: { value: services.effectView.stormMask() }, grain: { value: services.effectView.stormGrain() },
@@ -9734,17 +9794,12 @@ SinglePassMaterials.enable(THREE);
       var flakeMat = new THREE.MeshBasicMaterial({ color: 0xFFFFFF, transparent: true, opacity: 0.9, depthWrite: false });
       var flakes = new THREE.InstancedMesh(services.geo.ball, flakeMat, EffectView.STORM_FLAKES), flakeList = [];
       flakes.instanceMatrix.setUsage(THREE.DynamicDrawUsage); flakes.frustumCulled = false;
-      for (var j = 0; j < EffectView.STORM_FLAKES; j++) {
-        var rr = e.r * (0.12 + 0.82 * ((j * 0.618) % 1)), a = j * 2.4;
-        flakeList.push({ x: Math.cos(a) * rr, z: Math.sin(a) * rr, size: 3 + (j % 3), ph: j * 0.37 });
-      }
+      for (var j = 0; j < EffectView.STORM_FLAKES; j++) flakeList.push({ x: 0, z: 0, size: 3 + (j % 3), ph: j * 0.37 });
       g.add(flakes);
-      g.userData = { mats: [floorMat, flakeMat], floor: floorMat, flakeMat: flakeMat, flakes: flakes, flakeList: flakeList };
-      g.userData.dropInstances = flakes;
-      services.stage.scene.add(g);
+      g.userData = { floor: floorMat, floorMesh: floor, flakeMat: flakeMat, flakes: flakes, flakeList: flakeList };
       return g;
     }
-    dropStormVis(s) { var services = this.services; if (!s.vis) return; services.stage.scene.remove(s.vis); s.vis.userData.mats.forEach(function (m) { m.dispose(); }); s.vis.userData.dropInstances.dispose(); s.vis = null; }
+    dropStormVis(s) { if (!s.vis) return; s.vis.userData.shelf.give(s.vis); s.vis = null; }
     renderStorm(s, t, dt) { var services = this.services;
       var e = s.e, start = e.createdAt + e.delay, end = start + e.dur;
       if (t < start || t >= end) return;
@@ -9773,7 +9828,8 @@ SinglePassMaterials.enable(THREE);
     static BEHIND = 46;
     static RISE_MS = 420;
     static CHARGE_MS = 800;
-    constructor(services) { this.services = services; this.cache = null; this.facing = new THREE.Vector3(); }
+    constructor(services) { this.services = services; this.cache = null; this.facing = new THREE.Vector3(); this.holeShelf = new SpareShelf(this.buildHole.bind(this)); this.burstShelf = new SpareShelf(this.buildBurst.bind(this)); }
+    spareRoots() { return this.holeShelf.spareRoots().concat(this.burstShelf.spareRoots()); }
     paint(size, draw) {
       var cv = document.createElement("canvas"); cv.width = cv.height = size;
       draw(cv.getContext("2d"), size);
@@ -9838,13 +9894,14 @@ SinglePassMaterials.enable(THREE);
       if (!this.cache) this.cache = { disc: this.paint(256, this.paintDisc), halo: this.paint(256, this.paintHalo), vortex: this.paint(256, this.paintVortex) };
       return this.cache;
     }
-    make(e) { var services = this.services;
+    make(e) { var g = this.holeShelf.take(this.services.stage.scene), ud = g.userData; ud.vortex.scale.setScalar(e.r); ud.edge.scale.setScalar(e.r); return g; }
+    buildHole() { var services = this.services;
       var tx = this.textures(), g = new THREE.Group(), mats = [];
       function mat(opts) { var m = new THREE.MeshBasicMaterial(opts); mats.push(m); return m; }
       var vortex = services.arenaView.flatMesh(services.geo.disc, mat({ map: tx.vortex, transparent: true, depthWrite: false }));
-      vortex.scale.setScalar(e.r); vortex.position.y = 1.6; g.add(vortex);
+      vortex.position.y = 1.6; g.add(vortex);
       var edgeMat = mat({ color: 0xFF9A4A, transparent: true, opacity: 0.8, depthWrite: false, blending: THREE.AdditiveBlending });
-      var edge = services.arenaView.flatMesh(services.geo.ringFx, edgeMat); edge.scale.setScalar(e.r); edge.position.y = 2; g.add(edge);
+      var edge = services.arenaView.flatMesh(services.geo.ringFx, edgeMat); edge.position.y = 2; g.add(edge);
       var tilt = new THREE.Group(); tilt.position.y = GargantuaView.DISC_Y; tilt.rotation.x = 0.1; g.add(tilt);
       var discMat = mat({ map: tx.disc, transparent: true, opacity: 0.78, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
       var disc = services.arenaView.flatMesh(services.geo.disc, discMat); disc.scale.setScalar(GargantuaView.DISC_R); tilt.add(disc);
@@ -9853,11 +9910,11 @@ SinglePassMaterials.enable(THREE);
       var black = new THREE.Mesh(services.geo.disc, mat({ color: 0x000000 })); black.scale.setScalar(GargantuaView.BLACK_R); g.add(black);
       var haloMat = mat({ map: tx.halo, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
       var halo = new THREE.Mesh(services.geo.disc, haloMat); halo.scale.setScalar(GargantuaView.HALO_SCALE); g.add(halo);
-      g.userData = { mats: mats, vortex: vortex, edgeMat: edgeMat, tilt: tilt, disc: disc, disc2: disc2, black: black, halo: halo, haloMat: haloMat };
-      services.stage.scene.add(g);
+      g.userData = { mats: mats, vortex: vortex, edge: edge, edgeMat: edgeMat, tilt: tilt, disc: disc, disc2: disc2, black: black, halo: halo, haloMat: haloMat };
       return g;
     }
-    makeBurst(f) { var services = this.services;
+    makeBurst(f) { var g = this.burstShelf.take(this.services.stage.scene); g.position.set(f.x, 0, f.y); g.userData.r = f.r; return g; }
+    buildBurst() { var services = this.services;
       var tx = this.textures(), g = new THREE.Group(), mats = [], G = GargantuaView;
       function mat(opts) { var m = new THREE.MeshBasicMaterial(opts); mats.push(m); return m; }
       var add = { transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide };
@@ -9867,9 +9924,7 @@ SinglePassMaterials.enable(THREE);
       var dome = new THREE.Mesh(services.geo.ball, mat(Object.assign({ color: 0xFFB060 }, add))); dome.position.y = 40;
       var disc = services.arenaView.flatMesh(services.geo.disc, mat(Object.assign({ map: tx.disc }, add))); disc.position.y = G.DISC_Y;
       [ring1, ring2, flash, dome, disc].forEach(function (m) { g.add(m); });
-      g.position.set(f.x, 0, f.y);
-      g.userData = { mats: mats, r: f.r, ring1: ring1, ring2: ring2, flash: flash, dome: dome, disc: disc };
-      services.stage.scene.add(g);
+      g.userData = { keepsMats: true, mats: mats, r: 0, ring1: ring1, ring2: ring2, flash: flash, dome: dome, disc: disc };
       return g;
     }
     stepBurst(g, k) {
@@ -10913,7 +10968,9 @@ SinglePassMaterials.enable(THREE);
     }
   }
   class FxView {
-    constructor(services) { this.services = services; }
+    constructor(services) { this.services = services; this.bladeZones = new SpareShelf(this.buildBladeZone.bind(this)); this.plain = { spark: new SpareShelf(this.buildPlain.bind(this, "spark")), smoke: new SpareShelf(this.buildPlain.bind(this, "smoke")), flat: new SpareShelf(this.buildPlain.bind(this, "flat")) }; }
+    prefillPlain() { this.plain.spark.prefill(24); this.plain.smoke.prefill(4); this.plain.flat.prefill(6); }
+    buildPlain(kind) { var services = this.services; if (kind === "spark") return new THREE.Mesh(services.geo.ringFx); if (kind === "smoke") return new THREE.Mesh(services.geo.ball); return services.arenaView.flatMesh(services.geo.ringFx); }
     static BOLT_TOP = 520;
     static BOLT_SEGS = 8;
     static BOLT_JITTER = 110;
@@ -10986,26 +11043,32 @@ SinglePassMaterials.enable(THREE);
     }
     dropFxMesh(f) { var services = this.services;
       if (!f.mesh) return;
+      var shelf = f.mesh.userData.shelf;
+      if (shelf && f.mesh.userData.keepsMats) { shelf.give(f.mesh); f.mesh = null; return; }
       services.stage.scene.remove(f.mesh);
       (f.mesh.userData.mats || [f.mesh.material]).forEach(function (m) { services.fxMats.release(m); });
       if (f.mesh.userData.flashMat) services.fxMats.release(f.mesh.userData.flashMat);
       if (f.mesh.userData.boltBatch) services.boltFx.releaseBatch(f.mesh.userData.boltBatch);
+      if (shelf) shelf.give(f.mesh);
       f.mesh = null;
     }
-    bladeZoneMesh(f) { var services = this.services;
-      var g = new THREE.Group(), mats = [];
+    bladeZoneMesh(f) { var g = this.bladeZones.take(this.services.stage.scene), ud = g.userData;
+      g.position.set(f.x, 0, f.y);
+      ud.parts.forEach(function (part) { part.scale.setScalar(f.r); });
+      return g;
+    }
+    buildBladeZone() { var services = this.services;
+      var g = new THREE.Group(), mats = [], parts = [];
       function part(geo, color, opacity, y) {
         var mat = new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: opacity, depthWrite: false, side: THREE.DoubleSide });
         mat.userData.base = opacity; mats.push(mat);
-        var m = services.arenaView.flatMesh(geo, mat); m.position.y = y; m.scale.setScalar(f.r); g.add(m);
+        var m = services.arenaView.flatMesh(geo, mat); m.position.y = y; g.add(m); parts.push(m);
         return m;
       }
       part(services.geo.disc, 0xB0272C, 0.22, 2);
       g.userData.charge = part(services.geo.disc, 0xFFD9C8, 0.3, 2.2);
       part(services.geo.poolEdge, 0xFFFFFF, 0.95, 2.4);
-      g.position.set(f.x, 0, f.y);
-      g.userData.mats = mats;
-      services.stage.scene.add(g);
+      g.userData.mats = mats; g.userData.parts = parts; g.userData.keepsMats = true;
       return g;
     }
     fxMesh(f) { var services = this.services;
@@ -11014,10 +11077,11 @@ SinglePassMaterials.enable(THREE);
       if (f.k === "bladeZone") return services.fxView.bladeZoneMesh(f);
       if (f.k === "holeBurst") return services.gargantua.makeBurst(f);
       var mat = services.fxMats.acquire("basic", { color: f.c, transparent: true, depthWrite: false, side: THREE.DoubleSide }), m;
-      if (f.k === "spark") { m = new THREE.Mesh(services.geo.ringFx, mat); m.position.set(f.x, 36, f.y); }
-      else if (f.k === "smoke") { m = new THREE.Mesh(services.geo.ball, mat); m.position.set(f.x, 30, f.y); }
-      else { m = services.arenaView.flatMesh(services.geo.ringFx, mat); m.position.set(f.x, 3, f.y); }
-      services.stage.scene.add(m);
+      m = this.plain[f.k === "spark" || f.k === "smoke" ? f.k : "flat"].take(services.stage.scene);
+      m.material = mat;
+      if (f.k === "spark") m.position.set(f.x, 36, f.y);
+      else if (f.k === "smoke") m.position.set(f.x, 30, f.y);
+      else m.position.set(f.x, 3, f.y);
       return m;
     }
     stepFx(nowMs) { var services = this.services;
@@ -11487,17 +11551,13 @@ SinglePassMaterials.enable(THREE);
         if (g.userData.stab) { services.effectView.placeStabLine(g, m.d, f); return; }
         if (g.userData.fxVis) { g.userData.fxPool.paint(g.userData.fxVis, f); return; }
         if (g.userData.outline) services.arenaFx.thrustBlades.paint(g.userData.outline, f);
+        if (g.userData.cloud) { g.userData.cloud.paint(g, Math.max(0.03, Math.min(1, age / wave.travel)), f, nowMs); return; }
         g.userData.fill.opacity = 0.2 * (1 - f);
         g.userData.edge.opacity = 0.9 * (1 - (wave ? f * f : f));
         if (wave) {
           var reach = Math.max(0.03, Math.min(1, age / wave.travel));
           g.userData.edgeMesh.scale.x = g.userData.line * reach;
           g.userData.fillMesh.scale.x = g.userData.line * reach;
-          g.userData.puffs.forEach(function (p) {
-            var grow = (0.7 + 0.3 * reach) * (0.8 + 0.5 * f);
-            p.mesh.position.set(p.u * g.userData.line * reach, 16 + 4 * Math.sin(nowMs / 170 + p.phase), p.lane + 4 * Math.sin(nowMs / 140 + p.phase));
-            p.mesh.scale.set(p.r * grow, p.r * grow * 0.75, p.r * grow);
-          });
         } else if (g.userData.line) g.userData.edgeMesh.scale.x = g.userData.line * (0.55 + 0.45 * Math.min(1, f * 3));
         else g.userData.edgeMesh.scale.setScalar(0.85 + 0.2 * f);
       });
@@ -12285,7 +12345,7 @@ SinglePassMaterials.enable(THREE);
     }
   }
   class PerfProbe {
-    static BUILD = "lag22";
+    static BUILD = "lag23";
     static PATH = "perfDiag/teambattle/";
     static RTT_KEEP = 50;
     static RECORDS = !Environment.SILENT_RUN;
@@ -12599,7 +12659,7 @@ SinglePassMaterials.enable(THREE);
     static PROBE_SPOT = -9000;
     static DOT_PX = 24;
     static DOT_SCALE = 0.04;
-    constructor(services) { this.services = services; this.effectsWarmed = false; }
+    constructor(services) { this.services = services; this.effectsWarmed = false; this.rehearsal = new FirstUseRehearsal(services); }
     sampleShots() { var services = this.services, P = ShaderWarmup.PROBE_SPOT;
       return services.charTypes.list.map(function (c) {
         var g = new THREE.Group();
@@ -12701,6 +12761,7 @@ SinglePassMaterials.enable(THREE);
       this.paintRealPixels(objects);
       shown.forEach(function (o) { o.visible = false; });
       objects.forEach(function (obj) { if (obj.parent) obj.parent.remove(obj); });
+      this.rehearsal.finish();
       renderer.render(scene, camera);
     }
     matchStarting() { this.formsPending = true; this.prefillPooledViews(); }
@@ -12716,6 +12777,8 @@ SinglePassMaterials.enable(THREE);
       var snipers = this.castersByTeam("sniper"), sniperCount = snipers.blue + snipers.red, guardians = this.castersByTeam("guardian"), guardianCount = guardians.blue + guardians.red;
       var rogues = this.castersByTeam("rogue"), rangers = this.castersByTeam("ranger"), knights = this.castersByTeam("knight"), throwers = this.castersByTeam("thrower"), shamans = this.castersByTeam("shaman"), stargazers = this.castersByTeam("astrologer"), throwerCount = throwers.blue + throwers.red, starCount = (stargazers.blue + stargazers.red) * 2;
       var wraiths = this.castersByTeam("wraith"); services.hookView.prefill(wraiths.blue + wraiths.red);
+      this.prefillReusedFx();
+      this.rehearseFirstUses();
       services.arenaFx.prefillForMatch({ toxicPools: throwerCount * (ThrowerType.ULT.plMax + 1), domains: shamans.blue + shamans.red, starfalls: starCount, stealthBursts: rogues.blue + rogues.red });
       services.poolView.prefillBottles(throwerCount * 2);
       services.hitmanSlashView.prefill(hitmanCount * 3);
@@ -12725,13 +12788,32 @@ SinglePassMaterials.enable(THREE);
       services.impactBlasts.prefill(mageCount + (smiths.blue + smiths.red) * 2 + giantCount * 2 + hitmanCount + sniperCount + guardianCount + starCount + knights.blue + knights.red);
       if (clerics.blue + clerics.red) services.revGraceView.prefillBeams(RevGraceView.MAX_BEAMS);
       ["blue", "red"].forEach(function (team) {
-        services.fighterView.prefillMinions(team, necros[team] * NecroType.ULT.smMax);
+        services.fighterView.prefillMinions(team, necros[team] * (NecroType.ULT.smMax + 2));
         if (services.models.kit.propsReady) services.turrets.prefill(team, engineers[team] * EngineerType.ULT.trMax);
       });
       if (services.models.kit.propsReady) services.groves.prefill(druids.blue + druids.red);
     }
+    prefillReusedFx() { var services = this.services, total = function (count) { return count.blue + count.red; };
+      var dancers = total(this.castersByTeam("dancer")), bearers = total(this.castersByTeam("bearer")), shamans = total(this.castersByTeam("shaman")), stargazers = total(this.castersByTeam("astrologer")), frosts = total(this.castersByTeam("frost")), engineers = total(this.castersByTeam("engineer"));
+      services.fxView.prefillPlain();
+      services.fxView.bladeZones.prefill(dancers);
+      services.hammerStrikes.prefill(bearers * 2);
+      services.cloudWaves.shelf.prefill(shamans * 2);
+      services.gargantua.holeShelf.prefill(stargazers);
+      services.gargantua.burstShelf.prefill(stargazers);
+      services.stormView.shelf.prefill(frosts);
+      services.turrets.shellShelf.prefill(engineers * 8);
+    }
+    rehearseFirstUses() { var rehearsal = this.rehearsal, druids = this.castersByTeam("druid"), hitmen = this.castersByTeam("hitman"), stormbows = this.castersByTeam("stormbow");
+      rehearsal.finish();
+      ["blue", "red"].forEach(function (team) {
+        rehearsal.shots("druid", team, false, druids[team] * 2);
+        rehearsal.shots("hitman", team, true, hitmen[team]);
+      });
+      if (stormbows.blue + stormbows.red) rehearsal.overcharge();
+    }
     warmObjects() { var services = this.services;
-      return (this.kept || []).concat(services.fighterView.spareMinionRoots(), services.turrets.spareRoots(), services.groves.spare, services.revGraceView.spareBeamRoots(), services.meteorFall.spareRoots(), services.galeView.spareRoots(), services.impactBlasts.spareRoots(), services.hitmanSlashView.spareRoots(), services.sniperShots.spareRoots(), services.arenaFx.spareRoots(ShaderWarmup.PROBE_SPOT), services.hookView.spareRoots());
+      return (this.kept || []).concat(services.fxView.bladeZones.spareRoots(), services.hammerStrikes.spareRoots(), services.cloudWaves.shelf.spareRoots(), services.gargantua.spareRoots(), services.stormView.shelf.spareRoots(), this.rehearsal.roots, services.fighterView.spareMinionRoots(), services.turrets.spareRoots(), services.groves.spare, services.revGraceView.spareBeamRoots(), services.meteorFall.spareRoots(), services.galeView.spareRoots(), services.impactBlasts.spareRoots(), services.hitmanSlashView.spareRoots(), services.sniperShots.spareRoots(), services.arenaFx.spareRoots(ShaderWarmup.PROBE_SPOT), services.hookView.spareRoots());
     }
   }
   class FramePhaseMeter {
@@ -13300,6 +13382,7 @@ SinglePassMaterials.enable(THREE);
       services.domainView = new DomainView(services);
       services.revGraceView = new RevGraceView(services);
       services.stormView = new StormView(services);
+      services.cloudWaves = new CloudWavePool(services);
       services.gargantua = new GargantuaView(services);
       services.galeView = new GolemGaleView(services);
       services.meteorFall = new MeteorFallView(services);
