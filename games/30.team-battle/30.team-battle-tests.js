@@ -2646,6 +2646,21 @@ class ResultCollector {
     } finally { roster.rows = realRows; board.update(false); }
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "6행·7열·팀 구분선·변경 때만 다시 그림·숨김");
   });
+  run(FLOWG, "경기 종료 2초 배너: 선수는 승리(파랑)·패배(빨강), 관전자는 'OO팀 승리!'(흰 글자·팀색 테두리), 무승부, 2초가 지나면 꺼지는가", function (done) {
+    var bad = [], B = api.END_BANNER;
+    var win = B.wordsFor("blue", "blue"), lose = B.wordsFor("blue", "red"), blueSpec = B.wordsFor("blue", null), redSpec = B.wordsFor("red", null), draw = B.wordsFor("draw", "blue");
+    if (win.text !== "승리!" || win.color !== "#5B9BFF") bad.push("승리 " + JSON.stringify(win));
+    if (lose.text !== "패배!" || lose.color !== "#FF4D45") bad.push("패배 " + JSON.stringify(lose));
+    if (blueSpec.text !== "블루팀 승리!" || blueSpec.color !== "#FFFFFF" || !blueSpec.edge) bad.push("관전 블루 " + JSON.stringify(blueSpec));
+    if (redSpec.text !== "레드팀 승리!" || redSpec.edge === blueSpec.edge) bad.push("관전 레드 " + JSON.stringify(redSpec));
+    if (draw.text !== "무승부!") bad.push("무승부 " + JSON.stringify(draw));
+    var now = api.CLOCK.now(), fake = function (status, endedAt) { return { status: status, endedAt: endedAt }; };
+    if (!B.isOn(fake("ended", now - 500))) bad.push("0.5초 뒤 꺼짐");
+    if (B.isOn(fake("ended", now - 2500))) bad.push("2.5초 뒤에도 켜짐");
+    if (B.isOn(fake("playing", now - 500))) bad.push("진행 중인데 켜짐");
+    if (B.isOn(fake("ended", 0))) bad.push("종료 시각이 없는데 켜짐");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "승·패·관전·무승부 글자와 2초 판정 확인");
+  });
   run(FLOWG, "로비 → 드래프트: 지난 판 결과(로스터·승패·통계 메모·투사체)를 지우고 방 상태가 draft 로 바뀌는가", function (done) {
     withDraft([], function (S) {
       var bad = [];

@@ -100,7 +100,6 @@
   .specList .none { color: var(--sg-ink-faint); font-weight: 400; }
 
   .specPanel { position: absolute; top: 236px; bottom: 28px; width: 340px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: flex-start; gap: 12px; pointer-events: none; }
-  #specCode { position: absolute; left: 12px; bottom: 6px; font-size: 13px; font-weight: 800; color: rgba(255,255,255,.8); pointer-events: none; text-shadow: 0 1px 2px rgba(0,0,0,.6); }
   .specPanel.blue { left: 8px; }
   .specPanel.red { right: 8px; }
   .spCard { flex: 0 1 166px; display: flex; gap: 12px; align-items: center; background: rgba(16,24,19,.86); color: #F4F1E8; border-radius: 10px; padding: 10px 12px; border: 2px solid transparent; box-sizing: border-box; }
@@ -219,8 +218,13 @@
   #hudTimer.tick { animation: timerTick 1s ease-out; }
   @keyframes timerTick { 0% { transform: scale(1); } 18% { transform: scale(1.35); } 100% { transform: scale(1); } }
   #hudCount { font-size: 13px; font-weight: 800; }
-  #killFeed { position: absolute; top: 50%; right: 8px; transform: translateY(-50%); display: flex; flex-direction: column; align-items: flex-end; gap: 4px; pointer-events: none; }
-  #killFeed.spec { top: 84px; right: auto; left: 50%; transform: translateX(-50%); align-items: center; }
+  #killFeed { position: absolute; top: 64px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 6px; width: max-content; max-width: 56vw; pointer-events: none; }
+  #endBanner { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 6; padding: 14px 72px 18px; border: 4px solid transparent; border-radius: 14px; background: rgba(0,0,0,.62); font-size: 84px; font-weight: 800; line-height: 1.15; white-space: nowrap; pointer-events: none; animation: endBannerIn .25s ease-out; }
+  #endBanner[hidden] { display: none; }
+  #scrGame.spec #endBanner { font-size: 64px; padding: 12px 48px 16px; }
+  @keyframes endBannerIn { from { opacity: 0; transform: translate(-50%, -50%) scale(.8); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
+  #hudRight { position: absolute; top: 8px; right: 8px; display: flex; align-items: center; gap: 8px; pointer-events: none; }
+  #hudRight .room-code-tag { position: static; transform: none; margin: 0; }
   #killBanner { position: absolute; top: 24%; left: 50%; transform: translateX(-50%); pointer-events: none; white-space: nowrap; padding: 5px 16px; border-radius: 8px;
                 background: rgba(14,20,17,.72); border: 1px solid rgba(255,255,255,.14); border-bottom: 2px solid #D97B4F; color: #F4F1E8; font-size: 18px; font-weight: 800; opacity: 0; }
   #killBanner .kbHead { color: #D97B4F; margin-right: 8px; }
@@ -230,14 +234,14 @@
   #killBanner small { margin-left: 3px; font-size: 12px; font-weight: 700; color: rgba(244,241,232,.6); }
   #killBanner.show { animation: killBannerPop 1.1s ease-out forwards; }
   @keyframes killBannerPop { 0% { opacity: 0; transform: translateX(-50%) scale(.7); } 12% { opacity: 1; transform: translateX(-50%) scale(1.08); } 22% { transform: translateX(-50%) scale(1); } 75% { opacity: 1; } 100% { opacity: 0; transform: translateX(-50%) translateY(-8px); } }
-  .kf { display: flex; align-items: center; gap: 8px; white-space: nowrap; padding: 4px 12px; border-radius: 8px; font-size: 14px; font-weight: 800; color: #F4F1E8;
-        background: rgba(14,20,17,.78); border: 1px solid rgba(255,255,255,.14); box-shadow: 0 4px 12px rgba(0,0,0,.25); animation: kfIn .18s ease-out; }
+  .kf { display: flex; align-items: center; gap: 10px; white-space: nowrap; padding: 8px 18px; border-radius: 6px; font-size: 20px; font-weight: 800; color: #F4F1E8;
+        background: rgba(14,20,17,.82); border: 1px solid rgba(255,255,255,.14); box-shadow: 0 4px 12px rgba(0,0,0,.25); animation: kfIn .18s ease-out; }
   .kf.mine { border-color: #D97B4F; box-shadow: 0 0 0 1px #D97B4F, 0 4px 12px rgba(0,0,0,.25); }
   .kf .b { color: #6FA8FF; }
   .kf .r { color: #FF7A70; }
-  .kf small { font-size: 11px; font-weight: 700; color: rgba(244,241,232,.6); }
-  .kfArrow { color: #D97B4F; font-size: 12px; }
-  .kfStreak { margin-left: 4px; padding: 1px 7px; border-radius: 5px; font-size: 12px; font-weight: 800; color: #1B130E; background: #D97B4F; }
+  .kf small { font-size: 14px; font-weight: 700; color: rgba(244,241,232,.6); }
+  .kfArrow { color: #D97B4F; font-size: 16px; }
+  .kfStreak { margin-left: 4px; padding: 2px 10px; border-radius: 5px; font-size: 16px; font-weight: 800; color: #1B130E; background: #D97B4F; }
   .kfStreak.triple { background: #FFCF5A; box-shadow: 0 0 8px rgba(255,207,90,.7); }
   .kfStreak.quadra { background: #FF8A3D; color: #fff; box-shadow: 0 0 10px rgba(255,138,61,.8); }
   .kfStreak.penta { background: #E0413A; color: #fff; box-shadow: 0 0 12px rgba(255,80,70,.9); animation: kfPenta .6s ease-in-out infinite alternate; }
@@ -288,7 +292,7 @@
     #liveBoard td.nm { max-width: 44px; }
     #liveBoard .dot { width: 6px; height: 6px; }
   }
-  #btnLeaveGame { position: absolute; top: 8px; right: 8px; height: 34px; padding: 0 12px; font-size: 14px; font-weight: 800; border-radius: 6px; border: 1px solid rgba(255,138,138,.6); background: rgba(14,20,17,.8); color: #FF9A9A; }
+  #btnLeaveGame { position: static; height: 34px; padding: 0 12px; font-size: 14px; font-weight: 800; border-radius: 6px; border: 1px solid rgba(255,138,138,.6); background: rgba(14,20,17,.8); color: #FF9A9A; }
   #practiceBar { position: absolute; top: 8px; right: 8px; display: flex; flex-direction: column; align-items: stretch; gap: 6px; pointer-events: auto; }
   #practiceBar button { height: 34px; padding: 0 12px; font-size: 14px; font-weight: 800; border-radius: 6px; border: 1px solid rgba(255,255,255,.28); border-bottom: 2px solid #D97B4F; background: rgba(14,20,17,.82); color: #F4F1E8; white-space: nowrap; }
   #practiceBar #btnPracExit { border-color: rgba(255,138,138,.6); color: #FF9A9A; }
@@ -534,7 +538,10 @@
     #hudMid { padding: 0 6px; }
     #btnLeaveGame { padding: 0 8px; font-size: 13px; }
     #killBanner { font-size: 15px; padding: 4px 12px; }
-    .kf { font-size: 12px; padding: 3px 8px; gap: 5px; }
+    .kf { font-size: 15px; padding: 4px 12px; gap: 6px; }
+    .kf small { font-size: 11px; }
+    #killFeed { gap: 3px; }
+    #endBanner { font-size: 44px; padding: 10px 32px 12px; }
     .dfTitle, .dfMap { font-size: 19px; }
     .dfTimer { font-size: 30px; }
     .dfSteps { gap: 4px; }

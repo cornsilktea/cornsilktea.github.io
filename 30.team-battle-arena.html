@@ -182,17 +182,16 @@
     <div class="hdSide b"><span>블루 킬</span><b id="hudKillB">0</b></div>
     <div id="hudMid"><div id="hudTimer">1:30</div><div id="hudCount"></div></div>
     <div class="hdSide r" data-fps-beside><span>레드 킬</span><b id="hudKillR">0</b></div>
-    <div class="room-code-tag" id="hudRoomCode"></div>
   </div>
   <div id="killFeed"></div>
   <div id="killBanner"></div>
-  <button id="btnLeaveGame" type="button">방 나가기</button>
+  <div id="hudRight"><div class="room-code-tag" id="hudRoomCode"></div><button id="btnLeaveGame" type="button">방 나가기</button></div>
+  <div id="endBanner" hidden></div>
   <div id="practiceBar" hidden><button id="btnPracExit" type="button">연습장 나가기</button><button id="btnPracChar" type="button">캐릭터 변경</button><button id="btnPracGauge" type="button">스킬 게이지 채우기(H)</button></div>
   <div id="practiceInfo" hidden></div>
   <div id="liveBoard" hidden><table><thead><tr><th></th><th class="nm">닉네임</th><th class="nm job">직업</th><th>처치</th><th>쓰러짐</th><th>어시스트</th><th>입힌 피해</th></tr></thead><tbody id="liveBoardBody"></tbody></table></div>
   <div id="specL" class="specPanel blue" hidden></div>
   <div id="specR" class="specPanel red" hidden></div>
-  <div id="specCode" hidden></div>
   <div id="btnUlt" class="actBtn"><div class="fill"></div><div class="readyFace"></div><span>스킬</span></div>
   <div id="btnAtk" class="actBtn"><div class="cd"></div><span>공격</span></div>
   <div id="deadMsg" hidden></div>
@@ -402,6 +401,7 @@ SinglePassMaterials.enable(THREE);
     frameRenderer;
     resultBoard;
     liveBoard;
+    endBanner;
     hud;
     hudBars;
     overlaySprites;
@@ -11819,6 +11819,30 @@ SinglePassMaterials.enable(THREE);
       el.style.color = won ? ResultTitle.WIN_COLOR : ResultTitle.LOSE_COLOR;
     }
   }
+  class MatchEndBanner {
+    static SHOW_MS = 2000;
+    static WIN_COLOR = "#5B9BFF";
+    static LOSE_COLOR = "#FF4D45";
+    static NEUTRAL_COLOR = "#FFFFFF";
+    constructor(services) { this.services = services; }
+    isOn(room) { return room.status === "ended" && !!room.endedAt && this.services.clock.now() - room.endedAt < MatchEndBanner.SHOW_MS; }
+    wordsFor(winner, myTeam) {
+      if (winner === "draw") return { text: "무승부!", color: MatchEndBanner.NEUTRAL_COLOR };
+      if (!ResultTitle.TEAM_TEXT[winner]) return { text: "게임 종료", color: MatchEndBanner.NEUTRAL_COLOR };
+      if (!myTeam) return { text: ResultTitle.TEAM_TEXT[winner], color: MatchEndBanner.NEUTRAL_COLOR, edge: ResultTitle.TEAM_COLOR[winner] };
+      var won = winner === myTeam;
+      return { text: won ? "승리!" : "패배!", color: won ? MatchEndBanner.WIN_COLOR : MatchEndBanner.LOSE_COLOR };
+    }
+    update() { var services = this.services, room = services.session.room, banner = Dom.$("endBanner"), on = this.isOn(room);
+      Dom.show(banner, on);
+      if (!on) return false;
+      var words = this.wordsFor(room.winner, services.match.me ? services.match.me.team : null);
+      Dom.setText(banner, words.text);
+      banner.style.color = words.color;
+      banner.style.borderColor = words.edge || "transparent";
+      return true;
+    }
+  }
   class MyStatsWindow {
     static LOGIN_NEEDED = AccountLoginNotice.STATS_LOGIN_NEEDED;
     static NOT_READY = AccountLoginNotice.NOT_READY;
@@ -11999,9 +12023,8 @@ SinglePassMaterials.enable(THREE);
       Dom.setText(Dom.$("hudKillB"), String(s.blueKills)); Dom.setText(Dom.$("hudKillR"), String(s.redKills));
       services.overtime.paintHud(st, s);
       var spec = !services.match.me;
-      Dom.$("scrGame").classList.toggle("spec", spec); Dom.$("killFeed").classList.toggle("spec", spec);
-      services.liveBoard.update(!practice); Dom.show(Dom.$("specL"), spec); Dom.show(Dom.$("specR"), spec); Dom.show(Dom.$("specCode"), spec);
-      if (spec) Dom.setText(Dom.$("specCode"), "방 코드 " + services.session.room.code);
+      Dom.$("scrGame").classList.toggle("spec", spec);
+      services.liveBoard.update(!practice); Dom.show(Dom.$("specL"), spec); Dom.show(Dom.$("specR"), spec);
       if (spec) {
         Dom.setHtml(Dom.$("specL"), services.hud.specPanel("blue"));
         Dom.setHtml(Dom.$("specR"), services.hud.specPanel("red"));
@@ -12033,7 +12056,8 @@ SinglePassMaterials.enable(THREE);
         var beepKey = cd > 0 ? Math.ceil(cd / 1000) : 0;
         if (services.match.game.beeped !== beepKey) { services.match.game.beeped = beepKey; services.sound.sfx(beepKey > 0 ? "beep" : "go"); }
       }
-      if (st === "ended") {
+      var endBannerOn = services.endBanner.update();
+      if (st === "ended" && !endBannerOn) {
         var w = services.session.room.winner, f = services.session.room.final || {};
         Dom.show(Dom.$("endOv"), true);
         Dom.$("endOv").className = w === "blue" ? "blue" : (w === "red" ? "red" : "draw");
@@ -12597,7 +12621,7 @@ SinglePassMaterials.enable(THREE);
       var tag = Dom.$("hudRoomCode"), rect = tag.getBoundingClientRect(), beside = rect.width > 0;
       var dot = beside ? rect.height : BadConnectionBanner.DOT_PX;
       this.box.style.width = this.box.style.height = dot + "px";
-      this.box.style.left = (beside ? rect.right + 5 : window.innerWidth / 2 - dot / 2) + "px";
+      this.box.style.left = (beside ? rect.left - dot - 5 : window.innerWidth / 2 - dot / 2) + "px";
       this.box.style.top = (beside ? rect.top + (rect.height - dot) / 2 : 56) + "px";
     }
     setVisible(on) {
@@ -13063,7 +13087,7 @@ SinglePassMaterials.enable(THREE);
       bindRoom: function (fakeRoom, players) { services.session.room = fakeRoom; services.session.players = players; },
       unbindRoom: function () { services.session.room = null; services.session.players = {}; },
       setMyId: function (id) { var before = services.session.myId; services.session.myId = id; return before; },
-      HUD: services.hud, LIVE_BOARD: services.liveBoard, RESULT_BOARD: services.resultBoard,SOUND: services.sound, BACKEND: services.backend, TIMESCALE: services.timescale, THREE: THREE, CAMERA_RIG: services.cameraRig, ARENA_VIEW: services.arenaView, PROPS: services.props, PROP_THEMES: services.propThemes, camera: services.stage.camera, overlay: Canvases.overlay, QA: services.quality, PIX_MIN: Environment.PIX_MIN, PIX_START: Environment.PIX_START, SCENERY: services.arenaView.scenery,
+      HUD: services.hud, LIVE_BOARD: services.liveBoard, END_BANNER: services.endBanner,RESULT_BOARD: services.resultBoard,SOUND: services.sound, BACKEND: services.backend, TIMESCALE: services.timescale, THREE: THREE, CAMERA_RIG: services.cameraRig, ARENA_VIEW: services.arenaView, PROPS: services.props, PROP_THEMES: services.propThemes, camera: services.stage.camera, overlay: Canvases.overlay, QA: services.quality, PIX_MIN: Environment.PIX_MIN, PIX_START: Environment.PIX_START, SCENERY: services.arenaView.scenery,
       setDb: function (fake) { var before = services.backend.db; services.backend.db = fake; return before; },
       setTestLink: function (flag) { var before = services.backend.isTestLink; services.backend.isTestLink = flag; return before; },
       MAP_X0: ArenaSize.MAP_X0, MAP_Y0: ArenaSize.MAP_Y0, TSUNAMI_LANES: services.tsunamiLanes, TsunamiLanes: TsunamiLanes, MARINA_STREAMS: services.marinaStreams, MARINA_BOT: services.marinaBot, TridentProp: TridentProp, HOOK_PATH: services.hookPath, HOOK_PULL: services.hookPull, HOOK_VIEW: services.hookView, playersNow: function () { return services.session.players; }, HAMMER_STRIKES: services.hammerStrikes, HammerBasicBlast: HammerBasicBlast, BANNER_AURA: services.bannerAura, BANNER_LEDGER: services.bannerLedger, BannerCreditLedger: BannerCreditLedger, makeBannerGlow: function (d) { return new BannerStrikeGlow(services, d); }, BannerStrikeGlow: BannerStrikeGlow, BannerBearerRig: BannerBearerRig, DraggedChain: DraggedChain, WraithChainRig: WraithChainRig, ChainSlamBurst: ChainSlamBurst, FIGHTER_VIEW: services.fighterView, GEO: services.geo, FRAME_RENDERER: services.frameRenderer, stage: services.stage, CHAR_TYPES: services.charTypes, AUTO_AIM: services.autoAim, AUTO_AIM_ERR: AutoAim.AUTO_AIM_ERR, AUTO_AIM_LEAD: AutoAim.AUTO_AIM_LEAD, FullscreenKeeper: FullscreenKeeper, DRAFT_AI: services.draftAi,
@@ -13450,6 +13474,7 @@ SinglePassMaterials.enable(THREE);
       services.frameRenderer = new FrameRenderer(services);
       services.resultBoard = new ResultBoard(services);
       services.liveBoard = new LiveScoreboard(services);
+      services.endBanner = new MatchEndBanner(services);
       services.hud = new Hud2D(services);
       services.hudBars = new HudBars(services);
       services.overlaySprites = new OverlayTextSprites(services);
