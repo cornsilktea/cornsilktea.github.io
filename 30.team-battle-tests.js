@@ -1121,25 +1121,26 @@ class ResultCollector {
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "기본 공격 " + api.CHARS.mage.dmg + " + 화상 " + (want - api.CHARS.mage.dmg) + " = " + want + ", 화상 중에만 회복 절반");
   });
 
-  run(PASSIVE2, "투척병: 독병·독안개 위의 적만 회복이 절반이고, 화상과 겹쳐도 절반 1회만 적용되는가", function (done) {
-    var y = OPEN_Y.forest;
+  run(PASSIVE2, "투척병: 적중한 적이 " + api.secs(api.CHARS.thrower.poison.ms) + "간 중독되어 1초당 최대 체력의 " + api.CHARS.thrower.poison.maxHpRate * 100 + "%의 피해를 입고, 그동안 회복이 절반이며 화상과 겹쳐도 절반 1회만 적용되는가", function (done) {
+    var y = OPEN_Y.forest, poison = api.CHARS.thrower.poison;
     var W = world("forest", [
       { id: "th", team: "blue", char: "thrower", x: 250, y: y },
       { id: "mg", team: "blue", char: "mage", x: 250, y: y - 200 },
-      { id: "foe", team: "red", char: "knight", x: 450, y: y },
-      { id: "al", team: "blue", char: "knight", x: 450, y: y + 20 }
+      { id: "foe", team: "red", char: "warrior", x: 450, y: y }
     ]);
-    var foe = W.ent("foe"), al = W.ent("al"), bad = [];
-    foe.hp = al.hp = 100;
-    api.fireBasic(W.ent("th"), 0, 200);
-    W.step(900);
-    if (!api.healCut(foe, W.t())) bad.push("독병 위의 적 회복 감소 없음");
-    if (api.healCut(al, W.t())) bad.push("아군까지 회복 감소");
+    var foe = W.ent("foe"), bad = [];
+    api.damage(foe, api.CHARS.thrower.dmg, "th", 1, null);
+    if (!api.healCut(foe, W.t())) bad.push("중독 중 회복 감소 없음");
+    if (api.healAmount(foe, 10, W.t()) !== 5) bad.push("회복 10 → " + api.healAmount(foe, 10, W.t()));
     api.damage(foe, api.CHARS.mage.dmg, "mg", 2, null);
-    if (api.healAmount(foe, 20, W.t()) !== 10) bad.push("독병+화상 회복 20 → " + api.healAmount(foe, 20, W.t()));
-    W.step(Math.max(api.ULT.plDur, api.CHARS.mage.burn.ms) + 500);
-    if (api.healCut(foe, W.t())) bad.push("독병이 사라져도 회복 감소 남음");
-    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "독병 위 적만 절반, 화상과 겹쳐도 절반");
+    if (api.healAmount(foe, 20, W.t()) !== 10) bad.push("중독+화상 회복 20 → " + api.healAmount(foe, 20, W.t()));
+    W.step(Math.max(poison.ms, api.CHARS.mage.burn.ms) + 500);
+    var poisonLost = Math.round(foe.maxHp * poison.maxHpRate) * Math.round(poison.ms / api.TIMESCALE.burnTickMs);
+    var burnLost = Math.round(foe.maxHp * api.CHARS.mage.burn.maxHpRate) * Math.round(api.CHARS.mage.burn.ms / api.TIMESCALE.burnTickMs);
+    var want = api.CHARS.thrower.dmg + api.CHARS.mage.dmg + poisonLost + burnLost, lost = foe.maxHp - foe.hp;
+    if (lost !== want) bad.push("받은 피해 " + lost + " (기대 " + want + ")");
+    if (api.healCut(foe, W.t())) bad.push("중독·화상이 끝나도 회복 감소 남음");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "중독 피해 " + poisonLost + ", 중독 중에만 회복 절반, 화상과 겹쳐도 절반");
   });
 
   run(PASSIVE2, "기사: 모든 피해가 1회마다 " + api.CHARS.knight.armor + " 줄고(방어태세는 배율 먼저), 줄어든 만큼 막은 피해에 쌓이는가", function (done) {
@@ -1162,7 +1163,7 @@ class ResultCollector {
     if (kn.blocked - blocked0 !== 30 - guarded) bad.push("방어태세 막은 피해 " + (kn.blocked - blocked0));
     kn.buffUntil = 0;
     api.fireBasic(W.ent("th"), 0, 200);
-    W.step(4000);
+    for (var i = 0; i < 40; i++) { W.step(100); k2.poisonUntil = 0; k2.poisonNext = 0; }
     var tick = api.CHARS.thrower.dmg - armor;
     if (k2.maxHp - k2.hp !== tick * api.CHARS.thrower.ticks) bad.push("독병 → " + (k2.maxHp - k2.hp) + " (기대 " + tick * api.CHARS.thrower.ticks + ")");
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "화살 " + (15 - armor) + "×2, 독병 " + tick + "×" + api.CHARS.thrower.ticks + ", 방어태세 중 30 → " + (Math.round(30 * api.ULT.tkDef) - armor) + ", 막은 피해 기록");
@@ -7445,7 +7446,7 @@ class SkillResetTests {
         var W = kit.world("forest", [{ id: "th", team: "blue", char: "thrower", x: 200, y: y, gauge: api.GAUGE_MAX }, { id: "foe", team: "red", char: "guardian", x: 500, y: y }]), th = W.ent("th"), foe = W.ent("foe");
         for (var i = 0; i < basics; i++) api.fireBasic(th, 0, 300);
         if (fog) api.useUlt(th, 0, 300);
-        W.step(ULT.fgDur + 2000);
+        for (var i = 0; i < (ULT.fgDur + 2000) / 100; i++) { W.step(100); foe.poisonUntil = 0; foe.poisonNext = 0; }
         return foe.maxHp - foe.hp;
       }
       var one = measure(1, false), fog = measure(0, true), both = measure(1, true), two = measure(2, false);

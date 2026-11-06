@@ -2240,7 +2240,7 @@ SinglePassMaterials.enable(THREE);
   class NetState {
     constructor(services) { this.services = services; }
     static NET_MS = 143;
-    static STATE_TIMES = ["diedAt", "atkAt", "ultUntil", "buffUntil", "stealthUntil", "regenUntil", "skillUntil", "protectUntil", "slowUntil", "stunUntil", "summonAt", "revealUntil", "frostStackAt", "leapAt", "stabAt", "burnUntil"];
+    static STATE_TIMES = ["diedAt", "atkAt", "ultUntil", "buffUntil", "stealthUntil", "regenUntil", "skillUntil", "protectUntil", "slowUntil", "stunUntil", "summonAt", "revealUntil", "frostStackAt", "leapAt", "stabAt", "burnUntil", "poisonUntil"];
     static STATE_TIMES_AT = 12;
     static STATE_EXTRA_AT = NetState.STATE_TIMES_AT + NetState.STATE_TIMES.length;
     stKey(team, slot) { return (team === "blue" ? "b" : "r") + slot; }
@@ -2811,10 +2811,11 @@ SinglePassMaterials.enable(THREE);
       plFlight: 700, plFlightMin: 100, plR: 70, plDur: GameTime.gameMs(2.5), plTick: GameTime.gameMs(1), plMax: 4, plFade: 500, plLob: 90, plGauge: 1,
       fgR: 150, fgDur: GameTime.gameMs(6), fgDmg: 15, fgHeal: 5, fgSlowMul: 0.6, fgSlowMs: 400, fgCast: ArenaSize.KEY * 4 + 100, fgRefund: 1
     };
-    static STATS = { name: "투척병", role: "shooter", icon: "🧪", hp: 120, speed: GameTime.gameSpeed(145), cd: GameTime.gameMs(1.4), dmg: 18, ticks: 3, range: ArenaSize.KEY * 4 + 120, minRange: ArenaSize.KEY * 1, healCut: true, ultName: "독안개", ultAim: true, heals: true };
+    static STATS = { name: "투척병", role: "shooter", icon: "🧪", hp: 120, speed: GameTime.gameSpeed(145), cd: GameTime.gameMs(1.4), dmg: 15, ticks: 3, range: ArenaSize.KEY * 4 + 120, minRange: ArenaSize.KEY * 1, poison: { ms: GameTime.gameMs(4), maxHpRate: 0.01 }, ultName: "독안개", ultAim: true, heals: true };
     showAimGuide(E, ult, c) { var services = this.services; services.aimGuide.showAimCircle(services.input.aimReach(E, services.input.aim.btn), ult ? ThrowerType.ULT.fgR : ThrowerType.ULT.plR); return true; }
     aimRange(btn) { return [ThrowerType.STATS.minRange, btn === "ult" ? ThrowerType.ULT.fgCast : ThrowerType.STATS.range]; }
     overrideBasic(E, ang, reach, t) { var services = this.services; services.fieldFx.throwPoison(E, ang, reach, false); return true; }
+    afterDealtDamage(T, owner, ultKey, t) { var services = this.services; if (ultKey !== "poison") services.status.infectPoison(T, owner, t); }
     onHitLate(owner, h) { if (h.u === "fog" && !owner.isGaugeLocked()) owner.gauge = Math.min(MatchRules.GAUGE_MAX, owner.gauge + ThrowerType.ULT.fgRefund); }
     botAct(B, target, enemies, t) { var services = this.services; services.brain.botThrow(B, target, enemies, t); return true; }
     skillGlow(E, t) { return E.ultUntil > t ? 0x1E5212 : 0; }
@@ -2828,7 +2829,8 @@ SinglePassMaterials.enable(THREE);
       return "지정한 곳에 " + services.skilltext.secs(ThrowerType.ULT.fgDur) + "간 유지되는 반경 " + ThrowerType.ULT.fgR + "의 독안개 설치. 아군은 1초당 체력 " + ThrowerType.ULT.fgHeal + " 회복, 적은 1초당 " + ThrowerType.ULT.fgDmg + "의 피해를 입고 " + services.skilltext.slowPct(ThrowerType.ULT.fgSlowMul);
     }
     passiveDesc() { var services = this.services;
-      return "기본 공격·스킬 지역 위의 적은 회복 " + services.skilltext.healCutPct() + " 감소";
+      var c = this.data;
+      return "기본 공격·스킬에 맞은 적은 " + services.skilltext.secs(c.poison.ms) + "간 중독되어 1초당 최대 체력의 " + services.skilltext.pctOf(c.poison.maxHpRate) + "%의 피해를 입고 회복 " + services.skilltext.healCutPct() + " 감소";
     }
     basicDesc() { var services = this.services;
       var c = this.data;
@@ -4693,7 +4695,7 @@ SinglePassMaterials.enable(THREE);
                summonAt: s.summonAt || 0, minions: [], revealUntil: s.revealUntil || 0, frostStacks: s.frostStacks || 0, frostStackAt: s.frostStackAt || 0,
                lastStandUsed: !!(services.charTypes.statsOf(c).lastStandHp && s.hp != null && s.hp <= services.charTypes.statsOf(c).lastStandHp),
                rallyUsed: !!(services.charTypes.statsOf(c).rally && s.hp != null && s.hp < services.charTypes.statsOf(c).hp * services.charTypes.statsOf(c).rally.hpRate),
-               burnUntil: s.burnUntil || 0, burnNext: 0, regenNext: 0, shield: s.hp == null ? !!services.charTypes.statsOf(c).respawnShield : !!s.shield,
+               burnUntil: s.burnUntil || 0, burnNext: 0, poisonUntil: s.poisonUntil || 0, poisonNext: 0, regenNext: 0, shield: s.hp == null ? !!services.charTypes.statsOf(c).respawnShield : !!s.shield,
                burst: null, volley: null, mv: false, pending: null });
       E.maxHp = services.charTypes.statsOf(E.char).hp;
       if (s.minions) services.minions.adoptMinions(E, s.minions, null);
@@ -4770,7 +4772,7 @@ SinglePassMaterials.enable(THREE);
         r.slowUntil = pos.slowUntil; r.slowMul = pos.slowMul; r.stunUntil = pos.stunUntil;
         r.summonAt = pos.summonAt;
         r.revealUntil = pos.revealUntil; r.frostStacks = pos.frostStacks; r.frostStackAt = pos.frostStackAt;
-        r.burnUntil = pos.burnUntil; r.shield = pos.shield;
+        r.burnUntil = pos.burnUntil; r.poisonUntil = pos.poisonUntil; r.shield = pos.shield;
         services.minions.adoptMinions(r, pos.minions, k);
       });
     }
@@ -5413,6 +5415,18 @@ SinglePassMaterials.enable(THREE);
       E.burnNext += services.timescale.burnTickMs;
       services.damage.damage(E, Math.round(E.maxHp * MageType.STATS.burn.maxHpRate), E.burnOwner, false, "burn");
     }
+    infectPoison(T, owner, t) { var services = this.services;
+      if (!(T.poisonUntil > t)) T.poisonNext = t + services.timescale.burnTickMs;
+      T.poisonUntil = t + ThrowerType.STATS.poison.ms; T.poisonOwner = owner;
+      services.match.game.forceNet = true;
+    }
+    stepPoison(E, t) { var services = this.services;
+      if (!E.poisonNext || !E.alive) return;
+      if (E.poisonNext > E.poisonUntil + 1) { E.poisonNext = 0; return; }
+      if (t < E.poisonNext) return;
+      E.poisonNext += services.timescale.burnTickMs;
+      services.damage.damage(E, Math.round(E.maxHp * ThrowerType.STATS.poison.maxHpRate), E.poisonOwner, false, "poison");
+    }
     stepRally(E, t) { var services = this.services;
       if (!E.regenNext || !E.alive) return;
       if (E.regenNext > E.regenUntil + 1) { E.regenNext = 0; return; }
@@ -5424,14 +5438,7 @@ SinglePassMaterials.enable(THREE);
       services.match.game.forceNet = true;
       if (E === services.match.me) services.sound.sfx("heal");
     }
-    inEnemyPoison(T, t) { var services = this.services;
-      return services.field.pools.some(function (pl) {
-        var e = pl.e, start = services.fieldFx.poolStart(e);
-        return e.team !== T.team && !pl.cut && t >= start && t < start + e.dur && services.charTypes.statsOf(services.session.players[e.owner] ? services.session.players[e.owner].characterType : "thrower").healCut &&
-               MathKit.hyp(T.x - e.x, T.y - e.y) <= e.r + T.hitR * 0.5;
-      });
-    }
-    healCut(T, t) { var services = this.services; t = t || services.clock.now(); return T.burnUntil > t || services.status.inEnemyPoison(T, t); }
+    healCut(T, t) { var services = this.services; t = t || services.clock.now(); return T.burnUntil > t || T.poisonUntil > t; }
     healAmount(T, amount, t) { var services = this.services; return Math.max(0, Math.min(T.maxHp - T.hp, services.status.healCut(T, t) ? Math.round(amount * MatchRules.HEAL_CUT_MUL) : amount)); }
     slowWhileInside(T, t, owner, mul, ms) { var services = this.services;
       var fresh = (T.slows || []).some(function (s) { return s.mul === mul && s.until - t > ms / 2; });
@@ -6315,7 +6322,7 @@ SinglePassMaterials.enable(THREE);
       var dm = Math.min(amount, T.hp), killed = false;
       T.taken = (T.taken || 0) + dm;
       T.hp -= dm; if (!noHurtGauge && !T.isGaugeLocked()) T.gauge = Math.min(MatchRules.GAUGE_MAX, T.gauge + services.catalog.roleOf(T.char).gaugeOnHurt);
-      if (T.hp <= 0) { killed = true; T.hp = 0; T.alive = false; T.deaths++; T.diedAt = services.clock.now(); T.burst = null; T.volley = null; T.slash = null; T.regenUntil = 0; T.skillUntil = 0; T.slowUntil = 0; T.slows = null; T.stunUntil = 0; T.lance = null; T.windUntil = 0; T.hookPull = null; T.hookCast = null; T.hookRootUntil = 0; T.frostStacks = 0; T.hasteUntil = 0; T.hasteStacks = 0; T.burnUntil = 0; T.burnNext = 0; T.regenNext = 0; if (T === services.match.me) { services.sound.sfx("down"); services.input.reset(); } }
+      if (T.hp <= 0) { killed = true; T.hp = 0; T.alive = false; T.deaths++; T.diedAt = services.clock.now(); T.burst = null; T.volley = null; T.slash = null; T.regenUntil = 0; T.skillUntil = 0; T.slowUntil = 0; T.slows = null; T.stunUntil = 0; T.lance = null; T.windUntil = 0; T.hookPull = null; T.hookCast = null; T.hookRootUntil = 0; T.frostStacks = 0; T.hasteUntil = 0; T.hasteStacks = 0; T.burnUntil = 0; T.burnNext = 0; T.poisonUntil = 0; T.poisonNext = 0; T.regenNext = 0; if (T === services.match.me) { services.sound.sfx("down"); services.input.reset(); } }
       else {
         if (T === services.match.me) services.sound.sfx("hit");
         services.status.afflict(T, fx, owner);
@@ -6938,7 +6945,7 @@ SinglePassMaterials.enable(THREE);
       E.cdUntil = 0; E.pending = null; E.burst = null; E.volley = null; E.slash = null;
       E.buffUntil = 0; E.slamAt = 0; E.leap = null; E.dash = null; E.shove = null; E.stealthUntil = 0; E.ultUntil = 0; E.skillUntil = 0; E.regenUntil = 0; E.slowUntil = 0; E.slows = null; E.stunUntil = 0; E.lance = null; E.windUntil = 0; E.hookPull = null; E.hookCast = null; E.hookRootUntil = 0;
       E.frostStacks = 0; E.frostStackAt = 0; E.revealUntil = 0; E.lastStandUsed = false; E.hasteUntil = 0; E.hasteStacks = 0;
-      E.burnUntil = 0; E.burnNext = 0; E.rallyUsed = false; E.regenNext = 0; E.shield = !!services.charTypes.statsOf(E.char).respawnShield;
+      E.burnUntil = 0; E.burnNext = 0; E.poisonUntil = 0; E.poisonNext = 0; E.rallyUsed = false; E.regenNext = 0; E.shield = !!services.charTypes.statsOf(E.char).respawnShield;
       if (E === services.match.me) services.cameraRig.view.snap = true;
       services.match.game.forceNet = true;
     }
@@ -7647,7 +7654,7 @@ SinglePassMaterials.enable(THREE);
       if (services.session.room.roster && services.session.room.roster[services.session.myId]) services.session.room.ref.child("roster/" + services.session.myId + "/c").set(c);
       var E = services.flow.makeEnt(services.session.myId, d);
       Object.assign(E, { x: old.x, y: old.y, angle: old.angle, alive: true, diedAt: 0, gauge: 0, minions: [], protectUntil: 0,
-                         stealthUntil: 0, skillUntil: 0, skillDur: 0, stunUntil: 0, slowUntil: 0, slowMul: 1, revealUntil: 0, burnUntil: 0,
+                         stealthUntil: 0, skillUntil: 0, skillDur: 0, stunUntil: 0, slowUntil: 0, slowMul: 1, revealUntil: 0, burnUntil: 0, poisonUntil: 0,
                          frostStacks: 0, frostStackAt: 0, lastStandUsed: false, rallyUsed: false, shield: !!services.charTypes.statsOf(c).respawnShield });
       E.maxHp = services.charTypes.statsOf(E.char).hp; E.hp = E.maxHp;
       services.practice.clearSkillsOf(old.id);
@@ -11426,6 +11433,7 @@ SinglePassMaterials.enable(THREE);
       if (frostStacks === 1) return 0x3A6E99;
       if (frostStacks === 2) return 0x2E8FD9;
       if (E.isFrostFrozen(t)) return 0x6FB8E0;
+      if (E.poisonUntil > t) return 0x2E7A1A;
       if (E.burnUntil > t) return 0x7A2A00;
       if (E.shield) return 0x4A3A00;
       return 0x000000;
@@ -11456,6 +11464,9 @@ SinglePassMaterials.enable(THREE);
         }
         services.match.lastHp[id] = E.hp;
         if (E.knockedAt && E.knockedAt !== v.knockSeen) { v.knockSeen = E.knockedAt; hurt = true; }
+        var poisoned = E.alive && E.poisonUntil > t;
+        if (poisoned && !v.poisonShown) services.fxView.floatText(E.x, E.y - 14, "중독", "#5FD35A");
+        v.poisonShown = poisoned;
         if (E.frostStackAt !== v.frostSeen) {
           if (v.frostSeen !== undefined && E.alive && t - E.frostStackAt < 600) {
             if (E.frostStacks > 0) services.fxView.floatText(E.x, E.y - 14, "❄" + E.frostStacks, "#8FD8F0");
@@ -12965,7 +12976,7 @@ SinglePassMaterials.enable(THREE);
       services.damage.payKillGaugeOwed(E, t);
     }
     stepStatusTicks(t) { var services = this.services;
-      services.targets.localTargets().forEach(function (T) { services.status.stepShove(T, t); services.hookPull.stepPull(T, t); if (!T.minion) { services.bannerAura.stepHelp(T, t); services.status.stepBurn(T, t); services.status.stepRally(T, t); services.domainFx.stepDomainBolt(T, t); services.domainFx.stepCurse(T, t); T.type.stepPassive(T, t); } });
+      services.targets.localTargets().forEach(function (T) { services.status.stepShove(T, t); services.hookPull.stepPull(T, t); if (!T.minion) { services.bannerAura.stepHelp(T, t); services.status.stepBurn(T, t); services.status.stepPoison(T, t); services.status.stepRally(T, t); services.domainFx.stepDomainBolt(T, t); services.domainFx.stepCurse(T, t); T.type.stepPassive(T, t); } });
     }
   }
 
