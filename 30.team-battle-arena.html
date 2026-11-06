@@ -293,7 +293,7 @@
 <script charset="utf-8" src="account-match-kit.js?v=20261103e"></script>
 <script charset="utf-8" src="account-stats.js?v=20261104c"></script>
 <script charset="utf-8" src="30.team-battle-versus.js?v=20261104a"></script>
-<script charset="utf-8" src="30.team-battle-fx.js?v=20261106a"></script>
+<script charset="utf-8" src="30.team-battle-fx.js?v=20261106c"></script>
 <script charset="utf-8" src="patch-notes.js?v=20261029b"></script>
 <script type="module">
 import * as THREE from "three";
@@ -6870,8 +6870,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
           if (!T.alive || T.team === e.team || T.isProtected(t) || MathKit.hyp(T.x - e.x, T.y - e.y) > e.r + T.hitR * 0.5) return;
           services.damage.damage(T, e.dmg, e.owner, e.createdAt, null, e.stun ? { stunMs: e.stun } : null);
         });
-        services.fxView.boom(e.x, e.y, e.r, e.team);
-        services.fxView.spark(e.x, e.y, e.stun ? "#FFD35A" : "#D9A8FF", 1.8);
+        services.impactBlasts.star(e);
         if (!services.match.me || MathKit.hyp(e.x - services.match.me.x, e.y - services.match.me.y) < 700) services.sound.sfx("boom");
         services.starfallView.drop(s);
         return false;
@@ -9424,7 +9423,6 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     static CURSE_CENTER_Y = 46;
     static CLOUD_PUFFS = 16;
     static CLOUD_LANES = [-1, 0.4, -0.4, 1, 0];
-    static POOL_OPACITY = { fill: 0.34, edge: 0.85, team: 0.7, bub: 0.8 };
     static STORM_FLAKES = 18;
     static GRAIN_SIZE = 64;
     static SKY_BEAM_H = 460;
@@ -9500,15 +9498,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       if (d.len) return fx.thrustBlades.thrust(d.x, d.y, d.angle, d.len + ArenaSize.BODY_R, d.width, look, seed).root;
       return fx.arcBlades.swing(d.x, d.y, d.angle, d.radius + ArenaSize.BODY_R, d.arc || Math.PI * 2, look, seed).root;
     }
-    makeLungeVis(d) { var services = this.services;
-      var m = services.arenaView.flatMesh(services.geo.strip, services.fxMats.acquire("basic", MaterialLibrary.LUNGE));
-      m.scale.set(d.len + ArenaSize.BODY_R, d.width, 1);
-      var g = new THREE.Group(); g.add(m); g.position.set(d.x, 2.6, d.y); g.rotation.y = -d.angle;
-      g.userData.mat = m.material;
-      services.stage.scene.add(g);
-      return g;
-    }
-    dropLungeVis(l) { var services = this.services; if (!l.vis) return; services.stage.scene.remove(l.vis); services.fxMats.release(l.vis.userData.mat); l.vis = null; }
+    makeLungeVis(d) { return this.services.arenaFx.lungeBands.spawn(d.x, d.y, d.angle, d.len + ArenaSize.BODY_R, d.width); }
+    dropLungeVis(l) { if (!l.vis) return; this.services.arenaFx.lungeBands.give(l.vis); l.vis = null; }
     releaseMeleeVis(g) { var services = this.services; if (g.userData.fxVis) { g.userData.fxPool.give(g.userData.fxVis); return; } services.stage.scene.remove(g); services.fxMats.release(g.userData.fill); services.fxMats.release(g.userData.edge); }
     dropMelee(k) { var services = this.services; var g = services.effectView.melees[k]; if (!g) return; services.effectView.releaseMeleeVis(g); delete services.effectView.melees[k]; }
     stormGrain() {
@@ -9542,29 +9533,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class PoolView {
-    constructor(services) { this.services = services; }
-    makePoolVis(e) { var services = this.services;
-      var g = new THREE.Group(), seed = e.x * 7 + e.y * 13 + e.createdAt % 997;
-      var mats = {
-        fill: new THREE.MeshBasicMaterial({ color: 0x4FB82E, transparent: true, opacity: EffectView.POOL_OPACITY.fill, depthWrite: false }),
-        edge: new THREE.MeshBasicMaterial({ color: 0xB8FF6E, transparent: true, opacity: EffectView.POOL_OPACITY.edge, depthWrite: false }),
-        team: new THREE.MeshBasicMaterial({ color: Palette.C_FX[e.team], transparent: true, opacity: EffectView.POOL_OPACITY.team, depthWrite: false }),
-        bub: new THREE.MeshBasicMaterial({ color: 0xDDFFA8, transparent: true, opacity: EffectView.POOL_OPACITY.bub, depthWrite: false })
-      };
-      var fill = services.arenaView.flatMesh(services.geo.disc, mats.fill); fill.scale.setScalar(e.r); fill.position.y = 1.6; g.add(fill);
-      var edge = services.arenaView.flatMesh(services.geo.poolEdge, mats.edge); edge.scale.setScalar(e.r); edge.position.y = 1.8; g.add(edge);
-      var team = services.arenaView.flatMesh(services.geo.teamEdge, mats.team); team.scale.setScalar(e.r); team.position.y = 1.7; g.add(team);
-      var bubbles = [], n = e.u ? 10 : 4;
-      for (var i = 0; i < n; i++) {
-        var a = (seed + i * 2.4) % (Math.PI * 2), rr = e.r * (0.2 + 0.65 * ((seed * 0.37 + i * 0.61) % 1));
-        var b = new THREE.Mesh(services.geo.ball, mats.bub); b.position.set(Math.cos(a) * rr, 3, Math.sin(a) * rr); g.add(b);
-        bubbles.push({ m: b, ph: (i * 0.37 + seed * 0.013) % 1, size: e.u ? 7 : 5 });
-      }
-      g.position.set(e.x, 0, e.y);
-      g.userData = { mats: mats, bubbles: bubbles, edge: edge };
-      services.stage.scene.add(g);
-      return g;
-    }
+    constructor(services) { this.services = services; this.spareBottles = []; }
+    giveBottle(bottle) { var services = this.services; services.stage.scene.remove(bottle); services.poolView.spareBottles.push(bottle); }
+    prefillBottles(count) { var services = this.services, made = []; while (services.poolView.spareBottles.length + made.length < count) made.push(services.poolView.makeBottleVis()); made.forEach(services.poolView.giveBottle.bind(services.poolView)); }
     makeHoleVis(e) { var services = this.services;
       if (e.ga) return services.gargantua.make(e);
       var g = new THREE.Group();
@@ -9588,7 +9559,8 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       ud.ring.rotation.z = -nowMs / 250;
       ud.fill.scale.setScalar(ud.r * (0.9 + 0.1 * Math.sin(nowMs / 180)));
     }
-    makeBottleVis() { var services = this.services;
+    makeBottleVis() { var services = this.services, spare = services.poolView.spareBottles.pop();
+      if (spare) { services.stage.scene.add(spare); return spare; }
       var g = new THREE.Group();
       if (services.models.kit.weapons.Potion_1) { var p = services.models.kit.weapons.Potion_1.clone(); p.scale.setScalar(ModelTuning.POTION_SCALE); p.position.y = -6; g.add(p); }
       else {
@@ -9600,10 +9572,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       return g;
     }
     dropPoolVis(pl) { var services = this.services;
-      if (pl.bottle) { services.stage.scene.remove(pl.bottle); pl.bottle = null; }
+      if (pl.bottle) { services.poolView.giveBottle(pl.bottle); pl.bottle = null; }
       if (!pl.vis) return;
-      services.stage.scene.remove(pl.vis);
-      var mats = pl.vis.userData.mats; Object.keys(mats || {}).forEach(function (k) { mats[k].dispose(); });
+      services.arenaFx.toxicPools.give(pl.vis);
       pl.vis = null;
     }
     renderPool(pl, t, nowMs) { var services = this.services;
@@ -9615,19 +9586,9 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         pl.bottle.rotation.set(k * 9, 0, k * 6);
         return;
       }
-      if (pl.bottle) { services.stage.scene.remove(pl.bottle); pl.bottle = null; services.fxView.spark(e.x, e.y, "#8CFF5A", e.u ? 2.4 : 1.4); }
-      if (!pl.vis) pl.vis = services.poolView.makePoolVis(e);
-      var ud = pl.vis.userData, grow = MathKit.clamp((t - start) / 160, 0, 1), fade = MathKit.clamp((end - t) / ThrowerType.ULT.plFade, 0, 1);
-      pl.vis.scale.set(0.55 + 0.45 * grow, 1, 0.55 + 0.45 * grow);
-      ud.mats.fill.opacity = EffectView.POOL_OPACITY.fill * fade;
-      ud.mats.edge.opacity = (EffectView.POOL_OPACITY.edge - 0.2 + 0.2 * Math.sin(nowMs / 160)) * fade;
-      ud.mats.team.opacity = EffectView.POOL_OPACITY.team * fade;
-      ud.mats.bub.opacity = EffectView.POOL_OPACITY.bub * fade;
-      ud.bubbles.forEach(function (b) {
-        var f = (nowMs / 900 + b.ph) % 1;
-        b.m.position.y = 3 + f * 12;
-        b.m.scale.setScalar(b.size * (f < 0.8 ? 0.4 + f * 0.75 : (1 - f) * 5));
-      });
+      if (pl.bottle) { services.poolView.giveBottle(pl.bottle); pl.bottle = null; services.fxView.spark(e.x, e.y, "#8CFF5A", e.u ? 2.4 : 1.4); }
+      if (!pl.vis) pl.vis = services.arenaFx.toxicPools.spawn(e.x, e.y, e.r, !!e.u, Palette.C_FX[e.team]);
+      services.arenaFx.toxicPools.paint(pl.vis, MathKit.clamp((t - start) / 160, 0, 1), MathKit.clamp((end - t) / ThrowerType.ULT.plFade, 0, 1), nowMs);
     }
   }
   class DomainView {
@@ -9671,31 +9632,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         if (!services.match.me || MathKit.hyp(E.x - services.match.me.x, E.y - services.match.me.y) < 700) services.sound.sfx("boom");
       }
     }
-    makeDomainVis() { var services = this.services;
-      var g = new THREE.Group();
-      var domeMat = new THREE.MeshBasicMaterial({ color: 0x1A1222, transparent: true, opacity: 0.42, depthWrite: false });
-      var shardMat = new THREE.MeshBasicMaterial({ color: 0x9A0E1C, transparent: true, opacity: 0.45, depthWrite: false, wireframe: true });
-      var floorMat = new THREE.MeshBasicMaterial({ color: 0x0C0810, transparent: true, opacity: 0.38, depthWrite: false });
-      var rimMat = new THREE.MeshBasicMaterial({ color: 0xC0101E, transparent: true, opacity: 0.8, depthWrite: false });
-      var dome = new THREE.Mesh(services.geo.domainDome, domeMat); g.add(dome);
-      var shards = new THREE.Mesh(services.geo.domainShards, shardMat); shards.scale.setScalar(0.995); g.add(shards);
-      var floor = services.arenaView.flatMesh(services.geo.disc, floorMat); floor.position.y = 1.2 / 400; g.add(floor);
-      var rim = services.arenaView.flatMesh(services.geo.domainRim, rimMat); rim.position.y = 1.6 / 400; g.add(rim);
-      g.userData = { mats: [domeMat, shardMat, floorMat, rimMat], base: [0.42, 0.45, 0.38, 0.85], shards: shards };
-      services.stage.scene.add(g);
-      return g;
-    }
-    dropDomainVis(dm) { var services = this.services; if (!dm.vis) return; services.stage.scene.remove(dm.vis); dm.vis.userData.mats.forEach(function (m) { m.dispose(); }); dm.vis = null; }
+    dropDomainVis(dm) { var services = this.services; if (!dm.vis) return; services.arenaFx.domains.give(dm.vis); dm.vis = null; }
     renderDomain(dm, t, nowMs) { var services = this.services;
       var e = dm.e;
       if (!services.domainFx.domainActive(e, t)) return;
-      if (!dm.vis) dm.vis = services.domainView.makeDomainVis();
-      var ud = dm.vis.userData, r = Math.max(1, services.domainFx.domainRadius(e, t)), fade = MathKit.clamp((e.createdAt + e.dur - t) / 400, 0, 1);
+      if (!dm.vis) dm.vis = services.arenaFx.domains.spawn();
       var c = services.domainFx.domainCenter(dm);
-      dm.vis.position.set(c.x, 0, c.y);
-      dm.vis.scale.setScalar(r);
-      ud.shards.rotation.y = nowMs / 4000;
-      ud.mats.forEach(function (m, i) { m.opacity = ud.base[i] * fade; });
+      services.arenaFx.domains.paint(dm.vis, c.x, c.y, Math.max(1, services.domainFx.domainRadius(e, t)), MathKit.clamp((e.createdAt + e.dur - t) / 400, 0, 1), nowMs);
     }
   }
   class RevGraceView {
@@ -9703,21 +9646,14 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     static MAX_BEAMS = 4;
     constructor(services) { this.services = services; this.spareBeams = {}; }
     buildSkyBeam(color, ash) { var services = this.services;
-      var g = new THREE.Group();
-      var blend = ash ? THREE.NormalBlending : THREE.AdditiveBlending;
-      var mat = new THREE.MeshBasicMaterial({ color: color, map: services.effectView.skyBeamFade, transparent: true, opacity: 0.5, depthWrite: false, blending: blend });
-      var core = new THREE.MeshBasicMaterial({ color: ash ? 0xB8B6B0 : 0xFFF6CC, map: services.effectView.skyBeamFade, transparent: true, opacity: 0.6, depthWrite: false, blending: blend });
-      var padMat = new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.5, depthWrite: false, blending: blend });
-      var outer = new THREE.Mesh(services.geo.skyBeam, mat); outer.scale.set(26, EffectView.SKY_BEAM_H, 26); g.add(outer);
-      var inner = new THREE.Mesh(services.geo.skyBeam, core); inner.scale.set(9, EffectView.SKY_BEAM_H, 9); g.add(inner);
-      var pad = services.arenaView.flatMesh(services.geo.disc, padMat); pad.scale.setScalar(34); pad.position.y = 1.5; g.add(pad);
-      g.userData = { mats: [mat, core, padMat], outer: outer, inner: inner, pad: pad, key: this.beamKey(color, ash) };
+      var g = services.arenaFx.skyBeams.build(color, ash ? 0xB8B6B0 : 0xFFF6CC, ash, services.geo.skyBeam);
+      g.userData.key = this.beamKey(color, ash);
       return g;
     }
     beamKey(color, ash) { return color + (ash ? "|ash" : "|glow"); }
     makeSkyBeam(color, ash) { var services = this.services;
       var spare = this.spareBeams[this.beamKey(color, ash)], g = (spare && spare.pop()) || this.buildSkyBeam(color, ash);
-      g.userData.inner.scale.x = g.userData.inner.scale.z = 9;
+      g.userData.beam.core.value = 1;
       g.visible = true;
       services.stage.scene.add(g);
       return g;
@@ -9736,14 +9672,13 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     dropRevVis(r) { var services = this.services; if (!r.vis) return; Object.keys(r.vis || {}).forEach(function (id) { services.revGraceView.dropSkyBeam(r.vis[id]); }); r.vis = null; }
     placeSkyBeam(b, x, y, drop, fade, nowMs) {
       if (RevGraceView.HIDDEN) { b.visible = false; return; }
-      var ud = b.userData, len = EffectView.SKY_BEAM_H * drop;
+      var ud = b.userData.beam, len = EffectView.SKY_BEAM_H * drop;
       b.position.set(x, EffectView.SKY_BEAM_H - len, y);
-      ud.outer.scale.y = ud.inner.scale.y = len;
+      ud.beam.scale.y = len;
       ud.pad.position.y = 1.5 - (EffectView.SKY_BEAM_H - len);
       ud.pad.visible = drop >= 1;
-      ud.mats[0].opacity = (0.62 + 0.1 * Math.sin(nowMs / 110)) * fade;
-      ud.mats[1].opacity = 0.9 * fade;
-      ud.mats[2].opacity = 0.35 * fade;
+      ud.fade.value = fade;
+      ud.time.value = (nowMs % 100000) / 1000;
     }
     renderRev(r, t, nowMs) { var services = this.services;
       var e = r.e, end = e.createdAt + e.dur;
@@ -9764,7 +9699,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         var e = g.e, age = t - e.createdAt, v = services.fighterView.fighters[e.tgt];
         if (age >= ClericType.ULT.grLife || !v) { services.revGraceView.dropGraceVis(g); return false; }
         if (age < 0) return true;
-        if (!g.vis) { g.vis = services.revGraceView.makeSkyBeam(EffectView.REV_ALLY_COLOR, false); g.vis.userData.inner.scale.x = g.vis.userData.inner.scale.z = 14; }
+        if (!g.vis) { g.vis = services.revGraceView.makeSkyBeam(EffectView.REV_ALLY_COLOR, false); g.vis.userData.beam.core.value = 1.6; }
         g.vis.visible = v.root.visible;
         services.revGraceView.placeSkyBeam(g.vis, v.root.position.x, v.root.position.z, MathKit.clamp(age / 150, 0, 1), MathKit.clamp((ClericType.ULT.grLife - age) / 350, 0, 1), nowMs);
         if (!g.sparked && age >= 150) { g.sparked = true; if (v.root.visible) services.fxView.spark(v.root.position.x, v.root.position.z, Palette.HEAL_SPARK, 1.4); }
@@ -10498,6 +10433,21 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       u.uSpearRise.value = closing;
     }
   }
+  class StarBlast extends ImpactBlast {
+    static LIFE_SEC = 0.7;
+    static FRONT_SEC = 0.14;
+    static SPREAD = 0.06;
+    static PUFF_LIFE = 0.48;
+    static PUFF_SIZE = 62;
+    static LIFT = 60;
+    static PUFFS = 12;
+    static CHIPS = 20;
+    static CHIP_SPEED = 170;
+    static TONES = { hot: 0xF6EEFF, mid: 0xB07CFF, scorch: 0x1C0F33, fireHot: 0xF6EEFF, fire: 0x9B5CFF, smoke: 0x2A1E44, chip: 0xD9A8FF, ember: 0xF0DCFF };
+  }
+  class StunStarBlast extends StarBlast {
+    static TONES = { hot: 0xFFF7D6, mid: 0xFFC93C, scorch: 0x33240A, fireHot: 0xFFF7D6, fire: 0xFFB81E, smoke: 0x4A3A1A, chip: 0xFFE28A, ember: 0xFFF0B0 };
+  }
   class ImpactBlastView {
     static SHARED = null;
     static BOLT_WIDTH = 230;
@@ -10538,6 +10488,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     meteor(e) { return this.add(new MeteorBlast(e.x, e.y, e.r, e.team, e.createdAt + e.delay)); }
     thunder(d) { return this.add(new ThunderBlast(d.x, d.y, d.radius + ArenaSize.BODY_R, d.team, d.createdAt)); }
     mace(d) { return this.add(new MaceBlast(this.services, d)); }
+    star(e) { return this.add(new (e.stun ? StunStarBlast : StarBlast)(e.x, e.y, e.r, e.team, this.services.clock.now())); }
     guardianWall(d) { return this.add(new GuardianWallBlast(d.x, d.y, d.radius + ArenaSize.BODY_R, d.team, d.createdAt, d.angle)); }
     drop(blast) { if (!blast.vis) return; this.services.stage.scene.remove(blast.vis.group); this.free.push(blast.vis); blast.vis = null; }
     step(t) { var view = this, scale = this.services.clock.scale;
@@ -10841,39 +10792,10 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
   }
   class StarfallView {
     constructor(services) { this.services = services; }
-    static STAR_R = 13;
-    static TAIL = 190;
-    static GLOW_COLOR = 0xB07CFF;
-    static STUN_COLOR = 0xFFD35A;
-    make(e) { var services = this.services;
-      var g = new THREE.Group(), mats = [], G = StarfallView, tint = e.stun ? G.STUN_COLOR : G.GLOW_COLOR;
-      function mat(opts) { var m = new THREE.MeshBasicMaterial(Object.assign({ transparent: true, depthWrite: false }, opts)); mats.push(m); return m; }
-      var base = services.arenaView.flatMesh(services.geo.disc, mat({ color: tint, opacity: 0.16 })); base.scale.setScalar(e.r); base.position.y = 2;
-      var fill = services.arenaView.flatMesh(services.geo.disc, mat({ color: tint, opacity: 0.34 })); fill.scale.setScalar(0.01); fill.position.y = 2.2;
-      var edgeMat = mat({ color: Palette.C_FX[e.team], opacity: 0.8 });
-      var edge = services.arenaView.flatMesh(services.geo.ringFx, edgeMat); edge.scale.setScalar(e.r); edge.position.y = 2.4;
-      g.add(base); g.add(fill); g.add(edge);
-      var star = new THREE.Group();
-      var core = new THREE.Mesh(services.geo.ball, mat({ color: e.stun ? 0xFFF3C4 : 0xF6EEFF, opacity: 1 })); core.scale.setScalar(G.STAR_R);
-      var glow = new THREE.Mesh(services.geo.ball, mat({ color: tint, opacity: 0.5, blending: THREE.AdditiveBlending })); glow.scale.setScalar(G.STAR_R * 2.1);
-      var tail = new THREE.Mesh(services.geo.meteorTail, mat({ color: tint, opacity: 0.5, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
-      tail.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), MeteorLook.DIR); tail.scale.set(G.STAR_R * 0.9, G.TAIL, G.STAR_R * 0.9);
-      star.add(tail); star.add(glow); star.add(core);
-      g.add(star);
-      g.position.set(e.x, 0, e.y);
-      g.userData = { mats: mats, fill: fill, edgeMat: edgeMat, star: star };
-      services.stage.scene.add(g);
-      return g;
-    }
-    drop(s) { var services = this.services; if (!s.vis) return; services.stage.scene.remove(s.vis); s.vis.userData.mats.forEach(function (m) { m.dispose(); }); s.vis = null; }
-    render(s, t, nowMs) { var services = this.services;
-      var e = s.e, G = StarfallView;
-      if (!s.vis) s.vis = this.make(e);
-      var ud = s.vis.userData, k = MathKit.clamp((t - e.createdAt) / e.delay, 0, 1), lift = MeteorLook.TOP * (1 - k * k) + G.STAR_R;
-      ud.fill.scale.setScalar(Math.max(0.01, k) * e.r);
-      ud.edgeMat.opacity = 0.55 + 0.4 * Math.sin(nowMs / 60);
-      ud.star.visible = services.cameraRig.pix >= Environment.PIX_START;
-      ud.star.position.set(MeteorLook.DIR.x / MeteorLook.DIR.y * (lift - G.STAR_R), lift, MeteorLook.DIR.z / MeteorLook.DIR.y * (lift - G.STAR_R));
+    drop(s) { if (!s.vis) return; this.services.arenaFx.starfalls.give(s.vis); s.vis = null; }
+    render(s, t, nowMs) { var services = this.services, e = s.e;
+      if (!s.vis) s.vis = services.arenaFx.starfalls.spawn(e.x, e.y, e.r, !!e.stun, Palette.C_FX[e.team]);
+      services.arenaFx.starfalls.paint(s.vis, MathKit.clamp((t - e.createdAt) / e.delay, 0, 1), nowMs);
     }
   }
   class AimGuide {
@@ -11546,7 +11468,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       });
       services.field.lunges.forEach(function (l) {
         if (!l.vis) l.vis = services.effectView.makeLungeVis(l.d);
-        l.vis.userData.mat.opacity = 0.3 + 0.2 * Math.sin(nowMs / 45);
+        services.arenaFx.lungeBands.paint(l.vis, MathKit.clamp((t - l.d.createdAt) / l.d.wind, 0, 1), nowMs);
       });
       Object.keys(services.effectView.melees || {}).forEach(function (k) { if (!services.match.melee[k]) services.effectView.dropMelee(k); });
 
@@ -12341,7 +12263,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
     }
   }
   class PerfProbe {
-    static BUILD = "lag17";
+    static BUILD = "lag18";
     static PATH = "perfDiag/teambattle/";
     static RTT_KEEP = 50;
     static RECORDS = !Environment.SILENT_RUN;
@@ -12675,23 +12597,18 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
         function () { return services.fxView.fxMesh({ k: "bladeZone", x: P, y: P, r: 60 }); },
         function () { return services.effectView.makeMeleeVis({ x: P, y: P, angle: 0, radius: 60, arc: 1.5, owner: "", zap: 1 }); },
         function () { return services.effectView.makeMeleeVis({ x: P, y: P, angle: 0, len: 120, width: 40, owner: "", u: 1, zap: 1 }); },
-        function () { return services.effectView.makeLungeVis({ x: P, y: P, angle: 0, len: 120, width: 40 }); },
         function () { return services.meteorFall.warmSample(); },
         function () { return services.impactBlasts.warmSample(); },
         function () { return services.hitmanSlashView.warmSample(); },
         function () { return services.sniperShots.warmSample(); },
-        function () { return services.poolView.makePoolVis(e); },
         function () { return services.poolView.makeHoleVis(e); },
         function () { return services.poolView.makeBottleVis(); },
         function () { return services.domainView.makeCurseVis(); },
-        function () { return services.domainView.makeDomainVis(); },
         function () { return services.revGraceView.makeSkyBeam(EffectView.REV_ALLY_COLOR, false); },
         function () { return services.revGraceView.makeSkyBeam(EffectView.REV_FOE_COLOR, true); },
         function () { return services.stormView.makeStormVis(e); },
         function () { return services.gargantua.make(Object.assign({}, e, { ga: true })); },
         function () { return services.galeView.warmSample(); },
-        function () { return services.starfallView.make(e); },
-        function () { return services.starfallView.make(Object.assign({}, e, { stun: true })); },
         function () { return services.hookView.warmSample(); },
         function () { return new BannerStrikeGlow(services, { x: P, y: P, angle: 0, len: 120, width: 60, createdAt: 0 }).group; },
         function () { return BannerBearerRig.warmSample(services); },
@@ -12775,12 +12692,14 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       var mages = this.castersByTeam("mage"), smiths = this.castersByTeam("blacksmith"), giants = this.castersByTeam("giant"), giantCount = giants.blue + giants.red, mageCount = mages.blue + mages.red;
       var hitmen = this.castersByTeam("hitman"), hitmanCount = hitmen.blue + hitmen.red;
       var snipers = this.castersByTeam("sniper"), sniperCount = snipers.blue + snipers.red, guardians = this.castersByTeam("guardian"), guardianCount = guardians.blue + guardians.red;
-      services.arenaFx.prefillForMatch();
+      var throwers = this.castersByTeam("thrower"), shamans = this.castersByTeam("shaman"), stargazers = this.castersByTeam("astrologer"), throwerCount = throwers.blue + throwers.red, starCount = (stargazers.blue + stargazers.red) * 2;
+      services.arenaFx.prefillForMatch({ toxicPools: throwerCount * (ThrowerType.ULT.plMax + 1), domains: shamans.blue + shamans.red, starfalls: starCount });
+      services.poolView.prefillBottles(throwerCount * 2);
       services.hitmanSlashView.prefill(hitmanCount * 3);
       services.sniperShots.prefill(sniperCount * 3);
       services.meteorFall.prefill(mageCount);
       services.galeView.prefill(giantCount);
-      services.impactBlasts.prefill(mageCount + smiths.blue + smiths.red + giantCount * 2 + hitmanCount + sniperCount + guardianCount);
+      services.impactBlasts.prefill(mageCount + smiths.blue + smiths.red + giantCount * 2 + hitmanCount + sniperCount + guardianCount + starCount);
       if (clerics.blue + clerics.red) services.revGraceView.prefillBeams(RevGraceView.MAX_BEAMS);
       ["blue", "red"].forEach(function (team) {
         services.fighterView.prefillMinions(team, necros[team] * NecroType.ULT.smMax);
@@ -13357,7 +13276,7 @@ import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
       services.gargantua = new GargantuaView(services);
       services.galeView = new GolemGaleView(services);
       services.meteorFall = new MeteorFallView(services);
-      services.arenaFx = new ArenaFxViews({ THREE: THREE, noise: function () { return WaterNoise.texture(); }, scene: function () { return services.stage.scene; }, pixelScale: function () { return WaterNoise.pixelScale(services); }, isLite: function () { return services.cameraRig.pix < Environment.PIX_START; } });
+      services.arenaFx = new ArenaFxViews({ THREE: THREE, noise: function () { return WaterNoise.texture(); }, scene: function () { return services.stage.scene; }, pixelScale: function () { return WaterNoise.pixelScale(services); }, isLite: function () { return services.cameraRig.pix < Environment.PIX_START; }, meteorPath: function () { return { dir: MeteorLook.DIR, top: MeteorLook.TOP }; } });
       services.impactBlasts = new ImpactBlastView(services);
       services.hitmanSlashView = new HitmanSlashView(services);
       services.sniperShots = new SniperShotView(services);
