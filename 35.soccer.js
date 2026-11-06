@@ -313,6 +313,11 @@ class SocHostDirector {
         this.lastTickMs = nowMs;
         this.onEvents(this.engine.begin(nowMs));
     }
+    resume(game, nowMs) {
+        this.started = true;
+        this.lastTickMs = nowMs;
+        this.onEvents(this.engine.resume(game, nowMs));
+    }
     tick(nowMs) {
         if (!this.started)
             return;
@@ -395,6 +400,45 @@ class SoccerMatch {
     }
     isHostAi(actor) {
         return this.isHost() && actor.id !== this.session.myId && !(actor.controller instanceof SocRemoteController);
+    }
+    takeOverAsHost() {
+        const game = this.session.value("game");
+        if (this.director || !game || game.phase === "over")
+            return false;
+        this.seats.forEach((actor, slot) => {
+            if (!actor || slot >= SocConfig.SEAT_COUNT)
+                return;
+            const record = this.session.players.get(actor.id);
+            if (!record || !record.isBot || actor.controller instanceof SocBot)
+                return;
+            const bot = new SocBot(slot, Math.random);
+            bot.x = actor.controller.x;
+            bot.z = actor.controller.z;
+            bot.yaw = actor.controller.yaw;
+            bot.teleport(actor.controller.x, actor.controller.z);
+            actor.controller = bot;
+            actor.seenActionSeq = bot.actionSeq;
+            this.controllers[slot] = bot;
+            this.bodies[slot] = bot;
+            bot.obstacles = this.bodies;
+        });
+        this.engine = new SocEngine(this.controllers, Math.random);
+        for (let index = 0; index < 2; index++) {
+            const slot = SocConfig.SEAT_COUNT + index;
+            const keeper = this.engine.keepers[index];
+            const home = SocCourtLayout.keeperHome(slot);
+            keeper.teleport(home.x, home.z);
+            const actor = this.seats[slot];
+            if (actor) {
+                actor.controller = keeper;
+                actor.seenActionSeq = keeper.actionSeq;
+            }
+            this.bodies[slot] = keeper;
+            keeper.obstacles = this.bodies;
+        }
+        this.director = new SocHostDirector(this.engine, (events) => this.applyEvents(events));
+        this.director.resume(game, this.services.backend.now());
+        return true;
     }
     applyChange(kind) {
         if (kind === "players" || kind === "match")
@@ -1095,7 +1139,7 @@ class SoccerGame {
         session.onPlayerRemoved = (id) => { if (this.match)
             this.match.playerRemoved(id); };
         session.onClosed = (message) => this.exitToStart(message);
-        session.onHostTakeover = () => this.returnToLobby();
+        session.onHostTakeover = () => this.continueAsNewHost();
         session.connect();
         this.lobbyView.selectedSlot = -1;
         this.showLobby();
@@ -1221,6 +1265,13 @@ class SoccerGame {
         const match = { id: 1 + Math.floor(Math.random() * 1000000000), startAt: this.backend.now(), seats };
         Object.assign(updates, { match, status: "play", st: null, in: null, ball: null, game: null, end: null });
         session.ref.update(updates);
+    }
+    continueAsNewHost() {
+        if (this.session && this.session.status === "end")
+            return;
+        if (this.match && this.match.takeOverAsHost())
+            return;
+        this.returnToLobby();
     }
     returnToLobby() {
         const session = this.session;

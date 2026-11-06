@@ -583,6 +583,27 @@ class VbRallyEngine {
     return this.events;
   }
 
+  resume(rally: VbRallyRecord, nowMs: number): VbEvent[] {
+    this.events.length = 0;
+    this.score[0] = rally.sa;
+    this.score[1] = rally.sb;
+    this.serveTeam = rally.serveTeam;
+    this.serverIndex[0] = this.serverIndex[1] = 0;
+    this.serverIndex[rally.serveTeam] = Math.max(0, Math.min(1, rally.server - rally.serveTeam * 2));
+    this.rallyNo = rally.n;
+    this.winner = -1;
+    if (rally.phase === "point") {
+      this.phase = "point";
+      this.pointAtMs = nowMs;
+      this.winner = rally.winner;
+      this.touchTeam = -1;
+      this.incoming = null;
+    } else {
+      this.startRally(nowMs, nowMs + VbConfig.SERVE_PREP_MS);
+    }
+    return this.events;
+  }
+
   update(dtSec: number, nowMs: number): VbEvent[] {
     this.events.length = 0;
     if (this.phase === "serve") this.updateServe(nowMs);

@@ -1064,6 +1064,19 @@ class SocEngine {
         this.startReady(nowMs, SocConfig.READY_MS);
         return this.flush();
     }
+    resume(game, nowMs) {
+        this.events = [];
+        this.score = [game.sa, game.sb];
+        this.leftMs = game.leftMs;
+        this.overtime = game.overtime;
+        this.gameNo = game.n;
+        this.kickoffTeam = game.kickoff;
+        if (game.overtime && game.sa !== game.sb)
+            this.finish(nowMs, game.sa > game.sb ? 0 : 1);
+        else
+            this.startReady(nowMs, SocConfig.READY_MS);
+        return this.flush();
+    }
     update(dtSec, nowMs) {
         this.events = [];
         const playing = this.phase === "play";

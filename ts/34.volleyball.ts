@@ -1072,6 +1072,12 @@ class VbHostDirector {
     this.onEvents(this.engine.begin(nowMs));
   }
 
+  resume(rally: VbRallyRecord, nowMs: number): void {
+    this.started = true;
+    this.lastTickMs = nowMs;
+    this.onEvents(this.engine.resume(rally, nowMs));
+  }
+
   tick(dtSec: number, nowMs: number): void {
     if (!this.started) return;
     const elapsed = Math.min(VbHostDirector.MAX_TICK_SEC, Math.max(0, (nowMs - this.lastTickMs) / 1000));
@@ -1148,6 +1154,27 @@ class VolleyballMatch {
       this.engine = new VbRallyEngine(this.controllers, Math.random);
       this.director = new VbHostDirector(this.engine, (events) => this.applyEvents(events));
     }
+  }
+
+  takeOverAsHost(): boolean {
+    const rally = this.session.rally;
+    if (this.director || !rally || rally.phase === "over") return false;
+    this.seats.forEach((actor, slot) => {
+      if (!actor) return;
+      const record = this.session.players.get(actor.id);
+      if (!record || !record.isBot || actor.controller instanceof VolleyballBot) return;
+      const bot = new VolleyballBot(slot, Math.random);
+      bot.x = actor.controller.x;
+      bot.z = actor.controller.z;
+      bot.yaw = actor.controller.yaw;
+      bot.teleport(actor.controller.x, actor.controller.z);
+      actor.controller = bot;
+      this.controllers[slot] = bot;
+    });
+    this.engine = new VbRallyEngine(this.controllers, Math.random);
+    this.director = new VbHostDirector(this.engine, (events) => this.applyEvents(events));
+    this.director.resume(rally, this.services.backend.now());
+    return true;
   }
 
   applyChange(kind: VbChange): void {
@@ -1853,7 +1880,7 @@ class VolleyballGame {
     session.onPress = (id, record) => { if (this.match) this.match.receivePress(id, record); };
     session.onPlayerRemoved = (id) => { if (this.match) this.match.playerRemoved(id); };
     session.onClosed = (message) => this.exitToStart(message);
-    session.onHostTakeover = () => this.returnToLobby();
+    session.onHostTakeover = () => this.continueAsNewHost();
     session.connect();
     this.lobbyView.selectedSlot = -1;
     this.showLobby();
@@ -1969,6 +1996,12 @@ class VolleyballGame {
     const match: VbMatchRecord = { id: 1 + Math.floor(Math.random() * 1000000000), startAt: this.backend.now(), seats };
     Object.assign(updates, { match, status: "play", st: null, in: null, ball: null, rally: null, end: null });
     session.ref.update(updates);
+  }
+
+  private continueAsNewHost(): void {
+    if (this.session && this.session.status === "end") return;
+    if (this.match && this.match.takeOverAsHost()) return;
+    this.returnToLobby();
   }
 
   private returnToLobby(): void {
