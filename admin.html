@@ -249,6 +249,11 @@
   .stats-box tr:hover td { background: var(--sg-bg); }
   .stats-box td:first-child { font-weight: 700; }
   .stats-box td b { font-size: var(--sg-fs-lg); }
+  /* 사용량 표: 게임 칸 30% + 지표 4칸 같은 너비(17.5%)로 맞추고, 숫자는 오른쪽 맞춤(칸 안 여백은 같게) */
+  .stats-box table.usage-board { table-layout: fixed; margin: 0; }
+  .stats-box table.usage-board th:first-child, .stats-box table.usage-board td:first-child { width: 30%; }
+  .stats-box table.usage-board th:not(:first-child), .stats-box table.usage-board td:not(:first-child) { width: 17.5%; padding-right: var(--sg-s4); }
+  .stats-box table.usage-board th, .stats-box table.usage-board td { padding-top: var(--sg-s3); padding-bottom: var(--sg-s3); }
   /* 직업군(전사·마법사…) 구분 줄 */
   .stats-box tr.stats-group td { padding: var(--sg-s3); font-size: var(--sg-fs-xl); font-weight: 800; color: var(--sg-ink);
     background: rgba(217, 123, 79, 0.12); border-top: var(--sg-s4) solid var(--sg-panel); border-bottom: 2px solid #D97B4F; }
@@ -1924,7 +1929,7 @@ class UsagePanel {
     const row = this.days[day] || {};
     const slugs = Object.keys(row).sort((a, b) => (+row[b].down || 0) - (+row[a].down || 0));
     say("usageMsg", UsagePanel.dayText(day) + " · 사용한 게임 " + slugs.length + "개 · 받은 데이터가 많은 순");
-    const table = el("table"), head = el("tr");
+    const table = el("table", "usage-board"), head = el("tr");
     ["게임"].concat(UsagePanel.COLUMNS.map((c) => c[1])).forEach((t) => head.appendChild(el("th", null, t)));
     table.appendChild(head);
     slugs.forEach((slug) => {
