@@ -611,12 +611,7 @@
             판 종료 신호가 없는 화면(기록 없는 게임 등)은 화면을 떠날 때 한 번 더합니다.
           </p>
           <div class="actions">
-            <select id="usageMetric">
-              <option value="down">받은 데이터(MB)</option>
-              <option value="up">보낸 데이터(MB)</option>
-              <option value="req">요청 수</option>
-              <option value="rounds">판 수</option>
-            </select>
+            <select id="usageDay"></select>
             <button id="usageLoad" type="button">불러오기</button>
           </div>
           <p class="msg" id="usageMsg"></p>
@@ -1864,10 +1859,9 @@ new LagDiagPanel().bind();
 
 /* ---------------- 사용량 ----------------
    usageDaily/<YYYYMMDD>/<자료> = { down, up, req, sec, rounds } (교사 계정만 읽기). 학생 기기가 판이 끝날 때 서버 increment 로 더한다.
-   불러오기를 누를 때 전체를 한 번 읽고(날짜 × 자료 수만큼이라 작다), 지표를 바꾸면 다시 읽지 않고 표만 다시 그린다. */
+   불러오기를 누를 때 전체를 한 번 읽고(날짜 × 자료 수만큼이라 작다), 날짜를 바꾸면 다시 읽지 않고 그 날짜의 게임별 표(지표 4가지)만 다시 그린다. */
 class UsagePanel {
-  static METRIC_LABELS = { down: "받은 데이터", up: "보낸 데이터", req: "요청 수", rounds: "판 수" };
-  static BYTE_METRICS = ["down", "up"];
+  static COLUMNS = [["down", "받은 데이터(MB)", true], ["up", "보낸 데이터(MB)", true], ["req", "요청 수", false], ["rounds", "판 수", false]];
 
   constructor() { this.days = {}; this.loaded = false; }
 
@@ -1882,7 +1876,7 @@ class UsagePanel {
       $("usageToggle").setAttribute("aria-expanded", open ? "true" : "false");
     });
     $("usageLoad").addEventListener("click", () => this.load());
-    $("usageMetric").addEventListener("change", () => this.render());
+    $("usageDay").addEventListener("change", () => this.render());
   }
 
   async load() {
@@ -1892,6 +1886,7 @@ class UsagePanel {
       if (!r.ok) throw new Error(r.status === 401 || r.status === 403 ? "읽기 권한이 없습니다. 데이터베이스 규칙(usageDaily)을 콘솔에 게시했는지 확인해 주세요." : "불러오지 못했습니다 (" + r.status + ")");
       this.days = (await r.json()) || {};
       this.loaded = true;
+      this.fillDays();
       this.render();
     } catch (e) {
       say("usageMsg", e.message);
@@ -1903,51 +1898,44 @@ class UsagePanel {
     return found ? found.title : slug;
   }
 
-  cell(metric, value) {
+  cell(column, value) {
     const n = +value || 0;
     if (!n) return "-";
-    return UsagePanel.BYTE_METRICS.includes(metric) ? UsagePanel.megabytes(n) : n.toLocaleString("ko-KR");
+    return column[2] ? UsagePanel.megabytes(n) : n.toLocaleString("ko-KR");
   }
 
-  gameKeys() {
-    const totals = {};
-    Object.keys(this.days).forEach((day) => Object.keys(this.days[day] || {}).forEach((slug) => {
-      totals[slug] = (totals[slug] || 0) + (+(this.days[day][slug] || {}).down || 0);
-    }));
-    return Object.keys(totals).sort((a, b) => totals[b] - totals[a]);
+  fillDays() {
+    const select = $("usageDay"), keep = select.value;
+    select.textContent = "";
+    const dayKeys = Object.keys(this.days).sort().reverse();
+    dayKeys.forEach((day) => {
+      const option = el("option", null, UsagePanel.dayText(day));
+      option.value = day;
+      select.appendChild(option);
+    });
+    select.value = dayKeys.includes(keep) ? keep : (dayKeys[0] || "");
   }
 
   render() {
     const box = $("usageTable");
     box.textContent = "";
-    const metric = $("usageMetric").value;
-    const dayKeys = Object.keys(this.days).sort().reverse();
-    if (!dayKeys.length) { say("usageMsg", "아직 기록이 없습니다."); return; }
-    const slugs = this.gameKeys();
-    const unit = UsagePanel.BYTE_METRICS.includes(metric) ? " (MB)" : "";
-    say("usageMsg", UsagePanel.METRIC_LABELS[metric] + unit + " · " + dayKeys.length + "일 · 게임은 받은 데이터가 많은 순");
+    const day = $("usageDay").value;
+    if (!day) { say("usageMsg", "아직 기록이 없습니다."); return; }
+    const row = this.days[day] || {};
+    const slugs = Object.keys(row).sort((a, b) => (+row[b].down || 0) - (+row[a].down || 0));
+    say("usageMsg", UsagePanel.dayText(day) + " · 사용한 게임 " + slugs.length + "개 · 받은 데이터가 많은 순");
     const table = el("table"), head = el("tr");
-    ["날짜", "합계"].concat(slugs.map((s) => this.titleOf(s))).forEach((t) => head.appendChild(el("th", null, t)));
+    ["게임"].concat(UsagePanel.COLUMNS.map((c) => c[1])).forEach((t) => head.appendChild(el("th", null, t)));
     table.appendChild(head);
-    const grand = { sum: 0, perGame: {} };
-    dayKeys.forEach((day) => {
-      const row = this.days[day] || {};
-      const sum = slugs.reduce((s, slug) => s + (+(row[slug] || {})[metric] || 0), 0);
-      grand.sum += sum;
+    slugs.forEach((slug) => {
       const tr = el("tr");
-      tr.appendChild(el("td", null, UsagePanel.dayText(day)));
-      tr.appendChild(el("td", null, this.cell(metric, sum)));
-      slugs.forEach((slug) => {
-        const value = +(row[slug] || {})[metric] || 0;
-        grand.perGame[slug] = (grand.perGame[slug] || 0) + value;
-        tr.appendChild(el("td", null, this.cell(metric, value)));
-      });
+      tr.appendChild(el("td", null, this.titleOf(slug)));
+      UsagePanel.COLUMNS.forEach((c) => tr.appendChild(el("td", null, this.cell(c, (row[slug] || {})[c[0]]))));
       table.appendChild(tr);
     });
     const total = el("tr");
-    total.appendChild(el("td", null, "전체 합계"));
-    total.appendChild(el("td", null, this.cell(metric, grand.sum)));
-    slugs.forEach((slug) => total.appendChild(el("td", null, this.cell(metric, grand.perGame[slug]))));
+    total.appendChild(el("td", null, "합계"));
+    UsagePanel.COLUMNS.forEach((c) => total.appendChild(el("td", null, this.cell(c, slugs.reduce((s, slug) => s + (+(row[slug] || {})[c[0]] || 0), 0)))));
     total.style.fontWeight = "bold";
     table.appendChild(total);
     box.appendChild(table);
