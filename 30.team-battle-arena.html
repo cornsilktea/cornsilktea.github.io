@@ -38,8 +38,7 @@
   <div class="tbv-curtain-in">
     <div class="tbv-head">⚔️ 상대 팀을 찾았어요!</div>
     <div class="tbv" id="tbvBody"></div>
-    <div class="tbv-hint">곧 캐릭터 선택이 시작돼요.</div>
-  </div>
+ </div>
 </div>
 
 <div id="scrStart" data-account-home class="screen">
@@ -183,10 +182,9 @@
     <div id="hudMid"><div id="hudTimer">1:30</div><div id="hudCount"></div></div>
     <div class="hdSide r" data-fps-beside><span>레드 킬</span><b id="hudKillR">0</b></div>
   </div>
-  <button id="btnSpecFollow" type="button" hidden>자동 추적</button>
-  <div id="killFeed"></div>
+ <div id="killFeed"></div>
   <div id="killBanner"></div>
-  <div id="hudRight"><div class="room-code-tag" id="hudRoomCode"></div><button id="btnLeaveGame" type="button">방 나가기</button></div>
+  <div id="hudRight"><button id="btnSpecFollow" type="button" hidden>자동 추적</button><div class="room-code-tag" id="hudRoomCode"></div><button id="btnLeaveGame" type="button">방 나가기</button></div>
   <div id="endBanner" hidden></div>
   <div id="practiceBar" hidden><button id="btnPracExit" type="button">연습장 나가기</button><button id="btnPracChar" type="button">캐릭터 변경</button><button id="btnPracGauge" type="button">스킬 게이지 채우기(H)</button></div>
   <div id="practiceInfo" hidden></div>
@@ -1425,11 +1423,10 @@ SinglePassMaterials.enable(THREE);
               " (" + specs.length + "/" + (practice ? 0 : MatchRules.SPEC_MAX) + ")");
       Dom.show(Dom.$("btnSpec"), !imSpec); Dom.$("btnSpec").disabled = practice || !services.roster.canMoveTo("spec");
       var cup = mode === "cup";
-      Dom.show(Dom.$("charCardBox"), cup || !imSpec);
-      if (!cup && imSpec) services.cards.setCharZoom(false);
+      Dom.show(Dom.$("charCardBox"), true);
       Dom.show(Dom.$("btnSwapTeams"), services.session.isHost() && services.session.room.status === "lobby");
 
-      Dom.setHtmlKeepScroll(Dom.$("chars"), services.cards.cardsHtml(me, cup)); services.cards.fitCardHeight(); services.cards.fitCharCol(Dom.$("charCardBox"));
+      Dom.setHtmlKeepScroll(Dom.$("chars"), services.cards.cardsHtml(me, cup || imSpec)); services.cards.fitCardHeight(); services.cards.fitCharCol(Dom.$("charCardBox"));
 
       var host = services.session.isHost(), ok = false, hint = "";
       if (!mode) hint = "게임 방식을 먼저 골라 주세요.";
@@ -1438,7 +1435,7 @@ SinglePassMaterials.enable(THREE);
         hint = ok ? "연습 봇을 상대로 혼자 연습해요. 게임 시작을 누르면 연습장에 들어가요." : "블루팀이나 레드팀으로 이동해 주세요.";
       } else {
         if (nb < 1 || nr < 1) hint = "양 팀에 1명 이상 있어야 시작할 수 있어요.";
-        else { ok = true; hint = nb !== nr ? "인원이 달라요 (블루 " + nb + " vs 레드 " + nr + ") — 그래도 시작할 수 있어요." : "블루 " + nb + " vs 레드 " + nr; }
+        else { ok = true; hint = nb !== nr ? "인원이 달라요 (블루 " + nb + " vs 레드 " + nr + ") — 그래도 시작할 수 있어요." : ""; }
       }
       if (!cup && !practice) ["blue", "red"].forEach(function (team) {
         services.session.teamIds(team).forEach(function (id) {
@@ -11245,14 +11242,16 @@ SinglePassMaterials.enable(THREE);
   }
   class SpectatorFollow {
     static PAD = 150;
-    static EASE_PER_SEC = 1.6;
-    static MIN_DIST_RATIO = 0.42;
-    constructor(services) { this.services = services; this.on = false; }
+    static LOOK_EASE = 0.9;
+    static ZOOM_IN_EASE = 0.7;
+    static ZOOM_OUT_EASE = 0.3;
+    static MIN_DIST_RATIO = 0.55;
+    constructor(services) { this.services = services; this.on = false; this.held = null; }
     bind() { var follow = this; Dom.$("btnSpecFollow").addEventListener("click", function () { follow.toggle(); }); }
-    toggle() { this.on = !this.on; this.paint(); }
+    toggle() { this.on = !this.on; this.held = null; this.paint(); }
     paint() { Dom.setText(Dom.$("btnSpecFollow"), this.on ? "전체 화면" : "자동 추적"); Dom.$("btnSpecFollow").classList.toggle("on", this.on); }
     sync(spec) {
-      if (!spec && this.on) { this.on = false; this.paint(); }
+      if (!spec && this.on) { this.on = false; this.held = null; this.paint(); }
       Dom.show(Dom.$("btnSpecFollow"), spec);
     }
     aliveBounds() { var services = this.services, b = null;
@@ -11264,12 +11263,15 @@ SinglePassMaterials.enable(THREE);
       return b;
     }
     frame() { var services = this.services, view = services.cameraRig.view, whole = { lx: ArenaSize.MW / 2, lz: ArenaSize.MH / 2, dist: view.fullDist };
-      var b = this.on ? this.aliveBounds() : null;
-      if (!b) return whole;
+      var room = services.session.room, status = room ? room.status : "";
+      if (status !== "playing" && status !== "ended") this.held = null;
+      var b = this.on && status !== "ended" ? this.aliveBounds() : null;
+      if (!b) return this.on && this.held ? this.held : whole;
       var pad = SpectatorFollow.PAD, x0 = Math.max(0, b.x0 - pad), x1 = Math.min(ArenaSize.MW, b.x1 + pad), z0 = Math.max(0, b.z0 - pad), z1 = Math.min(ArenaSize.MH, b.z1 + pad);
       var lx = (x0 + x1) / 2, lz = (z0 + z1) / 2, h = CameraRig.HEAD_Y;
       var fit = services.cameraRig.fitDist([[x0, 0, z0], [x1, 0, z0], [x0, 0, z1], [x1, 0, z1], [x0, h, z0], [x1, h, z0]], lx, lz, view.pitchSpec, view.specXMax);
-      return { lx: lx, lz: lz, dist: MathKit.clamp(fit, view.fullDist * SpectatorFollow.MIN_DIST_RATIO, view.fullDist) };
+      this.held = { lx: lx, lz: lz, dist: MathKit.clamp(fit, view.fullDist * SpectatorFollow.MIN_DIST_RATIO, view.fullDist) };
+      return this.held;
     }
   }
   class CameraRig {
@@ -11364,9 +11366,9 @@ SinglePassMaterials.enable(THREE);
       }
       if (services.cameraRig.view.snap) { services.cameraRig.view.look.set(lx, 0, lz); services.cameraRig.view.snap = false; }
       else {
-        var k = 1 - Math.exp(-dt * (spec ? SpectatorFollow.EASE_PER_SEC : 7));
+        var zoomingOut = spec && wantDist > services.cameraRig.view.dist, k = 1 - Math.exp(-dt * (spec ? (zoomingOut ? SpectatorFollow.ZOOM_OUT_EASE : SpectatorFollow.LOOK_EASE) : 7));
         services.cameraRig.view.look.x += (lx - services.cameraRig.view.look.x) * k; services.cameraRig.view.look.z += (lz - services.cameraRig.view.look.z) * k;
-        if (spec) services.cameraRig.view.dist += (wantDist - services.cameraRig.view.dist) * k;
+        if (spec) services.cameraRig.view.dist += (wantDist - services.cameraRig.view.dist) * (1 - Math.exp(-dt * (zoomingOut ? SpectatorFollow.ZOOM_OUT_EASE : SpectatorFollow.ZOOM_IN_EASE)));
       }
       services.cameraRig.placeCamera(services.cameraRig.view.look.x, services.cameraRig.view.look.z, services.cameraRig.view.dist, pitch, b);
     }
@@ -12213,10 +12215,10 @@ SinglePassMaterials.enable(THREE);
       var compact = !services.match.me, bw = compact ? 34 : 62, bh = compact ? 4 : 7, x0 = p.x - bw / 2, top = p.y - 4, ratio = MathKit.clamp(E.hp / E.maxHp, 0, 1);
       Canvases.overlayCtx.save(); Canvases.overlayCtx.globalAlpha = alpha;
       services.hudBars.drawStatus(E, p.x, top - (E === services.match.me ? 52 : (compact ? 24 : 33)));
-      var mine = E === services.match.me, teamCss = E.team === "blue" ? "#2F6FD6" : "#D6453D", ny = top - (compact ? 10 : 13), gauge = ally && !compact;
+      var mine = E === services.match.me, teamCss = E.team === "blue" ? "#2F6FD6" : "#D6453D", ny = top - (compact ? 10 : 13), gauge = ally;
       services.overlaySprites.drawNameTag(E.nickname || "", teamCss, mine, p.x, ny, compact);
       if (mine) services.hudBars.drawMeArrow(p.x, ny - 14);
-      var frameH = bh + 4 + (gauge ? 7 : 0);
+      var frameH = bh + 4 + (gauge ? (compact ? 5 : 7) : 0);
       Canvases.overlayCtx.fillStyle = "rgba(10,14,12,.85)"; services.hud.pill(x0 - 2, top - 2, bw + 4, frameH, 3); Canvases.overlayCtx.fill();
       Canvases.overlayCtx.lineWidth = mine ? 2.5 : 1.5; Canvases.overlayCtx.strokeStyle = mine ? MeMarker.CSS : teamCss; Canvases.overlayCtx.stroke();
       Canvases.overlayCtx.fillStyle = ally ? (ratio < 0.3 ? "#F2A33A" : "#4CC27E") : "#E8505A";
@@ -12225,10 +12227,10 @@ SinglePassMaterials.enable(THREE);
       Canvases.overlayCtx.fillStyle = "rgba(10,14,12,.6)";
       if (E.maxHp <= 1000 && !compact) for (var hp = 50; hp < E.maxHp; hp += 50) Canvases.overlayCtx.fillRect(x0 + bw * hp / E.maxHp, top, 1, bh);
       if (gauge) {
-        var gy = top + bh + 3, full = E.gauge >= MatchRules.GAUGE_MAX, t = services.clock.now(), act = E.hasSkillActive(t);
-        Canvases.overlayCtx.fillStyle = "rgba(10,14,12,.8)"; Canvases.overlayCtx.fillRect(x0 - 1, gy - 1, bw + 2, 6);
+        var gy = top + bh + (compact ? 2 : 3), gh = compact ? 3 : 4, full = E.gauge >= MatchRules.GAUGE_MAX, t = services.clock.now(), act = E.hasSkillActive(t);
+        Canvases.overlayCtx.fillStyle = "rgba(10,14,12,.8)"; Canvases.overlayCtx.fillRect(x0 - 1, gy - 1, bw + 2, gh + 2);
         Canvases.overlayCtx.fillStyle = act ? "#F06BB5" : (full ? "#FF5A4E" : "#F2C230");
-        Canvases.overlayCtx.fillRect(x0, gy, bw * (act ? E.skillLeft(t) : MathKit.clamp(E.gauge / MatchRules.GAUGE_MAX, 0, 1)), 4);
+        Canvases.overlayCtx.fillRect(x0, gy, bw * (act ? E.skillLeft(t) : MathKit.clamp(E.gauge / MatchRules.GAUGE_MAX, 0, 1)), gh);
       }
       Canvases.overlayCtx.restore();
     }
@@ -13404,10 +13406,9 @@ SinglePassMaterials.enable(THREE);
     mapName(room) { var ticket = this.services.randomMatch.ticket(), map = MapCatalog.of(room.map);
       return (ticket && ticket.map) || (map ? map.name : ArenaVersusCurtain.UNDECIDED_MAP);
     }
-    writeHead() { var matched = this.matched(), room = this.services.session.room;
+    writeHead() { var matched = this.matched();
       Dom.setText(this.root.querySelector(".tbv-head"), matched ? "⚔️ 상대 팀을 찾았어요!" : "⚔️ 곧 대결이 시작돼요!");
-      Dom.setText(this.root.querySelector(".tbv-hint"), room && room.mode === "cup" ? "곧 캐릭터 선택이 시작돼요." : "곧 경기가 시작돼요.");
-    }
+   }
     hostStart(start) { var services = this.services, room = services.session.room, self = this;
       if (!room || room.mode === "practice" || this.matched()) { start(); return; }
       if (this.roomLeftMs() > 0) return;
