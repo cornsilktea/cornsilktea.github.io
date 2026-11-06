@@ -1866,6 +1866,7 @@ new LagDiagPanel().bind();
    usageDaily/<YYYYMMDD>/<자료> = { down, up, req, sec, rounds } (교사 계정만 읽기). 학생 기기가 판이 끝날 때 서버 increment 로 더한다.
    불러오기를 누를 때 전체를 한 번 읽고(날짜 × 자료 수만큼이라 작다), 날짜를 바꾸면 다시 읽지 않고 그 날짜의 게임별 표(지표 4가지)만 다시 그린다. */
 class UsagePanel {
+  static SHOWN_DAYS = 7;
   static COLUMNS = [["down", "받은 데이터(MB)", true], ["up", "보낸 데이터(MB)", true], ["req", "요청 수", false], ["rounds", "판 수", false]];
 
   constructor() { this.days = {}; this.loaded = false; }
@@ -1909,10 +1910,15 @@ class UsagePanel {
     return column[2] ? UsagePanel.megabytes(n) : n.toLocaleString("ko-KR");
   }
 
+  usedOn(day) {
+    const row = this.days[day] || {};
+    return Object.keys(row).some((slug) => UsagePanel.COLUMNS.some((c) => (+(row[slug] || {})[c[0]] || 0) > 0));
+  }
+
   fillDays() {
     const select = $("usageDay"), keep = select.value;
     select.textContent = "";
-    const dayKeys = Object.keys(this.days).sort().reverse();
+    const dayKeys = Object.keys(this.days).sort().reverse().filter((day) => this.usedOn(day)).slice(0, UsagePanel.SHOWN_DAYS);
     dayKeys.forEach((day) => {
       const option = el("option", null, UsagePanel.dayText(day));
       option.value = day;
@@ -1927,7 +1933,7 @@ class UsagePanel {
     const day = $("usageDay").value;
     if (!day) { say("usageMsg", "아직 기록이 없습니다."); return; }
     const row = this.days[day] || {};
-    const slugs = Object.keys(row).sort((a, b) => (+row[b].down || 0) - (+row[a].down || 0));
+    const slugs = Object.keys(row).filter((slug) => UsagePanel.COLUMNS.some((c) => (+(row[slug] || {})[c[0]] || 0) > 0)).sort((a, b) => (+row[b].down || 0) - (+row[a].down || 0));
     say("usageMsg", UsagePanel.dayText(day) + " · 사용한 게임 " + slugs.length + "개 · 받은 데이터가 많은 순");
     const table = el("table", "usage-board"), head = el("tr");
     ["게임"].concat(UsagePanel.COLUMNS.map((c) => c[1])).forEach((t) => head.appendChild(el("th", null, t)));
