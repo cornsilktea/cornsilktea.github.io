@@ -10,7 +10,7 @@
        (databaseURL 이 안 보이면 Realtime Database 화면 맨 위 주소를 씁니다)
 
    세 값 모두 웹에 공개되어도 괜찮은 값입니다.
-   실제 보안은 Realtime Database 규칙(사용법.md 참고)이 담당합니다.
+   실제 보안은 Realtime Database 규칙(docs/common/사용법.md 참고)이 담당합니다.
    ===================================================================== */
 
 window.PORTAL_CONFIG = {

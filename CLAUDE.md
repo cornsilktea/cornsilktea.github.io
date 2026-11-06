@@ -31,7 +31,7 @@
 - **공용 캐릭터 만들기는 `ts/character-kit.ts`**(2026-10-02 선생님 요청, 33번이 첫 사용). 닉네임·외형(`PlayerProfile`, 기기 저장 `portal_profile_v1`)과 6종 캐릭터 꾸미기 화면(`ProfileEditor`)·3D 모델 만들기(`CharacterModelFactory`)를 클래스로 묶었다.
   **캐릭터 만들기는 학급 화면(`index.html?c=…`)의 QR 위 `캐릭터 만들기` 버튼이 같은 화면 위 창으로 띄운다**(2026-10-03 선생님 요청, `ts/character-maker.ts` 의 `CharacterMakerPage`, three 는 버튼을 누를 때 늦게 불러옴).
   **캐릭터 만들기 확장(2026-10-10)**: Medium 캐릭터 13종(`CharacterCatalog.TYPES`, 타입별 색칸 규칙·라벨·모자/망토 메시), 색은 팔레트 + 직접 고르기(`look.p[부위]` 는 번호 또는 `#rrggbb`), 닉네임 입력칸 아래 "닉네임은 본명으로 입력합니다". **닉네임은 `portal_profile_v1` 한 곳에만 저장**하고 게임별 닉네임 저장은 없앴다(24·25·31 포함). 창은 `ts/character-maker.ts` 의 `CharacterMakerDialog`(버튼에 `data-maker-open`, 코드로는 `CharacterMakerDialog.requestOpen()`)가 어느 화면 위에서든 띄운다. 닉네임이 필요한 곳은 `PlayerProfile.storedNick()` 을 읽고, 바뀐 것은 `PlayerProfile.CHANGE_EVENT`(입력 중)·`SETTLED_EVENT`(확정) 로 받는다. 새 게임 대기방도 같은 방식으로 붙인다. RTS(37)는 멀티 모드를 만들 때 연결한다.
-  게임(32·33)의 캐릭터 만들기 카드는 접힌 한 줄(`.st-fold`, `ts/fold-card.ts` 의 `FoldCard`)이고 오른쪽 삼각형으로 펼친다. 32번 종목 규칙 카드도 같은 접이식. 새 게임도 같은 방식으로 둔다. 닉네임·외형은 기기 `localStorage`(`portal_profile_v1`)에 남는다. 새 3D 게임은 이 모듈로 캐릭터를 만든다. 사용법·클래스 표는 `33.castle-spy-notes.md` 2절.
+  게임(32·33)의 캐릭터 만들기 카드는 접힌 한 줄(`.st-fold`, `ts/fold-card.ts` 의 `FoldCard`)이고 오른쪽 삼각형으로 펼친다. 32번 종목 규칙 카드도 같은 접이식. 새 게임도 같은 방식으로 둔다. 닉네임·외형은 기기 `localStorage`(`portal_profile_v1`)에 남는다. 새 3D 게임은 이 모듈로 캐릭터를 만든다. 사용법·클래스 표는 `docs/33.castle-spy/33.castle-spy-notes.md` 2절.
 
 # 수업 자료 저장소 작업 지침
 
@@ -55,7 +55,7 @@
      자료 안에서 다른 자료로 링크할 때는 `location.search` 를 그대로 붙여 반이 유지되게 한다.
      학급 목록(1~3학년 각 5반, 3학년은 2026-10-29 미리 추가)은 `data.js` 의 `CLASSES` 한 곳에만 있다.
    - 대회서버(`?c=contest`)는 `data.js` 의 `CONTEST_GAMES` 에 적힌 자료만 나온다. 설명은 `data.js` 주석.
-   - 파일에 `Content-Security-Policy` 가 있으면 `connect-src` 에 Firebase 주소를 허용한다(사용법.md 3절).
+   - 파일에 `Content-Security-Policy` 가 있으면 `connect-src` 에 Firebase 주소를 허용한다(docs/common/사용법.md 3절).
 2. **파일 이름은 `<번호>.<영문이름>.html`**, 번호는 저장소 최대 번호 + 1 (`ls` 로 확인). 구분자는 점.
 3. **`초기데이터.json` 의 `portal.games` 에 항목 추가**(title·url·memo·order·open·units·unitsSet).
    `open` 은 참고용일 뿐이다 — 제어판에서 등록하면 **어떤 자료든 모든 반에서 잠긴 채로** 시작하고
@@ -66,7 +66,7 @@
    `ctx.font` 에 글꼴 이름을 넣을 땐 `"Nanum Gothic", "Malgun Gothic", sans-serif` 큰따옴표.
    "버튼이 안 눌린다"는 보고는 콘솔 SyntaxError 부터 의심.
 
-- **학생 구글 로그인(2026-10-26)**: 반별 링크·대회서버는 `ts/account-login.ts`(`AccountGate`)가 자료 실행 전에 로그인을 요구하고 `window.PORTAL_USER` 를 제공한다. 계정별 기록은 `ts/personal-records.ts`. 로그인하면 닉네임은 계정 이름으로 고정(수정 불가). 작업 전 `계정로그인.md` 를 읽는다. CSP 가 있는 자료(1~3번)는 Firebase Auth 주소가 허용돼 있어야 한다.
+- **학생 구글 로그인(2026-10-26)**: 반별 링크·대회서버는 `ts/account-login.ts`(`AccountGate`)가 자료 실행 전에 로그인을 요구하고 `window.PORTAL_USER` 를 제공한다. 계정별 기록은 `ts/personal-records.ts`. 로그인하면 닉네임은 계정 이름으로 고정(수정 불가). 작업 전 `docs/common/계정로그인.md` 를 읽는다. CSP 가 있는 자료(1~3번)는 Firebase Auth 주소가 허용돼 있어야 한다.
 
 ## 디자인·조작 규칙
 
@@ -77,7 +77,7 @@
 - **색감은 `theme.css` 의 `--sg-*` 토큰(스네이크 톤), 글꼴은 나눔고딕(`var(--sg-font)`)으로 고정.**
   보색이 필요하면 `#D97B4F` 만 쓴다. 캔버스 안에서는 CSS 변수가 안 먹으니 hex 값 그대로.
   예외: 14(어두운 청록)·19(라면가게 크림) 배경과 게임 안 그림은 색을 건드리지 않음.
-- **새 3D 게임은 처음부터 `3d-performance-guide.md`(3D 게임 성능 지침)대로 만들고, 기존 게임을 최적화할 때도 그 순서로 고친다**(2026-11-05 선생님 요청). 효과 그림 재사용·인스턴싱·게임 중 복제 금지, 카운트다운에 실제로 한 번 그려 첫 사용 끊김 없애기, 글자 미리 그리기, HUD 는 `transform`·`opacity` 만, 이펙트 예산(마리나 해일 기준)이 거기 있다. 만들기 전과 끝내기 전에 읽는다.
+- **새 3D 게임은 처음부터 `docs/common/3d-performance-guide.md`(3D 게임 성능 지침)대로 만들고, 기존 게임을 최적화할 때도 그 순서로 고친다**(2026-11-05 선생님 요청). 효과 그림 재사용·인스턴싱·게임 중 복제 금지, 카운트다운에 실제로 한 번 그려 첫 사용 끊김 없애기, 글자 미리 그리기, HUD 는 `transform`·`opacity` 만, 이펙트 예산(마리나 해일 기준)이 거기 있다. 만들기 전과 끝내기 전에 읽는다.
 - **모든 게임은 초당 60프레임으로 제한한다**(2026-11-06 선생님 요청, 앞으로 만드는 게임 포함). `access-guard.js` 의 `FrameRateLimiter` 가 `requestAnimationFrame` 을 감싸 저절로 적용되므로 잠금 확인 줄만 넣으면 된다. 그리기 루프는 반드시 `requestAnimationFrame` 으로 돌리고 `setInterval` 등으로 따로 돌리지 않는다. 터치 기기 성능은 키보드가 아니라 **터치한 상태로** 잰다(터치 때 주사율이 90·120Hz 로 올라감).
 - **조이스틱은 거리와 상관없이 항상 그 방향의 최고 속도로 움직인다**(2026-11-06 선생님 요청, 모든 게임·앞으로 만드는 게임). 가운데 무감 구역 안에서만 멈추고, 거리에 비례한 속도(아날로그)는 쓰지 않는다.
 - **3D(three.js) 자료의 기준 기기는 갤럭시탭 S7 FE(`SM-T733`, 60Hz)다**(2026-11-06 선생님 확인: 올해·내년 학생이 쓰는 기기). 이 기기에서 터치한 채로 60fps 근처가 나와야 통과다(30번 이펙트 패치 뒤 평균 59.7·하위 5% 55). 제어판 렉 진단 첫 열의 `SM-T733` 줄로 확인한다. 아래 S7·S9 비율은 옛 추정이다.
@@ -114,33 +114,33 @@
   소문자 영문만(`^[a-z]+$`). 새 게임은 `데이터베이스규칙.json` 의 `.validate` 에 **점수 상한 한 줄**을 추가하고
   선생님이 콘솔에 다시 게시하도록 알린다(없으면 F12 로 아무 점수나 넣을 수 있음).
   개인 기기의 localStorage 최고 기록은 그대로 유지한다. 패턴은 1·19·20번 참고.
-- 개인전 게임의 기기 최고 기록은 **계정에도 저장**한다(2026-10-26 선생님 결정): 최고 기록을 localStorage 에 저장하는 곳 다음에 `WorldRecord.syncBest(게임, {storageKey, merge: WorldRecord.betterOf(원문→점수, lower), onApply: 다시 읽고 다시 그리기})` 한 줄(신기록일 때만 `WR.prompt` 를 부르는 게임은 저장 직후 `WorldRecord.pushBest(게임)` 도). 설명은 `계정로그인.md`.
+- 개인전 게임의 기기 최고 기록은 **계정에도 저장**한다(2026-10-26 선생님 결정): 최고 기록을 localStorage 에 저장하는 곳 다음에 `WorldRecord.syncBest(게임, {storageKey, merge: WorldRecord.betterOf(원문→점수, lower), onApply: 다시 읽고 다시 그리기})` 한 줄(신기록일 때만 `WR.prompt` 를 부르는 게임은 저장 직후 `WorldRecord.pushBest(게임)` 도). 설명은 `docs/common/계정로그인.md`.
 - 개인전 게임은 **우리 반 신기록**(`WR.cls`)도 함께 둔다. 사용법·저장 경로·화면 처리는 `world-record.js` 머리 주석. 패턴은 6·20·25번 참고.
 
-- **30번(팀 배틀) 작업은 시작 전에 반드시 `30.team-battle-notes.md` 를 읽는다.** 구조·규칙·캐릭터 추가 순서(`admin.html` 통계표·`데이터베이스규칙.json` 포함)·클래스 구조(9·10절)·검사 방법이 모두 거기 있고, 30번 규칙을 새로 정하거나 바꾸면 이 파일이 아니라 그 노트에 적는다.
+- **30번(팀 배틀) 작업은 시작 전에 반드시 `docs/30.team-battle/30.team-battle-notes.md` 를 읽는다.** 구조·규칙·캐릭터 추가 순서(`admin.html` 통계표·`데이터베이스규칙.json` 포함)·클래스 구조(9·10절)·검사 방법이 모두 거기 있고, 30번 규칙을 새로 정하거나 바꾸면 이 파일이 아니라 그 노트에 적는다.
   끝나면 `&test`·`&sim` 해시로 확인한다.
-- **33번(성 안의 스파이) 작업은 시작 전에 `33.castle-spy-notes.md` 를 읽는다.** 규칙·클래스 지도·Firebase 구조·검사 방법이 거기 있다.
-- **34번(2대2 3D 배구) 작업은 시작 전에 `34.volleyball-notes.md` 를 읽는다.** 규칙·표식 규칙·클래스 지도·Firebase 구조·검사 방법이 거기 있다. 규칙 코드(`ts/34.volleyball-rules.ts`)는 화면을 몰라서 `node .claude/volley-sim.js` 로 검사한다.
-- **35번(2대2 3D 미니 축구) 작업은 시작 전에 `35.soccer-notes.md` 를 읽는다.** 규칙·네트워크 구조·클래스 지도·검사 방법이 거기 있다. 규칙 코드(`ts/35.soccer-rules.ts`)는 화면을 몰라서 `node .claude/soccer-sim.js`·`node .claude/soccer-unit.js` 로 검사한다. 방 연결은 새 공용 모듈 `ts/room-kit.ts`(`Rk*`)를 쓴다.
-- **36번(던전 레이드) 작업은 시작 전에 `36.dungeon-raid-notes.md` 를 읽는다.** 규칙·수치 조정 기록·네트워크 구조·클래스 지도·검사 방법이 거기 있다. 규칙 엔진(`ts/36.raid-rules.ts`)은 화면을 몰라서 `node .claude/raid-sim.js`·`node .claude/raid-unit.js` 로 검사한다. 파티(5명) 세계 신기록은 `world-record.js` 의 `askName`·`submitParty` 를 쓴다.
-- **37번(우주전쟁 RTS) 작업은 시작 전에 `37.space-war-notes.md` 와 확정 사양 `37.space-war-proposal.md` 를 읽는다.** 규칙 엔진(`ts/37.war-rules.ts`)은 화면을 몰라서 `node .claude/war-sim.js` 로 검사한다.
+- **33번(성 안의 스파이) 작업은 시작 전에 `docs/33.castle-spy/33.castle-spy-notes.md` 를 읽는다.** 규칙·클래스 지도·Firebase 구조·검사 방법이 거기 있다.
+- **34번(2대2 3D 배구) 작업은 시작 전에 `docs/34.volleyball/34.volleyball-notes.md` 를 읽는다.** 규칙·표식 규칙·클래스 지도·Firebase 구조·검사 방법이 거기 있다. 규칙 코드(`ts/34.volleyball-rules.ts`)는 화면을 몰라서 `node .claude/volley-sim.js` 로 검사한다.
+- **35번(2대2 3D 미니 축구) 작업은 시작 전에 `docs/35.soccer/35.soccer-notes.md` 를 읽는다.** 규칙·네트워크 구조·클래스 지도·검사 방법이 거기 있다. 규칙 코드(`ts/35.soccer-rules.ts`)는 화면을 몰라서 `node .claude/soccer-sim.js`·`node .claude/soccer-unit.js` 로 검사한다. 방 연결은 새 공용 모듈 `ts/room-kit.ts`(`Rk*`)를 쓴다.
+- **36번(던전 레이드) 작업은 시작 전에 `docs/36.dungeon-raid/36.dungeon-raid-notes.md` 를 읽는다.** 규칙·수치 조정 기록·네트워크 구조·클래스 지도·검사 방법이 거기 있다. 규칙 엔진(`ts/36.raid-rules.ts`)은 화면을 몰라서 `node .claude/raid-sim.js`·`node .claude/raid-unit.js` 로 검사한다. 파티(5명) 세계 신기록은 `world-record.js` 의 `askName`·`submitParty` 를 쓴다.
+- **37번(우주전쟁 RTS) 작업은 시작 전에 `docs/37.space-war/37.space-war-notes.md` 와 확정 사양 `docs/37.space-war/37.space-war-proposal.md` 를 읽는다.** 규칙 엔진(`ts/37.war-rules.ts`)은 화면을 몰라서 `node .claude/war-sim.js` 로 검사한다.
   **37번은 푸시 전 `node tools/war-check.js`(컴파일·규칙·글자 깨짐·모델 파일·안내 문구 수치·스크립트 버전)가 모두 통과해야 하고, 푸시 뒤에는 `node tools/war-deploy-check.js` 로 Pages 빌드 성공과 사이트 파일 일치까지 확인한 다음에 보고한다**(2026-10-10, 배포가 한 시간 멈춘 사고 이후). `.js` 를 고치면 `37.space-war.html` 의 `?v=` 값을 함께 올린다.
   화면 확인은 `node tools/war-test-page.js` 로 만드는 `.claude/war-test.html`(항상 내 팀 시점, `__t.start/spawn/look/lookAtTurret/errors`)으로 하고, 새 모델은 연결 전에 `tools/war-asset-lab.html?files=…` 로 기준점·뼈 이름·딸린 파일을 본다. 콘솔 오류(404 포함)가 있으면 보고하기 전에 처리한다.
   한글이 든 파일은 Edit·Write 도구나 UTF-8 을 명시한 코드로만 쓴다(`Add-Content`·`Get-Content | Set-Content` 금지). 안내 문구의 숫자는 `data-balance` 속성으로 `WarBalance` 값에서 가져온다.
-- **38번(눈싸움 배틀로얄) 작업은 시작 전에 `38.snow-royale-notes.md`(명세서·진행 상태)와 사양 `38.snow-royale-proposal.md` 를 읽는다.** 규칙 엔진(`ts/38.snow-rules.ts`)은 화면을 몰라서 `node .claude/snow-unit.js`·`node .claude/snow-sim.js` 로 검사한다. 여러 명 접속은 `.claude/snow-multi.html`(가짜 Firebase) 로 본다.
-- **39번(물풍선 대작전) 작업은 시작 전에 `39.water-balloon-notes.md` 와 사양 `39.water-balloon-proposal.md` 를 읽는다.** 규칙 엔진(`ts/39.balloon-rules.ts`)은 화면을 몰라서 `node tools/balloon-unit.js`·`node tools/balloon-sim.js` 로 검사한다(다른 컴퓨터에서도 쓰도록 검사 도구는 `tools/` 에 커밋).
-- **40번(모여봐요 동마의 숲) 작업은 시작 전에 `40.dongma-forest-notes.md`(명세서·진행 상태)와 확정안 `40.dongma-forest-proposal.md`, 진행 방식 `40.dongma-forest-prompt.md` 를 읽는다.** 규칙 엔진은 화면을 몰라서 `node tools/forest-unit.js`·`node tools/forest-sim.js` 로 검사한다.
-- **랜덤 매칭(24·25·30·31·32·34·35·38·39번) 작업은 시작 전에 `random-match-prompt.md`(랜덤 매칭 노트: 공용 `match-kit.ts` 사용법·게임별 규칙·바뀐 기록)를 읽는다.** 새 게임에 붙일 때도 그 파일의 "공용 모듈 사용법"대로 한다.
+- **38번(눈싸움 배틀로얄) 작업은 시작 전에 `docs/38.snow-royale/38.snow-royale-notes.md`(명세서·진행 상태)와 사양 `docs/38.snow-royale/38.snow-royale-proposal.md` 를 읽는다.** 규칙 엔진(`ts/38.snow-rules.ts`)은 화면을 몰라서 `node .claude/snow-unit.js`·`node .claude/snow-sim.js` 로 검사한다. 여러 명 접속은 `.claude/snow-multi.html`(가짜 Firebase) 로 본다.
+- **39번(물풍선 대작전) 작업은 시작 전에 `docs/39.water-balloon/39.water-balloon-notes.md` 와 사양 `docs/39.water-balloon/39.water-balloon-proposal.md` 를 읽는다.** 규칙 엔진(`ts/39.balloon-rules.ts`)은 화면을 몰라서 `node tools/balloon-unit.js`·`node tools/balloon-sim.js` 로 검사한다(다른 컴퓨터에서도 쓰도록 검사 도구는 `tools/` 에 커밋).
+- **40번(모여봐요 동마의 숲) 작업은 시작 전에 `docs/40.dongma-forest/40.dongma-forest-notes.md`(명세서·진행 상태)와 확정안 `docs/40.dongma-forest/40.dongma-forest-proposal.md`, 진행 방식 `docs/40.dongma-forest/40.dongma-forest-prompt.md` 를 읽는다.** 규칙 엔진은 화면을 몰라서 `node tools/forest-unit.js`·`node tools/forest-sim.js` 로 검사한다.
+- **랜덤 매칭(24·25·30·31·32·34·35·38·39번) 작업은 시작 전에 `docs/common/random-match-prompt.md`(랜덤 매칭 노트: 공용 `match-kit.ts` 사용법·게임별 규칙·바뀐 기록)를 읽는다.** 새 게임에 붙일 때도 그 파일의 "공용 모듈 사용법"대로 한다.
 - **방(방 코드)이 있는 게임 공통 규칙**(2026-10-28 선생님 요청, 앞으로 만드는 게임 모두):
   - 시작 화면에 `관전하기`·`관전자로 입장` 버튼을 따로 두지 않는다. `입장` 하나로 들어가고, 이미 진행 중이거나 선수 자리가 찬 방이면 남은 관전 자리로 자동 입장한다(`room-kit.ts` 의 `RkRoomDirectory.join` 이 그렇게 동작). 방 안에서 선수↔관전 바꾸기 버튼은 둘 수 있다.
   - 방에 들어가면 시작 화면 입장 칸(`joinCode`)에 그 방 코드를 넣어 둔다 — 나오거나 튕겨도 바로 다시 입장할 수 있게(30번 밴픽창 위에도 작은 방 코드).
   - 경기 화면 위쪽 HUD 에 작은 방 코드를 띄운다: 위쪽 가운데 HUD 상자 안에 `<div class="room-code-tag" id="hudRoomCode"></div>`(상자 바로 아래에 붙음) 또는 HUD 상자 안 한 줄이면 `class="room-code-tag in-flow"`(theme.css). 방에 들어갈 때 `"방 코드 " + code`, 혼자 하기·연습이면 빈 글자(빈 글자면 숨는다). 다른 HUD·버튼에 가리지 않는지 좁은 화면(640px)까지 확인한다.
   - 시작 화면 실행 카드의 세로 간격은 모두 10px 로 맞춘다(만들기 → 랜덤 매칭 → 방 코드 입력 줄 → `📊 내 통계 · 최근 20매치`, theme.css `.st-btn` 의 `margin-top:10px` 기준). 입력칸·빈 안내 줄이 간격을 벌리지 않게 한다.
   - 랜덤 매칭 팀 대기실의 오른쪽 위 나가기 버튼과 머리 줄 버튼이 겹치지 않게 한다(theme.css `.mk-panel` 머리 줄은 넘치면 다음 줄로 내려감).
-- **대전이 있는 새 게임은 계정 통계(내 통계·최근 20매치·교사 반 별 통계) 저장까지 처음부터 함께 만든다**(2026-10-28 선생님 요청, 24번 터보 랩이 기준). 시작 화면 실행 버튼 아래에 넓은 버튼 하나 `📊 내 통계 · 최근 20매치`(`data-account-open="stats"`)만 두고, 내 통계·최근 매치 버튼을 따로 만들지 않는다. 만드는 순서·게임 키를 넣을 곳(DB 규칙·admin `RankGame.GAMES`·`tools/account-stats-unit.js`)은 `account-stats-prompt.md` 맨 위 "★ 새 게임을 만들 때" 절. **교사 제어판 반 별 통계에서 학생 이름을 누르면 그 학생의 개인 통계(학생이 보는 창과 같은 내용) 창이 열려야 한다**(2026-10-28 선생님 요청) — admin 에 그 게임 통계 `.js` 를 불러오고 `RankGame` 에 `account`(`{profile, view}`)를 넘긴다.
-- **대전이 있는 새 게임은 매칭 화면(대결 화면)을 처음부터 함께 만든다**(2026-10-29 선생님 요청, 24번 `TurboLapVersusView`·30번 `ArenaVersusCurtain` 이 기준). 랜덤 매칭으로 상대를 찾아 방에 들어가면 화면 전체를 덮는 어두운 막에 양쪽(팀)을 VS 로 마주 세우고, 선수마다 닉네임·계정 누적 승률과 그 게임에 맞는 개인 기록(30번: 많이 고른 캐릭터 3종 초상화·이름·`n회 / nn%`, 24번: 차·코스 승률)을 보여 준 뒤 방장이 몇 초 뒤 경기를 시작한다. 기록이 없으면 빈 칸·`기록 없음`, AI 는 `🤖 AI`, 아직 안 들어온 사람은 `입장하는 중…`. 크기는 vw·vh 로 화면에 꽉 차게, 갤럭시탭 가로(1280×800)와 좁은 화면까지 확인하고 예시 사진을 찍어 보고한다. 만드는 방법은 `random-match-prompt.md` 의 "★ 새 게임 매칭 화면" 절. **일반 방(방 만들기·코드 입장)에서 시작할 때도 같은 화면을 띄우고, 화면의 승률·개인 기록은 랜덤 매칭에서 생긴 자료만 보여 준다**(2026-10-29 선생님 결정, 24·30번 적용 — 30번만 일반 방 대회모드가 섞인 통계를 그대로 쓰는 예외). 기존 대전 게임에 붙일 때는 `versus-screen-prompt.md`.
-- **계정 통계(내 통계·최근 20매치·교사 반 별 통계) 작업은 시작 전에 `account-stats-prompt.md`(계정 통계 노트)를 읽는다.** 30번 계정 통계 설명은 `30.team-battle-notes.md` 5-2b.
-- **32번(미니게임 모음) 작업은 시작 전에 `32.minigames-notes.md` 를 읽는다.** `32.minigames/last-tile/`(옛 마지막 발판 규칙 코드, 설명은 `32.minigames-last-tile-notes.md`)도 같은 모음 안의 코드다. 종목 추가 방법·클래스 지도·Firebase 구조·검사 방법이 거기 있다.
+- **대전이 있는 새 게임은 계정 통계(내 통계·최근 20매치·교사 반 별 통계) 저장까지 처음부터 함께 만든다**(2026-10-28 선생님 요청, 24번 터보 랩이 기준). 시작 화면 실행 버튼 아래에 넓은 버튼 하나 `📊 내 통계 · 최근 20매치`(`data-account-open="stats"`)만 두고, 내 통계·최근 매치 버튼을 따로 만들지 않는다. 만드는 순서·게임 키를 넣을 곳(DB 규칙·admin `RankGame.GAMES`·`tools/account-stats-unit.js`)은 `docs/common/account-stats-prompt.md` 맨 위 "★ 새 게임을 만들 때" 절. **교사 제어판 반 별 통계에서 학생 이름을 누르면 그 학생의 개인 통계(학생이 보는 창과 같은 내용) 창이 열려야 한다**(2026-10-28 선생님 요청) — admin 에 그 게임 통계 `.js` 를 불러오고 `RankGame` 에 `account`(`{profile, view}`)를 넘긴다.
+- **대전이 있는 새 게임은 매칭 화면(대결 화면)을 처음부터 함께 만든다**(2026-10-29 선생님 요청, 24번 `TurboLapVersusView`·30번 `ArenaVersusCurtain` 이 기준). 랜덤 매칭으로 상대를 찾아 방에 들어가면 화면 전체를 덮는 어두운 막에 양쪽(팀)을 VS 로 마주 세우고, 선수마다 닉네임·계정 누적 승률과 그 게임에 맞는 개인 기록(30번: 많이 고른 캐릭터 3종 초상화·이름·`n회 / nn%`, 24번: 차·코스 승률)을 보여 준 뒤 방장이 몇 초 뒤 경기를 시작한다. 기록이 없으면 빈 칸·`기록 없음`, AI 는 `🤖 AI`, 아직 안 들어온 사람은 `입장하는 중…`. 크기는 vw·vh 로 화면에 꽉 차게, 갤럭시탭 가로(1280×800)와 좁은 화면까지 확인하고 예시 사진을 찍어 보고한다. 만드는 방법은 `docs/common/random-match-prompt.md` 의 "★ 새 게임 매칭 화면" 절. **일반 방(방 만들기·코드 입장)에서 시작할 때도 같은 화면을 띄우고, 화면의 승률·개인 기록은 랜덤 매칭에서 생긴 자료만 보여 준다**(2026-10-29 선생님 결정, 24·30번 적용 — 30번만 일반 방 대회모드가 섞인 통계를 그대로 쓰는 예외). 기존 대전 게임에 붙일 때는 `docs/common/versus-screen-prompt.md`.
+- **계정 통계(내 통계·최근 20매치·교사 반 별 통계) 작업은 시작 전에 `docs/common/account-stats-prompt.md`(계정 통계 노트)를 읽는다.** 30번 계정 통계 설명은 `docs/30.team-battle/30.team-battle-notes.md` 5-2b.
+- **32번(미니게임 모음) 작업은 시작 전에 `docs/32.minigames/32.minigames-notes.md` 를 읽는다.** `32.minigames/last-tile/`(옛 마지막 발판 규칙 코드, 설명은 `docs/32.minigames/32.minigames-last-tile-notes.md`)도 같은 모음 안의 코드다. 종목 추가 방법·클래스 지도·Firebase 구조·검사 방법이 거기 있다.
 
 - **새 게임에 쓸 3D 에셋(캐릭터·애니메이션·건물·소품)을 고를 때는 먼저 `kaykit-catalog/README.md` 를 읽는다**(2026-10-03 선생님 요청). `3d-assets` 21개 팩의 용도·캐릭터·애니메이션 클립을 정리해 두었고, `node tools/kaykit-find.js 단어` 로 모델·클립을 바로 검색한다. 전체 이름표는 `kaykit-catalog/names.md`. 팩을 더 받으면 README 맨 위 명령으로 다시 만든다.
 

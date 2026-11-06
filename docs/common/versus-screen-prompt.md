@@ -13,11 +13,11 @@
 
 먼저 읽을 것
 - CLAUDE.md 의 "대전이 있는 새 게임은 매칭 화면을 처음부터 함께 만든다" 항목
-- random-match-prompt.md 의 "★ 새 게임 매칭 화면" 절(언제·무엇을·데이터·모양·처음 그리는 값·일반 방·표시 자료 기준)
-- account-stats-prompt.md 의 "★ 새 게임을 만들 때"와 "모든 게임 공통 규칙", 그리고 이 게임 절
-- 이 게임의 노트(<번호>.*-notes.md 가 있으면 그것, 없으면 account-stats-prompt.md·random-match-prompt.md 의 이 게임 절)
+- docs/common/random-match-prompt.md 의 "★ 새 게임 매칭 화면" 절(언제·무엇을·데이터·모양·처음 그리는 값·일반 방·표시 자료 기준)
+- docs/common/account-stats-prompt.md 의 "★ 새 게임을 만들 때"와 "모든 게임 공통 규칙", 그리고 이 게임 절
+- 이 게임의 노트(<번호>.*-notes.md 가 있으면 그것, 없으면 docs/common/account-stats-prompt.md·docs/common/random-match-prompt.md 의 이 게임 절)
 - 기준 구현: 24번 ts/24.turbo-lap-stats.ts 의 TurboLapVersusView·TurboLapRates, 24.turbo-lap.html 의 VersusCurtain·TurboRoomVersus,
-  30번 ts/30.team-battle-versus.ts 와 30.team-battle-arena.html 의 ArenaVersusCurtain(30.team-battle-notes.md 5-2c)
+  30번 ts/30.team-battle-versus.ts 와 30.team-battle-arena.html 의 ArenaVersusCurtain(docs/30.team-battle/30.team-battle-notes.md 5-2c)
 
 만들 것
 1. 랜덤 매칭으로 방에 들어가면 화면 전체를 덮는 어두운 막에 양쪽(팀)을 VS 로 마주 세운다.
@@ -47,7 +47,7 @@
   (2) 일반 방: 방 만들기 → AI·상대 넣기 → 시작 → 모두에게 막 → 몇 초 뒤 경기 시작
 - 콘솔 오류 0(가짜 Firebase 의 ref.parent 없음 오류는 도구 한계), 예시 사진(랜덤 매칭·일반 방, 넓은 화면·좁은 화면)을 찍어 보고.
 
-끝나면 노트(이 게임 노트와 random-match-prompt.md 의 이 게임 절)에 무엇을 보여 주는지·자료 출처·시간을 적고, 커밋·푸시까지 해 줘.
+끝나면 노트(이 게임 노트와 docs/common/random-match-prompt.md 의 이 게임 절)에 무엇을 보여 주는지·자료 출처·시간을 적고, 커밋·푸시까지 해 줘.
 ```
 
 ---
@@ -56,13 +56,13 @@
 
 | 번호 | 게임 | 판 모양 | 계정 통계가 센 판 | 막에 보일 개인 기록(제안 — 선생님 확인) | 노트 |
 |---|---|---|---|---|---|
-| 25 | FPS 서바이벌 | 팀 대전 | 팀 대전(방 만들기·코드 입장·랜덤 매칭) 중 AI 없는 판 → **랜덤 매칭 칸 새로 필요** | 판당 처치·K/D, 많이 쓴 무기 | `account-stats-prompt.md` 25번 절 |
-| 31 | 좀비 아웃브레이크 | 생존자 vs 좀비 | 온라인 방(랜덤 매칭 포함) 중 AI 없는 판 → **랜덤 매칭 칸 새로 필요** | 진영별 승률(생존자·좀비), 판당 감염시킨 수 | `account-stats-prompt.md` 31번 절 |
-| 32 | 미니게임 모음 | 팀 순위전 | 랜덤 매칭 판만(`RandomMatchAccount`) | 3위 안 비율, 1등 횟수 — **완료(2026-10-29)**, 기존 `g·w·t` 칸 그대로 | `32.minigames-notes.md` 1절 |
-| 34 | 2대2 배구 | 2대2 | 랜덤 매칭 판만(`RandomMatchAccount`) | 승률만(계정에 더 남는 값이 없음 — 더 보여 주려면 칸 추가를 먼저 묻기) | `34.volleyball-notes.md` |
-| 35 | 2대2 미니 축구 | 2대2 | 랜덤 매칭 판만(`RandomMatchAccount`, 비긴 판 제외) | 승률만(위와 같음) | `35.soccer-notes.md` |
-| 38 | 눈싸움 배틀로얄 | 개인전·2인 팀 | 온라인 방(랜덤 매칭 포함) 중 AI 없는 판 → **랜덤 매칭 칸 새로 필요** | 1위 비율, 판당 처치, 평균 순위 | `38.snow-royale-notes.md` |
-| 39 | 물풍선 대작전 | 개인전·팀전 | 온라인 방(랜덤 매칭 포함) 중 AI 없는 판 → **랜덤 매칭 칸 새로 필요** | 1위 비율, 판당 처치·구출 | `39.water-balloon-notes.md` |
+| 25 | FPS 서바이벌 | 팀 대전 | 팀 대전(방 만들기·코드 입장·랜덤 매칭) 중 AI 없는 판 → **랜덤 매칭 칸 새로 필요** | 판당 처치·K/D, 많이 쓴 무기 | `docs/common/account-stats-prompt.md` 25번 절 |
+| 31 | 좀비 아웃브레이크 | 생존자 vs 좀비 | 온라인 방(랜덤 매칭 포함) 중 AI 없는 판 → **랜덤 매칭 칸 새로 필요** | 진영별 승률(생존자·좀비), 판당 감염시킨 수 | `docs/common/account-stats-prompt.md` 31번 절 |
+| 32 | 미니게임 모음 | 팀 순위전 | 랜덤 매칭 판만(`RandomMatchAccount`) | 3위 안 비율, 1등 횟수 — **완료(2026-10-29)**, 기존 `g·w·t` 칸 그대로 | `docs/32.minigames/32.minigames-notes.md` 1절 |
+| 34 | 2대2 배구 | 2대2 | 랜덤 매칭 판만(`RandomMatchAccount`) | 승률만(계정에 더 남는 값이 없음 — 더 보여 주려면 칸 추가를 먼저 묻기) | `docs/34.volleyball/34.volleyball-notes.md` |
+| 35 | 2대2 미니 축구 | 2대2 | 랜덤 매칭 판만(`RandomMatchAccount`, 비긴 판 제외) | 승률만(위와 같음) | `docs/35.soccer/35.soccer-notes.md` |
+| 38 | 눈싸움 배틀로얄 | 개인전·2인 팀 | 온라인 방(랜덤 매칭 포함) 중 AI 없는 판 → **랜덤 매칭 칸 새로 필요** | 1위 비율, 판당 처치, 평균 순위 | `docs/38.snow-royale/38.snow-royale-notes.md` |
+| 39 | 물풍선 대작전 | 개인전·팀전 | 온라인 방(랜덤 매칭 포함) 중 AI 없는 판 → **랜덤 매칭 칸 새로 필요** | 1위 비율, 판당 처치·구출 | `docs/39.water-balloon/39.water-balloon-notes.md` |
 
 - 배틀로얄(38·39)처럼 여러 명이 겨루는 판은 "양쪽 VS" 대신 참가자 칸을 여러 개 늘어놓는 모양이 맞을 수 있다 — 모양을 먼저 그려 보여 주고 고른다.
 - 32·34·35 는 랜덤 매칭 통계에 승패만 있어 개인 기록이 얇다. 칸을 늘리려면 DB 규칙·통계 클래스가 바뀌므로 먼저 묻는다.
