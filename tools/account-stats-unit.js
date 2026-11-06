@@ -7,7 +7,7 @@ const names = ["AccountNumbers", "AccountRates", "AccountMatchKey", "AccountKeyL
   "ZombiePlan", "ZombieCodec", "ZombieStatsMath", "ZombieProfile", "ZombieStatsView", "ZombieRandomTallyMath", "ZombieRoleTallyMath", "ZombieOriginRotation", "ZombieVersusCards", "ZombieVersusLineup", "ZombieMissionSites", "ZombieMissionCatalog", "ZombieMissionProgress", "SnAccountPlan", "SnAccountCodec", "SnAccountMath", "SnAccountProfile", "SnAccountView", "SnReportBuilder", "SnVersusCards",
   "WbAccountPlan", "WbAccountCodec", "WbAccountMath", "WbAccountProfile", "WbAccountView", "WbReportBuilder", "WbRandomTallyMath", "WbVersusCards", "WbVersusLineupBuilder",
   "AccountClassRank", "RandomMatchPlan", "RandomMatchCodec", "RandomMatchMath", "RandomMatchProfile", "RandomMatchView",
-  "AccountOutbox", "AccountRepairPlanner", "ZombieRepairGame", "TurboLapRepairGame", "FpsRepairGame", "SnowRepairGame", "BalloonRepairGame", "AccountStatsNormalizer", "AccountPendingCodec", "AccountMatchSender", "AccountPendingGuard", "MkStreakMath", "TurboLapClock", "TurboLapOutcome", "TeamBattleScore", "PatchNoteCodec", "PatchNoteSeen"];
+  "AccountOutbox", "AccountRepairPlanner", "ZombieRepairGame", "TurboLapRepairGame", "FpsRepairGame", "SnowRepairGame", "BalloonRepairGame", "AccountStatsNormalizer", "TeamBattleDuplicatePlan", "TeamBattleGameFingerprint", "TeamBattleStatsReverter", "TeamBattleRepairPlanner", "AccountPendingCodec", "AccountMatchSender", "AccountPendingGuard", "MkStreakMath", "TurboLapClock", "TurboLapOutcome", "TeamBattleScore", "PatchNoteCodec", "PatchNoteSeen"];
 const src = files.map((f) => fs.readFileSync(path.join(root, f), "utf8")).join("\n") + "\n;({" + names.join(",") + "})";
 const fakeStorage = { data: {}, getItem(k) { return this.data[k] === undefined ? null : this.data[k]; }, setItem(k, v) { this.data[k] = String(v); } };
 const K = vm.runInNewContext(src, { localStorage: fakeStorage, console, Math, Set, Map, Array, Object, Number, String, JSON, isFinite, Date, Promise, window: { localStorage: fakeStorage, setTimeout: (fn) => { fn(); return 0; } }, WbBalance: { RATE: 30 } });
@@ -777,7 +777,45 @@ const outboxChecks = (async () => {
   await new Promise((resolve) => setTimeout(resolve, 20));
   check("보관 상자: 이미 보낸 판은 다시 보내지 않음", calls.filter((id) => id === "g2").length === 5 || calls.filter((id) => id === "g2").length >= 2);
 })();
-Promise.all([done, gameChecks, pendingChecks, repairChecks, outboxChecks]).then(() => {
+
+const duplicateChecks = (async () => {
+  const at = 1700000000000;
+  const gameReport = (id, extra) => report(Object.assign({ matchId: id }, extra || {}));
+  const stored = (r, key, atTime) => Object.assign(JSON.parse(JSON.stringify(K.TeamBattleCodec.encode(r, key, true))), { at: atTime });
+  const other = report({ matchId: "other", players: players({ 0: { kills: 1, dmg: 200 }, 3: { kills: 2 } }), score: [2, 5], winnerTeam: 1 });
+  const otherLine = other.players[0], gameLine = report().players[0];
+  let node = K.AccountStatsMath.apply(null, otherLine, { key: "other", win: false, side: 0, mvp: false, at: at - 500 }).node;
+  const expected = K.AccountStatsMath.apply(JSON.parse(JSON.stringify(node)), gameLine, { key: "A-1", win: true, side: 0, mvp: true, at }).node;
+  node = K.AccountStatsMath.apply(JSON.parse(JSON.stringify(expected)), gameLine, { key: "room1_1000", win: true, side: 0, mvp: true, at: at + 10 }).node;
+  const slots = { 0: stored(other, "other", at - 500), 1: stored(gameReport("A-1"), "A-1", at), 2: stored(gameReport("room1_1000"), "room1_1000", at + 10) };
+  const doubled = () => ({ u1: { profile: { name: "20124 장재이", cls: "1-1" }, stats: { teambattle: JSON.parse(JSON.stringify(node)) }, recent: { teambattle: JSON.parse(JSON.stringify(slots)) } } });
+  const plan = K.TeamBattleDuplicatePlan.build(doubled());
+  const patch = plan.patch();
+  check("중복 정리(30번): 같은 판을 다른 열쇠로 두 번 올린 것을 찾아 나중 칸을 지움", plan.removedCount === 1 && patch["users/u1/recent/teambattle/2"] === null && !("users/u1/recent/teambattle/1" in patch) && patch["users/u1/stats/teambattle/ids/room1_1000"] === null, patch);
+  check("중복 정리(30번): 판·승·MVP·캐릭터 통계가 한 번 센 값으로 돌아오고 반 요약도 맞춤",
+    patch["users/u1/stats/teambattle/g"] === expected.g && patch["users/u1/stats/teambattle/w"] === expected.w && patch["users/u1/stats/teambattle/m"] === expected.m && patch["users/u1/stats/teambattle/bg"] === expected.bg
+    && patch["users/u1/stats/teambattle/c/warrior"].n === expected.c.warrior.n && Math.abs(patch["users/u1/stats/teambattle/c/warrior"].dmg - expected.c.warrior.dmg) <= 0.15 && patch["classStats/1-1/u1"].g === expected.g, patch);
+  const aiSlots = JSON.parse(JSON.stringify(slots));
+  const withAi = (r) => Object.assign({}, r, { players: r.players.map((p, i) => i === 4 ? Object.assign({}, p, { ai: true }) : p) });
+  aiSlots[1] = stored(withAi(gameReport("A-1")), "A-1", at); aiSlots[2] = stored(withAi(gameReport("room1_1000")), "room1_1000", at + 10);
+  const aiPlan = K.TeamBattleDuplicatePlan.build({ u1: { profile: { name: "20124 장재이", cls: "1-1" }, stats: { teambattle: JSON.parse(JSON.stringify(expected)) }, recent: { teambattle: aiSlots } } });
+  check("중복 정리(30번): AI 판 중복은 최근 매치 칸만 지우고 통계는 건드리지 않음", aiPlan.removedCount === 1 && aiPlan.patch()["users/u1/recent/teambattle/2"] === null && Object.keys(aiPlan.patch()).every((k) => k.indexOf("/stats/") < 0), aiPlan.patch());
+  const unknown = doubled(); delete unknown.u1.stats.teambattle.ids["room1_1000"];
+  const unknownPlan = K.TeamBattleDuplicatePlan.build(unknown);
+  check("중복 정리(30번): 누적에 센 판인지 열쇠로 알 수 없으면 건드리지 않고 알림", unknownPlan.removedCount === 0 && unknownPlan.skips.length === 1 && Object.keys(unknownPlan.patch()).length === 0);
+  const distinct = { u1: { profile: { name: "20124 장재이", cls: "1-1" }, stats: { teambattle: expected }, recent: { teambattle: { 0: slots[0], 1: slots[1] } } } };
+  check("중복 정리(30번): 서로 다른 판은 지우지 않음", K.TeamBattleDuplicatePlan.build(distinct).removedCount === 0);
+  const mate = { profile: { name: "20125 나", cls: "1-1" }, stats: {}, recent: { teambattle: { 0: Object.assign({}, stored(gameReport("A-1"), "A-1", at), { me: 1 }) } } };
+  const withMate = doubled(); withMate.u1.recent.teambattle = { 0: slots[2] }; withMate.u1.stats.teambattle = expected; withMate.uB = mate;
+  const guarded = new K.TeamBattleRepairPlanner(true).plan(withMate);
+  check("정상화(30번): 열쇠만 다르고 같은 판을 이미 가진 학생에게는 또 채우지 않음", !guarded.fixes.some((fix) => fix.uid === "u1"), guarded.fixes.map((fix) => fix.uid));
+  const db = doubled(); const writes = [];
+  const apply = (all, values) => Object.keys(values).forEach((path) => { const parts = path.split("/"); let o = all; for (let i = 0; i < parts.length - 1; i++) { o[parts[i]] = o[parts[i]] || {}; o = o[parts[i]]; } if (values[path] === null) delete o[parts[parts.length - 1]]; else o[parts[parts.length - 1]] = values[path]; });
+  const norm = new K.AccountStatsNormalizer({ read: () => Promise.resolve(JSON.parse(JSON.stringify(db))), patch: (v) => { writes.push(v); apply(db.users ? db : (() => { return null; })() || { users: db }, v); return Promise.resolve(); } });
+  const first = await norm.normalize("teambattle");
+  check("정상화(30번): 새로고침 한 번에 중복을 지움", !!first.removed && first.removed.length === 1 && first.removed[0].list.length === 1, first.removed);
+})();
+Promise.all([done, gameChecks, pendingChecks, repairChecks, outboxChecks, duplicateChecks]).then(() => {
   if (failures.length) { console.log("실패 " + failures.length + "개\n" + failures.join("\n")); process.exit(1); }
   console.log("통과 " + passed + " · 문제 0");
 }).catch((e) => { console.log("오류", e); process.exit(1); });

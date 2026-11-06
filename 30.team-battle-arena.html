@@ -1122,7 +1122,9 @@ SinglePassMaterials.enable(THREE);
         else if (st === "draft") { services.match.game = null; services.match.me = null; services.match.bots = {}; if (prev !== "draft") services.draft.view = null; services.screens.showScreen("draft"); services.draftView.renderDraft(); }
         else services.screens.showScreen("game");
         if (st === "countdown" && prev !== "countdown") services.clock.burst();
-        if (st === "ended" && prev !== "ended") services.flow.onEnded();
+        var enteredAlreadyEnded = !services.session.room.statusSeen;
+        services.session.room.statusSeen = true;
+        if (st === "ended" && prev !== "ended") services.flow.onEnded(enteredAlreadyEnded);
         services.randomMatch.armMatch();
       });
       var stRef = ref.child("st");
@@ -4828,10 +4830,10 @@ SinglePassMaterials.enable(THREE);
       if (services.session.room.status === "ended" && services.session.room.endedAt && t - services.session.room.endedAt > 300000) services.session.room.ref.remove();
     }
     endStep(step, run) { try { run(); } catch (e) { this.services.perf.noteEndError(step, e); } }
-    onEnded() { var services = this.services;
+    onEnded(enteredAlreadyEnded) { var services = this.services;
       this.endStep("banner", function () { services.bannerLedger.flush(); });
       this.endStep("match", function () { services.randomMatch.matchEnded(); });
-      this.endStep("account", function () { services.accountRecorder.matchEnded(); });
+      if (!enteredAlreadyEnded) this.endStep("account", function () { services.accountRecorder.matchEnded(); });
       if (!services.match.game) return;
       services.perf.matchEnded();
       services.match.game.forceNet = true;
@@ -11689,7 +11691,7 @@ SinglePassMaterials.enable(THREE);
   }
   class AccountReportBuilder {
     static TEAMS = ["blue", "red"];
-    constructor(services) { this.services = services; }
+    constructor(services) { this.services = services; this.keyByGame = {}; }
     lineOf(row, left, rosterAi) {
       var E = row.ent, d = row.player || {};
       return { name: String(d.nickname || E.nickname || ""), team: d.team === "red" ? 1 : 0, char: E.char,
@@ -11708,8 +11710,9 @@ SinglePassMaterials.enable(THREE);
     }
     scoreOf(line) { return this.services.resultBoard.mvpScore(this.entOf(line)); }
     judge() { var self = this; return new AccountMvpJudge(function (line) { return self.scoreOf(line); }); }
-    matchIdOf(room) { var ticket = this.services.randomMatch.ticket();
-      return room.matchId || (ticket && ticket.matchId) || (room.code + "_" + room.startAt);
+    matchIdOf(room) { var ticket = this.services.randomMatch.ticket(), gameKey = room.code + "_" + room.startAt;
+      if (!this.keyByGame[gameKey]) this.keyByGame[gameKey] = room.matchId || (ticket && ticket.matchId) || gameKey;
+      return this.keyByGame[gameKey];
     }
     snapshot() { var services = this.services, room = services.session.room, myId = services.session.myId;
       if (!room || !room.roster || !room.roster[myId]) return null;

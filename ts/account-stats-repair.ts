@@ -56,6 +56,8 @@ interface AccountRepairResult {
   additions: Array<{ name: string; list: AccountRepairAddition[] }>;
   skips: AccountRepairSkip[];
   agedOutLines: number;
+  removed?: Array<{ name: string; list: Array<{ at: number; win: boolean }> }>;
+  removedSkips?: AccountRepairSkip[];
 }
 
 class AccountRepairNames {
@@ -407,15 +409,33 @@ class AccountStatsNormalizer {
     return !!this.planners[gameKey];
   }
 
+  /* 30번은 먼저 같은 판이 두 번 올라간 중복을 지우고(2026-11-06), 그 뒤 깨끗한 자료로 빠진 판을 채운다 */
   async normalize(gameKey: string): Promise<AccountRepairResult | null> {
     const make = this.planners[gameKey];
     if (!make) return null;
+    const duplicates = gameKey === "teambattle" ? await this.removeTeamBattleDuplicates() : null;
     const first = make(await this.readUsers());
-    if (!first.summary().studentCount) return first.summary();
+    if (!first.summary().studentCount) return AccountStatsNormalizer.withDuplicates(first.summary(), duplicates);
     const fresh = make(await this.readUsers());
     const values = fresh.patch();
     if (Object.keys(values).length) await this.io.patch(values);
-    return fresh.summary();
+    return AccountStatsNormalizer.withDuplicates(fresh.summary(), duplicates);
+  }
+
+  private async removeTeamBattleDuplicates(): Promise<TeamBattleDuplicatePlan | null> {
+    const first = TeamBattleDuplicatePlan.build(await this.readUsers() as unknown as Record<string, TeamBattleRepairUserRaw>);
+    if (!first.removedCount) return first;
+    const fresh = TeamBattleDuplicatePlan.build(await this.readUsers() as unknown as Record<string, TeamBattleRepairUserRaw>);
+    const values = fresh.patch();
+    if (Object.keys(values).length) await this.io.patch(values);
+    return fresh;
+  }
+
+  private static withDuplicates(result: AccountRepairResult, duplicates: TeamBattleDuplicatePlan | null): AccountRepairResult {
+    if (!duplicates) return result;
+    result.removed = duplicates.fixes.filter((fix) => fix.removals.length).map((fix) => ({ name: fix.name, list: fix.removals.map((removal) => ({ at: removal.at, win: removal.win })) }));
+    result.removedSkips = duplicates.skips.map((skip) => ({ name: skip.name, key: skip.key, reason: skip.reason }));
+    return result;
   }
 
   private async readUsers(): Promise<Record<string, AccountRepairUserRaw>> {
@@ -446,17 +466,21 @@ class AccountRepairReport {
   static line(result: AccountRepairResult | null): string {
     if (!result) return "";
     const added = result.additions.reduce((sum, item) => sum + item.list.length, 0);
-    if (!added) return "통계 정상화: 빠진 기록이 없습니다.";
-    return "통계 정상화: 학생 " + result.studentCount + "명의 빠진 판 " + added + "개를 채웠습니다." + (result.skips.length ? " (건너뜀 " + result.skips.length + "줄)" : "");
+    const removed = (result.removed || []).reduce((sum, item) => sum + item.list.length, 0);
+    const removedText = removed ? "같은 판이 두 번 기록된 " + removed + "판(학생 " + (result.removed || []).length + "명)을 지워 통계에서 뺐습니다. " : "";
+    if (!added) return "통계 정상화: " + removedText + "빠진 기록이 없습니다.";
+    return "통계 정상화: " + removedText + "학생 " + result.studentCount + "명의 빠진 판 " + added + "개를 채웠습니다." + (result.skips.length ? " (건너뜀 " + result.skips.length + "줄)" : "");
   }
 
   static html(result: AccountRepairResult | null): string {
-    if (!result || (!result.additions.length && !result.skips.length)) return "";
-    const rows = result.additions.map((item) => {
-      const list = item.list.map((addition) => RecentBlockList.whenText(addition.at) + " " + (addition.win ? "승" : "패") + (addition.countsStats ? "" : "(AI 판)")).join(", ");
-      return "<tr><td>" + AccountHtml.esc(item.name) + "</td><td>" + item.list.length + "</td><td>" + AccountHtml.esc(list) + "</td></tr>";
-    });
-    const skipRows = result.skips.map((skip) => "<tr><td>" + AccountHtml.esc(skip.name) + "</td><td>-</td><td>" + AccountHtml.esc(skip.reason) + "</td></tr>");
-    return "<table><thead><tr><th>학생</th><th>판</th><th>채운 판 / 건너뛴 까닭</th></tr></thead><tbody>" + rows.join("") + skipRows.join("") + "</tbody></table>";
+    if (!result) return "";
+    const row = (name: string, count: string, text: string) => "<tr><td>" + AccountHtml.esc(name) + "</td><td>" + count + "</td><td>" + AccountHtml.esc(text) + "</td></tr>";
+    const removedRows = (result.removed || []).map((item) => row(item.name, String(item.list.length), "중복 삭제: " + item.list.map((one) => RecentBlockList.whenText(one.at) + " " + (one.win ? "승" : "패")).join(", ")))
+      .concat((result.removedSkips || []).map((skip) => row(skip.name, "-", skip.reason)));
+    const addedRows = result.additions.map((item) => row(item.name, String(item.list.length), "채움: " + item.list.map((addition) => RecentBlockList.whenText(addition.at) + " " + (addition.win ? "승" : "패") + (addition.countsStats ? "" : "(AI 판)")).join(", ")));
+    const skipRows = result.skips.map((skip) => row(skip.name, "-", skip.reason));
+    const rows = removedRows.concat(addedRows, skipRows);
+    if (!rows.length) return "";
+    return "<table><thead><tr><th>학생</th><th>판</th><th>정리한 내용 / 건너뛴 까닭</th></tr></thead><tbody>" + rows.join("") + "</tbody></table>";
   }
 }

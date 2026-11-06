@@ -17,6 +17,148 @@
    쓰기는 선생님 계정만 할 수 있다(데이터베이스규칙.json 의 stats·recent·pending 의 teambattle 교사 예외 — 콘솔 게시 필요).
    미리 보기 → 적용 순서이고, 적용 직전에 다시 읽어 그 사이 학생이 한 판을 더 해도 덮어쓰지 않는다.
    ===================================================================== */
+/* 같은 판이 경기 열쇠만 다르게 두 번 올라간 것을 알아보는 지문(2026-11-06): 점수와 모든 선수의 이름·팀·캐릭터·킬·데스·어시스트·피해·회복이 같고 시각이 가까우면 같은 판이다.
+   나감·AI 표시는 다시 입장하면 달라질 수 있어 뺀다 */
+class TeamBattleGameFingerprint {
+    static of(entry) {
+        return JSON.stringify([entry.score, entry.players.map((line) => [line.name, line.team, line.char, line.kills, line.deaths, line.assists, Math.round(line.dmg), Math.round(line.heal)])]);
+    }
+    static same(a, b) {
+        return Math.abs((a.at || 0) - (b.at || 0)) <= TeamBattleGameFingerprint.SAME_GAME_WINDOW_MS && TeamBattleGameFingerprint.of(a) === TeamBattleGameFingerprint.of(b);
+    }
+}
+TeamBattleGameFingerprint.SAME_GAME_WINDOW_MS = 3 * 60 * 60 * 1000;
+/* 누적 통계에서 한 판을 되돌려 뺀다(AccountStatsMath.apply 의 거꾸로). 평균은 한 자리 반올림이라 아주 조금 어긋날 수 있다 */
+class TeamBattleStatsReverter {
+    static remove(raw, entry, key) {
+        const before = AccountStatsMath.normalize(raw);
+        const me = entry.players[entry.myIndex];
+        const blue = me.team === 0;
+        const win = entry.win;
+        const mvp = !me.left && new AccountMvpJudge((line) => TeamBattleScore.of(line)).isMvp(entry.players, entry.myIndex);
+        const down = (value, flag) => Math.max(0, value - (flag ? 1 : 0));
+        const node = {
+            g: down(before.g, true), w: down(before.w, win), l: down(before.l, !win),
+            bg: down(before.bg, blue), bw: down(before.bw, blue && win), rg: down(before.rg, !blue), rw: down(before.rw, !blue && win),
+            m: down(before.m, mvp), ids: Object.assign({}, before.ids || {}), c: Object.assign({}, before.c || {})
+        };
+        delete node.ids[key];
+        const reduced = TeamBattleStatsReverter.removeChar(node.c[me.char] || AccountStatsMath.emptyChar(), me, win, blue, mvp);
+        if (reduced.n > 0)
+            node.c[me.char] = reduced;
+        else
+            delete node.c[me.char];
+        return { node, charId: me.char };
+    }
+    static unaverage(average, samplesNow, value) {
+        return samplesNow <= 1 ? 0 : Math.max(0, AccountNumbers.oneDecimal((average * samplesNow - value) / (samplesNow - 1)));
+    }
+    static removeChar(before, line, win, blue, mvp) {
+        const un = TeamBattleStatsReverter.unaverage;
+        const down = (value, flag) => Math.max(0, value - (flag ? 1 : 0));
+        const skillKnown = line.skillDmg != null;
+        const dealt = Math.max(0, Number(line.dmg) || 0);
+        return {
+            n: down(before.n, true), w: down(before.w, win), bg: down(before.bg, blue), bw: down(before.bw, blue && win),
+            rg: down(before.rg, !blue), rw: down(before.rw, !blue && win), m: down(before.m, mvp),
+            kn: down(before.kn, true),
+            k: un(before.k, before.kn, AccountNumbers.count(line.kills)),
+            d: un(before.d, before.kn, AccountNumbers.count(line.deaths)),
+            a: un(before.a, before.kn, AccountNumbers.count(line.assists)),
+            dmg: un(before.dmg, before.n, dealt),
+            hl: un(before.hl, before.n, Math.max(0, Number(line.heal) || 0)),
+            bl: un(before.bl, before.n, Math.max(0, Number(line.blocked) || 0)),
+            st: un(before.st, before.n, Math.max(0, Number(line.stun) || 0)),
+            sl: un(before.sl, before.n, Math.max(0, Number(line.slow) || 0)),
+            scn: down(before.scn, true),
+            sc: un(before.sc, before.scn, TeamBattleScore.of(line)),
+            skn: down(before.skn, skillKnown),
+            sk: skillKnown ? un(before.sk, before.skn, Math.max(0, Number(line.skillDmg) || 0)) : before.sk,
+            skb: skillKnown ? un(before.skb, before.skn, dealt) : before.skb
+        };
+    }
+}
+/* 한 학생의 같은 판 중복을 지우는 계산: 최근 매치 칸을 비우고, 누적에 셌던 판이면 누적·캐릭터 통계·반 별 요약을 되돌린다 */
+class TeamBattleDuplicateFix {
+    constructor(uid, user) {
+        this.uid = uid;
+        this.user = user;
+        this.removals = [];
+        this.skips = [];
+        this.node = null;
+        this.values = {};
+    }
+    get name() {
+        return TeamBattleRepairNames.nameOf(this.user) || this.uid;
+    }
+    /* 오래된 칸을 남기고 같은 판의 나중 칸들을 지운다 */
+    collect() {
+        const slots = AccountShape.slots(this.user.recent?.teambattle);
+        const entries = Object.keys(slots)
+            .map((slot) => ({ slot, entry: TeamBattleCodec.decode(slots[slot]) }))
+            .filter((item) => !!item.entry)
+            .sort((a, b) => (a.entry.at - b.entry.at) || (a.entry.id < b.entry.id ? -1 : 1));
+        const kept = [];
+        entries.forEach((item) => {
+            if (!kept.some((other) => TeamBattleGameFingerprint.same(other, item.entry))) {
+                kept.push(item.entry);
+                return;
+            }
+            this.remove(item.slot, item.entry);
+        });
+    }
+    patch() {
+        return this.values;
+    }
+    remove(slot, entry) {
+        const root = "users/" + this.uid + "/";
+        const statsRaw = this.node || this.user.stats?.teambattle;
+        const ids = AccountStatsMath.normalize(statsRaw).ids || {};
+        const counted = ids[entry.id] != null;
+        if (!entry.withAi && !counted) {
+            this.skips.push({ name: this.name, key: entry.id, reason: "누적에 센 판인지 알 수 없어(오래된 열쇠가 밀려남) 그대로 둠" });
+            return;
+        }
+        if (!entry.withAi) {
+            const reduced = TeamBattleStatsReverter.remove(statsRaw, entry, entry.id);
+            this.node = reduced.node;
+            const node = reduced.node;
+            ["g", "w", "l", "bg", "bw", "rg", "rw", "m"].forEach((field) => { this.values[root + "stats/teambattle/" + field] = node[field]; });
+            this.values[root + "stats/teambattle/ids/" + entry.id] = null;
+            this.values[root + "stats/teambattle/c/" + reduced.charId] = node.c[reduced.charId] || null;
+            if (TeamBattleRepairNames.ADMIN_UIDS.indexOf(this.uid) < 0) {
+                const classKey = TeamBattleRepairNames.classOf(this.user);
+                this.values["classStats/" + classKey + "/" + this.uid] = ClassStatsSummary.build(this.name, node);
+            }
+        }
+        this.values[root + "recent/teambattle/" + slot] = null;
+        this.removals.push({ key: entry.id, at: entry.at, win: entry.win, countedInStats: !entry.withAi });
+    }
+}
+class TeamBattleDuplicatePlan {
+    constructor() {
+        this.fixes = [];
+    }
+    get removedCount() {
+        return this.fixes.reduce((sum, fix) => sum + fix.removals.length, 0);
+    }
+    get skips() {
+        return [].concat(...this.fixes.map((fix) => fix.skips));
+    }
+    patch() {
+        return Object.assign({}, ...this.fixes.map((fix) => fix.patch()));
+    }
+    static build(users) {
+        const plan = new TeamBattleDuplicatePlan();
+        Object.keys(users).forEach((uid) => {
+            const fix = new TeamBattleDuplicateFix(uid, users[uid] || {});
+            fix.collect();
+            if (fix.removals.length || fix.skips.length)
+                plan.fixes.push(fix);
+        });
+        return plan;
+    }
+}
 class TeamBattleRepairNames {
     /* 게임 닉네임 규칙: AccountPolicy.personName(학번 떼기) → PlayerProfile 닉네임 정리(제어 문자 빼고 4자) */
     static nickOf(accountName) {
@@ -87,6 +229,14 @@ class TeamBattleRepairFix {
         if (ids[key] != null || (this.node && this.node.ids && this.node.ids[key] != null))
             return true;
         return Object.keys(this.slots).some((slot) => this.slots[slot]?.id === key);
+    }
+    /* 열쇠만 다르고 같은 판이 이미 이 학생 칸에 있으면(다시 입장해 두 번 올라간 판 등) 또 채우지 않는다 */
+    holdsSameGame(match) {
+        const target = match.source.entry;
+        return Object.keys(this.slots).some((slot) => {
+            const entry = TeamBattleCodec.decode(this.slots[slot]);
+            return !!entry && TeamBattleGameFingerprint.same(entry, target);
+        });
     }
     /* 최근 20칸이 다 찼는데 이 판이 그보다 오래됐으면 예전에 이미 세고 밀려난 판일 수 있어 넣지 않는다(두 번 세지 않게) */
     fitsRecent(at) {
@@ -196,7 +346,7 @@ class TeamBattleRepairPlanner {
                 if (line.left && !this.includeLeft)
                     return skip("중간에 나감(패배로 넣지 않기로 함)");
                 const fix = fixes[uid[0]] = fixes[uid[0]] || new TeamBattleRepairFix(uid[0], users[uid[0]]);
-                if (fix.has(match.key))
+                if (fix.has(match.key) || fix.holdsSameGame(match))
                     return;
                 if (!fix.fitsRecent(match.at)) {
                     plan.agedOutLines++;
