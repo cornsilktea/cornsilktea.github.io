@@ -3612,7 +3612,7 @@ SinglePassMaterials.enable(THREE);
     static BLADE_MODEL = "Skeleton_Dagger";
     static CHAIN_MUZZLE = 20;
     static ULT = {
-      hkWind: GameTime.gameMs(0.25), hkRange: 650, hkSpeed: GameTime.gameSpeed(1000), hkPr: 8, hkDmg: 45, hkAfterStunMs: GameTime.gameMs(0.5), hkPullSpeed: GameTime.gameSpeed(800),
+      hkWind: GameTime.gameMs(0.25), hkRange: 650, hkSpeed: GameTime.gameSpeed(1000), hkPr: 12, hkDmg: 45, hkAfterStunMs: GameTime.gameMs(0.5), hkPullSpeed: GameTime.gameSpeed(800),
       hkPassiveGauge: 1, hkBreakDist: 40, hkBotMinPull: 80
     };
     static STATS = { name: "사슬 망령", role: "fighter", icon: "⛓️", hp: 430, speed: GameTime.gameSpeed(150), cd: GameTime.gameMs(1.5), dmg: 28, range: 300, width: 100, windup: GameTime.gameMs(0.25), ultName: "사슬 갈고리", ultAim: true };
@@ -3881,6 +3881,7 @@ SinglePassMaterials.enable(THREE);
     }
   }
   class TsunamiLanes {
+    static EDGE_PROBE = 15;
     constructor(services) { this.services = services; }
     static exactAngle(ang) { return Math.round(ang * 1000) / 1000; }
     static laneOffset(i) { return (i - (MarinaType.ULT.mrLanes - 1) / 2) * ArenaSize.TILE; }
@@ -3905,10 +3906,20 @@ SinglePassMaterials.enable(THREE);
         if (this.blockAt(c, r)) return Math.floor(dist);
       }
     }
-    plan(x, y, ang) { var services = this.services, ca = Math.cos(ang), sa = Math.sin(ang), lens = [];
+    laneLength(sx, sy, ca, sa) {
+      if (this.blockAt(Math.floor((sx - ArenaSize.MAP_X0) / ArenaSize.TILE), Math.floor((sy - ArenaSize.MAP_Y0) / ArenaSize.TILE))) return 0;
+      var side = TsunamiLanes.EDGE_PROBE;
+      var lengths = [this.walk(sx + sa * side, sy - ca * side, ca, sa), this.walk(sx, sy, ca, sa), this.walk(sx - sa * side, sy + ca * side, ca, sa)];
+      return lengths.sort(function (a, b) { return a - b; })[1];
+    }
+    plan(x, y, ang) { var services = this.services, ca = Math.cos(ang), sa = Math.sin(ang), lens = [], fromCaster = null;
       for (var i = 0; i < MarinaType.ULT.mrLanes; i++) {
-        var off = TsunamiLanes.laneOffset(i), sx = x - sa * off, sy = y + ca * off;
-        lens.push(services.physics.losClear(x, y, sx, sy) ? this.walk(sx, sy, ca, sa) : 0);
+        var off = TsunamiLanes.laneOffset(i), sx = x - sa * off, sy = y + ca * off, len = this.laneLength(sx, sy, ca, sa);
+        if (len > 0 && !services.physics.losClear(x, y, sx, sy)) {
+          if (fromCaster === null) fromCaster = this.walk(x, y, ca, sa);
+          len = Math.min(len, fromCaster);
+        }
+        lens.push(len);
       }
       return lens;
     }

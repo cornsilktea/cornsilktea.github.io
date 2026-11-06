@@ -6393,7 +6393,7 @@ class MarinaTests {
       if (!found) bad.push("오른쪽 2칸만 막히는 자리를 못 찾음");
       self.verdict(done, bad, found ? "일부 칸만 막힘 예 " + found.map + " " + found.lens.join(",") : "");
     });
-    run(G, "칸 계산: 출발점이 벽 안인 칸은 0, 얇은 벽 너머 칸은 없고, 맵 밖은 벽이며, 물·다리는 막지 않는가", function (done) {
+    run(G, "칸 계산: 출발점이 벽 안인 칸은 0, 얇은 벽 너머 칸은 마리나 앞 길이를 못 넘고, 맵 밖은 벽이며, 물·다리는 막지 않는가", function (done) {
       var bad = [];
       var inWall = self.spotWhere("forest", function (lens, x, y, ang) {
         var ca = Math.cos(ang), sa = Math.sin(ang), off = E.laneOffset(0);
@@ -6405,7 +6405,10 @@ class MarinaTests {
         return !self.tileIsBlock(x - sa * off, y + ca * off) && !api.losClear(x, y, x - sa * off, y + ca * off);
       });
       if (!thin) bad.push("얇은 벽 자리를 못 찾음");
-      else if (thin.lens[ULT.mrLanes - 1] !== 0) bad.push("얇은 벽 너머 칸이 있음 " + thin.lens);
+      else {
+        var thinCa = Math.cos(thin.angle), thinSa = Math.sin(thin.angle), casterReach = L.walk(thin.x, thin.y, thinCa, thinSa);
+        if (thin.lens[ULT.mrLanes - 1] > casterReach) bad.push("얇은 벽 너머 칸이 마리나 앞 길이보다 김 " + thin.lens + " / " + casterReach);
+      }
       api.loadMapData("forest");
       if (!L.blockAt(-1, 3) || !L.blockAt(3, -1) || !L.blockAt(9999, 3)) bad.push("맵 밖이 벽이 아님");
       var water = self.spotWhere("river", function (lens, x, y, ang) {
@@ -6444,8 +6447,10 @@ class MarinaTests {
             checked++;
             if (!Number.isInteger(len) || len < 0 || len > ULT.mrLen) bad.push(map + " 값 " + len);
             if (len === 0) return;
-            var off = E.laneOffset(n), wrong = self.matchesSamples(x - sa * off, y + ca * off, ca, sa, len);
-            if (wrong) bad.push(map + " " + wrong + " / 계산 " + len + " 각도 " + ang);
+            var off = E.laneOffset(n), wrong = "";
+            if (!api.losClear(x, y, x - sa * off, y + ca * off)) return;
+            wrong = [-E.EDGE_PROBE, 0, E.EDGE_PROBE].map(function (probe) { return self.matchesSamples(x - sa * (off - probe), y + ca * (off - probe), ca, sa, len); }).filter(function (w) { return w; });
+            if (wrong.length === 3) bad.push(map + " " + wrong[1] + " / 계산 " + len + " 각도 " + ang);
           });
         }
       });
