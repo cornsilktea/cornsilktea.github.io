@@ -128,10 +128,19 @@ class RkSession {
         this.onPress = () => undefined;
         this.onPlayerRemoved = () => undefined;
         this.onClosed = () => undefined;
+        this.onHostTakeover = () => undefined;
         this.subscriptions = [];
         this.leaving = false;
         this.ref = backend.database.ref(rules.root + "/" + code);
         this.database = backend.database;
+        this.succession = new RoomHostSuccession({
+            myId: () => this.myId,
+            players: () => this.players,
+            hostId: () => this.hostId,
+            hostLoaded: () => this.hostLoaded,
+            leaving: () => this.leaving,
+            ref: () => this.ref
+        });
         this.dropRecovery = new RoomDropRecovery({
             myId: () => this.myId,
             room: () => this.ref,
@@ -166,7 +175,15 @@ class RkSession {
         this.subscribe(playersRef, "child_added", (snapshot) => this.setPlayer(snapshot));
         this.subscribe(playersRef, "child_changed", (snapshot) => this.setPlayer(snapshot));
         this.subscribe(playersRef, "child_removed", (snapshot) => this.removePlayer(snapshot));
-        this.watchValue("hostPlayerId", (value) => { this.hostId = value || null; this.hostLoaded = true; this.onChange("host"); });
+        this.watchValue("hostPlayerId", (value) => {
+            const before = this.hostId;
+            this.hostId = value || null;
+            this.hostLoaded = true;
+            this.succession.check();
+            if (before !== null && before !== this.myId && this.hostId === this.myId && this.status !== "lobby")
+                this.onHostTakeover();
+            this.onChange("host");
+        });
         this.watchValue("status", (value) => {
             if (value === null) {
                 if (!this.leaving)
@@ -216,29 +233,21 @@ class RkSession {
         this.leaving = true;
         this.unsubscribeAll();
         this.cancelDisconnect();
-        if (this.hosting) {
-            this.ref.remove().catch(() => undefined);
-            return;
-        }
+        this.succession.cancel();
+        if (this.isHost())
+            this.succession.handOver();
         this.removeMine();
     }
     silentClose() {
         this.leaving = true;
+        this.succession.cancel();
         this.unsubscribeAll();
         this.cancelDisconnect();
     }
     removeMineOnUnload() {
-        if (this.hosting) {
-            try {
-                this.ref.remove();
-            }
-            catch (error) {
-                return;
-            }
-        }
-        else {
-            this.removeMine();
-        }
+        if (this.isHost())
+            this.succession.handOver();
+        this.removeMine();
     }
     removeMine() {
         try {
@@ -255,8 +264,6 @@ class RkSession {
             this.ref.child("players/" + this.myId).onDisconnect().cancel();
             this.ref.child("st/" + this.myId).onDisconnect().cancel();
             this.ref.child("in/" + this.myId).onDisconnect().cancel();
-            if (this.hosting)
-                this.ref.onDisconnect().cancel();
         }
         catch (error) {
             return;
@@ -284,8 +291,6 @@ class RkSession {
         this.ref.child("players/" + this.myId).onDisconnect().remove();
         this.ref.child("st/" + this.myId).onDisconnect().remove();
         this.ref.child("in/" + this.myId).onDisconnect().remove();
-        if (this.hosting)
-            this.ref.onDisconnect().remove();
     }
     setPlayer(snapshot) {
         const record = snapshot.val();
@@ -301,6 +306,7 @@ class RkSession {
             return;
         }
         this.players.delete(snapshot.key);
+        this.succession.check();
         this.onPlayerRemoved(snapshot.key);
         this.onChange("players");
     }

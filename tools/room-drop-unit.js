@@ -99,5 +99,61 @@ const tick = () => new Promise((r) => setImmediate(r));
   store.clear();
   check("clear 후 읽으면 없음", store.read() === null);
 
+  const timers = [];
+  const hostSandbox = { window: { setTimeout: (fn) => { timers.push(fn); return timers.length; }, clearTimeout: (id) => { timers[id - 1] = null; } } };
+  vm.createContext(hostSandbox);
+  vm.runInContext(fs.readFileSync(path.join(__dirname, "..", "room-drop-recovery.js"), "utf8") + "\nthis.RoomHostSuccession = RoomHostSuccession;", hostSandbox);
+  const Succession = hostSandbox.RoomHostSuccession;
+  const roster = (entries) => new Map(Object.entries(entries));
+  const makePort = (me, entries, hostId) => {
+    const store = { data: {}, failSets: 0, armed: [], listeners: [] };
+    const updates = [];
+    const removed = [];
+    const ref = { update: (v) => { updates.push(v); return Promise.resolve(); }, remove: () => { removed.push(true); return Promise.resolve(); } };
+    const state = { players: roster(entries), hostId, leaving: false };
+    const port = { myId: () => me, players: () => state.players, hostId: () => state.hostId, hostLoaded: () => true, leaving: () => state.leaving, ref: () => ref };
+    return { port, updates, removed, state };
+  };
+  const people = { a: { joinedAt: 1 }, b: { joinedAt: 2 }, c: { joinedAt: 3 }, bot: { joinedAt: 0, isBot: true }, w: { joinedAt: -1, spectator: true } };
+
+  check("후계자: 봇·관전자 제외, 가장 먼저 들어온 사람", Succession.successor(roster(people)) === "a" && Succession.successor(roster(people), "a") === "b");
+  check("후계자: 사람이 없으면 null", Succession.successor(roster({ bot: people.bot })) === null);
+
+  let h = makePort("b", { b: people.b, c: people.c }, "a");
+  const successionB = new Succession(h.port);
+  timers.length = 0;
+  successionB.check();
+  check("방장이 사라지면 유예 시간 뒤에 확정(바로 쓰지 않음)", timers.length === 1 && h.updates.length === 0);
+  timers[0]();
+  check("가장 먼저 들어온 남은 사람이 방장이 된다", h.updates.length === 1 && h.updates[0].hostPlayerId === "b");
+
+  h = makePort("c", { b: people.b, c: people.c }, "a");
+  const successionC = new Succession(h.port);
+  timers.length = 0;
+  successionC.check();
+  timers[0]();
+  check("후계자가 아니면 방장을 가로채지 않는다", h.updates.length === 0);
+
+  h = makePort("b", { a: people.a, b: people.b }, "a");
+  const successionBack = new Succession(h.port);
+  timers.length = 0;
+  successionBack.check();
+  check("방장이 있으면 유예 시간도 걸지 않는다", timers.length === 0);
+
+  h = makePort("b", { b: people.b, c: people.c }, "a");
+  const successionReturn = new Succession(h.port);
+  timers.length = 0;
+  successionReturn.check();
+  h.state.players.set("a", people.a);
+  timers[0]();
+  check("유예 시간 안에 방장이 돌아오면 승계하지 않는다", h.updates.length === 0);
+
+  h = makePort("a", { a: people.a, b: people.b }, "a");
+  new Succession(h.port).handOver();
+  check("방장이 나가면 다음 사람에게 넘긴다", h.updates.length === 1 && h.updates[0].hostPlayerId === "b" && h.removed.length === 0);
+  h = makePort("a", { a: people.a, bot: people.bot }, "a");
+  new Succession(h.port).handOver();
+  check("남은 사람이 없으면 방을 지운다", h.updates.length === 0 && h.removed.length === 1);
+
   process.exit(results.every(Boolean) ? 0 : 1);
 })();

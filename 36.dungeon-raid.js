@@ -1588,6 +1588,7 @@ class RdGame {
         session.onPlayerRemoved = (id) => { if (this.match)
             this.match.playerRemoved(id); };
         session.onClosed = (message) => this.exitToStart(message);
+        session.onHostTakeover = () => this.returnToLobby();
         session.connect();
         this.showLobby();
         RkDom.setText(RkDom.byId("lobbyNotice"), notice);

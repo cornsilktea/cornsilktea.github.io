@@ -139,15 +139,25 @@ class VbRoomSession {
   onPress: (id: string, record: VbPressRecord) => void = () => undefined;
   onPlayerRemoved: (id: string) => void = () => undefined;
   onClosed: (message: string) => void = () => undefined;
+  onHostTakeover: () => void = () => undefined;
   readonly ref: FirebaseRef;
   private subscriptions: Array<{ ref: FirebaseRef; event: FirebaseEvent; listener: (snapshot: FirebaseSnapshot) => void }> = [];
   private leaving = false;
+  private readonly succession: RoomHostSuccession;
   private readonly database: FirebaseDatabase;
   private readonly dropRecovery: RoomDropRecovery;
 
   constructor(private readonly backend: VbBackend, readonly code: string, readonly myId: string, private readonly hosting: boolean) {
     this.database = backend.database as FirebaseDatabase;
     this.ref = this.database.ref(VbConfig.ROOT + "/" + code);
+    this.succession = new RoomHostSuccession({
+      myId: () => this.myId,
+      players: () => this.players,
+      hostId: () => this.hostId,
+      hostLoaded: () => this.hostLoaded,
+      leaving: () => this.leaving,
+      ref: () => this.ref
+    });
     this.dropRecovery = new RoomDropRecovery({
       myId: () => this.myId,
       room: () => this.ref,
@@ -188,7 +198,14 @@ class VbRoomSession {
     this.subscribe(playersRef, "child_added", (snapshot) => this.setPlayer(snapshot));
     this.subscribe(playersRef, "child_changed", (snapshot) => this.setPlayer(snapshot));
     this.subscribe(playersRef, "child_removed", (snapshot) => this.removePlayer(snapshot));
-    this.watchValue("hostPlayerId", (value) => { this.hostId = (value as string) || null; this.hostLoaded = true; this.onChange("host"); });
+    this.watchValue("hostPlayerId", (value) => {
+      const before = this.hostId;
+      this.hostId = (value as string) || null;
+      this.hostLoaded = true;
+      this.succession.check();
+      if (before !== null && before !== this.myId && this.hostId === this.myId && this.status !== "lobby") this.onHostTakeover();
+      this.onChange("host");
+    });
     this.watchValue("status", (value) => {
       if (value === null) {
         if (!this.leaving) this.onClosed("방이 종료되었어요.");
@@ -241,25 +258,21 @@ class VbRoomSession {
     this.leaving = true;
     this.unsubscribeAll();
     this.cancelDisconnect();
-    if (this.hosting) {
-      this.ref.remove().catch(() => undefined);
-      return;
-    }
+    this.succession.cancel();
+    if (this.isHost()) this.succession.handOver();
     this.removeMine();
   }
 
   silentClose(): void {
     this.leaving = true;
+    this.succession.cancel();
     this.unsubscribeAll();
     this.cancelDisconnect();
   }
 
   removeMineOnUnload(): void {
-    if (this.hosting) {
-      try { this.ref.remove(); } catch (error) { return; }
-    } else {
-      this.removeMine();
-    }
+    if (this.isHost()) this.succession.handOver();
+    this.removeMine();
   }
 
   private removeMine(): void {
@@ -277,7 +290,6 @@ class VbRoomSession {
       this.ref.child("players/" + this.myId).onDisconnect().cancel();
       this.ref.child("st/" + this.myId).onDisconnect().cancel();
       this.ref.child("in/" + this.myId).onDisconnect().cancel();
-      if (this.hosting) this.ref.onDisconnect().cancel();
     } catch (error) {
       return;
     }
@@ -303,7 +315,6 @@ class VbRoomSession {
     this.ref.child("players/" + this.myId).onDisconnect().remove();
     this.ref.child("st/" + this.myId).onDisconnect().remove();
     this.ref.child("in/" + this.myId).onDisconnect().remove();
-    if (this.hosting) this.ref.onDisconnect().remove();
   }
 
   private setPlayer(snapshot: FirebaseSnapshot): void {
@@ -320,6 +331,7 @@ class VbRoomSession {
       return;
     }
     this.players.delete(snapshot.key);
+    this.succession.check();
     this.onPlayerRemoved(snapshot.key);
     this.onChange("players");
   }
@@ -1841,6 +1853,7 @@ class VolleyballGame {
     session.onPress = (id, record) => { if (this.match) this.match.receivePress(id, record); };
     session.onPlayerRemoved = (id) => { if (this.match) this.match.playerRemoved(id); };
     session.onClosed = (message) => this.exitToStart(message);
+    session.onHostTakeover = () => this.returnToLobby();
     session.connect();
     this.lobbyView.selectedSlot = -1;
     this.showLobby();

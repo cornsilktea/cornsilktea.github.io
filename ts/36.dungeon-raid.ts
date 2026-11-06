@@ -1604,6 +1604,7 @@ class RdGame {
     session.onRemoteState = (id, raw) => { if (this.match) this.match.receiveRemote(id, raw); };
     session.onPlayerRemoved = (id) => { if (this.match) this.match.playerRemoved(id); };
     session.onClosed = (message) => this.exitToStart(message);
+    session.onHostTakeover = () => this.returnToLobby();
     session.connect();
     this.showLobby();
     RkDom.setText(RkDom.byId("lobbyNotice"), notice);

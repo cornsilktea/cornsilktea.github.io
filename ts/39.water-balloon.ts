@@ -989,6 +989,7 @@ class WbGame {
     session.onRemoteState = (id, raw) => { if (this.view && this.view.driver instanceof WbHostDriver) this.view.driver.receiveState(id, raw, performance.now()); };
     session.onPlayerRemoved = (id) => this.playerRemoved(id);
     session.onClosed = (message) => this.exitToStart(message);
+    session.onHostTakeover = () => session.ref.update({ status: "lobby", match: null, st: null, snap: null, ev: null, board: null, end: null });
     session.connect();
     this.showScreen("lobby");
     (this.lobby as WbLobbyView).render(session, this.seatPlan);

@@ -1127,6 +1127,7 @@ class SoccerGame {
     session.onPress = (id, record) => { if (this.match) this.match.receivePress(id, record as SocPressRecord); };
     session.onPlayerRemoved = (id) => { if (this.match) this.match.playerRemoved(id); };
     session.onClosed = (message) => this.exitToStart(message);
+    session.onHostTakeover = () => this.returnToLobby();
     session.connect();
     this.lobbyView.selectedSlot = -1;
     this.showLobby();

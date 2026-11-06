@@ -143,9 +143,11 @@ class RkSession<P extends RkPlayerRecord> {
   onPress: (id: string, record: unknown) => void = () => undefined;
   onPlayerRemoved: (id: string) => void = () => undefined;
   onClosed: (message: string) => void = () => undefined;
+  onHostTakeover: () => void = () => undefined;
   readonly ref: FirebaseRef;
   private subscriptions: Array<{ ref: FirebaseRef; event: FirebaseEvent; listener: (snapshot: FirebaseSnapshot) => void }> = [];
   private leaving = false;
+  private readonly succession: RoomHostSuccession;
   private readonly database: FirebaseDatabase;
   private readonly dropRecovery: RoomDropRecovery;
 
@@ -159,6 +161,14 @@ class RkSession<P extends RkPlayerRecord> {
   ) {
     this.ref = (backend.database as FirebaseDatabase).ref(rules.root + "/" + code);
     this.database = backend.database as FirebaseDatabase;
+    this.succession = new RoomHostSuccession({
+      myId: () => this.myId,
+      players: () => this.players,
+      hostId: () => this.hostId,
+      hostLoaded: () => this.hostLoaded,
+      leaving: () => this.leaving,
+      ref: () => this.ref
+    });
     this.dropRecovery = new RoomDropRecovery({
       myId: () => this.myId,
       room: () => this.ref,
@@ -197,7 +207,14 @@ class RkSession<P extends RkPlayerRecord> {
     this.subscribe(playersRef, "child_added", (snapshot) => this.setPlayer(snapshot));
     this.subscribe(playersRef, "child_changed", (snapshot) => this.setPlayer(snapshot));
     this.subscribe(playersRef, "child_removed", (snapshot) => this.removePlayer(snapshot));
-    this.watchValue("hostPlayerId", (value) => { this.hostId = (value as string) || null; this.hostLoaded = true; this.onChange("host"); });
+    this.watchValue("hostPlayerId", (value) => {
+      const before = this.hostId;
+      this.hostId = (value as string) || null;
+      this.hostLoaded = true;
+      this.succession.check();
+      if (before !== null && before !== this.myId && this.hostId === this.myId && this.status !== "lobby") this.onHostTakeover();
+      this.onChange("host");
+    });
     this.watchValue("status", (value) => {
       if (value === null) {
         if (!this.leaving) this.onClosed("방이 종료되었어요.");
@@ -248,25 +265,21 @@ class RkSession<P extends RkPlayerRecord> {
     this.leaving = true;
     this.unsubscribeAll();
     this.cancelDisconnect();
-    if (this.hosting) {
-      this.ref.remove().catch(() => undefined);
-      return;
-    }
+    this.succession.cancel();
+    if (this.isHost()) this.succession.handOver();
     this.removeMine();
   }
 
   silentClose(): void {
     this.leaving = true;
+    this.succession.cancel();
     this.unsubscribeAll();
     this.cancelDisconnect();
   }
 
   removeMineOnUnload(): void {
-    if (this.hosting) {
-      try { this.ref.remove(); } catch (error) { return; }
-    } else {
-      this.removeMine();
-    }
+    if (this.isHost()) this.succession.handOver();
+    this.removeMine();
   }
 
   private removeMine(): void {
@@ -284,7 +297,6 @@ class RkSession<P extends RkPlayerRecord> {
       this.ref.child("players/" + this.myId).onDisconnect().cancel();
       this.ref.child("st/" + this.myId).onDisconnect().cancel();
       this.ref.child("in/" + this.myId).onDisconnect().cancel();
-      if (this.hosting) this.ref.onDisconnect().cancel();
     } catch (error) {
       return;
     }
@@ -310,7 +322,6 @@ class RkSession<P extends RkPlayerRecord> {
     this.ref.child("players/" + this.myId).onDisconnect().remove();
     this.ref.child("st/" + this.myId).onDisconnect().remove();
     this.ref.child("in/" + this.myId).onDisconnect().remove();
-    if (this.hosting) this.ref.onDisconnect().remove();
   }
 
   private setPlayer(snapshot: FirebaseSnapshot): void {
@@ -327,6 +338,7 @@ class RkSession<P extends RkPlayerRecord> {
       return;
     }
     this.players.delete(snapshot.key);
+    this.succession.check();
     this.onPlayerRemoved(snapshot.key);
     this.onChange("players");
   }

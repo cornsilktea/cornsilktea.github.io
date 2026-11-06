@@ -88,6 +88,61 @@ class RoomResumeStore {
 }
 RoomResumeStore.RESUME_MS = 180000;
 RoomResumeStore.SAVE_EVERY_MS = 20000;
+/* 방장이 사라지면(끊김·나감) 남은 사람 중 한 명이 방장이 된다. 잠깐 끊겼다 돌아오는 방장을 기다리려고 GRACE_MS 뒤에 확정한다.
+   방장이 바뀐 뒤 경기 상태를 어떻게 할지는 게임이 정한다(RkSession.onHostTakeover). */
+class RoomHostSuccession {
+    constructor(port) {
+        this.port = port;
+        this.timer = 0;
+    }
+    static successor(players, except = "") {
+        const humans = Array.from(players.keys()).filter((id) => {
+            const record = players.get(id);
+            return id !== except && !record.isBot && !record.isAI;
+        });
+        humans.sort((a, b) => {
+            const first = players.get(a);
+            const second = players.get(b);
+            const seat = Number(!!first.spectator) - Number(!!second.spectator);
+            if (seat)
+                return seat;
+            const joined = first.joinedAt - second.joinedAt;
+            return joined || (a < b ? -1 : 1);
+        });
+        return humans.length ? humans[0] : null;
+    }
+    check() {
+        if (this.timer || this.port.leaving() || !this.hostMissing())
+            return;
+        this.timer = window.setTimeout(() => {
+            this.timer = 0;
+            if (this.port.leaving() || !this.hostMissing())
+                return;
+            if (RoomHostSuccession.successor(this.port.players()) === this.port.myId())
+                this.port.ref().update({ hostPlayerId: this.port.myId() });
+        }, RoomHostSuccession.GRACE_MS);
+    }
+    cancel() {
+        if (this.timer)
+            window.clearTimeout(this.timer);
+        this.timer = 0;
+    }
+    handOver() {
+        const next = RoomHostSuccession.successor(this.port.players(), this.port.myId());
+        if (next)
+            this.port.ref().update({ hostPlayerId: next });
+        else
+            this.port.ref().remove().catch(() => undefined);
+    }
+    hostMissing() {
+        if (!this.port.hostLoaded() || !this.port.players().has(this.port.myId()))
+            return false;
+        const hostId = this.port.hostId();
+        const host = hostId ? this.port.players().get(hostId) : null;
+        return !host || !!host.isBot || !!host.isAI;
+    }
+}
+RoomHostSuccession.GRACE_MS = 4000;
 class RoomDropRecovery {
     constructor(host, db, mineFolders) {
         this.host = host;

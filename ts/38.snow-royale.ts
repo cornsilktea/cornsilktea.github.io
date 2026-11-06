@@ -878,6 +878,7 @@ class SnGame {
     session.onRemoteState = (id, raw) => { if (this.view && this.view.driver instanceof SnHostDriver) this.view.driver.receiveState(id, raw, performance.now()); };
     session.onPlayerRemoved = (id) => { if (this.view && this.view.driver instanceof SnHostDriver) this.view.driver.playerLeft(id); };
     session.onClosed = (message) => this.exitToStart(message);
+    session.onHostTakeover = () => session.ref.update({ status: "lobby", match: null, st: null, snap: null, wall: null, loot: null, snowmap: null, ev: null, end: null });
     session.connect();
     this.showScreen("lobby");
     this.lobby.render(session, this.seatPlan);
