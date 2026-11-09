@@ -246,11 +246,11 @@
     font-size: var(--sg-fs-xs); color: var(--sg-ink-soft); font-weight: 700; border-bottom: 2px solid var(--sg-line-mid);
   }
   .stats-box tr.few td { opacity: .5; }
-  .arena-subs { display: flex; flex-wrap: wrap; gap: var(--sg-s2); margin-bottom: var(--sg-s4); }
-  .arena-subs button { min-height: 44px; padding: var(--sg-s2) var(--sg-s5); border: 1px solid var(--sg-line-mid); border-radius: var(--sg-radius);
+  .tool-subs { display: flex; flex-wrap: wrap; gap: var(--sg-s2); margin-bottom: var(--sg-s4); }
+  .tool-subs button { min-height: 44px; padding: var(--sg-s2) var(--sg-s5); border: 1px solid var(--sg-line-mid); border-radius: var(--sg-radius);
     background: var(--sg-panel); color: var(--sg-ink-soft); font-size: var(--sg-fs-md); font-weight: 800; box-shadow: none; }
-  .arena-subs button:hover { background: var(--sg-panel-alt); color: var(--sg-ink); }
-  .arena-subs button.on { border-color: #D97B4F; background: var(--sg-panel-alt); color: var(--sg-ink); }
+  .tool-subs button:hover { background: var(--sg-panel-alt); color: var(--sg-ink); }
+  .tool-subs button.on { border-color: #D97B4F; background: var(--sg-panel-alt); color: var(--sg-ink); }
   .stats-box tr.mvp-pick { cursor: pointer; }
   .stats-box tr.mvp-winners > td { white-space: normal; text-align: left; font-weight: 400; }
   .stats-box .mvp-who { display: flex; flex-wrap: wrap; gap: var(--sg-s5); }
@@ -505,13 +505,10 @@
          각 기능의 '처음 펼칠 때만 읽기'는 예전 펼치기 버튼(숨김, *Toggle)이 그대로 맡고, ToolTabs 는 그 버튼을 눌러 줄 뿐이다. -->
     <div class="tool-box" id="toolBox">
       <div class="tool-tabs" role="tablist">
-        <button class="tool-tab" type="button" role="tab" aria-selected="false" data-tool="rec">세계 신기록 관리</button>
-        <button class="tool-tab" type="button" role="tab" aria-selected="false" data-tool="crec"><span id="crecTitle">학급 신기록 관리</span></button>
-        <button class="tool-tab" type="button" role="tab" aria-selected="false" data-tool="rank">반 별 통계</button>
+        <button class="tool-tab" type="button" role="tab" aria-selected="false" data-tool="records">기록·통계</button>
         <button class="tool-tab" type="button" role="tab" aria-selected="false" data-tool="patchNote">패치노트</button>
         <button class="tool-tab" type="button" role="tab" aria-selected="false" data-tool="arena">아레나</button>
-        <button class="tool-tab" type="button" role="tab" aria-selected="false" data-tool="forest">동마의 숲 섬 코드</button>
-        <button class="tool-tab" type="button" role="tab" aria-selected="false" data-tool="forestAdmin">동마의 숲 섬 관리</button>
+        <button class="tool-tab" type="button" role="tab" aria-selected="false" data-tool="forestHub">동마의 숲</button>
         <button class="tool-tab" type="button" role="tab" aria-selected="false" data-tool="usage">사용량</button>
         <button class="tool-tab" type="button" role="tab" aria-selected="false" data-tool="year">새 학년도 시작</button>
       </div>
@@ -520,6 +517,8 @@
         <button id="crecToggle" type="button" aria-expanded="false">펼치기</button>
         <button id="rankToggle" type="button" aria-expanded="false">펼치기</button>
         <button id="patchNoteToggle" type="button" aria-expanded="false">펼치기</button>
+        <button id="recordsToggle" type="button" aria-expanded="false">펼치기</button>
+        <button id="forestHubToggle" type="button" aria-expanded="false">펼치기</button>
         <button id="arenaToggle" type="button" aria-expanded="false">펼치기</button>
         <button id="teamFormToggle" type="button" aria-expanded="false">펼치기</button>
         <button id="lagToggle" type="button" aria-expanded="false">펼치기</button>
@@ -530,6 +529,14 @@
         <button id="yearToggle" type="button" aria-expanded="false">펼치기</button>
       </div>
       <div class="tool-sheet" id="toolSheet" hidden>
+        <!-- 기록·통계(2026-11-09 선생님 요청): 세계 신기록 관리·학급 신기록 관리·반 별 통계 셋을 한 탭에 모았다(동작은 스크립트의 ToolGroup). -->
+        <div id="recordsBody" hidden>
+        <div class="tool-subs" id="recordsSubs">
+          <button type="button" data-sub="rec" aria-pressed="false">세계 신기록 관리</button>
+          <button type="button" data-sub="crec" aria-pressed="false"><span id="crecTitle">학급 신기록 관리</span></button>
+          <button type="button" data-sub="rank" aria-pressed="false">반 별 통계</button>
+        </div>
+
         <!-- 세계 신기록 관리: records/<게임>/<항목> 을 읽어 보여 주고, 선생님 계정으로 고치거나 지웁니다.
              (학생은 규칙상 더 높은 점수만 쓸 수 있고, 선생님 UID 는 규칙에서 예외) -->
         <div id="recBody" hidden>
@@ -571,6 +578,8 @@
           <div id="rankTable" class="stats-box"></div>
         </div>
 
+        </div>
+
         <!-- 패치노트(2026-10-29): 게임별 패치노트를 portal/patchNotes/<게임> 에 쓰면 로그인한 학생이 그 게임에 처음 들어올 때 한 번 창으로 본다.
              펼칠 때 지금 게시된 글을 한 번 읽는다. 동작은 games/30.team-battle/patch-notes.js 의 PatchNoteEditor·PatchNoteNotice -->
         <div id="patchNoteBody" hidden>
@@ -592,10 +601,10 @@
         <!-- 아레나(2026-11-09 선생님 요청): 30번(아레나) 관련 도구 셋(팀 구성·렉 진단·MVP율)을 한 탭에 모았다.
              탭을 누르면 맨 위에 세 버튼이 나오고, 버튼을 누르면 그 도구만 펼쳐진다(각 도구의 숨은 펼치기 버튼 *Toggle 을 ArenaTabs 가 눌러 준다). -->
         <div id="arenaBody" hidden>
-        <div class="arena-subs" id="arenaSubs">
-          <button type="button" data-arena="teamForm" aria-pressed="false">팀 구성</button>
-          <button type="button" data-arena="lag" aria-pressed="false">렉 진단</button>
-          <button type="button" data-arena="charMvp" aria-pressed="false">MVP율</button>
+        <div class="tool-subs" id="arenaSubs">
+          <button type="button" data-sub="teamForm" aria-pressed="false">팀 구성</button>
+          <button type="button" data-sub="lag" aria-pressed="false">렉 진단</button>
+          <button type="button" data-sub="charMvp" aria-pressed="false">MVP율</button>
         </div>
 
         <!-- 30번 팀 구성(2026-11-02): 고른 반의 classStats/<반> 을 불러올 때 한 번만 읽고(폴링 없음) MVP율 순으로 티어를 나눠 조를 짠다.
@@ -671,6 +680,13 @@
           <div id="usageTable" class="stats-box"></div>
         </div>
 
+        <!-- 동마의 숲(2026-11-09 선생님 요청): 섬 코드·섬 관리 둘을 한 탭에 모았다(동작은 스크립트의 ToolGroup). -->
+        <div id="forestHubBody" hidden>
+        <div class="tool-subs" id="forestHubSubs">
+          <button type="button" data-sub="forest" aria-pressed="false">섬 코드</button>
+          <button type="button" data-sub="forestAdmin" aria-pressed="false">섬 관리</button>
+        </div>
+
         <!-- 40번 동마의 숲 섬 코드(2026-10-30):학생은 시작 화면에 코드를 넣어 섬에 들어가고(forestCodes/<코드> = {cls, island}),
              한 번 정해진 섬은 학생이 바꾸지 못한다. 배포용(test)은 코드 없이 test_1 섬으로 들어간다. 동작은 스크립트의 ForestCodePanel. -->
         <div id="forestBody" hidden>
@@ -719,6 +735,8 @@
             <button id="fa-log" type="button">최근 40개 보기</button>
           </div>
           <div id="fa-logs" class="stats-box"></div>
+        </div>
+
         </div>
 
         <!-- 새 학년도 시작(2026-10-29 선생님 요청): 일 년에 한 번만 쓰고 되돌리기 어려워서 관리 도구 맨 끝 탭에 두고, 확인 창에서 문구를 쳐야 시작한다.
@@ -3012,48 +3030,55 @@ $("charMvpToggle").addEventListener("click", () => {
   $("charMvpToggle").textContent = open ? "접기" : "펼치기";
   $("charMvpToggle").setAttribute("aria-expanded", open ? "true" : "false");
 });
-/* 아레나 탭(2026-11-09 선생님 요청): 팀 구성·렉 진단·MVP율 세 도구를 한 탭에 모았다. 아레나 탭을 열면 위에 세 버튼만 보이고,
-   버튼을 누르면 그 도구만 펼쳐진다(같은 버튼을 다시 누르면 접힘). 실제 펼치기·처음 읽기는 각 도구의 숨은 펼치기 버튼이 하고 여기서는 눌러 줄 뿐이다.
-   아레나 탭 자체를 닫으면 열려 있던 도구도 함께 접는다. */
-class ArenaTabs {
-  static KEYS = ["teamForm", "lag", "charMvp"];
+/* 도구 묶음 탭(2026-11-09 선생님 요청): 탭 수를 줄이려고 관련 도구 여럿을 한 탭에 모았다(아레나·기록·통계·동마의 숲).
+   묶음 탭을 열면 위에 도구 버튼만 보이고, 버튼을 누르면 그 도구만 펼쳐진다(같은 버튼을 다시 누르면 접힘).
+   실제 펼치기·처음 읽기는 각 도구의 숨은 펼치기 버튼(<키>Toggle)이 하고 여기서는 눌러 줄 뿐이다. 묶음 탭 자체를 닫으면 열려 있던 도구도 함께 접는다.
+   키 g 의 묶음은 #gBody(덮개)·#gToggle(숨은 펼치기 버튼)·#gSubs(도구 버튼 줄, 버튼의 data-sub 가 도구 키)를 쓴다. */
+class ToolGroup {
+  static GROUPS = { arena: ["teamForm", "lag", "charMvp"], records: ["rec", "crec", "rank"], forestHub: ["forest", "forestAdmin"] };
 
-  constructor() { this.buttons = Array.from(document.querySelectorAll("#arenaSubs [data-arena]")); }
+  static bindAll() { Object.keys(ToolGroup.GROUPS).forEach((key) => new ToolGroup(key, ToolGroup.GROUPS[key]).bind()); }
 
-  bind() {
-    this.buttons.forEach((b) => b.addEventListener("click", () => this.choose(b.dataset.arena)));
-    $("arenaToggle").addEventListener("click", () => this.toggleSheet());
+  constructor(key, subKeys) {
+    this.key = key;
+    this.subKeys = subKeys;
+    this.buttons = Array.from(document.querySelectorAll("#" + key + "Subs [data-sub]"));
   }
 
-  isOpen(key) { return !$(key + "Body").hidden; }
+  bind() {
+    this.buttons.forEach((b) => b.addEventListener("click", () => this.choose(b.dataset.sub)));
+    $(this.key + "Toggle").addEventListener("click", () => this.toggleSheet());
+  }
 
-  closeAll() { ArenaTabs.KEYS.forEach((key) => { if (this.isOpen(key)) $(key + "Toggle").click(); }); }
+  isOpen(subKey) { return !$(subKey + "Body").hidden; }
 
-  choose(key) {
-    const reopen = !this.isOpen(key);
+  closeAll() { this.subKeys.forEach((subKey) => { if (this.isOpen(subKey)) $(subKey + "Toggle").click(); }); }
+
+  choose(subKey) {
+    const reopen = !this.isOpen(subKey);
     this.closeAll();
-    if (reopen) $(key + "Toggle").click();
+    if (reopen) $(subKey + "Toggle").click();
     this.mark();
   }
 
   toggleSheet() {
-    const opening = $("arenaBody").hidden;
-    $("arenaBody").hidden = !opening;
-    $("arenaToggle").textContent = opening ? "접기" : "펼치기";
-    $("arenaToggle").setAttribute("aria-expanded", opening ? "true" : "false");
+    const body = $(this.key + "Body"), toggle = $(this.key + "Toggle"), opening = body.hidden;
+    body.hidden = !opening;
+    toggle.textContent = opening ? "접기" : "펼치기";
+    toggle.setAttribute("aria-expanded", opening ? "true" : "false");
     if (!opening) this.closeAll();
     this.mark();
   }
 
   mark() {
     this.buttons.forEach((b) => {
-      const on = this.isOpen(b.dataset.arena);
+      const on = this.isOpen(b.dataset.sub);
       b.classList.toggle("on", on);
       b.setAttribute("aria-pressed", on ? "true" : "false");
     });
   }
 }
-new ArenaTabs().bind();
+ToolGroup.bindAll();
 new PatchNotePanel(new PatchNoteEditor(new AdminRestIo(), { game: "patchNoteGame", title: "patchNoteTitle", body: "patchNoteText", again: "patchNoteAgain", publish: "patchNotePublish", remove: "patchNoteRemove", msg: "patchNoteMsg", preview: "patchNotePreview" })).bind();
 
 /* 새 학년도 시작(2026-10-29 선생님 요청): 학생 반(profile.cls)은 반 링크로 처음 로그인할 때 한 번만 적히고 규칙상 교사만 바꿀 수 있어서,
