@@ -245,6 +245,9 @@
     position: sticky; top: 0; z-index: 1; background: var(--sg-panel); white-space: normal; vertical-align: bottom; line-height: 1.3;
     font-size: var(--sg-fs-xs); color: var(--sg-ink-soft); font-weight: 700; border-bottom: 2px solid var(--sg-line-mid);
   }
+  .stats-box tr.few td { opacity: .5; }
+  .stats-box tr.total td { border-top: 2px solid var(--sg-line-strong); font-weight: 800; }
+  .stats-box .mvp-bar { display: inline-block; height: 8px; margin-left: 8px; border-radius: 4px; background: #D97B4F; vertical-align: middle; }
   .stats-box th small { display: block; margin-top: 2px; font-size: 11px; font-weight: 400; }
   .stats-box tr:hover td { background: var(--sg-bg); }
   .stats-box td:first-child { font-weight: 700; }
@@ -496,6 +499,7 @@
         <button class="tool-tab" type="button" role="tab" aria-selected="false" data-tool="patchNote">패치노트</button>
         <button class="tool-tab" type="button" role="tab" aria-selected="false" data-tool="teamForm">30번 팀 구성</button>
         <button class="tool-tab" type="button" role="tab" aria-selected="false" data-tool="lag">30번 렉 진단</button>
+        <button class="tool-tab" type="button" role="tab" aria-selected="false" data-tool="charMvp">30번 캐릭터 MVP율</button>
         <button class="tool-tab" type="button" role="tab" aria-selected="false" data-tool="forest">동마의 숲 섬 코드</button>
         <button class="tool-tab" type="button" role="tab" aria-selected="false" data-tool="forestAdmin">동마의 숲 섬 관리</button>
         <button class="tool-tab" type="button" role="tab" aria-selected="false" data-tool="usage">사용량</button>
@@ -508,6 +512,7 @@
         <button id="patchNoteToggle" type="button" aria-expanded="false">펼치기</button>
         <button id="teamFormToggle" type="button" aria-expanded="false">펼치기</button>
         <button id="lagToggle" type="button" aria-expanded="false">펼치기</button>
+        <button id="charMvpToggle" type="button" aria-expanded="false">펼치기</button>
         <button id="forestToggle" type="button" aria-expanded="false">펼치기</button>
         <button id="forestAdminToggle" type="button" aria-expanded="false">펼치기</button>
         <button id="usageToggle" type="button" aria-expanded="false">펼치기</button>
@@ -608,6 +613,24 @@
           <div id="lagTable" class="stats-box"></div>
           <p class="msg" id="lagGapMsg"></p>
           <div id="lagGaps" class="stats-box"></div>
+        </div>
+
+        <!-- 30번 캐릭터별 MVP율(2026-11-09 선생님 요청): 불러오기를 누를 때 classStats 한 번 + 판 기록이 있는 학생마다 users/<uid>/stats/teambattle/c 를 한 번씩 읽어
+             캐릭터별 픽 수·MVP 횟수를 합칩니다(폴링 없음). 동작은 스크립트의 CharMvpRatePanel. -->
+        <div id="charMvpBody" hidden>
+          <p class="hint">
+            학생 계정에 쌓인 캐릭터별 기록을 모두 합쳐 <b>MVP 횟수 ÷ 픽 수</b>를 보여 줍니다. 한 판에 6명 중 1명이 MVP 를 받으므로 기준선은 약 17% 안팎입니다.
+          </p>
+          <div class="actions">
+            <select id="charMvpSort">
+              <option value="rate">MVP율 높은 순</option>
+              <option value="picks">픽 수 많은 순</option>
+              <option value="group">직업군 순</option>
+            </select>
+            <button id="charMvpLoad" type="button">불러오기</button>
+          </div>
+          <p class="msg" id="charMvpMsg"></p>
+          <div id="charMvpTable" class="stats-box"></div>
         </div>
 
         <!-- 사용량(2026-11-07): 학생 기기가 한 판이 끝날 때(판 종료 신호가 없는 화면은 떠날 때) 그 사이 쓴 Firebase 바이트를
@@ -2788,6 +2811,144 @@ $("teamFormToggle").addEventListener("click", () => {
   $("teamFormToggle").textContent = open ? "접기" : "펼치기";
   $("teamFormToggle").setAttribute("aria-expanded", open ? "true" : "false");
   if (open) teamFormPanel.open();
+});
+/* 30번 캐릭터별 MVP율(2026-11-09 선생님 요청): 학생 계정의 users/<uid>/stats/teambattle/c/<캐릭터> = { n 픽 수, m MVP 횟수, … } 를 모든 학생에 걸쳐 합친다.
+   전체 통계(patchstats)에는 평균 MVP 점수만 있고 MVP 횟수가 없어서 계정 쪽을 읽는다. 대회모드(AI 없음)만 계정에 쌓이고 패치 구분은 없다.
+   읽기: classStats 1번 + 판 기록(g > 0)이 있는 학생마다 1번(동시에 PARALLEL 개씩). 불러오기를 누를 때만 읽는다. */
+class CharMvpTally {
+  constructor(roleIds) {
+    this.byRole = new Map(roleIds.map((id) => [id, { picks: 0, mvp: 0 }]));
+    this.students = 0;
+  }
+
+  addStudent(chars) {
+    if (!chars) return;
+    this.students++;
+    Object.keys(chars).forEach((id) => {
+      const slot = this.byRole.get(id);
+      if (!slot) return;
+      slot.picks += +(chars[id] || {}).n || 0;
+      slot.mvp += +(chars[id] || {}).m || 0;
+    });
+  }
+
+  totalPicks() { return Array.from(this.byRole.values()).reduce((s, v) => s + v.picks, 0); }
+
+  totalMvp() { return Array.from(this.byRole.values()).reduce((s, v) => s + v.mvp, 0); }
+}
+
+class CharMvpRatePanel {
+  static MIN_PICKS = 30;
+  static PARALLEL = 6;
+
+  constructor(io, roles, groups) {
+    this.io = io;
+    this.roles = roles;
+    this.groups = groups;
+    this.tally = null;
+    this.failed = 0;
+  }
+
+  bind() {
+    $("charMvpLoad").addEventListener("click", () => this.load());
+    $("charMvpSort").addEventListener("change", () => this.render());
+  }
+
+  activeUids(classStats) {
+    const uids = new Set();
+    Object.keys(classStats).forEach((cls) => {
+      const students = classStats[cls] || {};
+      Object.keys(students).forEach((uid) => { if ((+(students[uid] || {}).g || 0) > 0) uids.add(uid); });
+    });
+    return Array.from(uids);
+  }
+
+  async eachLimited(items, work) {
+    let next = 0;
+    const lanes = Array.from({ length: Math.min(CharMvpRatePanel.PARALLEL, items.length) }, async () => {
+      while (next < items.length) await work(items[next++]);
+    });
+    await Promise.all(lanes);
+  }
+
+  async load() {
+    $("charMvpTable").textContent = "";
+    this.tally = null;
+    this.failed = 0;
+    say("charMvpMsg", "학생 목록을 읽는 중…");
+    try {
+      const uids = this.activeUids((await this.io.read("classStats")) || {});
+      const tally = new CharMvpTally(this.roles.map((r) => r.id));
+      let done = 0;
+      await this.eachLimited(uids, async (uid) => {
+        try { tally.addStudent(await this.io.read("users/" + uid + "/stats/teambattle/c")); } catch (e) { this.failed++; }
+        if (++done % 10 === 0) say("charMvpMsg", "학생 기록 읽는 중… " + done + " / " + uids.length);
+      });
+      this.tally = tally;
+      this.render();
+    } catch (e) {
+      say("charMvpMsg", "불러오지 못했습니다 (" + e.message + "). 읽기 권한과 인터넷 연결을 확인해 주세요.");
+    }
+  }
+
+  rows() {
+    const groupAt = (role) => this.groups.findIndex((gr) => gr.id === role.group);
+    const rows = this.roles.map((role) => {
+      const slot = this.tally.byRole.get(role.id);
+      return { role, group: this.groups[groupAt(role)], picks: slot.picks, mvp: slot.mvp, rate: slot.picks ? slot.mvp / slot.picks : -1 };
+    });
+    const mode = $("charMvpSort").value;
+    const enough = (r) => (r.picks >= CharMvpRatePanel.MIN_PICKS ? 1 : 0);
+    if (mode === "group") return rows.sort((a, b) => groupAt(a.role) - groupAt(b.role) || a.role.name.localeCompare(b.role.name, "ko"));
+    if (mode === "picks") return rows.sort((a, b) => b.picks - a.picks);
+    return rows.sort((a, b) => enough(b) - enough(a) || b.rate - a.rate);
+  }
+
+  render() {
+    const box = $("charMvpTable");
+    box.textContent = "";
+    if (!this.tally) return;
+    const totalPicks = this.tally.totalPicks(), totalMvp = this.tally.totalMvp();
+    say("charMvpMsg", "기록을 읽은 학생 " + this.tally.students + "명 · 전체 픽 " + totalPicks + " · MVP " + totalMvp + " · 평균 MVP율 " + pct(totalMvp, totalPicks) +
+      (this.failed ? " · 읽지 못한 학생 " + this.failed + "명" : ""));
+    const rows = this.rows(), top = rows.reduce((m, r) => Math.max(m, r.rate), 0);
+    const table = el("table"), head = el("tr");
+    [["직업"], ["픽 수"], ["MVP 횟수"], ["MVP율", "MVP 횟수 ÷ 픽 수"]].forEach((col) => {
+      const th = el("th", null, col[0]);
+      if (col[1]) th.appendChild(el("small", null, col[1]));
+      head.appendChild(th);
+    });
+    table.appendChild(head);
+    rows.forEach((r) => {
+      const tr = el("tr", r.picks < CharMvpRatePanel.MIN_PICKS ? "few" : null);
+      tr.appendChild(el("td", null, (r.group ? r.group.icon + " " : "") + r.role.name));
+      tr.appendChild(el("td", null, String(r.picks)));
+      tr.appendChild(el("td", null, String(r.mvp)));
+      const rate = el("td");
+      rate.appendChild(el("b", null, pct(r.mvp, r.picks)));
+      if (r.picks && top > 0) { const bar = el("span", "mvp-bar"); bar.style.width = Math.round(r.rate / top * 90) + "px"; rate.appendChild(bar); }
+      tr.appendChild(rate);
+      table.appendChild(tr);
+    });
+    const total = el("tr", "total");
+    [["전체"], [String(totalPicks)], [String(totalMvp)], [pct(totalMvp, totalPicks)]].forEach((c) => total.appendChild(el("td", null, c[0])));
+    table.appendChild(total);
+    box.appendChild(table);
+    const notes = el("ul", "hint");
+    ["학생 계정에 쌓인 대회모드(AI 없이 치른 경기, 랜덤 매칭 포함) 기록의 합계입니다. 밸런스 패치 구분 없이 모든 기간을 더했습니다.",
+     "픽 수 " + CharMvpRatePanel.MIN_PICKS + " 미만인 직업은 흐리게 표시하고 MVP율 순서에서는 맨 아래로 보냅니다(표본이 적어 비율이 크게 흔들립니다).",
+     "점수가 같으면 공동 MVP 라 MVP 횟수가 판 수보다 조금 많을 수 있고, 중간에 나간 사람과 처치·어시스트가 없는 사람은 MVP 후보에서 빠집니다.",
+     "기록이 남지 않는 옛 직업과 계정이 없는 경기는 포함되지 않습니다."].forEach((t) => notes.appendChild(el("li", null, t)));
+    box.appendChild(notes);
+  }
+}
+const charMvpPanel = new CharMvpRatePanel(new AdminRestIo(), STATS_GAMES.teambattle.roles, STATS_GAMES.teambattle.groups);
+charMvpPanel.bind();
+$("charMvpToggle").addEventListener("click", () => {
+  const open = $("charMvpBody").hidden;
+  $("charMvpBody").hidden = !open;
+  $("charMvpToggle").textContent = open ? "접기" : "펼치기";
+  $("charMvpToggle").setAttribute("aria-expanded", open ? "true" : "false");
 });
 new PatchNotePanel(new PatchNoteEditor(new AdminRestIo(), { game: "patchNoteGame", title: "patchNoteTitle", body: "patchNoteText", again: "patchNoteAgain", publish: "patchNotePublish", remove: "patchNoteRemove", msg: "patchNoteMsg", preview: "patchNotePreview" })).bind();
 
