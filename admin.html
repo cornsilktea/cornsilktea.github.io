@@ -246,6 +246,11 @@
     font-size: var(--sg-fs-xs); color: var(--sg-ink-soft); font-weight: 700; border-bottom: 2px solid var(--sg-line-mid);
   }
   .stats-box tr.few td { opacity: .5; }
+  .arena-subs { display: flex; flex-wrap: wrap; gap: var(--sg-s2); margin-bottom: var(--sg-s4); }
+  .arena-subs button { min-height: 44px; padding: var(--sg-s2) var(--sg-s5); border: 1px solid var(--sg-line-mid); border-radius: var(--sg-radius);
+    background: var(--sg-panel); color: var(--sg-ink-soft); font-size: var(--sg-fs-md); font-weight: 800; box-shadow: none; }
+  .arena-subs button:hover { background: var(--sg-panel-alt); color: var(--sg-ink); }
+  .arena-subs button.on { border-color: #D97B4F; background: var(--sg-panel-alt); color: var(--sg-ink); }
   .stats-box tr.mvp-pick { cursor: pointer; }
   .stats-box tr.mvp-winners td { white-space: normal; text-align: left; font-weight: 400; line-height: 1.7; }
   .stats-box tr.total td { border-top: 2px solid var(--sg-line-strong); font-weight: 800; }
@@ -499,9 +504,7 @@
         <button class="tool-tab" type="button" role="tab" aria-selected="false" data-tool="crec"><span id="crecTitle">학급 신기록 관리</span></button>
         <button class="tool-tab" type="button" role="tab" aria-selected="false" data-tool="rank">반 별 통계</button>
         <button class="tool-tab" type="button" role="tab" aria-selected="false" data-tool="patchNote">패치노트</button>
-        <button class="tool-tab" type="button" role="tab" aria-selected="false" data-tool="teamForm">30번 팀 구성</button>
-        <button class="tool-tab" type="button" role="tab" aria-selected="false" data-tool="lag">30번 렉 진단</button>
-        <button class="tool-tab" type="button" role="tab" aria-selected="false" data-tool="charMvp">30번 캐릭터 MVP율</button>
+        <button class="tool-tab" type="button" role="tab" aria-selected="false" data-tool="arena">아레나</button>
         <button class="tool-tab" type="button" role="tab" aria-selected="false" data-tool="forest">동마의 숲 섬 코드</button>
         <button class="tool-tab" type="button" role="tab" aria-selected="false" data-tool="forestAdmin">동마의 숲 섬 관리</button>
         <button class="tool-tab" type="button" role="tab" aria-selected="false" data-tool="usage">사용량</button>
@@ -512,6 +515,7 @@
         <button id="crecToggle" type="button" aria-expanded="false">펼치기</button>
         <button id="rankToggle" type="button" aria-expanded="false">펼치기</button>
         <button id="patchNoteToggle" type="button" aria-expanded="false">펼치기</button>
+        <button id="arenaToggle" type="button" aria-expanded="false">펼치기</button>
         <button id="teamFormToggle" type="button" aria-expanded="false">펼치기</button>
         <button id="lagToggle" type="button" aria-expanded="false">펼치기</button>
         <button id="charMvpToggle" type="button" aria-expanded="false">펼치기</button>
@@ -580,6 +584,15 @@
           <div id="patchNotePreview" class="patch-note-preview"></div>
         </div>
 
+        <!-- 아레나(2026-11-09 선생님 요청): 30번(아레나) 관련 도구 셋(팀 구성·렉 진단·MVP율)을 한 탭에 모았다.
+             탭을 누르면 맨 위에 세 버튼이 나오고, 버튼을 누르면 그 도구만 펼쳐진다(각 도구의 숨은 펼치기 버튼 *Toggle 을 ArenaTabs 가 눌러 준다). -->
+        <div id="arenaBody" hidden>
+        <div class="arena-subs" id="arenaSubs">
+          <button type="button" data-arena="teamForm" aria-pressed="false">팀 구성</button>
+          <button type="button" data-arena="lag" aria-pressed="false">렉 진단</button>
+          <button type="button" data-arena="charMvp" aria-pressed="false">MVP율</button>
+        </div>
+
         <!-- 30번 팀 구성(2026-11-02): 고른 반의 classStats/<반> 을 불러올 때 한 번만 읽고(폴링 없음) MVP율 순으로 티어를 나눠 조를 짠다.
              다른 학생의 통계를 읽으므로 교사 제어판에만 있다. 동작은 ts/games/30.team-battle/30.team-formation.ts -->
         <div id="teamFormBody" hidden>
@@ -633,6 +646,7 @@
           </div>
           <p class="msg" id="charMvpMsg"></p>
           <div id="charMvpTable" class="stats-box"></div>
+        </div>
         </div>
 
         <!-- 사용량(2026-11-07): 학생 기기가 한 판이 끝날 때(판 종료 신호가 없는 화면은 떠날 때) 그 사이 쓴 Firebase 바이트를
@@ -2972,6 +2986,48 @@ $("charMvpToggle").addEventListener("click", () => {
   $("charMvpToggle").textContent = open ? "접기" : "펼치기";
   $("charMvpToggle").setAttribute("aria-expanded", open ? "true" : "false");
 });
+/* 아레나 탭(2026-11-09 선생님 요청): 팀 구성·렉 진단·MVP율 세 도구를 한 탭에 모았다. 아레나 탭을 열면 위에 세 버튼만 보이고,
+   버튼을 누르면 그 도구만 펼쳐진다(같은 버튼을 다시 누르면 접힘). 실제 펼치기·처음 읽기는 각 도구의 숨은 펼치기 버튼이 하고 여기서는 눌러 줄 뿐이다.
+   아레나 탭 자체를 닫으면 열려 있던 도구도 함께 접는다. */
+class ArenaTabs {
+  static KEYS = ["teamForm", "lag", "charMvp"];
+
+  constructor() { this.buttons = Array.from(document.querySelectorAll("#arenaSubs [data-arena]")); }
+
+  bind() {
+    this.buttons.forEach((b) => b.addEventListener("click", () => this.choose(b.dataset.arena)));
+    $("arenaToggle").addEventListener("click", () => this.toggleSheet());
+  }
+
+  isOpen(key) { return !$(key + "Body").hidden; }
+
+  closeAll() { ArenaTabs.KEYS.forEach((key) => { if (this.isOpen(key)) $(key + "Toggle").click(); }); }
+
+  choose(key) {
+    const reopen = !this.isOpen(key);
+    this.closeAll();
+    if (reopen) $(key + "Toggle").click();
+    this.mark();
+  }
+
+  toggleSheet() {
+    const opening = $("arenaBody").hidden;
+    $("arenaBody").hidden = !opening;
+    $("arenaToggle").textContent = opening ? "접기" : "펼치기";
+    $("arenaToggle").setAttribute("aria-expanded", opening ? "true" : "false");
+    if (!opening) this.closeAll();
+    this.mark();
+  }
+
+  mark() {
+    this.buttons.forEach((b) => {
+      const on = this.isOpen(b.dataset.arena);
+      b.classList.toggle("on", on);
+      b.setAttribute("aria-pressed", on ? "true" : "false");
+    });
+  }
+}
+new ArenaTabs().bind();
 new PatchNotePanel(new PatchNoteEditor(new AdminRestIo(), { game: "patchNoteGame", title: "patchNoteTitle", body: "patchNoteText", again: "patchNoteAgain", publish: "patchNotePublish", remove: "patchNoteRemove", msg: "patchNoteMsg", preview: "patchNotePreview" })).bind();
 
 /* 새 학년도 시작(2026-10-29 선생님 요청): 학생 반(profile.cls)은 반 링크로 처음 로그인할 때 한 번만 적히고 규칙상 교사만 바꿀 수 있어서,
