@@ -14,7 +14,7 @@
      classStats/<학년-반|none>/<uid> { n 이름, g, w, m }  교사 화면 반별 승률 순위용 요약(교사만 읽음)
 
    집계 규칙(2026-10-26 선생님 결정)
-     - 누적 통계: 대회모드이고 AI 가 한 명도 없던 경기만. 경기 절반 뒤에 나가면 패배, 절반 전에 나가면 기록 없음.
+     - 누적 통계: 대회모드이고 AI 가 한 명도 없던 경기, 또는 AI 포함 6명 경기에서 양 팀 모두 사람이 2명 이상인 경기(2026-11-09, TeamBattleStatsEligibility). 경기 절반 뒤에 나가면 패배, 절반 전에 나가면 기록 없음.
      - 최근 매치: 대회모드 경기면 AI 가 있어도 기록(절반 전에 나간 판은 없음).
      - MVP: 환산점수 최고점, 동점이면 모두 인정, 나간 사람과 처치·어시스트가 하나도 없는 사람은 후보에서 뺀다.
      - 승률·MVP율 같은 파생값은 저장하지 않고 화면에서 계산한다(TeamBattleRates).
@@ -54,13 +54,25 @@ class AccountMvpJudge {
         return this.winners(players).indexOf(index) >= 0;
     }
 }
+/* 누적 통계에 넣는 판인가(2026-11-09 선생님 결정): AI 가 없던 판, 또는 AI 를 포함해 모두 6명이고 양 팀 모두 사람이 2명 이상인 판 */
+class TeamBattleStatsEligibility {
+    static counts(players) {
+        if (!players.some((line) => line.ai))
+            return true;
+        if (players.length !== TeamBattleStatsEligibility.FULL_ROOM)
+            return false;
+        return [0, 1].every((team) => players.filter((line) => line.team === team && !line.ai).length >= TeamBattleStatsEligibility.MIN_HUMANS_PER_TEAM);
+    }
+}
+TeamBattleStatsEligibility.FULL_ROOM = 6;
+TeamBattleStatsEligibility.MIN_HUMANS_PER_TEAM = 2;
 class TeamBattlePlan {
     constructor(report, judge) {
         const me = report.players[report.myIndex];
         const leftEarly = AccountForfeit.leftEarly(report.iLeft, report.progress);
         this.withAi = report.players.some((line) => line.ai);
         this.recordsRecent = report.mode === TeamBattlePlan.CUP_MODE && !!me && !leftEarly && (report.winnerTeam === 0 || report.winnerTeam === 1 || report.iLeft);
-        this.countsStats = this.recordsRecent && !this.withAi;
+        this.countsStats = this.recordsRecent && TeamBattleStatsEligibility.counts(report.players);
         this.win = !!me && !report.iLeft && me.team === report.winnerTeam;
         this.mvp = !!me && !report.iLeft && judge.isMvp(report.players, report.myIndex);
     }
@@ -452,7 +464,7 @@ class TeamBattleRecentBlock {
             + "<em>우리 " + (me.team === 0 ? "블루" : "레드") + "팀 : 상대</em></span>"
             + '<span class="tbr-teams"><span><i>우리 팀</i>' + TeamBattleRecentBlock.namesHtml(entry, me.team) + "</span>"
             + "<span><i>상대 팀</i>" + TeamBattleRecentBlock.namesHtml(entry, 1 - me.team) + "</span>"
-            + (entry.withAi ? '<span class="ai">🤖 AI 포함 · 내 통계 제외</span>' : "") + "</span>";
+            + (entry.withAi && !TeamBattleStatsEligibility.counts(entry.players) ? '<span class="ai">🤖 AI 포함 · 내 통계 제외</span>' : "") + "</span>";
     }
     static namesHtml(entry, team) {
         return entry.players.map((line, index) => ({ line, index })).filter((item) => item.line.team === team).map((item) => {

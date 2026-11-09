@@ -167,11 +167,12 @@ class TeamBattleDuplicateFix {
     const statsRaw = this.node || this.user.stats?.teambattle;
     const ids = AccountStatsMath.normalize(statsRaw).ids || {};
     const counted = ids[entry.id] != null;
-    if (!entry.withAi && !counted) {
+    const countsStats = TeamBattleStatsEligibility.counts(entry.players);
+    if (countsStats && !counted && !entry.withAi) {
       this.skips.push({ name: this.name, key: entry.id, reason: "누적에 센 판인지 알 수 없어(오래된 열쇠가 밀려남) 그대로 둠" });
       return;
     }
-    if (!entry.withAi) {
+    if (countsStats && counted) {
       const reduced = TeamBattleStatsReverter.remove(statsRaw, entry, entry.id);
       this.node = reduced.node;
       const node = reduced.node;
@@ -184,7 +185,7 @@ class TeamBattleDuplicateFix {
       }
     }
     this.values[root + "recent/teambattle/" + slot] = null;
-    this.removals.push({ key: entry.id, at: entry.at, win: entry.win, countedInStats: !entry.withAi });
+    this.removals.push({ key: entry.id, at: entry.at, win: entry.win, countedInStats: countsStats && counted });
   }
 }
 
@@ -316,7 +317,7 @@ class TeamBattleRepairFix {
     const left = line.left;
     const win = !left && line.team === winnerTeam;
     const mvp = !left && new AccountMvpJudge((player) => TeamBattleScore.of(player)).isMvp(source.entry.players, index);
-    const countsStats = !source.entry.withAi;
+    const countsStats = TeamBattleStatsEligibility.counts(source.entry.players);
     const at = match.at;
     if (countsStats) {
       const change = AccountStatsMath.apply(this.node || this.user.stats?.teambattle, line, { key: match.key, win, side: line.team, mvp, at });
@@ -330,6 +331,26 @@ class TeamBattleRepairFix {
     }
     const pendingId = this.user.pending?.teambattle?.id;
     this.additions.push({ key: match.key, at, index, win, mvp, left, countsStats, intoRecent: slot !== null, pendingSame: pendingId === match.key });
+  }
+
+  /* 새 집계 규칙(AI 포함 6명 + 양 팀 사람 2명 이상) 이전에 AI 판이라 빠졌던, 이 학생 최근 매치의 판들을 누적 통계에 센다 */
+  catchUpOwnRecent(): void {
+    const slots = AccountShape.slots(this.user.recent?.teambattle);
+    Object.keys(slots)
+      .map((slot) => TeamBattleCodec.decode(slots[slot]))
+      .filter((entry): entry is RecentMatchEntry => !!entry && !!entry.id)
+      .sort((a, b) => a.at - b.at)
+      .forEach((entry) => {
+        const ids = (this.node && this.node.ids) || AccountStatsMath.normalize(this.user.stats?.teambattle).ids || {};
+        if (!entry.withAi || ids[entry.id] != null || !TeamBattleStatsEligibility.counts(entry.players)) return;
+        const line = entry.players[entry.myIndex];
+        const mvp = !line.left && new AccountMvpJudge((player) => TeamBattleScore.of(player)).isMvp(entry.players, entry.myIndex);
+        const win = !line.left && entry.win;
+        const change = AccountStatsMath.apply(this.node || this.user.stats?.teambattle, line, { key: entry.id, win, side: line.team, mvp, at: entry.at });
+        if (!change) return;
+        this.node = change.node;
+        this.additions.push({ key: entry.id, at: entry.at, index: entry.myIndex, win, mvp, left: line.left, countsStats: true, intoRecent: false, pendingSame: false });
+      });
   }
 
   patch(): Record<string, unknown> {
@@ -412,6 +433,10 @@ class TeamBattleRepairPlanner {
         if (!fix.fitsRecent(match.at)) { plan.agedOutLines++; return; }
         fix.add(match, index, winnerTeam);
       });
+    });
+    Object.keys(users).forEach((uid) => {
+      const fix = fixes[uid] = fixes[uid] || new TeamBattleRepairFix(uid, users[uid] || {});
+      fix.catchUpOwnRecent();
     });
     plan.fixes.push(...Object.keys(fixes).map((uid) => fixes[uid]).filter((fix) => fix.additions.length > 0));
     return plan;
