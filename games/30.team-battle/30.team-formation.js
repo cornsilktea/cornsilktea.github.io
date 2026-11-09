@@ -32,6 +32,7 @@ class TeamFormationStudent {
         return a.shownName.localeCompare(b.shownName, "ko") || a.fullName.localeCompare(b.fullName, "ko");
     }
 }
+TeamFormationStudent.LAST_TIER = 3;
 class TeamFormationRoster {
     constructor(raw) {
         this.students = Object.keys(raw)
@@ -166,7 +167,8 @@ class TeamFormationView {
     tokenElement(student) {
         const token = this.make("div", "tf-token tf-token" + student.tier);
         token.appendChild(this.make("div", "tf-token-name", student.shownName));
-        token.appendChild(this.make("div", "tf-token-rate", student.mvpPercentText));
+        if (student.tier !== TeamFormationStudent.LAST_TIER)
+            token.appendChild(this.make("div", "tf-token-rate", student.mvpPercentText));
         token.draggable = true;
         token.title = student.fullName + " · MVP율 " + (student.games ? (student.mvpRate * 100).toFixed(1) + "% (" + student.mvp + "/" + student.games + "판)" : "기록 없음");
         if (student === this.selected)

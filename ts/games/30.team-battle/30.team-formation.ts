@@ -36,6 +36,8 @@ interface TeamFormationSlot {
 }
 
 class TeamFormationStudent {
+  static readonly LAST_TIER = 3;
+
   constructor(
     readonly id: string,
     readonly fullName: string,
@@ -213,7 +215,7 @@ class TeamFormationView {
   private tokenElement(student: TeamFormationStudent): HTMLElement {
     const token = this.make("div", "tf-token tf-token" + student.tier);
     token.appendChild(this.make("div", "tf-token-name", student.shownName));
-    token.appendChild(this.make("div", "tf-token-rate", student.mvpPercentText));
+    if (student.tier !== TeamFormationStudent.LAST_TIER) token.appendChild(this.make("div", "tf-token-rate", student.mvpPercentText));
     token.draggable = true;
     token.title = student.fullName + " · MVP율 " + (student.games ? (student.mvpRate * 100).toFixed(1) + "% (" + student.mvp + "/" + student.games + "판)" : "기록 없음");
     if (student === this.selected) token.classList.add("selected");

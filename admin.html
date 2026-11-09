@@ -188,6 +188,7 @@
   .tf-tray-title { font-weight: 800; font-size: 14px; color: var(--sg-ink-mid); margin-bottom: var(--sg-s2); }
   .tf-tray-list { display: flex; flex-wrap: wrap; gap: 8px; }
   .tf-token { padding: 8px 12px; border-radius: 8px; font-weight: 800; font-size: 15px; color: #fff; cursor: grab; user-select: none; background: #6B7F6A; text-align: center; }
+  #teamFormBody .actions .msg { flex: 1 1 220px; align-self: center; margin: 0; }
   .tf-token-rate { margin-top: 2px; font-size: 11px; font-weight: 400; line-height: 1.2; opacity: .9; }
   .tf-token1 { background: #D97B4F; }
   .tf-token2 { background: #4F8F6A; }
@@ -619,8 +620,8 @@
           <div class="actions">
             <select id="teamFormClass"></select>
             <button id="teamFormLoad" type="button">불러오기</button>
+            <p class="msg" id="teamFormMsg"></p>
           </div>
-          <p class="msg" id="teamFormMsg"></p>
           <div id="teamFormBoard" class="tf-board"></div>
           <div id="teamFormTray" class="tf-tray"></div>
         </div>
@@ -772,7 +773,7 @@
 <script charset="utf-8" src="common/account-stats.js?v=20261109a"></script>
 <script charset="utf-8" src="games/30.team-battle/teambattle-stats-repair.js?v=20261109b"></script>
 <script charset="utf-8" src="games/30.team-battle/patch-notes.js?v=20261029b"></script>
-<script charset="utf-8" src="games/30.team-battle/30.team-formation.js?v=20261109a"></script>
+<script charset="utf-8" src="games/30.team-battle/30.team-formation.js?v=20261109b"></script>
 <script charset="utf-8" src="games/24.turbo-lap/24.turbo-lap-stats.js?v=20261029c"></script>
 <script charset="utf-8" src="games/25.fps-survival/25.fps-survival-stats.js?v=20261028c"></script>
 <script charset="utf-8" src="games/31.zombie-outbreak/31.zombie-outbreak-stats.js?v=20261104a"></script>
