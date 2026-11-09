@@ -53,6 +53,10 @@ class TeamFormationStudent {
     return this.games > 0 ? this.mvp / this.games : -1;
   }
 
+  get mvpPercentText(): string {
+    return this.games > 0 ? Math.round(this.mvpRate * 100) + "%" : "-";
+  }
+
   static byMvpRate(a: TeamFormationStudent, b: TeamFormationStudent): number {
     return b.mvpRate - a.mvpRate || b.games - a.games || a.shownName.localeCompare(b.shownName, "ko");
   }
@@ -207,7 +211,9 @@ class TeamFormationView {
   }
 
   private tokenElement(student: TeamFormationStudent): HTMLElement {
-    const token = this.make("div", "tf-token tf-token" + student.tier, student.shownName);
+    const token = this.make("div", "tf-token tf-token" + student.tier);
+    token.appendChild(this.make("div", "tf-token-name", student.shownName));
+    token.appendChild(this.make("div", "tf-token-rate", student.mvpPercentText));
     token.draggable = true;
     token.title = student.fullName + " · MVP율 " + (student.games ? (student.mvpRate * 100).toFixed(1) + "% (" + student.mvp + "/" + student.games + "판)" : "기록 없음");
     if (student === this.selected) token.classList.add("selected");
