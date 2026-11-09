@@ -246,6 +246,8 @@
     font-size: var(--sg-fs-xs); color: var(--sg-ink-soft); font-weight: 700; border-bottom: 2px solid var(--sg-line-mid);
   }
   .stats-box tr.few td { opacity: .5; }
+  .stats-box tr.mvp-pick { cursor: pointer; }
+  .stats-box tr.mvp-winners td { white-space: normal; text-align: left; font-weight: 400; line-height: 1.7; }
   .stats-box tr.total td { border-top: 2px solid var(--sg-line-strong); font-weight: 800; }
   .stats-box .mvp-bar { display: inline-block; height: 8px; margin-left: 8px; border-radius: 4px; background: #D97B4F; vertical-align: middle; }
   .stats-box th small { display: block; margin-top: 2px; font-size: 11px; font-weight: 400; }
@@ -2816,18 +2818,20 @@ $("teamFormToggle").addEventListener("click", () => {
    읽기: classStats 1번 + 판 기록(g > 0)이 있는 학생마다 1번(동시에 PARALLEL 개씩). 불러오기를 누를 때만 읽는다. */
 class CharMvpTally {
   constructor(roleIds) {
-    this.byRole = new Map(roleIds.map((id) => [id, { picks: 0, mvp: 0 }]));
+    this.byRole = new Map(roleIds.map((id) => [id, { picks: 0, mvp: 0, winners: [] }]));
     this.students = 0;
   }
 
-  addStudent(chars) {
+  addStudent(chars, who) {
     if (!chars) return;
     this.students++;
     Object.keys(chars).forEach((id) => {
       const slot = this.byRole.get(id);
       if (!slot) return;
-      slot.picks += +(chars[id] || {}).n || 0;
-      slot.mvp += +(chars[id] || {}).m || 0;
+      const picks = +(chars[id] || {}).n || 0, mvp = +(chars[id] || {}).m || 0;
+      slot.picks += picks;
+      slot.mvp += mvp;
+      if (mvp > 0) slot.winners.push({ name: who.name, cls: who.cls, picks, mvp });
     });
   }
 
@@ -2853,13 +2857,17 @@ class CharMvpRatePanel {
     $("charMvpSort").addEventListener("change", () => this.render());
   }
 
-  activeUids(classStats) {
-    const uids = new Set();
+  activeStudents(classStats) {
+    const found = new Map();
     Object.keys(classStats).forEach((cls) => {
       const students = classStats[cls] || {};
-      Object.keys(students).forEach((uid) => { if ((+(students[uid] || {}).g || 0) > 0) uids.add(uid); });
+      Object.keys(students).forEach((uid) => {
+        const v = students[uid] || {};
+        if ((+v.g || 0) <= 0) return;
+        if (!found.has(uid) || cls !== "none") found.set(uid, { uid, name: String(v.n || "이름 없음"), cls: cls === "none" ? "반 없음" : cls });
+      });
     });
-    return Array.from(uids);
+    return Array.from(found.values());
   }
 
   async eachLimited(items, work) {
@@ -2876,12 +2884,12 @@ class CharMvpRatePanel {
     this.failed = 0;
     say("charMvpMsg", "학생 목록을 읽는 중…");
     try {
-      const uids = this.activeUids((await this.io.read("classStats")) || {});
+      const students = this.activeStudents((await this.io.read("classStats")) || {});
       const tally = new CharMvpTally(this.roles.map((r) => r.id));
       let done = 0;
-      await this.eachLimited(uids, async (uid) => {
-        try { tally.addStudent(await this.io.read("users/" + uid + "/stats/teambattle/c")); } catch (e) { this.failed++; }
-        if (++done % 10 === 0) say("charMvpMsg", "학생 기록 읽는 중… " + done + " / " + uids.length);
+      await this.eachLimited(students, async (who) => {
+        try { tally.addStudent(await this.io.read("users/" + who.uid + "/stats/teambattle/c"), who); } catch (e) { this.failed++; }
+        if (++done % 10 === 0) say("charMvpMsg", "학생 기록 읽는 중… " + done + " / " + students.length);
       });
       this.tally = tally;
       this.render();
@@ -2901,6 +2909,16 @@ class CharMvpRatePanel {
     if (mode === "group") return rows.sort((a, b) => groupAt(a.role) - groupAt(b.role) || a.role.name.localeCompare(b.role.name, "ko"));
     if (mode === "picks") return rows.sort((a, b) => b.picks - a.picks);
     return rows.sort((a, b) => enough(b) - enough(a) || b.rate - a.rate);
+  }
+
+  winnersRow(row) {
+    const detail = el("tr", "mvp-winners"), cell = el("td");
+    const winners = this.tally.byRole.get(row.role.id).winners.slice().sort((a, b) => b.mvp - a.mvp || b.picks - a.picks);
+    cell.colSpan = 4;
+    cell.textContent = winners.length ? winners.map((w) => w.name + "(" + w.cls + ") MVP " + w.mvp + "회 / 픽 " + w.picks + "판").join(" · ") : "이 직업으로 MVP 를 한 학생이 없습니다.";
+    detail.hidden = true;
+    detail.appendChild(cell);
+    return detail;
   }
 
   render() {
@@ -2927,7 +2945,12 @@ class CharMvpRatePanel {
       rate.appendChild(el("b", null, pct(r.mvp, r.picks)));
       if (r.picks && top > 0) { const bar = el("span", "mvp-bar"); bar.style.width = Math.round(r.rate / top * 90) + "px"; rate.appendChild(bar); }
       tr.appendChild(rate);
+      tr.className += " mvp-pick";
+      tr.title = "누르면 이 직업으로 MVP 를 한 학생이 나옵니다";
+      const detail = this.winnersRow(r);
+      tr.addEventListener("click", () => { detail.hidden = !detail.hidden; });
       table.appendChild(tr);
+      table.appendChild(detail);
     });
     const total = el("tr", "total");
     [["전체"], [String(totalPicks)], [String(totalMvp)], [pct(totalMvp, totalPicks)]].forEach((c) => total.appendChild(el("td", null, c[0])));
