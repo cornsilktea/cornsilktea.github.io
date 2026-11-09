@@ -1622,8 +1622,7 @@ class StudentStatsWindow {
      통계 정상화가 다른 학생 결과표에서 지운 판을 다시 채우지 않도록, 지우기 전의 판 열쇠(ids)만 남기고 숫자는 0으로 둔다 */
   async eraseRecords() {
     if (this.erasing) return;
-    if (!confirm(this.name + " 학생의 30번 팀 배틀 기록(누적 통계·최근 20매치)을 모두 지울까요?
-지운 기록은 되돌릴 수 없습니다.")) return;
+    if (!confirm(this.name + " 학생의 30번 팀 배틀 기록(누적 통계·최근 20매치)을 모두 지울까요?\n지운 기록은 되돌릴 수 없습니다.")) return;
     this.erasing = true;
     try {
       const cls = await this.readValue("users/" + this.uid + "/profile/cls");
