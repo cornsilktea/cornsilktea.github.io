@@ -252,7 +252,12 @@
   .arena-subs button:hover { background: var(--sg-panel-alt); color: var(--sg-ink); }
   .arena-subs button.on { border-color: #D97B4F; background: var(--sg-panel-alt); color: var(--sg-ink); }
   .stats-box tr.mvp-pick { cursor: pointer; }
-  .stats-box tr.mvp-winners td { white-space: normal; text-align: left; font-weight: 400; line-height: 1.7; }
+  .stats-box tr.mvp-winners > td { white-space: normal; text-align: left; font-weight: 400; }
+  .stats-box .mvp-who { display: flex; flex-wrap: wrap; gap: var(--sg-s5); }
+  .stats-box .mvp-who table { flex: 1 1 300px; width: auto; margin: 0; }
+  .stats-box .mvp-who th:nth-child(2), .stats-box .mvp-who td:nth-child(2) { text-align: left; }
+  .stats-box .mvp-who td:first-child { font-weight: 400; text-align: center; }
+  .stats-box .mvp-who th:first-child { text-align: center; }
   .stats-box tr.total td { border-top: 2px solid var(--sg-line-strong); font-weight: 800; }
   .stats-box .mvp-bar { display: inline-block; height: 8px; margin-left: 8px; border-radius: 4px; background: #D97B4F; vertical-align: middle; }
   .stats-box th small { display: block; margin-top: 2px; font-size: 11px; font-weight: 400; }
@@ -2927,12 +2932,33 @@ class CharMvpRatePanel {
 
   winnersRow(row) {
     const detail = el("tr", "mvp-winners"), cell = el("td");
-    const winners = this.tally.byRole.get(row.role.id).winners.slice().sort((a, b) => b.mvp - a.mvp || b.picks - a.picks);
+    const rateOf = (w) => (w.picks ? w.mvp / w.picks : 0);
+    const winners = this.tally.byRole.get(row.role.id).winners.slice().sort((a, b) => rateOf(b) - rateOf(a) || b.mvp - a.mvp || b.picks - a.picks);
     cell.colSpan = 4;
-    cell.textContent = winners.length ? winners.map((w) => w.name + "(" + w.cls + ") MVP " + w.mvp + "회 / 픽 " + w.picks + "판").join(" · ") : "이 직업으로 MVP 를 한 학생이 없습니다.";
+    if (winners.length) cell.appendChild(this.winnersColumns(winners));
+    else cell.textContent = "이 직업으로 MVP 를 한 학생이 없습니다.";
     detail.hidden = true;
     detail.appendChild(cell);
     return detail;
+  }
+
+  winnersColumns(winners) {
+    const wrap = el("div", "mvp-who"), half = Math.ceil(winners.length / 2);
+    wrap.appendChild(this.winnersTable(winners.slice(0, half), 0));
+    if (winners.length > half) wrap.appendChild(this.winnersTable(winners.slice(half), half));
+    return wrap;
+  }
+
+  winnersTable(part, offset) {
+    const table = el("table"), head = el("tr");
+    ["순위", "학생", "MVP", "픽", "MVP율"].forEach((t) => head.appendChild(el("th", null, t)));
+    table.appendChild(head);
+    part.forEach((w, i) => {
+      const tr = el("tr");
+      [String(offset + i + 1), w.name + " (" + w.cls + ")", String(w.mvp), String(w.picks), pct(w.mvp, w.picks)].forEach((t) => tr.appendChild(el("td", null, t)));
+      table.appendChild(tr);
+    });
+    return table;
   }
 
   render() {
