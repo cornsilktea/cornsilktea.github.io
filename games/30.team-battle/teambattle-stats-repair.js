@@ -78,6 +78,37 @@ class TeamBattleStatsReverter {
         };
     }
 }
+/* 한 학생의 누적 통계에서 최근 매치 칸에 남은 판들의 몫을 한 번 뺀다(2026-11-09 선생님 요청: 56판이 나온 조민성 학생 — 최근 20판이 한 번 더 더해진 것으로 보고 바로잡음).
+   판 열쇠(ids)와 최근 매치 칸은 그대로 둔다(그 판들은 한 번은 센 것이 맞으므로 열쇠가 남아야 다시 세지 않는다). 새 집계 규칙에 들지 않는 판(AI 포함 등)은 애초에 안 세어서 빼지 않는다.
+   가장 나중 판부터 거꾸로 빼서 이동 평균이 원래 순서의 거꾸로가 되게 한다. 평균은 한 자리 반올림 오차가 조금 남을 수 있다 */
+class TeamBattleRecentBackout {
+    constructor(statsRaw, entries) {
+        this.statsRaw = statsRaw;
+        this.entries = entries;
+    }
+    plan() {
+        const before = AccountStatsMath.normalize(this.statsRaw);
+        const counted = this.entries.filter((entry) => !!entry.id && TeamBattleStatsEligibility.counts(entry.players)).sort((a, b) => b.at - a.at);
+        let node = before;
+        counted.forEach((entry) => { node = TeamBattleStatsReverter.remove(node, entry, entry.id).node; });
+        node.ids = Object.assign({}, before.ids || {});
+        const keysKnown = counted.filter((entry) => (before.ids || {})[entry.id] != null).length;
+        return { node, before, removed: counted.length, keysKnown, warnings: this.warningsFor(before, counted.length, keysKnown) };
+    }
+    warningsFor(before, removed, keysKnown) {
+        const warnings = [];
+        if (before.g < removed)
+            warnings.push("판 수(" + before.g + ")가 빼려는 판 수(" + removed + ")보다 적어 0 아래로는 내려가지 않게 막습니다");
+        const charSum = Object.keys(before.c || {}).reduce((sum, id) => sum + (before.c[id].n || 0), 0);
+        if (charSum !== before.g)
+            warnings.push("캐릭터별 판 수 합(" + charSum + ")이 판 수(" + before.g + ")와 다릅니다");
+        if (before.w + before.l !== before.g)
+            warnings.push("승 + 패(" + (before.w + before.l) + ")가 판 수(" + before.g + ")와 다릅니다");
+        if (keysKnown < removed)
+            warnings.push("빼려는 " + removed + "판 중 " + (removed - keysKnown) + "판은 통계 열쇠(ids)에 없어 이 계정에서 센 판이 맞는지 확인되지 않습니다");
+        return warnings;
+    }
+}
 /* 한 학생의 같은 판 중복을 지우는 계산: 최근 매치 칸을 비우고, 누적에 셌던 판이면 누적·캐릭터 통계·반 별 요약을 되돌린다 */
 class TeamBattleDuplicateFix {
     constructor(uid, user) {

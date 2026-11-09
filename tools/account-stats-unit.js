@@ -7,7 +7,7 @@ const names = ["AccountNumbers", "AccountRates", "AccountMatchKey", "AccountKeyL
   "ZombiePlan", "ZombieCodec", "ZombieStatsMath", "ZombieProfile", "ZombieStatsView", "ZombieRandomTallyMath", "ZombieRoleTallyMath", "ZombieOriginRotation", "ZombieVersusCards", "ZombieVersusLineup", "ZombieMissionSites", "ZombieMissionCatalog", "ZombieMissionProgress", "SnAccountPlan", "SnAccountCodec", "SnAccountMath", "SnAccountProfile", "SnAccountView", "SnReportBuilder", "SnVersusCards",
   "WbAccountPlan", "WbAccountCodec", "WbAccountMath", "WbAccountProfile", "WbAccountView", "WbReportBuilder", "WbRandomTallyMath", "WbVersusCards", "WbVersusLineupBuilder",
   "AccountClassRank", "RandomMatchPlan", "RandomMatchCodec", "RandomMatchMath", "RandomMatchProfile", "RandomMatchView",
-  "AccountOutbox", "AccountRepairPlanner", "ZombieRepairGame", "TurboLapRepairGame", "FpsRepairGame", "SnowRepairGame", "BalloonRepairGame", "AccountStatsNormalizer", "TeamBattleDuplicatePlan", "TeamBattleGameFingerprint", "TeamBattleStatsReverter", "TeamBattleRepairPlanner", "AccountPendingCodec", "AccountMatchSender", "AccountPendingGuard", "MkStreakMath", "TurboLapClock", "TurboLapOutcome", "TeamBattleScore", "PatchNoteCodec", "PatchNoteSeen"];
+  "AccountOutbox", "AccountRepairPlanner", "ZombieRepairGame", "TurboLapRepairGame", "FpsRepairGame", "SnowRepairGame", "BalloonRepairGame", "AccountStatsNormalizer", "TeamBattleDuplicatePlan", "TeamBattleGameFingerprint", "TeamBattleStatsReverter", "TeamBattleRepairPlanner", "AccountPendingCodec", "AccountMatchSender", "AccountPendingGuard", "MkStreakMath", "TurboLapClock", "TurboLapOutcome", "TeamBattleScore", "PatchNoteCodec", "PatchNoteSeen", "TeamBattleRecentBackout"];
 const src = files.map((f) => fs.readFileSync(path.join(root, f), "utf8")).join("\n") + "\n;({" + names.join(",") + "})";
 const fakeStorage = { data: {}, getItem(k) { return this.data[k] === undefined ? null : this.data[k]; }, setItem(k, v) { this.data[k] = String(v); } };
 const K = vm.runInNewContext(src, { Event, CustomEvent, localStorage: fakeStorage, console, Math, Set, Map, Array, Object, Number, String, JSON, isFinite, Date, Promise, window: { dispatchEvent: () => true, addEventListener: () => {}, localStorage: fakeStorage, setTimeout: (fn) => { fn(); return 0; } }, WbBalance: { RATE: 30 } });
@@ -826,6 +826,30 @@ const duplicateChecks = (async () => {
   const norm = new K.AccountStatsNormalizer({ read: () => Promise.resolve(JSON.parse(JSON.stringify(db))), patch: (v) => { writes.push(v); apply(db.users ? db : (() => { return null; })() || { users: db }, v); return Promise.resolve(); } });
   const first = await norm.normalize("teambattle");
   check("정상화(30번): 새로고침 한 번에 중복을 지움", !!first.removed && first.removed.length === 1 && first.removed[0].list.length === 1, first.removed);
+})();
+const backoutChecks = (() => {
+  const base = 1700000000000;
+  const make = (i) => report({ matchId: "M" + i, winnerTeam: i % 2, score: i % 2 ? [1, 4] : [4, 1], players: players({ 0: { kills: i % 5, deaths: i % 3, assists: i % 2, dmg: 200 + i * 7 }, 1: { kills: 1, dmg: 150 } }) });
+  const asEntry = (r, key, t) => K.TeamBattleCodec.decode(Object.assign(JSON.parse(JSON.stringify(K.TeamBattleCodec.encode(r, key, true))), { at: t }));
+  const mvpJudge = new K.AccountMvpJudge((l) => K.TeamBattleScore.of(l));
+  const count = (node, i, key, t) => { const entry = asEntry(make(i), key, t); return K.AccountStatsMath.apply(node, entry.players[entry.myIndex], { key, win: entry.win, side: entry.players[entry.myIndex].team, mvp: mvpJudge.isMvp(entry.players, entry.myIndex), at: t }).node; };
+  let node = null;
+  for (let i = 0; i < 36; i++) node = count(node, i, "M" + i, base + i * 1000);
+  const truth = JSON.parse(JSON.stringify(node));
+  const recent = []; for (let i = 16; i < 36; i++) recent.push(asEntry(make(i), "M" + i, base + i * 1000));
+  for (let i = 16; i < 36; i++) node = count(node, i, "D" + i, base + 90000 + i);
+  const inflated = JSON.parse(JSON.stringify(node));
+  const plan = new K.TeamBattleRecentBackout(inflated, recent).plan();
+  const fields = ["g", "w", "l", "bg", "bw", "rg", "rw", "m"];
+  check("최근 판 한 번 빼기(30번): 같은 20판이 두 번 센 56판에서 36판 상태로 돌아옴", node.g === 56 && plan.removed === 20 && fields.every((f) => plan.node[f] === truth[f]), { got: fields.map((f) => plan.node[f]), want: fields.map((f) => truth[f]) });
+  check("최근 판 한 번 빼기(30번): 캐릭터 통계 판 수도 같이 돌아오고 평균은 반올림 오차 안", plan.node.c.warrior.n === truth.c.warrior.n && Math.abs(plan.node.c.warrior.dmg - truth.c.warrior.dmg) <= 1, { got: plan.node.c.warrior, want: truth.c.warrior });
+  check("최근 판 한 번 빼기(30번): 판 열쇠(ids)는 그대로 둠", JSON.stringify(plan.node.ids) === JSON.stringify(inflated.ids));
+  check("최근 판 한 번 빼기(30번): 미리 보기는 입력 통계를 바꾸지 않음", inflated.g === 56 && Object.keys(plan.before).length > 0 && plan.before.g === 56);
+  const aiEntries = recent.map((entry) => Object.assign({}, entry, { players: entry.players.map((p, i) => i >= 3 ? Object.assign({}, p, { ai: true }) : p) }));
+  const aiPlan = new K.TeamBattleRecentBackout(inflated, aiEntries).plan();
+  check("최근 판 한 번 빼기(30번): 새 집계 규칙에 안 드는 판은 세지 않았으므로 빼지 않음", aiPlan.removed === 0 && aiPlan.node.g === 56, aiPlan.removed);
+  const small = new K.TeamBattleRecentBackout(JSON.parse(JSON.stringify(truth)).g ? Object.assign(JSON.parse(JSON.stringify(truth)), { g: 5, w: 3, l: 2 }) : null, recent).plan();
+  check("최근 판 한 번 빼기(30번): 판 수가 모자라면 0 아래로 안 내려가고 경고", small.node.g === 0 && small.warnings.some((t) => t.indexOf("0 아래") >= 0), small.warnings);
 })();
 Promise.all([done, gameChecks, pendingChecks, repairChecks, outboxChecks, duplicateChecks]).then(() => {
   if (failures.length) { console.log("실패 " + failures.length + "개\n" + failures.join("\n")); process.exit(1); }

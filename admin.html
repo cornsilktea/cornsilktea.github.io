@@ -769,7 +769,7 @@
      통계가 있는 새 게임을 만들면 그 게임의 통계 .js 를 여기 한 줄 더하고 ClassRankPanel.GAMES 에 account 를 넘긴다. -->
 <script charset="utf-8" src="common/account-match-kit.js?v=20261104a"></script>
 <script charset="utf-8" src="common/account-stats.js?v=20261109a"></script>
-<script charset="utf-8" src="games/30.team-battle/teambattle-stats-repair.js?v=20261109a"></script>
+<script charset="utf-8" src="games/30.team-battle/teambattle-stats-repair.js?v=20261109b"></script>
 <script charset="utf-8" src="games/30.team-battle/patch-notes.js?v=20261029b"></script>
 <script charset="utf-8" src="games/30.team-battle/30.team-formation.js?v=20261102b"></script>
 <script charset="utf-8" src="games/24.turbo-lap/24.turbo-lap-stats.js?v=20261029c"></script>
@@ -1649,12 +1649,56 @@ class StudentStatsWindow {
 
   topButtons() {
     const group = el("div", "top-actions");
+    const backOut = el("button", null, "최근 판 한 번 빼기"); backOut.type = "button";
+    backOut.addEventListener("click", () => { void this.backOutRecent(); });
     const erase = el("button", null, "기록 삭제"); erase.type = "button";
     erase.addEventListener("click", () => { void this.eraseRecords(); });
     const close = el("button", "stats-close", "닫기"); close.type = "button";
     close.addEventListener("click", () => this.box.parentNode.remove());
-    group.append(erase, close);
+    group.append(backOut, erase, close);
     return group;
+  }
+
+  /* 최근 매치 칸에 남은 판들의 몫을 누적 통계에서 한 번 뺀다(2026-11-09 선생님 요청: 최근 20판이 한 번 더 더해져 판 수가 부풀려진 학생을 바로잡음).
+     순서: 다시 읽어 미리 보기 계산(TeamBattleRecentBackout) → 확인 창에 바뀌는 숫자와 주의 사항 → 적용 직전에 한 번 더 읽어 그사이 바뀌었으면 중단
+     → 빼기 전 누적 통계를 archive/statsBackout 에 백업 → 누적 통계·반 별 요약 적용. 판 열쇠(ids)와 최근 매치 칸은 건드리지 않는다. */
+  async backOutRecent() {
+    if (this.erasing) return;
+    if (!this.entries.length) { this.msg.textContent = "최근 매치가 없어 뺄 판이 없습니다."; return; }
+    this.erasing = true;
+    try {
+      const root = "users/" + this.uid + "/", game = StudentStatsWindow.GAME;
+      const [fresh, cls] = await Promise.all([this.readValue(root + "stats/" + game), this.readValue(root + "profile/cls")]);
+      if (!fresh) throw new Error("누적 통계가 없어 뺄 것이 없습니다.");
+      const plan = new TeamBattleRecentBackout(fresh, this.entries).plan();
+      if (!plan.removed) throw new Error("최근 매치 중 누적 통계에 센 판이 없습니다(AI 포함 판 등은 세지 않았습니다).");
+      const b = plan.before, a = plan.node;
+      const lines = [this.name + " 학생 누적 통계에서 최근 " + plan.removed + "판의 몫을 한 번 뺍니다.",
+        "판 수 " + b.g + " → " + a.g + " · 승 " + b.w + " → " + a.w + " · 패 " + b.l + " → " + a.l + " · MVP " + b.m + " → " + a.m,
+        "빼려는 판 중 통계 열쇠에 확인된 판: " + plan.keysKnown + " / " + plan.removed]
+        .concat(plan.warnings.map((t) => "⚠ " + t))
+        .concat(["", "빼기 전 기록은 archive/statsBackout 에 백업됩니다. 계속할까요?"]);
+      if (!confirm(lines.join("\n"))) return;
+      const again = await this.readValue(root + "stats/" + game);
+      if (JSON.stringify(again) !== JSON.stringify(fresh)) throw new Error("확인하는 사이 학생 기록이 바뀌었습니다. 창을 닫고 다시 열어 주세요.");
+      const values = {};
+      values["archive/statsBackout/" + this.uid + "_" + Date.now()] = { uid: this.uid, name: this.name, cls: cls || "", game, removedMatches: plan.removed, at: { ".sv": "timestamp" }, stats: fresh };
+      values[root + "stats/" + game] = plan.node;
+      if (TeamBattleRepairNames.ADMIN_UIDS.indexOf(this.uid) < 0) {
+        const classKey = ClassStatsSummary.classKey(cls);
+        values["classStats/" + classKey + "/" + this.uid] = ClassStatsSummary.build(this.name, plan.node);
+        if (classKey !== ClassStatsSummary.NONE) values["classStats/" + ClassStatsSummary.NONE + "/" + this.uid] = null;
+      }
+      const r = await fetch(await authedUrl(""), { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(values) });
+      if (!r.ok) throw new Error(r.status === 401 || r.status === 403 ? "쓸 권한이 없습니다. 데이터베이스 규칙을 콘솔에 게시했는지 확인해 주세요." : "적용하지 못했습니다 (" + r.status + ")");
+      this.stats = AccountStatsMath.normalize(plan.node);
+      this.showStats();
+      this.msg.textContent = "최근 " + plan.removed + "판의 몫을 뺐습니다(" + b.g + " → " + a.g + "판). 빼기 전 기록은 archive/statsBackout 에 있습니다. 반 별 통계 표는 새로고침하면 반영됩니다.";
+    } catch (e) {
+      if (this.msg) this.msg.textContent = e.message;
+    } finally {
+      this.erasing = false;
+    }
   }
 
   /* 이 학생의 30번 기록(누적 통계·최근 20매치·미리 적기·반 별 요약)을 지운다(2026-11-09 선생님 요청). 되돌릴 수 없어 확인 창을 거친다.
