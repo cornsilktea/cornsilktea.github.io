@@ -4918,8 +4918,9 @@ SinglePassMaterials.enable(THREE);
   }
   class MatchPause {
     static COUNTDOWN_MS = 3000;
-    static FAIL_NOTICE_MS = 3000;
-    constructor(services) { this.services = services; this.busy = false; this.failedUntil = 0; }
+    static FAIL_NOTICE_MS = 10000;
+    static FAIL_TEXT_LEN = 120;
+    constructor(services) { this.services = services; this.busy = false; this.failedUntil = 0; this.failure = ""; }
     bind() { var pause = this; Dom.$("btnPause").addEventListener("click", function () { pause.press(); }); }
     adminUids() { return typeof AccountPolicy === "function" ? AccountPolicy.ADMIN_UIDS : []; }
     isTeacher() { var user = window.PORTAL_USER; return !!user && this.adminUids().indexOf(user.uid) >= 0; }
@@ -4935,7 +4936,10 @@ SinglePassMaterials.enable(THREE);
       return user.getToken().then(function (token) {
         return fetch(config.DB_URL.replace(/\/+$/, "") + "/" + RoomSession.ROOT + "/" + room.code + ".json?auth=" + encodeURIComponent(token),
           { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(fields) });
-      }).then(function (res) { if (!res.ok) throw new Error("http " + res.status); });
+      }).then(function (res) {
+        if (res.ok) return;
+        return res.text().then(function (body) { throw new Error("HTTP " + res.status + " " + String(body).slice(0, MatchPause.FAIL_TEXT_LEN)); });
+      });
     }
     applyLocal(fields) { var room = this.services.session.room; Object.keys(fields).forEach(function (key) { room[key] = fields[key]; }); }
     press() { var pause = this, services = this.services, room = services.session.room;
@@ -4949,7 +4953,12 @@ SinglePassMaterials.enable(THREE);
       }
       this.busy = true;
       this.applyLocal(fields);
-      this.writeRoom(fields).catch(function () { pause.applyLocal(before); pause.failedUntil = Date.now() + MatchPause.FAIL_NOTICE_MS; }).then(function () { pause.busy = false; });
+      this.writeRoom(fields).catch(function (error) {
+        pause.applyLocal(before);
+        pause.failure = String(error && error.message ? error.message : error);
+        pause.failedUntil = Date.now() + MatchPause.FAIL_NOTICE_MS;
+        console.error("퍼즈 저장 실패", pause.failure);
+      }).then(function () { pause.busy = false; });
     }
     clear() { document.body.classList.remove("matchPaused"); }
     paint() { var services = this.services, room = services.session.room, held = services.clock.held();
@@ -4958,7 +4967,9 @@ SinglePassMaterials.enable(THREE);
       Dom.show(button, show);
       Dom.setText(button, Date.now() < this.failedUntil ? "저장 실패" : (this.pausedNow() ? "재개" : "퍼즈"));
       button.disabled = this.countingDown() || (this.pausedNow() && missing.length > 0);
-      Dom.show(Dom.$("pauseOv"), held);
+      var failing = Date.now() < this.failedUntil;
+      Dom.show(Dom.$("pauseOv"), held || failing);
+      if (!held && failing) { Dom.setText(Dom.$("pauseTitle"), "퍼즈 저장 실패"); Dom.setText(Dom.$("pauseSub"), this.failure); return; }
       if (!held) return;
       if (this.pausedNow()) {
         Dom.setText(Dom.$("pauseTitle"), "일시정지");
