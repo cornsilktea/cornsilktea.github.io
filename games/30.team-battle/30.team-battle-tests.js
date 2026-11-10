@@ -4413,6 +4413,43 @@ class ResultCollector {
     if (!pw || pw.u.winner !== "draw" || updateWith(pvp.cap, "overtimeAt").length) bad.push("일반모드 무승부 " + JSON.stringify(pw));
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "동점 → 연장 1번·킬 없으면 계속·연장 중 처치 팀 승·킬 차이면 바로 끝·일반모드 무승부");
   });
+  run(JUDGEG, "경기 종료 뒤 킬 고정: 끝난 뒤에는 피해가 들어가지 않고, 쓰러짐이 늘어도 킬 점수는 확정 점수(room.final) 그대로인가", function (done) {
+    var y = OPEN_Y.forest, W = world("forest", [{ id: "a", team: "blue", char: "knight", x: 300, y: y }, { id: "b", team: "red", char: "knight", x: 700, y: y }]), bad = [];
+    var a = W.ent("a"), b = W.ent("b");
+    W.room.mode = "cup"; W.room.status = "ended"; W.room.final = { blue: 8, red: 7 };
+    a.deaths = 7; b.deaths = 8;
+    var hp = b.hp, before = b.deaths;
+    api.DAMAGE.damage(b, 99999, "a");
+    if (b.hp !== hp || !b.alive || b.deaths !== before) bad.push("끝난 뒤 피해가 들어감 hp " + b.hp + " 쓰러짐 " + b.deaths);
+    b.deaths = 9; a.deaths = 9;
+    var s = api.teamTotals();
+    if (s.blueKills !== 8 || s.redKills !== 7) bad.push("쓰러짐이 늘자 점수가 바뀜 " + s.blueKills + "·" + s.redKills + " (기대 8·7)");
+    W.room.status = "playing"; W.room.final = null;
+    s = api.teamTotals();
+    if (s.blueKills !== 9 || s.redKills !== 9) bad.push("경기 중에는 실제 쓰러짐을 세야 함 " + s.blueKills + "·" + s.redKills);
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "종료 후 피해 무시·점수 8:7 고정·경기 중에는 실제 값");
+  });
+  run(JUDGEG, "퍼즈: 퍼즈 중에는 게임 시계가 멈추고 재개하면 멈춘 만큼 늦춰 이어지며, 퍼즈 중에는 호스트가 경기를 끝내지 않는가", function (done) {
+    var y = OPEN_Y.forest, W = world("forest", [{ id: "a", team: "blue", char: "knight", x: 300, y: y }, { id: "b", team: "red", char: "knight", x: 700, y: y }]), bad = [];
+    var C = api.CLOCK, room = { pauseAt: null, resumeAt: null, pausedMs: 0 };
+    if (C.withoutPause(5000, room) !== 5000) bad.push("퍼즈 없을 때 시간이 바뀜");
+    room = { pauseAt: 1000, resumeAt: null, pausedMs: 0 };
+    if (C.withoutPause(1000, room) !== 1000 || C.withoutPause(9000, room) !== 1000) bad.push("퍼즈 중 시계가 흐름 " + C.withoutPause(9000, room));
+    room = { pauseAt: null, resumeAt: 7000, pausedMs: 6000 };
+    var frozen = C.withoutPause(5000, room), atResume = C.withoutPause(7000, room), later = C.withoutPause(8000, room);
+    if (frozen !== 1000 || atResume !== 1000 || later !== 2000) bad.push("재개 카운트다운·재개 뒤 시계 " + frozen + "/" + atResume + "/" + later + " (기대 1000/1000/2000)");
+    room = { pauseAt: 8000, resumeAt: 7000, pausedMs: 6000 };
+    if (C.withoutPause(20000, room) !== 2000) bad.push("두 번째 퍼즈에서 이전 퍼즈 시간을 잃음 " + C.withoutPause(20000, room));
+    W.room.mode = "cup"; W.room.status = "playing";
+    var cap = recordRef(W), end = W.room.startAt + api.matchMs();
+    W.room.pauseAt = 1; W.room.resumeAt = null;
+    if (!C.held()) bad.push("퍼즈인데 held 가 거짓");
+    api.setClock(end + 1000); api.hostJudge();
+    if (updateWith(cap, "winner").length || updateWith(cap, "overtimeAt").length) bad.push("퍼즈 중에 판정함");
+    W.room.pauseAt = null; W.room.resumeAt = null;
+    if (C.held()) bad.push("해제했는데 held 가 참");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "퍼즈 중 정지·재개 뒤 늦춰 이어짐·퍼즈 중 판정 없음");
+  });
   run(JUDGEG, "호스트 판정: 한 팀이 모두 나가면 시간이 남아도 상대 팀 승리로 끝내고 통계에서 제외하는가", function (done) {
     var y = OPEN_Y.forest, W = world("forest", [{ id: "a", team: "blue", char: "knight", x: 300, y: y }, { id: "b", team: "red", char: "knight", x: 700, y: y }]), bad = [];
     var cap = recordRef(W), P = api.players();

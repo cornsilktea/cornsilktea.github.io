@@ -83,7 +83,12 @@
         "$party": { ".write": "$party.matches(/^[0-9]{5}$/)" }
       },
       "rooms": {
-        "$room": { ".write": "$room.matches(/^[0-9]{5}$/)" }
+        "$room": {
+          ".write": "$room.matches(/^[0-9]{5}$/)",
+          "pauseAt": { ".validate": "newData.isNumber() && auth != null && (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')" },
+          "resumeAt": { ".validate": "newData.isNumber() && auth != null && (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')" },
+          "pausedMs": { ".validate": "newData.isNumber() && auth != null && (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')" }
+        }
       },
       "stats": {
         ".write": "auth != null && (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"

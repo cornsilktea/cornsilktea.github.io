@@ -221,6 +221,15 @@
   #hudCount { font-size: 13px; font-weight: 800; }
   #btnSpecFollow { position: static; margin-right: 22px; padding: 6px 16px; border-radius: 999px; border: 1px solid rgba(255,255,255,.25); background: rgba(14,20,17,.78); color: #F4F1E8; font: 800 14px var(--sg-font, "Nanum Gothic", sans-serif); cursor: pointer; pointer-events: auto; white-space: nowrap; }
   #btnSpecFollow[hidden] { display: none; }
+  #btnPause { position: static; margin-right: 8px; padding: 6px 16px; border-radius: 999px; border: 1px solid rgba(255,255,255,.25); background: rgba(14,20,17,.78); color: #F4F1E8; font: 800 14px var(--sg-font, "Nanum Gothic", sans-serif); cursor: pointer; pointer-events: auto; white-space: nowrap; }
+  #btnPause[hidden] { display: none; }
+  #btnPause:disabled { opacity: .5; cursor: default; }
+  body.matchPaused #btnPause { background: #D97B4F; border-color: #D97B4F; color: #fff; }
+  body.matchPaused #cv { filter: grayscale(1); }
+  #pauseOv { position: absolute; top: 42%; left: 50%; transform: translate(-50%, -50%); z-index: 6; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 14px 40px 16px; border-radius: 12px; background: rgba(14,20,17,.8); border-top: 3px solid #D97B4F; color: #F4F1E8; pointer-events: none; text-align: center; }
+  #pauseOv[hidden] { display: none; }
+  #pauseOv b { font-size: 44px; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  #pauseOv span { font-size: 15px; font-weight: 800; }
   #btnSpecFollow.on { background: #D97B4F; border-color: #D97B4F; color: #fff; }
   #killFeed { position: absolute; top: 56px; right: 8px; display: grid; grid-template-columns: max-content; row-gap: 6px; justify-items: end; pointer-events: none; }
   #scrGame.spec #killFeed { right: auto; left: calc(100% - 348px); justify-items: start; }

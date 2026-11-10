@@ -184,7 +184,8 @@
   </div>
  <div id="killFeed"></div>
   <div id="killBanner"></div>
-  <div id="hudRight"><button id="btnSpecFollow" type="button" hidden>자동 추적</button><div class="room-code-tag" id="hudRoomCode"></div><button id="btnLeaveGame" type="button">방 나가기</button></div>
+  <div id="pauseOv" hidden><b id="pauseTitle"></b><span id="pauseSub"></span></div>
+  <div id="hudRight"><button id="btnPause" type="button" hidden>퍼즈</button><button id="btnSpecFollow" type="button" hidden>자동 추적</button><div class="room-code-tag" id="hudRoomCode"></div><button id="btnLeaveGame" type="button">방 나가기</button></div>
   <div id="endBanner" hidden></div>
   <div id="practiceBar" hidden><button id="btnPracExit" type="button">연습장 나가기</button><button id="btnPracChar" type="button">캐릭터 변경</button><button id="btnPracGauge" type="button">스킬 게이지 채우기(H)</button></div>
   <div id="practiceInfo" hidden></div>
@@ -915,9 +916,15 @@ SinglePassMaterials.enable(THREE);
       this.off = Math.abs(gap) <= step ? this.target : this.off + (gap > 0 ? step : -step);
     }
     real() { this.follow(); return Date.now() + (this.off === null || this.link.isHost() ? this.serverOffset : this.off); }
+    held() { var room = this.link.room(); return !!room && (!!room.pauseAt || (!!room.resumeAt && this.real() < room.resumeAt)); }
+    withoutPause(real, room) {
+      if (!room || !(room.pausedMs || room.pauseAt || room.resumeAt)) return real;
+      var frozenAt = room.pauseAt ? room.pauseAt : (room.resumeAt && real < room.resumeAt ? room.resumeAt : real);
+      return frozenAt - (room.pausedMs || 0);
+    }
     now() {
       if (this.testTime !== null) return this.testTime;
-      var real = this.real(), room = this.link.room();
+      var room = this.link.room(), real = this.withoutPause(this.real(), room);
       return this.scale !== 1 && room && room.startAt && real > room.startAt ? room.startAt + (real - room.startAt) * this.scale : real;
     }
     stopBurst() { clearInterval(this.timer); }
@@ -1078,7 +1085,7 @@ SinglePassMaterials.enable(THREE);
       Dom.setText(Dom.$("dfRoomCode"), "방 코드 " + code);
       services.session.leaving = false;
       var ref = services.backend.db.ref(RoomSession.ROOT + "/" + code);
-      services.session.room = { code: code, ref: ref, mode: null, map: "forest", vsAt: 0, status: "lobby", host: null, startAt: 0, winner: null, overtimeAt: null, endedAt: 0, final: null, roster: null, draft: null, bans: null, statsNote: null };
+      services.session.room = { code: code, ref: ref, mode: null, map: "forest", vsAt: 0, status: "lobby", host: null, startAt: 0, winner: null, overtimeAt: null, endedAt: 0, final: null, roster: null, draft: null, bans: null, statsNote: null, pauseAt: null, resumeAt: null, pausedMs: 0 };
       services.fxView.clear3d();
       services.session.players = {}; services.match.leave();
       ref.child("players/" + services.session.myId).onDisconnect().remove();
@@ -1103,6 +1110,9 @@ SinglePassMaterials.enable(THREE);
       services.session.sub(ref.child("arena"), "value", function (s) { services.session.room.arena = s.val() || "forest"; services.arenaView.syncArena(); });
       services.session.sub(ref.child("hostPlayerId"), "value", function (s) { services.session.room.host = s.val(); services.session.room.hostLoaded = true; services.clock.hostChanged(services.session.room.host); services.session.checkHost(); services.lobby.playersChanged(); });
       services.session.sub(ref.child("startAt"), "value", function (s) { services.session.room.startAt = s.val() || 0; });
+      services.session.sub(ref.child("pauseAt"), "value", function (s) { services.session.room.pauseAt = s.val() || null; });
+      services.session.sub(ref.child("resumeAt"), "value", function (s) { services.session.room.resumeAt = s.val() || null; });
+      services.session.sub(ref.child("pausedMs"), "value", function (s) { services.session.room.pausedMs = s.val() || 0; });
       services.session.sub(ref.child("vsAt"), "value", function (s) { services.session.room.vsAt = s.val() || 0; services.versus.follow(services.screens.now); });
       services.session.sub(ref.child("winner"), "value", function (s) { services.session.room.winner = s.val(); });
       services.session.sub(ref.child("overtimeAt"), "value", function (s) { services.session.room.overtimeAt = s.val(); });
@@ -1888,7 +1898,7 @@ SinglePassMaterials.enable(THREE);
         });
       }
       u.roster = roster; u.st = st; u.arena = arena; u.draft = null; u.bans = bans && bans.length ? bans : null;
-      u.status = "countdown"; u.startAt = services.clock.real() + countMs; u.winner = null; u.overtimeAt = null; u.final = null; u.statsNote = null; u.endedAt = null;
+      u.status = "countdown"; u.startAt = services.clock.real() + countMs; u.winner = null; u.overtimeAt = null; u.final = null; u.statsNote = null; u.endedAt = null; u.pauseAt = null; u.resumeAt = null; u.pausedMs = null;
       u.shots = null; u.meleeHits = null; u.hits = null; u.effects = null; u.kills = null; u.projectiles = null;
       services.session.room.ref.update(u);
     }
@@ -2021,7 +2031,7 @@ SinglePassMaterials.enable(THREE);
       var names = {};
       Object.keys(seq).forEach(function (k) { names[seq[k]] = String(services.session.players[seq[k]].nickname || ""); });
       var d = services.draft.draftSettle({ seq: seq, names: names, step: 0, stepAt: t }, t);
-      services.session.room.ref.update({ draft: d, arena: services.arenaMap.resolveArena(services.session.room.map), status: "draft", roster: null, st: null, winner: null, overtimeAt: null, final: null, statsNote: null, endedAt: null, startAt: null,
+      services.session.room.ref.update({ draft: d, arena: services.arenaMap.resolveArena(services.session.room.map), status: "draft", roster: null, st: null, winner: null, overtimeAt: null, final: null, statsNote: null, endedAt: null, startAt: null, pauseAt: null, resumeAt: null, pausedMs: null,
                         shots: null, meleeHits: null, hits: null, effects: null, kills: null, projectiles: null });
     }
     applyDraftChoice(cur, id, c) { var services = this.services;
@@ -4804,6 +4814,8 @@ SinglePassMaterials.enable(THREE);
       });
       var departed = DepartedSeats.deathsByTeam(services);
       s.redKills += departed.blue; s.blueKills += departed.red;
+      var room = services.session.room;
+      if (room.status === "ended" && room.final && room.final.blue != null && room.final.red != null) { s.blueKills = +room.final.blue; s.redKills = +room.final.red; }
       return s;
     }
     teamAllQuit() { var services = this.services;
@@ -4818,7 +4830,7 @@ SinglePassMaterials.enable(THREE);
     hostJudge() { var services = this.services;
       var t = services.clock.now();
       if (services.session.room.status === "countdown" && t >= services.session.room.startAt && !services.match.game.playingSent) { services.match.game.playingSent = true; services.session.room.ref.update({ status: "playing" }); }
-      if (services.session.room.status !== "playing" || services.match.game.endSent || t < services.session.room.startAt || services.session.room.mode === "practice") return;
+      if (services.session.room.status !== "playing" || services.match.game.endSent || t < services.session.room.startAt || services.session.room.mode === "practice" || services.clock.held()) return;
       var s = services.flow.teamTotals();
       var quitTeam = services.flow.teamAllQuit();
       if (!quitTeam && t < services.session.room.startAt + services.timescale.matchMs) return;
@@ -4860,7 +4872,7 @@ SinglePassMaterials.enable(THREE);
       services.flow.backToLobby();
     }
     backToLobby() { var services = this.services;
-      var u = { status: "lobby", winner: null, overtimeAt: null, final: null, statsNote: null, startAt: null, endedAt: null, roster: null, draft: null, bans: null,
+      var u = { status: "lobby", winner: null, overtimeAt: null, final: null, statsNote: null, startAt: null, endedAt: null, pauseAt: null, resumeAt: null, pausedMs: null, roster: null, draft: null, bans: null,
                 st: null, done: null, shots: null, meleeHits: null, hits: null, effects: null, kills: null, projectiles: null };
       PracticeMode.BOTS.forEach(function (b) { if (services.session.players[b.id]) u["players/" + b.id] = null; });
       services.session.room.ref.update(u);
@@ -4902,6 +4914,44 @@ SinglePassMaterials.enable(THREE);
       void banner.offsetWidth;
       banner.className = "show ot";
       services.sound.sfx("go");
+    }
+  }
+  class MatchPause {
+    static COUNTDOWN_MS = 3000;
+    constructor(services) { this.services = services; }
+    bind() { var pause = this; Dom.$("btnPause").addEventListener("click", function () { pause.press(); }); }
+    isTeacher() { var user = window.PORTAL_USER; return !!user && typeof AccountPolicy === "function" && AccountPolicy.ADMIN_UIDS.indexOf(user.uid) >= 0; }
+    available() { var room = this.services.session.room; return !!room && room.mode === TeamBattlePlan.CUP_MODE && room.status === "playing" && !!this.services.match.game; }
+    pausedNow() { var room = this.services.session.room; return !!room && !!room.pauseAt; }
+    countingDown() { var room = this.services.session.room; return !!room && !room.pauseAt && !!room.resumeAt && this.services.clock.real() < room.resumeAt; }
+    missingNames() { var services = this.services, roster = services.session.room.roster || {}, names = [];
+      Object.keys(roster).forEach(function (id) { if (!roster[id].ai && !services.session.players[id]) names.push(roster[id].n || "선수"); });
+      return names;
+    }
+    press() { var services = this.services, room = services.session.room;
+      if (!this.isTeacher() || !this.available() || this.countingDown()) return;
+      var real = services.clock.real();
+      if (!room.pauseAt) { room.ref.update({ pauseAt: real, resumeAt: null }); return; }
+      if (this.missingNames().length) return;
+      var resumeAt = real + MatchPause.COUNTDOWN_MS;
+      room.ref.update({ pauseAt: null, resumeAt: resumeAt, pausedMs: (room.pausedMs || 0) + (resumeAt - room.pauseAt) });
+    }
+    clear() { document.body.classList.remove("matchPaused"); }
+    paint() { var services = this.services, room = services.session.room, held = services.clock.held();
+      document.body.classList.toggle("matchPaused", held);
+      var button = Dom.$("btnPause"), show = this.isTeacher() && this.available(), missing = this.pausedNow() ? this.missingNames() : [];
+      Dom.show(button, show);
+      Dom.setText(button, this.pausedNow() ? "재개" : "퍼즈");
+      button.disabled = this.countingDown() || (this.pausedNow() && missing.length > 0);
+      Dom.show(Dom.$("pauseOv"), held);
+      if (!held) return;
+      if (this.pausedNow()) {
+        Dom.setText(Dom.$("pauseTitle"), "일시정지");
+        Dom.setText(Dom.$("pauseSub"), missing.length ? "접속 대기: " + missing.join(", ") : "모두 접속했어요");
+      } else {
+        Dom.setText(Dom.$("pauseTitle"), String(Math.max(1, Math.ceil((room.resumeAt - services.clock.real()) / 1000))));
+        Dom.setText(Dom.$("pauseSub"), "곧 다시 시작해요");
+      }
     }
   }
   class KillFeed {
@@ -6319,6 +6369,7 @@ SinglePassMaterials.enable(THREE);
       services.match.game.forceNet = true;
     }
     damage(T, amount, owner, basic, ultKey, fx, gaugeGain, noHurtGauge, ownBonus, skillCredit, minionSpot) { var services = this.services;
+      if (services.session.room.status === "ended") return;
       if (T.minion) { services.damage.damageMinion(T, amount, owner, basic, ultKey, gaugeGain); return; }
       if (T.isProtected()) return;
       var t = services.clock.now(), boost = services.bannerAura.dealtBoost(T, amount, owner, ownBonus, t, minionSpot), C = services.charTypes.statsOf(T.char);
@@ -7754,7 +7805,7 @@ SinglePassMaterials.enable(THREE);
       services.input.moveX = vx; services.input.moveY = vy;
       return true;
     }
-    canAct() { var services = this.services; return services.match.game && services.session.room.status === "playing" && services.clock.now() >= services.session.room.startAt && services.match.me && services.match.me.alive && !services.match.me.isStunned(); }
+    canAct() { var services = this.services; return services.match.game && services.session.room.status === "playing" && !services.clock.held() && services.clock.now() >= services.session.room.startAt && services.match.me && services.match.me.alive && !services.match.me.isStunned(); }
     keyName(e) { var services = this.services; return services.input.keyMap[e.code] || services.input.keyMap[e.key] || null; }
     flip() { var services = this.services; return services.match.me && services.match.me.team === "blue"; }
     screenToWorldAngle(a) { var services = this.services; return services.input.flip() ? a + Math.PI : a; }
@@ -12075,6 +12126,7 @@ SinglePassMaterials.enable(THREE);
       if (!(services.overtime.active() && st === "playing")) Dom.setHtml(Dom.$("hudCount"), "");
       Dom.setText(Dom.$("hudKillB"), String(s.blueKills)); Dom.setText(Dom.$("hudKillR"), String(s.redKills));
       services.overtime.paintHud(st, s);
+      services.matchPause.paint();
       var spec = !services.match.me;
       Dom.$("scrGame").classList.toggle("spec", spec);
       services.specFollow.sync(spec);
@@ -12996,7 +13048,7 @@ SinglePassMaterials.enable(THREE);
       services.netDiag.frame(frameMs);
       services.badConnection.frame();
       services.propThemes.spinMillBlades(dt);
-      if (!services.session.room || services.screens.now !== "game") { services.phases.start(frameMs); services.tourView.renderTour(nowMs, dt); services.phases.mark("render"); return; }
+      if (!services.session.room || services.screens.now !== "game") { services.matchPause.clear(); services.phases.start(frameMs); services.tourView.renderTour(nowMs, dt); services.phases.mark("render"); return; }
       var st = services.session.room.status;
       if ((st === "countdown" || st === "playing" || st === "ended") && services.session.room.startAt && (!services.match.game || services.match.game.startAt !== services.session.room.startAt)) {
         if (services.session.players[services.session.myId] && (services.session.players[services.session.myId].slot || services.flow.isSpec())) services.flow.initGame(); else return;
@@ -13022,6 +13074,7 @@ SinglePassMaterials.enable(THREE);
     constructor(services) { this.services = services; }
     stepWorld(t, dt, driveBots, viewDt) { var services = this.services;
       services.flow.syncRemote(viewDt == null ? dt : viewDt);
+      if (services.clock.held()) { services.hookPull.releaseAll(); return; }
       services.world.stepFlightsAndFields(t, dt);
       if (services.session.room.status === "playing" && t >= services.session.room.startAt) services.world.stepPlaying(t, dt, driveBots);
       else services.hookPull.releaseAll();
@@ -13147,7 +13200,7 @@ SinglePassMaterials.enable(THREE);
       MAP_X0: ArenaSize.MAP_X0, MAP_Y0: ArenaSize.MAP_Y0, TSUNAMI_LANES: services.tsunamiLanes, TsunamiLanes: TsunamiLanes, MARINA_STREAMS: services.marinaStreams, MARINA_BOT: services.marinaBot, TridentProp: TridentProp, HOOK_PATH: services.hookPath, HOOK_PULL: services.hookPull, HOOK_VIEW: services.hookView, playersNow: function () { return services.session.players; }, HAMMER_STRIKES: services.hammerStrikes, HammerBasicBlast: HammerBasicBlast, BANNER_AURA: services.bannerAura, BANNER_LEDGER: services.bannerLedger, BannerCreditLedger: BannerCreditLedger, makeBannerGlow: function (d) { return new BannerStrikeGlow(services, d); }, BannerStrikeGlow: BannerStrikeGlow, BannerBearerRig: BannerBearerRig, DraggedChain: DraggedChain, WraithChainRig: WraithChainRig, ChainSlamBurst: ChainSlamBurst, FIGHTER_VIEW: services.fighterView, GEO: services.geo, FRAME_RENDERER: services.frameRenderer, stage: services.stage, CHAR_TYPES: services.charTypes, AUTO_AIM: services.autoAim, AUTO_AIM_ERR: AutoAim.AUTO_AIM_ERR, AUTO_AIM_LEAD: AutoAim.AUTO_AIM_LEAD, FullscreenKeeper: FullscreenKeeper, DRAFT_AI: services.draftAi,
       DRAFT: services.draft, DRAFT_VIEW: services.draftView, DRAFT_STEPS: Draft.STEPS, DRAFT_STEP_MS: Draft.STEP_MS, DRAFT_AI_MS: Draft.AI_MS, DRAFT_AI_TRADE_MS: Draft.AI_TRADE_MS, DRAFT_ABSENT_WAIT_MS: Draft.ABSENT_WAIT_MS, NO_BAN: Draft.NO_BAN,
       STATS: services.stats, STATS_PATH: MatchStats.path, STATS_PATCHES: StatsPatches, STATS_PENDING: MatchStats.PENDING, STATS_SETTLE_MS: MatchStats.SETTLE_MS, STATS_HOLD_MAX_MS: MatchStats.HOLD_MAX_MS,
-      CLOCK: services.clock, GameClock: GameClock, CLOCK_KEEP: GameClock.KEEP, CLOCK_PINGS: GameClock.PINGS,
+      CLOCK: services.clock, PAUSE: services.matchPause, DAMAGE: services.damage, GameClock: GameClock, CLOCK_KEEP: GameClock.KEEP, CLOCK_PINGS: GameClock.PINGS,
       MATCH: services.match, FIELD: services.field, resetLocal: services.session.resetLocal.bind(services.session), backToLobby: services.flow.backToLobby.bind(services.flow), stKey: services.netstate.stKey.bind(services.netstate),
       KEY_ON: services.input.keys, joy: services.input.joy, aim: services.input.aim, keyName: services.input.keyName.bind(services.input), joyBase: services.input.joyBase.bind(services.input), joyRadius: function () { return services.input.joyR; }, DRAG_MIN: services.input.dragMin, canAct: services.input.canAct.bind(services.input), flip: services.input.flip.bind(services.input),
       localTargets: services.targets.localTargets.bind(services.targets), hear: services.targets.hear.bind(services.targets), pruneLocal: services.world.pruneLocal.bind(services.world), revealedTo: services.vision.revealedTo.bind(services.vision), inBush: services.vision.inBush.bind(services.vision), STEALTH_REVEAL_DIST: VisionRules.STEALTH_REVEAL_DIST,
@@ -13454,6 +13507,7 @@ SinglePassMaterials.enable(THREE);
       services.flow = new MatchFlow(services);
       services.killfeed = new KillFeed(services);
       services.overtime = new CupOvertime(services);
+      services.matchPause = new MatchPause(services);
       services.targets = new TargetQuery(services);
       services.minions = new MinionSystem(services);
       services.vision = new VisionRules(services);
@@ -13679,6 +13733,7 @@ SinglePassMaterials.enable(THREE);
     if (services.cameraRig.renderer) services.gpuGuard.watch(Canvases.three);
     services.cameraRig.bindResize();
     services.specFollow.bind();
+    services.matchPause.bind();
     services.arenaView.ground = services.arenaView.flatMesh(new THREE.PlaneGeometry(ArenaSize.MW, ArenaSize.MH), services.stage.groundMat);
     services.arenaView.ground.position.set(ArenaSize.MW / 2, 0, ArenaSize.MH / 2);
     services.stage.scene.add(services.arenaView.ground);
