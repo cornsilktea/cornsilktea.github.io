@@ -182,7 +182,11 @@
   .keys b { color: #F4F1E8; }
   kbd { display: inline-block; min-width: 30px; padding: 2px 8px; border: 1px solid var(--sg-line-strong); border-bottom-width: 3px; border-radius: 4px; background: var(--sg-panel-alt); color: #F4F1E8; font-family: inherit; font-size: 14px; font-weight: 800; text-align: center; }
   .quickKeys { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--sg-line-mid); font-size: 15px; gap: 6px 12px; }
-  #scrLobby .wrap, #scrDraft .wrap { max-width: 760px; }
+  #scrLobby .wrap, #scrDraft .wrap, #scrMockDraft .wrap { max-width: 760px; }
+  .screen.mdScreen { z-index: 55; background: #121A15; }
+  .mdBtns { display: flex; flex: 0 0 auto; gap: 6px; }
+  .mdBtns .mini:disabled { opacity: .4; cursor: default; }
+  .mdLabel { cursor: default; }
   .charCol { width: 100%; max-width: 760px; margin: 0 auto 14px; }
   @media (min-width: 1000px) {
     .lobbyCols, .draftCols { display: flex; align-items: flex-start; gap: 14px; }
@@ -195,7 +199,7 @@
     .dfTeamCard .dfSlots .slot { margin: 0; }
     .dfCharCol { box-sizing: border-box; height: 0; min-height: 100%; min-width: 380px; max-width: calc(50vw - 24px); overflow-y: auto; scrollbar-width: thin; }
     .dfCharCol .dfCard img { height: 48px; }
-    .dfCharCol #dfPickBar .big, .dfCharCol .dfReadyBtn { height: 54px; font-size: 20px; }
+    .dfCharCol #dfPickBar .big, .dfCharCol #mdPickBar .big, .dfCharCol .dfReadyBtn { height: 54px; font-size: 20px; }
   }
   @media (min-width: 1400px) { .lobbyCols, .draftCols { margin-left: 3vw; } }
 
@@ -503,7 +507,7 @@
   .dfDetail .st th { text-align: left; color: var(--sg-ink-soft); font-weight: 700; }
   .dfDetail .st td { text-align: right; font-weight: 800; }
   .dfDetail .ultDesc { font-size: 14px; }
-  #dfPickBar .big { margin: 0; }
+  #dfPickBar .big, #mdPickBar .big { margin: 0; }
 
   .modal { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 50; background: rgba(8, 14, 11, .7); display: flex; align-items: center; justify-content: center; padding: 16px; }
   .modalBox { background: #18221B; border: 2px solid var(--sg-line-strong); border-radius: 10px; padding: 22px 20px; width: 100%; max-width: 400px; }

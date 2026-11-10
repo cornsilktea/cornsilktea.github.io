@@ -111,7 +111,7 @@
     </div>
   </div>
   <div id="charCardBox" class="card charCol">
-    <div class="secTitle charHead"><span>캐릭터</span><span class="charBtns"><button id="btnPatchNote" class="mini" type="button">패치노트</button><button id="btnStats" class="mini" type="button">전체 통계</button><button id="btnZoomChars" class="mini" type="button">확대</button><button id="btnFlipAll" class="mini" type="button">모든 카드 뒤집기</button></span></div>
+    <div class="secTitle charHead"><span>캐릭터</span><span class="charBtns"><button id="btnPatchNote" class="mini" type="button">패치노트</button><button id="btnStats" class="mini" type="button">전체 통계</button><button id="btnMockDraft" class="mini" type="button">모의밴픽</button><button id="btnZoomChars" class="mini" type="button">확대</button><button id="btnFlipAll" class="mini" type="button">모든 카드 뒤집기</button></span></div>
     <div class="chars" id="chars"></div>
   </div>
   </div>
@@ -172,6 +172,37 @@
     <div id="dfDetail" class="dfDetail"></div>
     <div id="dfPickBar" class="dfReadyBar" hidden></div>
     <div id="dfReadyBar" class="dfReadyBar" hidden><button id="btnDraftReady" class="dfReadyBtn" type="button">준비 완료</button><div id="dfReadyHint" class="dfReadyHint"></div></div>
+  </div>
+  </div>
+</div>
+
+<div id="scrMockDraft" class="screen mdScreen" hidden>
+  <div class="draftCols">
+  <div class="wrap draftLeft">
+    <div class="card dfTopCard">
+      <div class="dfHead">
+        <div class="dfTitle">🏆 모의 밴픽<span class="dfRoomCode">연습</span></div>
+        <span class="mdBtns"><button id="mdUndo" class="mini" type="button">되돌리기</button><button id="mdReset" class="mini" type="button">처음부터</button><button id="mdClose" class="mini danger" type="button">닫기</button></span>
+      </div>
+      <div class="dfHead dfHeadInfo">
+        <div class="dfMap mdLabel"><span class="dfMapLabel">순서</span><span>대회모드</span></div>
+        <div class="dfTimer"><small>시간 제한 없음</small></div>
+      </div>
+      <div id="mdSteps" class="dfSteps"></div>
+    </div>
+    <div class="card dfTeamCard">
+      <div class="teams">
+        <div class="team blue"><h3>블루팀<span id="mdBanB" class="dfBanBox"></span></h3><div id="mdBlue" class="dfSlots"></div></div>
+        <div class="team red"><h3>레드팀<span id="mdBanR" class="dfBanBox"></span></h3><div id="mdRed" class="dfSlots"></div></div>
+      </div>
+    </div>
+  </div>
+  <div id="mdCharCol" class="card charCol dfCharCol">
+    <div class="secTitle">캐릭터</div>
+    <div id="mdChars" class="dfChars"></div>
+    <div id="mdDetail" class="dfDetail"></div>
+    <div id="mdPickBar" class="dfReadyBar" hidden></div>
+    <div id="mdReadyBar" class="dfReadyBar" hidden><button id="btnMdAgain" class="dfReadyBtn" type="button">처음부터 다시</button><div id="mdReadyHint" class="dfReadyHint"></div></div>
   </div>
   </div>
 </div>
@@ -1739,7 +1770,8 @@ SinglePassMaterials.enable(THREE);
     bind() { var services = this.services;
       window.addEventListener("keydown", function (e) {
         if (e.key !== "Escape") return;
-        if (!Dom.$("pcModal").hidden) Dom.show(Dom.$("pcModal"), false);
+        if (services.mockDraftView.isOpen()) services.mockDraftView.close();
+        else if (!Dom.$("pcModal").hidden) Dom.show(Dom.$("pcModal"), false);
         else if (AccountWindows.closeTop()) return;
         else if (!Dom.$("statsModal").hidden) Dom.show(Dom.$("statsModal"), false);
         else if (!Dom.$("mapViewModal").hidden) Dom.show(Dom.$("mapViewModal"), false);
@@ -2245,6 +2277,123 @@ SinglePassMaterials.enable(THREE);
         services.skilltext.statTable(v) + services.skilltext.skillBlocks(v) : "");
       Dom.setHtml(Dom.$("dfPickBar"), pickBtn);
       Dom.show(Dom.$("dfPickBar"), !!pickBtn);
+    }
+  }
+
+  class MockDraft {
+    constructor(services) { this.services = services; this.reset(); }
+    reset() { this.step = 0; this.bans = {}; this.picks = {}; this.history = []; this.view = null; this.swapFrom = null; }
+    done() { return this.step >= Draft.STEPS.length; }
+    side() { return Draft.STEPS[this.step].keys[0].charAt(0); }
+    waiting() {
+      if (this.done()) return [];
+      var S = Draft.STEPS[this.step], picks = this.picks;
+      if (S.ban) return this.bans[this.side()] ? [] : [S.keys[0]];
+      return S.keys.filter(function (k) { return !picks[k]; });
+    }
+    settle() { while (!this.done() && !this.waiting().length) this.step++; }
+    banned() { var bans = this.bans; return ["b", "r"].map(function (s) { return bans[s]; }).filter(function (c) { return c && c !== Draft.NO_BAN; }); }
+    taken() { var picks = this.picks; return Object.keys(picks).map(function (k) { return picks[k]; }); }
+    left() { var services = this.services, gone = this.taken().concat(this.banned());
+      return services.charTypes.list.filter(function (c) { return services.catalog.pickable(c) && gone.indexOf(c) < 0; });
+    }
+    isBanStep() { return !this.done() && !!Draft.STEPS[this.step].ban; }
+    canChoose(c) { return !this.done() && this.left().indexOf(c) >= 0; }
+    snapshot() { return { step: this.step, bans: Object.assign({}, this.bans), picks: Object.assign({}, this.picks) }; }
+    choose(c) {
+      if (!this.canChoose(c)) return false;
+      this.history.push(this.snapshot());
+      if (this.isBanStep()) this.bans[this.side()] = c; else this.picks[this.waiting()[0]] = c;
+      this.settle();
+      this.view = null;
+      return true;
+    }
+    undo() {
+      var before = this.history.pop();
+      if (!before) return false;
+      this.step = before.step; this.bans = before.bans; this.picks = before.picks; this.swapFrom = null;
+      return true;
+    }
+    canSwap(a, b) { return this.done() && a !== b && a.charAt(0) === b.charAt(0) && !!this.picks[a] && !!this.picks[b]; }
+    swap(a, b) {
+      if (!this.canSwap(a, b)) return false;
+      this.history.push(this.snapshot());
+      var mine = this.picks[a]; this.picks[a] = this.picks[b]; this.picks[b] = mine;
+      return true;
+    }
+  }
+  class MockDraftView {
+    constructor(services) { this.services = services; }
+    isOpen() { return !Dom.$("scrMockDraft").hidden; }
+    open() { this.services.mockDraft.reset(); Dom.show(Dom.$("scrMockDraft"), true); this.render(); }
+    close() { Dom.show(Dom.$("scrMockDraft"), false); }
+    seatLabel(k) { return (k.charAt(0) === "b" ? "블루 " : "레드 ") + k.charAt(1) + "번"; }
+    banBoxHtml(side) { var services = this.services, m = services.mockDraft, ban = m.bans[side], nowStep = m.isBanStep() && m.side() === side;
+      if (ban && ban !== Draft.NO_BAN && services.charTypes.statsOf(ban)) return '<span class="dfBan"><span class="banX"><svg viewBox="0 0 10 10"><path d="M2.2 2.2L7.8 7.8M7.8 2.2L2.2 7.8" stroke="#FF4A3D" stroke-width="1.6" stroke-linecap="round"/></svg></span>' +
+        '<span class="pface" style="background-image:url(\'' + services.catalog.faceImgSrc(ban) + '\')"></span>' + services.charTypes.statsOf(ban).name + "</span>";
+      return '<span class="dfBan ' + (nowStep ? "now" : "wait") + '">' + (nowStep ? "밴 고르는 중…" : "밴 대기") + "</span>";
+    }
+    slotsHtml(team) { var services = this.services, m = services.mockDraft, pre = team === "blue" ? "b" : "r", waiting = m.waiting(), h = "", blankFace = '<span class="pface blank"></span>';
+      for (var i = 1; i <= 3; i++) {
+        var k = pre + i, c = m.picks[k], isTurn = waiting.indexOf(k) >= 0, pk;
+        if (c) pk = '<span class="pk picked"><b>' + services.charTypes.statsOf(c).name + '</b><span class="pface' + (m.done() ? " canTrade" : "") + '"' + (m.done() ? ' data-md-swap="' + k + '" title="같은 팀끼리 캐릭터 바꿔 보기"' : "") +
+                    ' style="background-image:url(\'' + services.catalog.faceImgSrc(c) + '\')"></span></span>';
+        else pk = '<span class="pk wait">' + (isTurn ? (m.isBanStep() ? "밴하는 중…" : "고르는 중…") : "대기") + "</span>" + blankFace;
+        h += '<div class="slot' + (m.swapFrom === k ? " mine" : "") + (isTurn ? " turn" : "") + '"><span class="dfNick">' + this.seatLabel(k) + "</span>" + pk + "</div>";
+      }
+      return h;
+    }
+    charCardHtml(k) { var services = this.services, m = services.mockDraft, banned = m.banned().indexOf(k) >= 0, owner = null;
+      Object.keys(m.picks).forEach(function (s) { if (m.picks[s] === k) owner = s; });
+      var tag = banned ? '<span class="tag ban">밴</span>' : (owner ? '<span class="tag ' + owner.charAt(0) + '">' + this.seatLabel(owner) + "</span>" : ""), canPick = m.canChoose(k);
+      return '<button type="button" class="dfCard' + (owner || banned ? " taken" : "") + (banned ? " banned" : "") + (m.view === k ? (canPick ? " on" : " view") : "") + '" data-c="' + k + '">' + tag +
+             '<img alt="" src="' + services.catalog.charImgSrc(k) + '"><div class="nm">' + services.charTypes.statsOf(k).name + "</div></button>";
+    }
+    render() { var services = this.services, m = services.mockDraft, view = this;
+      if (!this.isOpen()) return;
+      var done = m.done(), banTurn = m.isBanStep();
+      Dom.setHtml(Dom.$("mdSteps"), Draft.STEPS.map(function (S, i) {
+        return '<span class="' + (S.keys[0].charAt(0) === "b" ? "b" : "r") + (S.ban ? " ban" : "") + (i === m.step ? " now" : (i < m.step ? " done" : "")) + '">' + (i + 1) + ". " + services.draftView.draftStepLabel(i) + "</span>";
+      }).join(""));
+      Dom.setHtml(Dom.$("mdBanB"), this.banBoxHtml("b"));
+      Dom.setHtml(Dom.$("mdBanR"), this.banBoxHtml("r"));
+      Dom.setHtml(Dom.$("mdBlue"), this.slotsHtml("blue"));
+      Dom.setHtml(Dom.$("mdRed"), this.slotsHtml("red"));
+      Dom.$("mdUndo").disabled = !m.history.length;
+      Dom.show(Dom.$("mdReadyBar"), done);
+      Dom.setText(Dom.$("mdReadyHint"), m.swapFrom ? "바꿀 같은 팀 초상화를 눌러요." : "같은 팀의 초상화를 눌러 캐릭터를 바꿔 볼 수 있어요.");
+      Dom.setHtmlKeepScroll(Dom.$("mdChars"), services.cards.roleRowsHtml(function (k) { return view.charCardHtml(k); }));
+      services.cards.fitCharCol(Dom.$("mdCharCol"));
+      var v = m.view && services.catalog.playable(m.view) ? m.view : null, canPick = !!v && m.canChoose(v);
+      Dom.setHtml(Dom.$("mdDetail"), v ? '<div class="dfName">' + services.charTypes.statsOf(v).icon + " " + services.charTypes.statsOf(v).name + '<small>' + services.catalog.roleOf(v).icon + " " + services.catalog.roleOf(v).name + "</small></div>" +
+        services.skilltext.statTable(v) + services.skilltext.skillBlocks(v) : "");
+      var pickBtn = !canPick ? "" : banTurn ? '<button type="button" class="big danger" data-md-pick="' + v + '">🚫 ' + services.charTypes.statsOf(v).name + " 밴</button>" :
+        '<button type="button" class="big primary" data-md-pick="' + v + '">✔ ' + services.charTypes.statsOf(v).name + Korean.roParticle(services.charTypes.statsOf(v).name) + " 결정</button>";
+      Dom.setHtml(Dom.$("mdPickBar"), pickBtn);
+      Dom.show(Dom.$("mdPickBar"), !!pickBtn);
+    }
+    viewCharacter(c) { var m = this.services.mockDraft;
+      if (!this.services.catalog.playable(c)) return;
+      m.view = c;
+      this.render();
+    }
+    pickCharacter(c) { if (this.services.mockDraft.choose(c)) { this.services.sound.sfx("confirm"); this.render(); } }
+    touchSwap(k) { var services = this.services, m = services.mockDraft;
+      if (!m.done()) return;
+      if (!m.swapFrom || m.swapFrom === k) m.swapFrom = m.swapFrom === k ? null : k;
+      else if (m.swap(m.swapFrom, k)) { m.swapFrom = null; services.sound.sfx("confirm"); }
+      else m.swapFrom = k;
+      this.render();
+    }
+    bind() { var services = this.services, view = this;
+      Dom.$("btnMockDraft").onclick = function () { view.open(); };
+      Dom.$("mdClose").onclick = function () { view.close(); };
+      Dom.$("mdUndo").onclick = function () { if (services.mockDraft.undo()) view.render(); };
+      Dom.$("mdReset").onclick = Dom.$("btnMdAgain").onclick = function () { services.mockDraft.reset(); view.render(); };
+      Dom.$("mdChars").onclick = function (e) { var b = e.target.closest ? e.target.closest(".dfCard") : null; if (b) view.viewCharacter(b.getAttribute("data-c")); };
+      Dom.$("mdPickBar").onclick = function (e) { var b = e.target.closest ? e.target.closest("[data-md-pick]") : null; if (b) view.pickCharacter(b.getAttribute("data-md-pick")); };
+      Dom.$("mdBlue").onclick = Dom.$("mdRed").onclick = function (e) { var f = e.target.closest ? e.target.closest("[data-md-swap]") : null; if (f) view.touchSwap(f.getAttribute("data-md-swap")); };
+      window.addEventListener("resize", function () { view.render(); });
     }
   }
 
@@ -13224,6 +13373,7 @@ SinglePassMaterials.enable(THREE);
       setDb: function (fake) { var before = services.backend.db; services.backend.db = fake; return before; },
       setTestLink: function (flag) { var before = services.backend.isTestLink; services.backend.isTestLink = flag; return before; },
       MAP_X0: ArenaSize.MAP_X0, MAP_Y0: ArenaSize.MAP_Y0, TSUNAMI_LANES: services.tsunamiLanes, TsunamiLanes: TsunamiLanes, MARINA_STREAMS: services.marinaStreams, MARINA_BOT: services.marinaBot, TridentProp: TridentProp, HOOK_PATH: services.hookPath, HOOK_PULL: services.hookPull, HOOK_VIEW: services.hookView, playersNow: function () { return services.session.players; }, HAMMER_STRIKES: services.hammerStrikes, HammerBasicBlast: HammerBasicBlast, BANNER_AURA: services.bannerAura, BANNER_LEDGER: services.bannerLedger, BannerCreditLedger: BannerCreditLedger, makeBannerGlow: function (d) { return new BannerStrikeGlow(services, d); }, BannerStrikeGlow: BannerStrikeGlow, BannerBearerRig: BannerBearerRig, DraggedChain: DraggedChain, WraithChainRig: WraithChainRig, ChainSlamBurst: ChainSlamBurst, FIGHTER_VIEW: services.fighterView, GEO: services.geo, FRAME_RENDERER: services.frameRenderer, stage: services.stage, CHAR_TYPES: services.charTypes, AUTO_AIM: services.autoAim, AUTO_AIM_ERR: AutoAim.AUTO_AIM_ERR, AUTO_AIM_LEAD: AutoAim.AUTO_AIM_LEAD, FullscreenKeeper: FullscreenKeeper, DRAFT_AI: services.draftAi,
+      MOCK_DRAFT: services.mockDraft, MOCK_DRAFT_VIEW: services.mockDraftView,
       DRAFT: services.draft, DRAFT_VIEW: services.draftView, DRAFT_STEPS: Draft.STEPS, DRAFT_STEP_MS: Draft.STEP_MS, DRAFT_AI_MS: Draft.AI_MS, DRAFT_AI_TRADE_MS: Draft.AI_TRADE_MS, DRAFT_ABSENT_WAIT_MS: Draft.ABSENT_WAIT_MS, NO_BAN: Draft.NO_BAN,
       STATS: services.stats, STATS_PATH: MatchStats.path, STATS_PATCHES: StatsPatches, STATS_PENDING: MatchStats.PENDING, STATS_SETTLE_MS: MatchStats.SETTLE_MS, STATS_HOLD_MAX_MS: MatchStats.HOLD_MAX_MS,
       CLOCK: services.clock, PAUSE: services.matchPause, DAMAGE: services.damage, GameClock: GameClock, CLOCK_KEEP: GameClock.KEEP, CLOCK_PINGS: GameClock.PINGS,
@@ -13527,6 +13677,8 @@ SinglePassMaterials.enable(THREE);
       services.draftBan = new DraftAiBanner(services);
       services.draftView = new DraftView(services);
       services.draft = new Draft(services);
+      services.mockDraft = new MockDraft(services);
+      services.mockDraftView = new MockDraftView(services);
       services.netstate = new NetState(services);
       services.field = new BattleField(services);
       services.charTypes = new CharacterRegistry(services);
@@ -13794,6 +13946,7 @@ SinglePassMaterials.enable(THREE);
       new CardEvents(services).bind();
       new LobbyEvents(services).bind();
       new DraftEvents(services).bind();
+      services.mockDraftView.bind();
       new GameEvents(services).bind();
       new SceneBoot(services).build();
       new AppLauncher(services).launch();

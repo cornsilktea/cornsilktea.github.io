@@ -4482,6 +4482,48 @@ class ResultCollector {
     }
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "교사만·연습 제외·경기 중만·재개 글자·빠진 선수 대기·전원 접속 시 재개 가능");
   });
+  run(JUDGEG, "모의밴픽: 전체 통계와 확대 사이 버튼이 창을 열고, 대회모드 순서(밴 2·픽 6)대로 진행되며 시간 표시가 없고 되돌리기·같은 팀 교환이 되는가", function (done) {
+    var M = api.MOCK_DRAFT, V = api.MOCK_DRAFT_VIEW, bad = [], root = document.getElementById("scrMockDraft"), stats = document.getElementById("btnStats");
+    try {
+      if (!stats.nextElementSibling || stats.nextElementSibling.id !== "btnMockDraft" || stats.nextElementSibling.nextElementSibling.id !== "btnZoomChars") bad.push("버튼이 전체 통계와 확대 사이에 없음");
+      document.getElementById("btnMockDraft").click();
+      if (root.hidden) bad.push("버튼을 눌러도 창이 안 뜸");
+      if (root.querySelectorAll("#mdSteps span").length !== api.DRAFT_STEPS.length) bad.push("단계 표시 수 " + root.querySelectorAll("#mdSteps span").length);
+      if (root.querySelector(".dfBar") || root.querySelector("#dfTimer")) bad.push("시간 표시줄이 있음");
+      if (!M.isBanStep() || M.waiting().join() !== "b1") bad.push("처음이 블루 밴이 아님 " + M.waiting());
+      var L = M.left().slice(0, 9), seen = [];
+      function step(c, expectStep, expectWaiting, label) {
+        if (!M.choose(c)) { bad.push(label + " 선택 거부"); return; }
+        seen.push(label);
+        if (M.step !== expectStep || M.waiting().join() !== expectWaiting) bad.push(label + " 뒤 단계/차례 " + M.step + "/" + M.waiting() + " (기대 " + expectStep + "/" + expectWaiting + ")");
+      }
+      step(L[0], 1, "r1", "블루 밴");
+      step(L[1], 2, "b1", "레드 밴");
+      step(L[2], 3, "r1,r2", "블루 1번");
+      step(L[3], 3, "r2", "레드 1번");
+      step(L[4], 4, "b2,b3", "레드 2번");
+      step(L[5], 4, "b3", "블루 2번");
+      step(L[6], 5, "r3", "블루 3번");
+      step(L[7], 6, "", "레드 3번");
+      if (!M.done()) bad.push("끝났는데 done 이 거짓");
+      if (M.choose(L[8])) bad.push("끝난 뒤에도 선택됨");
+      if (M.banned().length !== 2 || M.taken().length !== 6) bad.push("밴·픽 수 " + M.banned().length + "/" + M.taken().length);
+      if (M.left().indexOf(L[0]) >= 0 || M.left().indexOf(L[2]) >= 0) bad.push("밴·픽된 캐릭터가 남아 있음");
+      V.render();
+      if (root.querySelectorAll(".dfSlots .canTrade").length !== 6) bad.push("교환 가능 초상화 수 " + root.querySelectorAll(".dfSlots .canTrade").length);
+      if (!M.canSwap("b1", "b2") || M.canSwap("b1", "r1")) bad.push("교환은 같은 팀끼리만");
+      var b1 = M.picks.b1, b2 = M.picks.b2;
+      V.touchSwap("b1"); V.touchSwap("b2");
+      if (M.picks.b1 !== b2 || M.picks.b2 !== b1) bad.push("교환이 안 됨");
+      if (!M.undo() || M.picks.b1 !== b1) bad.push("교환 되돌리기 실패");
+      if (!M.undo() || M.done() || M.picks.r3) bad.push("마지막 픽 되돌리기 실패");
+      M.reset(); V.render();
+      if (M.step !== 0 || M.taken().length || M.banned().length) bad.push("처음부터가 안 됨");
+    } finally {
+      V.close(); M.reset();
+    }
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "버튼 위치·창 열림·밴 2+픽 6 순서·시간 표시 없음·되돌리기·같은 팀 교환·처음부터");
+  });
   runAsync(JUDGEG, "퍼즈 누르기: 교사 로그인 토큰으로 방 값을 PATCH 로 쓰며 바로 멈추고, 저장이 거부되면 되돌리고, 재개는 3초 뒤 시각과 멈춘 시간을 쓰는가", function (done) {
     var y = OPEN_Y.forest, W = world("forest", [{ id: "a", team: "blue", char: "knight", x: 300, y: y }, { id: "b", team: "red", char: "knight", x: 700, y: y }]), bad = [];
     var P = api.PAUSE, calls = [], accept = true, savedFetch = window.fetch, savedUser = window.PORTAL_USER;
