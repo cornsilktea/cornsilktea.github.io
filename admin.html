@@ -1970,7 +1970,7 @@ class LagGapReport {
     box.textContent = "";
     const withGaps = this.rows.filter((r) => +r.gapN > 0).length;
     const clusters = this.clusters();
-    msg.textContent = "2초 넘는 신호 공백: 기록 " + this.rows.length + "개 중 " + withGaps + "개에 있음 · 겹친 묶음 " + clusters.length + "개" +
+    msg.textContent = "신호 공백(lag24는 2초, lag25부터 1초 이상): 기록 " + this.rows.length + "개 중 " + withGaps + "개에 있음 · 겹친 묶음 " + clusters.length + "개" +
       (clusters.length ? " (길이 순 위 " + Math.min(LagGapReport.SHOWN, clusters.length) + "개 표시)" : "");
     if (!clusters.length) return;
     const table = el("table"), head = el("tr");

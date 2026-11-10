@@ -12456,7 +12456,7 @@ SinglePassMaterials.enable(THREE);
     }
   }
   class SignalGapLog {
-    static MIN_GAP_MS = 2000;
+    static MIN_GAP_MS = 1000;
     static KEEP = 20;
     static TEXT_LEN = 400;
     constructor() { this.reset(); }
@@ -12468,7 +12468,7 @@ SinglePassMaterials.enable(THREE);
     text() { return this.items.join(",").slice(0, SignalGapLog.TEXT_LEN); }
   }
   class PerfProbe {
-    static BUILD = "lag24";
+    static BUILD = "lag25";
     static PATH = "perfDiag/teambattle/";
     static RTT_KEEP = 50;
     static RECORDS = !Environment.SILENT_RUN;
