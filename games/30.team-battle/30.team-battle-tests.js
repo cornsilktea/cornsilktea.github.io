@@ -4491,6 +4491,17 @@ class ResultCollector {
       if (root.querySelectorAll("#mdSteps span").length !== api.DRAFT_STEPS.length) bad.push("단계 표시 수 " + root.querySelectorAll("#mdSteps span").length);
       if (root.querySelector(".dfBar") || root.querySelector("#dfTimer")) bad.push("시간 표시줄이 있음");
       if (!M.isBanStep() || M.waiting().join() !== "b1") bad.push("처음이 블루 밴이 아님 " + M.waiting());
+      var mapBtn = document.getElementById("mdMap");
+      if (api.MAP_IDS.indexOf(M.mapId) < 0) bad.push("맵 아이디 " + M.mapId);
+      mapBtn.click();
+      var mapModal = document.getElementById("mapViewModal"), mapTitle = document.getElementById("mapViewTitle").textContent;
+      if (mapModal.hidden || mapModal.querySelectorAll("figure").length !== 1) bad.push("맵 버튼이 맵 창을 안 띄움");
+      if (!mapTitle || mapBtn.textContent.indexOf(mapTitle) < 0) bad.push("맵 이름 표시 " + mapBtn.textContent + " / " + mapTitle);
+      mapModal.hidden = true;
+      var seenMaps = {};
+      for (var mi = 0; mi < 60; mi++) { M.reset(); seenMaps[M.mapId] = true; }
+      if (Object.keys(seenMaps).length < 2) bad.push("맵이 랜덤이 아님");
+      M.reset(); V.render();
       var L = M.left().slice(0, 9), seen = [];
       function step(c, expectStep, expectWaiting, label) {
         if (!M.choose(c)) { bad.push(label + " 선택 거부"); return; }
@@ -8231,10 +8242,10 @@ class AccountStatsTests {
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "6명 환산점수 일치, MVP 표시 4가지(공동·피해량 가르기·없음) 일치, 블록에 점수·순위·MVP·요약 줄");
     });
 
-    run(G, "학생 화면: 캐릭터 칸 버튼이 패치노트·전체 통계·확대·모든 카드 뒤집기 순이고, 시작 화면 방 코드 아래 내 통계 · 최근 20매치 버튼 창에서 서로 오가며, 로그인 전에는 안내만 뜨는가", function (done) {
+    run(G, "학생 화면: 캐릭터 칸 버튼이 패치노트·전체 통계·모의밴픽·확대·모든 카드 뒤집기 순이고, 시작 화면 방 코드 아래 내 통계 · 최근 20매치 버튼 창에서 서로 오가며, 로그인 전에는 안내만 뜨는가", function (done) {
       var bad = [], userBefore = window.PORTAL_USER;
       var ids = Array.prototype.map.call(document.querySelectorAll(".charBtns button"), function (b) { return b.id + ":" + b.textContent; });
-      if (ids.join() !== "btnPatchNote:패치노트,btnStats:전체 통계,btnZoomChars:확대,btnFlipAll:모든 카드 뒤집기") bad.push("버튼 " + ids.join());
+      if (ids.join() !== "btnPatchNote:패치노트,btnStats:전체 통계,btnMockDraft:모의밴픽,btnZoomChars:확대,btnFlipAll:모든 카드 뒤집기") bad.push("버튼 " + ids.join());
       if (!document.querySelector("#joinBox + #btnMyStats")) bad.push("내 통계 버튼 위치");
       try {
         window.PORTAL_USER = null;

@@ -186,7 +186,7 @@
   .screen.mdScreen { z-index: 55; background: #121A15; }
   .mdBtns { display: flex; flex: 0 0 auto; gap: 6px; }
   .mdBtns .mini:disabled { opacity: .4; cursor: default; }
-  .mdLabel { cursor: default; }
+  #mapViewModal { z-index: 60; }
   .charCol { width: 100%; max-width: 760px; margin: 0 auto 14px; }
   @media (min-width: 1000px) {
     .lobbyCols, .draftCols { display: flex; align-items: flex-start; gap: 14px; }

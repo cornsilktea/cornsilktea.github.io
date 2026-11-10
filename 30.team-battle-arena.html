@@ -185,7 +185,7 @@
         <span class="mdBtns"><button id="mdUndo" class="mini" type="button">되돌리기</button><button id="mdReset" class="mini" type="button">처음부터</button><button id="mdClose" class="mini danger" type="button">닫기</button></span>
       </div>
       <div class="dfHead dfHeadInfo">
-        <div class="dfMap mdLabel"><span class="dfMapLabel">순서</span><span>대회모드</span></div>
+        <button id="mdMap" class="dfMap" type="button"></button>
         <div class="dfTimer"><small>시간 제한 없음</small></div>
       </div>
       <div id="mdSteps" class="dfSteps"></div>
@@ -1770,7 +1770,8 @@ SinglePassMaterials.enable(THREE);
     bind() { var services = this.services;
       window.addEventListener("keydown", function (e) {
         if (e.key !== "Escape") return;
-        if (services.mockDraftView.isOpen()) services.mockDraftView.close();
+        if (services.mockDraftView.isOpen() && !Dom.$("mapViewModal").hidden) Dom.show(Dom.$("mapViewModal"), false);
+        else if (services.mockDraftView.isOpen()) services.mockDraftView.close();
         else if (!Dom.$("pcModal").hidden) Dom.show(Dom.$("pcModal"), false);
         else if (AccountWindows.closeTop()) return;
         else if (!Dom.$("statsModal").hidden) Dom.show(Dom.$("statsModal"), false);
@@ -2282,7 +2283,7 @@ SinglePassMaterials.enable(THREE);
 
   class MockDraft {
     constructor(services) { this.services = services; this.reset(); }
-    reset() { this.step = 0; this.bans = {}; this.picks = {}; this.history = []; this.view = null; this.swapFrom = null; }
+    reset() { this.step = 0; this.bans = {}; this.picks = {}; this.history = []; this.view = null; this.swapFrom = null; this.mapId = MapCatalog.IDS[Math.floor(Math.random() * MapCatalog.IDS.length)]; }
     done() { return this.step >= Draft.STEPS.length; }
     side() { return Draft.STEPS[this.step].keys[0].charAt(0); }
     waiting() {
@@ -2352,6 +2353,7 @@ SinglePassMaterials.enable(THREE);
     render() { var services = this.services, m = services.mockDraft, view = this;
       if (!this.isOpen()) return;
       var done = m.done(), banTurn = m.isBanStep();
+      Dom.setHtml(Dom.$("mdMap"), '<span class="dfMapLabel">맵</span><span class="dfMapName">' + Dom.esc(MapCatalog.of(m.mapId).name) + "</span>");
       Dom.setHtml(Dom.$("mdSteps"), Draft.STEPS.map(function (S, i) {
         return '<span class="' + (S.keys[0].charAt(0) === "b" ? "b" : "r") + (S.ban ? " ban" : "") + (i === m.step ? " now" : (i < m.step ? " done" : "")) + '">' + (i + 1) + ". " + services.draftView.draftStepLabel(i) + "</span>";
       }).join(""));
@@ -2388,6 +2390,7 @@ SinglePassMaterials.enable(THREE);
     bind() { var services = this.services, view = this;
       Dom.$("btnMockDraft").onclick = function () { view.open(); };
       Dom.$("mdClose").onclick = function () { view.close(); };
+      Dom.$("mdMap").onclick = function () { services.mapWindow.showOne(services.mockDraft.mapId); };
       Dom.$("mdUndo").onclick = function () { if (services.mockDraft.undo()) view.render(); };
       Dom.$("mdReset").onclick = Dom.$("btnMdAgain").onclick = function () { services.mockDraft.reset(); view.render(); };
       Dom.$("mdChars").onclick = function (e) { var b = e.target.closest ? e.target.closest(".dfCard") : null; if (b) view.viewCharacter(b.getAttribute("data-c")); };
