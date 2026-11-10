@@ -7965,15 +7965,17 @@ class AccountStatsTests {
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "동점 2명 모두 MVP, 나간 사람·기여 없는 사람 제외");
     });
 
-    run(G, "집계 대상: AI 포함 경기는 누적 통계에서 빠지고 최근 매치에만, 일반·연습모드는 둘 다 기록하지 않는가", function (done) {
+    run(G, "집계 대상: AI 포함 6명 경기는 양 팀 사람이 2명 이상일 때만 누적 통계에 넣고 아니면 최근 매치에만, 일반·연습모드는 둘 다 기록하지 않는가", function (done) {
       var bad = [];
       var withAi = self.report({ players: self.players({ 4: { ai: true } }) });
       var p = self.plan(withAi);
-      if (!p.recordsRecent || p.countsStats || !p.withAi) bad.push("AI 포함 " + JSON.stringify(p));
+      if (!p.recordsRecent || !p.countsStats || !p.withAi) bad.push("AI 1명(양 팀 사람 2명 이상) " + JSON.stringify(p));
+      var lopsided = self.plan(self.report({ players: self.players({ 4: { ai: true }, 5: { ai: true } }) }));
+      if (!lopsided.recordsRecent || lopsided.countsStats || !lopsided.withAi) bad.push("레드 사람 1명 " + JSON.stringify(lopsided));
       var pure = self.plan(self.report());
       if (!pure.recordsRecent || !pure.countsStats || !pure.win) bad.push("AI 없음 " + JSON.stringify(pure));
       ["pvp", "practice"].forEach(function (mode) { if (self.plan(self.report({ mode: mode })).recordsRecent) bad.push(mode + " 기록됨"); });
-      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "AI 포함 → 최근 매치만, AI 없음 → 둘 다, 일반·연습 → 없음");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "AI 포함 양 팀 사람 2명 이상 → 둘 다, 한 팀 사람 1명 → 최근 매치만, AI 없음 → 둘 다, 일반·연습 → 없음");
     });
 
     run(G, "나가기: 경기 절반 뒤에 나가면 패배로 세고, 절반 전에 나가면 아무 기록도 남지 않는가", function (done) {
@@ -8075,9 +8077,9 @@ class AccountStatsTests {
         var cs = w["classStats/2-5/u1"];
         if (!cs || cs.n !== "홍길동" || cs.g !== 1 || cs.w !== 1 || cs.m !== 1 || w["classStats/none/u1"] !== null) bad.push("반 요약 " + JSON.stringify(cs));
         var ai = self.fakeStore({});
-        return ai.store.record(self.report({ players: self.players({ 0: { kills: 3 }, 5: { ai: true } }) }), judge).then(function (s2) {
+        return ai.store.record(self.report({ players: self.players({ 0: { kills: 3 }, 4: { ai: true }, 5: { ai: true } }) }), judge).then(function (s2) {
           var keys = Object.keys(ai.writes[0] || {});
-          if (s2 !== "recent" || keys.length !== 1 || keys[0] !== "users/u1/recent/teambattle/0") bad.push("AI 경기 " + s2 + " " + keys.join());
+          if (s2 !== "recent" || keys.length !== 1 || keys[0] !== "users/u1/recent/teambattle/0") bad.push("AI 경기(레드 사람 1명) " + s2 + " " + keys.join());
           var none = self.fakeStore({});
           return none.store.record(self.report(), judge);
         }).then(function (s3) {
@@ -8087,7 +8089,7 @@ class AccountStatsTests {
             var early = self.fakeStore({});
             return early.store.record(self.report({ iLeft: true, progress: 0.3 }), judge).then(function (s5) {
               if (s5 !== "skip" || early.writes.length) bad.push("절반 전 나감 " + s5);
-              done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "쓰기 1번(최근 매치+통계+반 요약), AI → 최근 매치만, 중복·절반 전 → 쓰기 없음 (반 없음 → " + s3 + ")");
+              done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "쓰기 1번(최근 매치+통계+반 요약), 한 팀 사람 1명 AI 경기 → 최근 매치만, 중복·절반 전 → 쓰기 없음 (반 없음 → " + s3 + ")");
             });
           });
         });
