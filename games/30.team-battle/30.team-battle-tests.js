@@ -4450,6 +4450,38 @@ class ResultCollector {
     if (C.held()) bad.push("해제했는데 held 가 참");
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "퍼즈 중 정지·재개 뒤 늦춰 이어짐·퍼즈 중 판정 없음");
   });
+  run(JUDGEG, "퍼즈 버튼: 교사 계정일 때만, 연습모드가 아닌 경기 중에만 나타나고, 퍼즈하면 재개 글자로 바뀌며 빠진 선수가 있으면 재개가 꺼지는가", function (done) {
+    var y = OPEN_Y.forest, W = world("forest", [{ id: "a", team: "blue", char: "knight", x: 300, y: y }, { id: "b", team: "red", char: "knight", x: 700, y: y }]), bad = [];
+    var button = document.getElementById("btnPause"), savedUser = window.PORTAL_USER, P = api.PAUSE;
+    function shown() { P.paint(); return !button.hidden; }
+    try {
+      W.room.mode = "cup"; W.room.status = "playing"; W.room.pauseAt = null; W.room.resumeAt = null;
+      window.PORTAL_USER = null;
+      if (shown()) bad.push("로그인 안 했는데 나타남");
+      window.PORTAL_USER = { uid: "student-uid" };
+      if (shown()) bad.push("학생 계정인데 나타남");
+      P.adminUids = function () { return ["teacher-uid"]; };
+      window.PORTAL_USER = { uid: "teacher-uid" };
+      if (!shown()) bad.push("교사 계정 대회모드 경기 중인데 안 나타남");
+      if (button.textContent !== "퍼즈") bad.push("글자 " + button.textContent);
+      W.room.mode = "pvp";
+      if (!shown()) bad.push("교사 계정 일반모드 경기 중인데 안 나타남");
+      W.room.mode = "practice";
+      if (shown()) bad.push("연습모드인데 나타남");
+      W.room.mode = "cup"; W.room.status = "lobby";
+      if (shown()) bad.push("경기 중이 아닌데 나타남");
+      W.room.status = "playing"; W.room.pauseAt = 1000;
+      W.room.roster = { a: { team: "blue", c: "knight", ai: false, s: 1, n: "가" }, b: { team: "red", c: "knight", ai: false, s: 1, n: "나" }, z: { team: "red", c: "knight", ai: false, s: 2, n: "빠진선수" } };
+      if (!shown() || button.textContent !== "재개" || !button.disabled) bad.push("빠진 선수가 있는데 재개가 켜짐 " + button.textContent + "/" + button.disabled);
+      if (document.getElementById("pauseSub").textContent.indexOf("빠진선수") < 0) bad.push("접속 대기 이름 없음 " + document.getElementById("pauseSub").textContent);
+      delete W.room.roster.z;
+      P.paint();
+      if (button.disabled) bad.push("전원 접속인데 재개가 꺼짐");
+    } finally {
+      delete P.adminUids; window.PORTAL_USER = savedUser; W.room.pauseAt = null; W.room.resumeAt = null; P.paint();
+    }
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "교사만·연습 제외·경기 중만·재개 글자·빠진 선수 대기·전원 접속 시 재개 가능");
+  });
   run(JUDGEG, "호스트 판정: 한 팀이 모두 나가면 시간이 남아도 상대 팀 승리로 끝내고 통계에서 제외하는가", function (done) {
     var y = OPEN_Y.forest, W = world("forest", [{ id: "a", team: "blue", char: "knight", x: 300, y: y }, { id: "b", team: "red", char: "knight", x: 700, y: y }]), bad = [];
     var cap = recordRef(W), P = api.players();

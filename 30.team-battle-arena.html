@@ -4920,8 +4920,9 @@ SinglePassMaterials.enable(THREE);
     static COUNTDOWN_MS = 3000;
     constructor(services) { this.services = services; }
     bind() { var pause = this; Dom.$("btnPause").addEventListener("click", function () { pause.press(); }); }
-    isTeacher() { var user = window.PORTAL_USER; return !!user && typeof AccountPolicy === "function" && AccountPolicy.ADMIN_UIDS.indexOf(user.uid) >= 0; }
-    available() { var room = this.services.session.room; return !!room && room.mode === TeamBattlePlan.CUP_MODE && room.status === "playing" && !!this.services.match.game; }
+    adminUids() { return typeof AccountPolicy === "function" ? AccountPolicy.ADMIN_UIDS : []; }
+    isTeacher() { var user = window.PORTAL_USER; return !!user && this.adminUids().indexOf(user.uid) >= 0; }
+    available() { var room = this.services.session.room; return !!room && room.mode !== "practice" && room.status === "playing" && !!this.services.match.game; }
     pausedNow() { var room = this.services.session.room; return !!room && !!room.pauseAt; }
     countingDown() { var room = this.services.session.room; return !!room && !room.pauseAt && !!room.resumeAt && this.services.clock.real() < room.resumeAt; }
     missingNames() { var services = this.services, roster = services.session.room.roster || {}, names = [];
