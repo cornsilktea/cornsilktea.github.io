@@ -4482,6 +4482,39 @@ class ResultCollector {
     }
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "교사만·연습 제외·경기 중만·재개 글자·빠진 선수 대기·전원 접속 시 재개 가능");
   });
+  runAsync(JUDGEG, "퍼즈 누르기: 교사 로그인 토큰으로 방 값을 PATCH 로 쓰며 바로 멈추고, 저장이 거부되면 되돌리고, 재개는 3초 뒤 시각과 멈춘 시간을 쓰는가", function (done) {
+    var y = OPEN_Y.forest, W = world("forest", [{ id: "a", team: "blue", char: "knight", x: 300, y: y }, { id: "b", team: "red", char: "knight", x: 700, y: y }]), bad = [];
+    var P = api.PAUSE, calls = [], accept = true, savedFetch = window.fetch, savedUser = window.PORTAL_USER;
+    function later(fn) { setTimeout(fn, 60); }
+    function restore() { window.fetch = savedFetch; window.PORTAL_USER = savedUser; delete P.adminUids; P.busy = false; P.failedUntil = 0; W.room.pauseAt = null; W.room.resumeAt = null; W.room.pausedMs = 0; P.paint(); }
+    W.room.code = "12345"; W.room.mode = "cup"; W.room.status = "playing"; W.room.pauseAt = null; W.room.resumeAt = null; W.room.pausedMs = 0;
+    W.room.roster = { a: { team: "blue", c: "knight", ai: false, s: 1, n: "가" }, b: { team: "red", c: "knight", ai: false, s: 1, n: "나" } };
+    window.fetch = function (url, options) { calls.push({ url: url, options: options }); return Promise.resolve({ ok: accept, status: accept ? 200 : 401 }); };
+    window.PORTAL_USER = { uid: "teacher-uid", getToken: function () { return Promise.resolve("tok"); } };
+    P.adminUids = function () { return ["teacher-uid"]; };
+    P.press();
+    if (!W.room.pauseAt) bad.push("누르자마자 멈추지 않음");
+    later(function () {
+      var first = calls[0], sent = first ? JSON.parse(first.options.body) : {};
+      if (!first || first.options.method !== "PATCH" || first.url.indexOf("/teambattle/rooms/12345.json?auth=tok") < 0) bad.push("요청 " + (first && first.url));
+      if (typeof sent.pauseAt !== "number" || sent.resumeAt !== null) bad.push("퍼즈 내용 " + (first && first.options.body));
+      var pausedAt = W.room.pauseAt;
+      P.press();
+      if (W.room.pauseAt !== null || !(W.room.resumeAt > pausedAt) || !(W.room.pausedMs > 0)) bad.push("재개 값 " + W.room.pauseAt + "/" + W.room.resumeAt + "/" + W.room.pausedMs);
+      later(function () {
+        var second = calls[1], resumed = second ? JSON.parse(second.options.body) : {};
+        if (!second || resumed.pauseAt !== null || resumed.pausedMs !== W.room.pausedMs || resumed.resumeAt !== W.room.resumeAt) bad.push("재개 내용 " + (second && second.options.body));
+        W.room.resumeAt = null; W.room.pausedMs = 0; accept = false;
+        P.press();
+        later(function () {
+          if (W.room.pauseAt !== null) bad.push("거부됐는데 멈춘 채로 남음");
+          if (!(P.failedUntil > Date.now())) bad.push("실패 안내 없음");
+          restore();
+          done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "누르면 바로 정지·PATCH 요청(토큰 포함)·재개는 resumeAt+pausedMs·거부되면 되돌림과 실패 안내");
+        });
+      });
+    });
+  });
   run(JUDGEG, "호스트 판정: 한 팀이 모두 나가면 시간이 남아도 상대 팀 승리로 끝내고 통계에서 제외하는가", function (done) {
     var y = OPEN_Y.forest, W = world("forest", [{ id: "a", team: "blue", char: "knight", x: 300, y: y }, { id: "b", team: "red", char: "knight", x: 700, y: y }]), bad = [];
     var cap = recordRef(W), P = api.players();

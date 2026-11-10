@@ -4918,7 +4918,8 @@ SinglePassMaterials.enable(THREE);
   }
   class MatchPause {
     static COUNTDOWN_MS = 3000;
-    constructor(services) { this.services = services; }
+    static FAIL_NOTICE_MS = 3000;
+    constructor(services) { this.services = services; this.busy = false; this.failedUntil = 0; }
     bind() { var pause = this; Dom.$("btnPause").addEventListener("click", function () { pause.press(); }); }
     adminUids() { return typeof AccountPolicy === "function" ? AccountPolicy.ADMIN_UIDS : []; }
     isTeacher() { var user = window.PORTAL_USER; return !!user && this.adminUids().indexOf(user.uid) >= 0; }
@@ -4929,20 +4930,33 @@ SinglePassMaterials.enable(THREE);
       Object.keys(roster).forEach(function (id) { if (!roster[id].ai && !services.session.players[id]) names.push(roster[id].n || "선수"); });
       return names;
     }
-    press() { var services = this.services, room = services.session.room;
-      if (!this.isTeacher() || !this.available() || this.countingDown()) return;
-      var real = services.clock.real();
-      if (!room.pauseAt) { room.ref.update({ pauseAt: real, resumeAt: null }); return; }
-      if (this.missingNames().length) return;
-      var resumeAt = real + MatchPause.COUNTDOWN_MS;
-      room.ref.update({ pauseAt: null, resumeAt: resumeAt, pausedMs: (room.pausedMs || 0) + (resumeAt - room.pauseAt) });
+    writeRoom(fields) { var room = this.services.session.room, user = window.PORTAL_USER, config = window.PORTAL_CONFIG;
+      if (!user || !user.getToken || !config || !config.isReady || !config.isReady()) return Promise.reject(new Error("login"));
+      return user.getToken().then(function (token) {
+        return fetch(config.DB_URL.replace(/\/+$/, "") + "/" + RoomSession.ROOT + "/" + room.code + ".json?auth=" + encodeURIComponent(token),
+          { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(fields) });
+      }).then(function (res) { if (!res.ok) throw new Error("http " + res.status); });
+    }
+    applyLocal(fields) { var room = this.services.session.room; Object.keys(fields).forEach(function (key) { room[key] = fields[key]; }); }
+    press() { var pause = this, services = this.services, room = services.session.room;
+      if (this.busy || !this.isTeacher() || !this.available() || this.countingDown()) return;
+      var real = services.clock.real(), before = { pauseAt: room.pauseAt, resumeAt: room.resumeAt, pausedMs: room.pausedMs || 0 }, fields;
+      if (!room.pauseAt) fields = { pauseAt: real, resumeAt: null };
+      else {
+        if (this.missingNames().length) return;
+        var resumeAt = real + MatchPause.COUNTDOWN_MS;
+        fields = { pauseAt: null, resumeAt: resumeAt, pausedMs: (room.pausedMs || 0) + (resumeAt - room.pauseAt) };
+      }
+      this.busy = true;
+      this.applyLocal(fields);
+      this.writeRoom(fields).catch(function () { pause.applyLocal(before); pause.failedUntil = Date.now() + MatchPause.FAIL_NOTICE_MS; }).then(function () { pause.busy = false; });
     }
     clear() { document.body.classList.remove("matchPaused"); }
     paint() { var services = this.services, room = services.session.room, held = services.clock.held();
       document.body.classList.toggle("matchPaused", held);
       var button = Dom.$("btnPause"), show = this.isTeacher() && this.available(), missing = this.pausedNow() ? this.missingNames() : [];
       Dom.show(button, show);
-      Dom.setText(button, this.pausedNow() ? "재개" : "퍼즈");
+      Dom.setText(button, Date.now() < this.failedUntil ? "저장 실패" : (this.pausedNow() ? "재개" : "퍼즈"));
       button.disabled = this.countingDown() || (this.pausedNow() && missing.length > 0);
       Dom.show(Dom.$("pauseOv"), held);
       if (!held) return;
