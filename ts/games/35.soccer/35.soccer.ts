@@ -581,6 +581,11 @@ class SoccerMatch {
     this.seatsDirty = !complete;
   }
 
+  private savedOwnPose(): SocRemoteState | null {
+    const raw = this.session.savedOwnState();
+    return raw ? SocStateCodec.decode(raw) : null;
+  }
+
   private makeController(slot: number, id: string, record: SocPlayerRecord, previous: SocPlayerController | null): SocPlayerController {
     let controller: SocPlayerController;
     if (id === this.session.myId && this.local) controller = this.local;
@@ -592,8 +597,10 @@ class SoccerMatch {
       controller.yaw = previous.yaw;
       if (controller instanceof SocRemoteController) controller.teleport(previous.x, previous.z);
     } else {
-      const spot = SocCourtLayout.kickoffSpot(slot, this.game ? this.game.kickoff : 0);
+      const saved = id === this.session.myId ? this.savedOwnPose() : null;
+      const spot = saved || SocCourtLayout.kickoffSpot(slot, this.game ? this.game.kickoff : 0);
       controller.teleport(spot.x, spot.z);
+      if (saved) controller.yaw = saved.yaw;
     }
     return controller;
   }

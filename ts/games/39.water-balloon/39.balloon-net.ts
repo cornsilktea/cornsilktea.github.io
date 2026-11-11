@@ -59,7 +59,9 @@ class WbHostLink {
   private lastBoard = "";
   private endWritten = false;
 
-  constructor(readonly engine: WbEngine, private readonly session: RkSession<WbPlayerRecord>, readonly match: WbMatchRecord, private readonly meter: WbNetMeter) {}
+  constructor(readonly engine: WbEngine, private readonly session: RkSession<WbPlayerRecord>, readonly match: WbMatchRecord, private readonly meter: WbNetMeter, firstSeq: number = 0) {
+    this.seq = firstSeq;
+  }
 
   receive(index: number, raw: string, nowMs: number): void {
     const pilot = this.remote.get(index);
@@ -129,6 +131,7 @@ class WbMirror implements WbSceneSource {
     this.engine.players.forEach((p) => { this.hostX.push(p.x); this.hostZ.push(p.z); });
   }
 
+  get eventSeq(): number { return this.lastSeq; }
   get tick(): number { return this.engine.tick; }
   get tickTime(): number { return this.estimate; }
   get mode(): WbMode { return this.engine.mode; }
@@ -285,8 +288,11 @@ class WbGuestBody implements WbLead {
 
   constructor(private readonly mirror: WbMirror, readonly index: number, private readonly input: WbInput, private readonly session: RkSession<WbPlayerRecord>, private readonly meter: WbNetMeter) {
     const me = mirror.engine.players[index];
-    this.body = { x: me.x, z: me.z };
-    this.face = me.face;
+    const raw = session.savedOwnState();
+    const saved = raw ? WbStateCodec.decode(raw) : null;
+    const resumed = !!saved && saved.match === mirror.match.id;
+    this.body = resumed ? { x: (saved as WbRemoteState).x, z: (saved as WbRemoteState).z } : { x: me.x, z: me.z };
+    this.face = resumed ? (saved as WbRemoteState).face : me.face;
   }
 
   position(): { x: number; z: number } { return { x: this.body.x, z: this.body.z }; }

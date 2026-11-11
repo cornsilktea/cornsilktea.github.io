@@ -13,10 +13,11 @@ class SnRoomRules {
   static readonly SEATS = 6;
   static readonly SPECTATOR_SLOT = 9;
   static readonly RULES: RkRoomRules = { root: SnRoomRules.ROOT, seatCount: SnRoomRules.SEATS, spectatorSlot: SnRoomRules.SPECTATOR_SLOT, seatOrder: [0, 2, 4, 1, 3, 5], spectatorLimit: 12 };
-  static readonly VALUES: readonly string[] = ["mode", "match", "snap", "wall", "loot", "snowmap", "ev", "end", "vsAt"];
+  static readonly VALUES: readonly string[] = ["mode", "match", "snap", "wall", "loot", "snowmap", "ev", "end", "vsAt", "hsave"];
   static readonly SEND_MS = 100;
   static readonly KEEPALIVE_MS = 1000;
   static readonly SNOWMAP_MS = 5000;
+  static readonly HOST_SAVE_MS = 2000;
   static readonly EVENT_HISTORY = 3;
   static teamOfSlot(mode: SnMode, slot: number): number { return mode === "duos" ? Math.floor(slot / 2) : slot; }
 }
@@ -86,10 +87,13 @@ class SnHostDirector {
   private seq = 0;
   private lastSendMs = 0;
   private lastSnowMs = 0;
+  private lastSaveMs = 0;
   private lastState = new Map<number, number>();
   private endWritten = false;
 
-  constructor(readonly engine: SnEngine, private readonly session: RkSession<SnPlayerRecord>, readonly match: SnMatchRecord, private readonly meter: SnNetMeter) {}
+  constructor(readonly engine: SnEngine, private readonly session: RkSession<SnPlayerRecord>, readonly match: SnMatchRecord, private readonly meter: SnNetMeter, firstSeq: number = 0) {
+    this.seq = firstSeq;
+  }
 
   receiveState(num: number, raw: string, nowMs: number): void {
     const pilot = this.remote.get(num);
@@ -112,6 +116,7 @@ class SnHostDirector {
     this.writeIfChanged("wall", SnSnapshotCodec.encodeWalls(e.walls));
     this.writeIfChanged("loot", SnSnapshotCodec.encodeLoot(e.crates, e.piles));
     if (nowMs - this.lastSnowMs > SnRoomRules.SNOWMAP_MS) { this.lastSnowMs = nowMs; this.writeIfChanged("snowmap", SnSnapshotCodec.encodeSnow(e.snow.amount)); }
+    if (nowMs - this.lastSaveMs > SnRoomRules.HOST_SAVE_MS) { this.lastSaveMs = nowMs; this.writeIfChanged("hsave", SnHostSave.encode(e)); }
     if (this.pending.length) {
       this.seq++;
       this.history.push([this.seq, this.pending.splice(0)]);
@@ -171,6 +176,7 @@ class SnMirror implements SnSceneSource {
     this.engine = new SnEngine({ seed: match.seed, mode: match.mode, teams: match.teams });
   }
 
+  get eventSeq(): number { return this.lastSeq; }
   get time(): number { return this.engine.time; }
   get mode(): SnMode { return this.engine.mode; }
   get players(): readonly SnPlayer[] { return this.engine.players; }

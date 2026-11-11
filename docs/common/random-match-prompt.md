@@ -353,3 +353,8 @@
 - `pagehide` 에서 `session.removeMineOnUnload()` (이미 있는 규칙).
 `RkSession` 은 (1) 내 방·아이디를 탭 `sessionStorage` 에 적어 두고 직접 나가면 지우며, (2) 경기 중 사람이 사라져도 `REJOIN_GRACE_MS`(20초) 안에 돌아오면 자리를 그대로 둔다(로비는 즉시 제거). 방장이 새로고침하면 방장은 즉시 넘어가고(`onHostTakeover`), 돌아온 사람은 일반 참가자로 이어진다.
 34번은 자체 `VbRoomSession` 사본을 쓰므로 같은 규칙을 그쪽에도 넣어 두었다(`VbReloadResume`). 방장 쪽 계산(물리·AI)을 이어받는 방식은 게임마다 다르다(34·35 `takeOverAsHost`, 36·38·39 는 대기실 복귀).
+
+### 내 위치·방장 이어받기 (2026-11-11 추가)
+- `RkSession.writeState` 가 내 마지막 위치 글자를 탭에 적고(`판 번호`와 함께), 새로고침 뒤 경기 화면을 만들 때 `session.savedOwnState()` 로 꺼내 쓴다(35·34 `savedOwnPose`, 39 `WbGuestBody`). 36·38번은 방장 스냅샷에 내 마지막 위치가 있어 따로 저장하지 않는다.
+- 38·39번은 방장이 사라지면(`onHostTakeover` → `continueAsNewHost`) 대기실로 돌리지 않고, 화면용으로 맞춰 두던 엔진(`SnClientDriver`/`WbGuestDriver` 의 mirror)을 방장 엔진으로 바꿔 판을 이어 간다. 스냅샷에 없는 방장 장부는 38번 `hsave`(2초마다, `SnHostSave`), 39번 `WbEngine.resumeAsHost`(돌발 커서·풍선 번호·숨은 아이템 다시 만들기)가 채운다. 이어받을 수 없으면(아직 스냅샷을 못 받음) 예전처럼 대기실로 돌린다.
+- 36번은 아직 대기실로 돌아간다.

@@ -286,7 +286,37 @@ class RkSession<P extends RkPlayerRecord> {
   }
 
   writeState(raw: string, id: string = this.myId): void {
+    if (id === this.myId) this.rememberOwnState(raw);
     this.ref.child("st/" + id).set(raw);
+  }
+
+  /* 내가 마지막으로 보낸 위치 글자를 탭에 적어 둔다. 새로고침 뒤 경기 화면을 만들 때 savedOwnState() 로 꺼내 그 자리에서 이어 간다. */
+  private rememberOwnState(raw: string): void {
+    try {
+      sessionStorage.setItem(this.poseKey(), JSON.stringify({ code: this.code, match: this.matchTag(), raw, savedAt: Date.now() }));
+    } catch (error) {
+      return;
+    }
+  }
+
+  /* 판이 바뀌면 옛 위치를 쓰지 않도록 현재 판 번호를 함께 적는다. */
+  private matchTag(): number {
+    const match = this.value<{ id?: number }>("match");
+    return match && typeof match.id === "number" ? match.id : 0;
+  }
+
+  private poseKey(): string {
+    return this.rules.root + "_pose_v1";
+  }
+
+  savedOwnState(): string | null {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(this.poseKey()) || "null") as { code: string; match: number; raw: string; savedAt: number } | null;
+      if (!saved || saved.code !== this.code || saved.match !== this.matchTag() || Date.now() - saved.savedAt > RoomResumeStore.RESUME_MS) return null;
+      return saved.raw;
+    } catch (error) {
+      return null;
+    }
   }
 
   writePress(record: unknown): void {
@@ -312,6 +342,7 @@ class RkSession<P extends RkPlayerRecord> {
 
   private forgetResume(): void {
     this.resume.clear();
+    try { sessionStorage.removeItem(this.poseKey()); } catch (error) { /* 저장소를 못 쓰면 무시 */ }
     this.pendingRemovals.forEach((timer) => window.clearTimeout(timer));
     this.pendingRemovals.clear();
   }

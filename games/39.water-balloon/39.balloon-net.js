@@ -45,7 +45,7 @@ class WbNetMeter {
     }
 }
 class WbHostLink {
-    constructor(engine, session, match, meter) {
+    constructor(engine, session, match, meter, firstSeq = 0) {
         this.engine = engine;
         this.session = session;
         this.match = match;
@@ -59,6 +59,7 @@ class WbHostLink {
         this.lastBoardMs = 0;
         this.lastBoard = "";
         this.endWritten = false;
+        this.seq = firstSeq;
     }
     receive(index, raw, nowMs) {
         const pilot = this.remote.get(index);
@@ -128,6 +129,7 @@ class WbMirror {
         this.engine = new WbEngine({ seed: match.seed, lootSeed: null, mode: match.mode, teams: match.teams });
         this.engine.players.forEach((p) => { this.hostX.push(p.x); this.hostZ.push(p.z); });
     }
+    get eventSeq() { return this.lastSeq; }
     get tick() { return this.engine.tick; }
     get tickTime() { return this.estimate; }
     get mode() { return this.engine.mode; }
@@ -356,8 +358,11 @@ class WbGuestBody {
         this.lastPress = 0;
         this.offFor = 0;
         const me = mirror.engine.players[index];
-        this.body = { x: me.x, z: me.z };
-        this.face = me.face;
+        const raw = session.savedOwnState();
+        const saved = raw ? WbStateCodec.decode(raw) : null;
+        const resumed = !!saved && saved.match === mirror.match.id;
+        this.body = resumed ? { x: saved.x, z: saved.z } : { x: me.x, z: me.z };
+        this.face = resumed ? saved.face : me.face;
     }
     position() { return { x: this.body.x, z: this.body.z }; }
     step(dt, nowMs) {

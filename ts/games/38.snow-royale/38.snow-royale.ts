@@ -111,10 +111,12 @@ class SnHostDriver extends SnMatchDriver {
   readonly myNum: number;
   readonly director: SnHostDirector;
   private carry = 0;
-  constructor(match: SnMatchRecord, session: RkSession<SnPlayerRecord>, controls: SnLocalControls, meter: SnNetMeter, private readonly speed: number) {
+  /* inherited 가 있으면 방장이 사라져 이어받는 경우: 직전까지 화면에 맞춰 두던 엔진을 그대로 방장 엔진으로 쓴다. */
+  constructor(match: SnMatchRecord, session: RkSession<SnPlayerRecord>, controls: SnLocalControls, meter: SnNetMeter, private readonly speed: number, inherited: SnClientDriver | null = null) {
     super();
-    this.engine = new SnEngine({ seed: match.seed, mode: match.mode, teams: match.teams });
-    this.director = new SnHostDirector(this.engine, session, match, meter);
+    this.engine = inherited ? inherited.engine : new SnEngine({ seed: match.seed, mode: match.mode, teams: match.teams });
+    if (inherited) SnHostSave.apply(this.engine, session.value<string>("hsave"));
+    this.director = new SnHostDirector(this.engine, session, match, meter, inherited ? inherited.mirror.eventSeq : 0);
     let mine = -1;
     this.engine.players.forEach((p) => {
       if (p.bot) this.engine.attach(p.num, new SnBotBrain(match.seed * 31 + p.num * 7919 + 1));
@@ -881,7 +883,7 @@ class SnGame {
     session.onRemoteState = (id, raw) => { if (this.view && this.view.driver instanceof SnHostDriver) this.view.driver.receiveState(id, raw, performance.now()); };
     session.onPlayerRemoved = (id) => { if (this.view && this.view.driver instanceof SnHostDriver) this.view.driver.playerLeft(id); };
     session.onClosed = (message) => this.exitToStart(message);
-    session.onHostTakeover = () => session.ref.update({ status: "lobby", match: null, st: null, snap: null, wall: null, loot: null, snowmap: null, ev: null, end: null });
+    session.onHostTakeover = () => this.continueAsNewHost();
     session.connect();
     this.showScreen("lobby");
     this.lobby.render(session, this.seatPlan);
@@ -913,11 +915,7 @@ class SnGame {
     if ((session.status === "playing" || session.status === "ended") && match && match.id !== this.matchId && session.me()) {
       if (this.view) this.view.dispose();
       this.matchId = match.id;
-      const looks = new Map<number, CharacterLook>();
-      match.teams.flatMap((t) => t.members).forEach((m, num) => {
-        const record = session.players.get(m.id);
-        looks.set(num, record && !m.bot ? record.look : SnBotLooks.make(match.seed + num * 97));
-      });
+      const looks = this.looksOf(match, session);
       const driver = session.isHost() ? new SnHostDriver(match, session, ui.controls, this.meter, this.options.speed) : new SnClientDriver(match, session, ui.controls, this.meter);
       if (this.backdrop) this.backdrop.stopTour();
     this.view = new SnMatchView(ui, driver, looks);
@@ -931,6 +929,31 @@ class SnGame {
     }
   }
 
+  private looksOf(match: SnMatchRecord, session: RkSession<SnPlayerRecord>): Map<number, CharacterLook> {
+    const looks = new Map<number, CharacterLook>();
+    match.teams.flatMap((t) => t.members).forEach((m, num) => {
+      const record = session.players.get(m.id);
+      looks.set(num, record && !m.bot ? record.look : SnBotLooks.make(match.seed + num * 97));
+    });
+    return looks;
+  }
+
+  /* 방장이 사라졌을 때: 진행 중인 판이면 직전 화면 상태(스냅샷·벽·상자·눈·방장 장부)를 이어받아 계속하고, 이어받을 수 없으면 대기실로 돌린다. */
+  private continueAsNewHost(): void {
+    const session = this.session, ui = this.ui, view = this.view;
+    if (!session || !ui) return;
+    if (session.status === "ended") return;
+    const match = session.value<SnMatchRecord>("match");
+    if (view && match && view.driver instanceof SnClientDriver && view.driver.mirror.received && view.driver.match.id === match.id) {
+      const inherited = view.driver;
+      view.dispose();
+      const driver = new SnHostDriver(match, session, ui.controls, this.meter, this.options.speed, inherited);
+      this.view = new SnMatchView(ui, driver, this.looksOf(match, session));
+      return;
+    }
+    session.ref.update({ status: "lobby", match: null, st: null, snap: null, wall: null, loot: null, snowmap: null, ev: null, end: null, hsave: null });
+  }
+
   private startMatch(): void {
     const session = this.session;
     if (!session || !session.isHost() || session.status !== "lobby") return;
@@ -940,14 +963,14 @@ class SnGame {
     seats.forEach((id, slot) => { if (id) humans.push({ id, nick: (session.players.get(id) as SnPlayerRecord).nick, team: SnRoomRules.teamOfSlot(mode, slot) }); });
     if (!humans.length) return;
     const match: SnMatchRecord = { id: 1 + Math.floor(Math.random() * 1e9), seed: Math.floor(Math.random() * 1e9), mode, teams: SnRosterPlanner.fill(mode, humans), startAt: this.backend.now() };
-    session.ref.update({ match, status: "playing", st: null, snap: null, wall: null, loot: null, snowmap: null, ev: null, end: null });
+    session.ref.update({ match, status: "playing", st: null, snap: null, wall: null, loot: null, snowmap: null, ev: null, end: null, hsave: null });
   }
 
   private afterResult(): void {
     if (this.options.offline || this.practice) { this.seed++; this.startOffline(); return; }
     const session = this.session;
     if (!session || !session.isHost()) return;
-    session.ref.update({ status: "lobby", match: null, st: null, snap: null, wall: null, loot: null, snowmap: null, ev: null, end: null });
+    session.ref.update({ status: "lobby", match: null, st: null, snap: null, wall: null, loot: null, snowmap: null, ev: null, end: null, hsave: null });
   }
 
   private toggleSeatMode(): void {

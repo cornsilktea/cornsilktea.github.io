@@ -259,7 +259,34 @@ class VbRoomSession {
   }
 
   writeState(raw: string, id: string = this.myId): void {
+    if (id === this.myId) this.rememberOwnState(raw);
     this.ref.child("st/" + id).set(raw);
+  }
+
+  private poseKey(): string {
+    return VbConfig.ROOT + "_pose_v1";
+  }
+
+  private matchTag(): number {
+    return this.match ? this.match.id : 0;
+  }
+
+  private rememberOwnState(raw: string): void {
+    try {
+      sessionStorage.setItem(this.poseKey(), JSON.stringify({ code: this.code, match: this.matchTag(), raw, savedAt: Date.now() }));
+    } catch (error) {
+      return;
+    }
+  }
+
+  savedOwnState(): string | null {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(this.poseKey()) || "null") as { code: string; match: number; raw: string; savedAt: number } | null;
+      if (!saved || saved.code !== this.code || saved.match !== this.matchTag() || Date.now() - saved.savedAt > RoomResumeStore.RESUME_MS) return null;
+      return saved.raw;
+    } catch (error) {
+      return null;
+    }
   }
 
   writePress(record: VbPressRecord): void {
@@ -288,6 +315,7 @@ class VbRoomSession {
 
   private forgetResume(): void {
     this.resume.clear();
+    try { sessionStorage.removeItem(this.poseKey()); } catch (error) { /* 저장소를 못 쓰면 무시 */ }
     this.pendingRemovals.forEach((timer) => window.clearTimeout(timer));
     this.pendingRemovals.clear();
   }
@@ -1322,6 +1350,10 @@ class VolleyballMatch {
     this.seatsDirty = !complete;
   }
 
+  private savedOwnPose(): VbRemoteState | null {
+    return VbStateCodec.decode(this.session.savedOwnState());
+  }
+
   private makeController(slot: number, id: string, record: VbPlayerRecord, previous: VbPlayerController | null): VbPlayerController {
     let controller: VbPlayerController;
     if (id === this.session.myId && this.local) controller = this.local;
@@ -1333,6 +1365,10 @@ class VolleyballMatch {
       controller.yaw = previous.yaw;
       if (controller instanceof VbRemoteController) controller.teleport(previous.x, previous.z);
       controller.locked = previous.locked;
+    } else if (id === this.session.myId && this.savedOwnPose()) {
+      const saved = this.savedOwnPose() as VbRemoteState;
+      controller.teleport(saved.x, saved.z);
+      controller.yaw = saved.yaw;
     } else if (this.rally) {
       const spot = VbCourtLayout.homeSpot(slot, this.rally.serveTeam, this.rally.server);
       controller.teleport(spot.x, spot.z);

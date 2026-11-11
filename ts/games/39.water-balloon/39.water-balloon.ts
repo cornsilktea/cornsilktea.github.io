@@ -171,10 +171,12 @@ class WbHostDriver extends WbMatchDriver {
   readonly link: WbHostLink;
   readonly mapId: string;
 
-  constructor(readonly match: WbMatchRecord, session: RkSession<WbPlayerRecord>, input: WbInput, meter: WbNetMeter, level: WbDifficulty, readonly looks: CharacterLook[]) {
+  /* inherited 가 있으면 방장이 사라져 이어받는 경우: 직전까지 화면에 맞춰 두던 엔진을 그대로 방장 엔진으로 쓴다. */
+  constructor(readonly match: WbMatchRecord, session: RkSession<WbPlayerRecord>, input: WbInput, meter: WbNetMeter, level: WbDifficulty, readonly looks: CharacterLook[], inherited: WbGuestDriver | null = null) {
     super();
-    this.engine = new WbEngine({ seed: match.seed, lootSeed: Math.floor(Math.random() * 1e9), mode: match.mode, teams: match.teams });
-    this.link = new WbHostLink(this.engine, session, match, meter);
+    this.engine = inherited ? inherited.engine : new WbEngine({ seed: match.seed, lootSeed: Math.floor(Math.random() * 1e9), mode: match.mode, teams: match.teams });
+    if (inherited) this.engine.resumeAsHost(new WbSeededRandom(Math.floor(Math.random() * 1e9)));
+    this.link = new WbHostLink(this.engine, session, match, meter, inherited ? inherited.mirror.eventSeq : 0);
     this.mapId = match.map;
     let mine = -1;
     this.engine.players.forEach((p) => {
@@ -992,7 +994,7 @@ class WbGame {
     session.onRemoteState = (id, raw) => { if (this.view && this.view.driver instanceof WbHostDriver) this.view.driver.receiveState(id, raw, performance.now()); };
     session.onPlayerRemoved = (id) => this.playerRemoved(id);
     session.onClosed = (message) => this.exitToStart(message);
-    session.onHostTakeover = () => session.ref.update({ status: "lobby", match: null, st: null, snap: null, ev: null, board: null, end: null });
+    session.onHostTakeover = () => this.continueAsNewHost();
     session.connect();
     this.showScreen("lobby");
     (this.lobby as WbLobbyView).render(session, this.seatPlan);
@@ -1054,6 +1056,23 @@ class WbGame {
       WbDom.text(WbDom.el("btnResultLeave"), matched ? (this.randomMode === "solo" ? "랜덤 매칭 대기실로" : "팀 대기실로") : "방 나가기");
       WbDom.text(WbDom.el("resultStreak"), "");
     }
+  }
+
+  /* 방장이 사라졌을 때: 진행 중인 판이면 직전 화면 상태(스냅샷·판·풍선)를 이어받아 계속하고, 이어받을 수 없으면 대기실로 돌린다. */
+  private continueAsNewHost(): void {
+    const session = this.session, ui = this.ui, world = this.world, input = this.input, view = this.view;
+    if (!session || !ui || !world || !input) return;
+    if (session.status === "ended") return;
+    const match = session.value<WbMatchRecord>("match");
+    if (view && match && view.driver instanceof WbGuestDriver && view.driver.mirror.received && view.driver.match.id === match.id) {
+      const inherited = view.driver;
+      const level = WbPlayOptions.levelOf(session.value<string>("level") || "");
+      view.dispose();
+      const driver = new WbHostDriver(match, session, input, this.meter, level, inherited.looks, inherited);
+      this.view = new WbMatchView(driver, world, ui, input);
+      return;
+    }
+    session.ref.update({ status: "lobby", match: null, st: null, snap: null, ev: null, board: null, end: null });
   }
 
   private requestStart(): void {

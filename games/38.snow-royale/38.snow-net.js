@@ -6,10 +6,11 @@ SnRoomRules.ROOT = "snowroyale/rooms";
 SnRoomRules.SEATS = 6;
 SnRoomRules.SPECTATOR_SLOT = 9;
 SnRoomRules.RULES = { root: SnRoomRules.ROOT, seatCount: SnRoomRules.SEATS, spectatorSlot: SnRoomRules.SPECTATOR_SLOT, seatOrder: [0, 2, 4, 1, 3, 5], spectatorLimit: 12 };
-SnRoomRules.VALUES = ["mode", "match", "snap", "wall", "loot", "snowmap", "ev", "end", "vsAt"];
+SnRoomRules.VALUES = ["mode", "match", "snap", "wall", "loot", "snowmap", "ev", "end", "vsAt", "hsave"];
 SnRoomRules.SEND_MS = 100;
 SnRoomRules.KEEPALIVE_MS = 1000;
 SnRoomRules.SNOWMAP_MS = 5000;
+SnRoomRules.HOST_SAVE_MS = 2000;
 SnRoomRules.EVENT_HISTORY = 3;
 class SnStateCodec {
     static encode(s) {
@@ -93,7 +94,7 @@ class SnNetMeter {
     }
 }
 class SnHostDirector {
-    constructor(engine, session, match, meter) {
+    constructor(engine, session, match, meter, firstSeq = 0) {
         this.engine = engine;
         this.session = session;
         this.match = match;
@@ -105,8 +106,10 @@ class SnHostDirector {
         this.seq = 0;
         this.lastSendMs = 0;
         this.lastSnowMs = 0;
+        this.lastSaveMs = 0;
         this.lastState = new Map();
         this.endWritten = false;
+        this.seq = firstSeq;
     }
     receiveState(num, raw, nowMs) {
         const pilot = this.remote.get(num);
@@ -131,6 +134,10 @@ class SnHostDirector {
         if (nowMs - this.lastSnowMs > SnRoomRules.SNOWMAP_MS) {
             this.lastSnowMs = nowMs;
             this.writeIfChanged("snowmap", SnSnapshotCodec.encodeSnow(e.snow.amount));
+        }
+        if (nowMs - this.lastSaveMs > SnRoomRules.HOST_SAVE_MS) {
+            this.lastSaveMs = nowMs;
+            this.writeIfChanged("hsave", SnHostSave.encode(e));
         }
         if (this.pending.length) {
             this.seq++;
@@ -197,6 +204,7 @@ class SnMirror {
         this.received = false;
         this.engine = new SnEngine({ seed: match.seed, mode: match.mode, teams: match.teams });
     }
+    get eventSeq() { return this.lastSeq; }
     get time() { return this.engine.time; }
     get mode() { return this.engine.mode; }
     get players() { return this.engine.players; }

@@ -603,6 +603,27 @@ class WbEngine implements WbMoveWorld {
     });
   }
 
+  /* 방장이 사라져 화면용으로 맞춰 두던 엔진을 방장 엔진으로 바꿀 때: 방장만 아는 장부(돌발 커서, 풍선 번호, 숨은 아이템)를 지금 판 모양에 맞게 다시 만든다. */
+  resumeAsHost(random: WbSeededRandom): void {
+    const s = this.sudden;
+    this.warnCursor = 0;
+    while (this.warnCursor < s.order.length && s.warnAt[this.warnCursor] < this.tick) this.warnCursor++;
+    this.suddenCursor = 0;
+    while (this.suddenCursor < s.order.length && s.landAt[this.suddenCursor] < this.tick) this.suddenCursor++;
+    this.nextBalloon = Math.max(this.nextBalloon, ...this.balloons.map((b) => b.id + 1)) + 50;
+    this.hidden.clear();
+    const boxes: number[] = [];
+    for (let k = 0; k < WbGrid.COUNT; k++) if (this.grid.cells[k] === WbCell.BOX) boxes.push(k);
+    random.shuffle(boxes);
+    const counts = WbLootDeck.gradeCounts(Math.round(boxes.length * WbFairBoxLayout.LOOT_RATIO));
+    let used = 0;
+    for (let grade = 0; grade < 3; grade++) {
+      WbLootDeck.kinds(counts[grade], WbLootTable.BY_GRADE[grade], random).forEach((kind) => {
+        if (used < boxes.length) this.hidden.set(boxes[used++], { grade, kind });
+      });
+    }
+  }
+
   get phase(): WbPhase { return this.ended ? "ended" : this.tick < 0 ? "countdown" : "play"; }
   get seconds(): number { return this.tick / WbBalance.RATE; }
   get tickTime(): number { return this.tick + this.carry * WbBalance.RATE; }

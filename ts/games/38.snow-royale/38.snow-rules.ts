@@ -1054,6 +1054,8 @@ class SnEngine {
   }
 
   nextId(): number { return ++this.idCounter; }
+  get lastIssuedId(): number { return this.idCounter; }
+  continueIdsFrom(last: number): void { this.idCounter = Math.max(this.idCounter, last); }
   emit(ev: SnEvent): void { this.events.push(ev); }
   attach(num: number, pilot: SnPilot): void { this.pilots.set(num, pilot); }
   teamOf(p: SnPlayer): SnTeam { return this.teams[p.team]; }
@@ -1197,6 +1199,36 @@ class SnEngine {
   }
 
   stormNow(): SnStormState { return this.storm.state(this.time); }
+}
+
+/* 방장이 새로고침해 사라졌을 때 다음 방장이 판을 이어받도록, 스냅샷에 없는 방장 쪽 장부를 2초마다 따로 적어 둔다. */
+class SnHostSave {
+  static encode(engine: SnEngine): string {
+    return JSON.stringify({
+      k: engine.tick, i: engine.lastIssuedId,
+      p: engine.players.map((p) => [Math.round(p.downAt * 10), p.dealt, p.collected, p.walls, p.assists]),
+      t: engine.teams.map((t) => [t.outTick, Math.round(t.outAt * 10)]),
+    });
+  }
+
+  static apply(engine: SnEngine, raw: string | null): boolean {
+    if (!raw) return false;
+    let data: { k: number; i: number; p: number[][]; t: number[][] };
+    try { data = JSON.parse(raw); } catch (error) { return false; }
+    engine.tick = Math.max(engine.tick, data.k);
+    engine.continueIdsFrom(data.i);
+    data.p.forEach((v, num) => {
+      const p = engine.players[num];
+      if (!p) return;
+      p.downAt = v[0] / 10; p.dealt = v[1]; p.collected = v[2]; p.walls = v[3]; p.assists = v[4];
+    });
+    data.t.forEach((v, num) => {
+      const t = engine.teams[num];
+      if (!t) return;
+      t.outTick = v[0]; t.outAt = v[1] / 10;
+    });
+    return true;
+  }
 }
 
 class SnSnapshotCodec {
