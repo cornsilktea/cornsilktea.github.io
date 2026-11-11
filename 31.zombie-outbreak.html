@@ -3272,13 +3272,19 @@ function enterRoom(code) {
   room.drop.watchConnection(ref);
   const pref = ref.child("players");
   resumeStore.keepFresh(() => room.ref ? { code: room.code, myId, record: room.players[myId] || null } : null);
-  sub(pref, "child_added", s => { room.players[s.key] = s.val(); if (s.key === myId) resumeStore.save(room.code, myId, s.val()); playersChanged(); });
+  zombieStateCache.clear();
+  sub(pref, "child_added", s => {
+    const returning = !room.players[s.key];
+    room.players[s.key] = s.val(); if (s.key === myId) resumeStore.save(room.code, myId, s.val());
+    if (returning && s.key !== myId) zombieRejoin.otherCameBack(s.key);
+    playersChanged();
+  });
   sub(pref, "child_changed", s => { room.players[s.key] = s.val(); if (s.key === myId) resumeStore.save(room.code, myId, s.val()); playersChanged(); });
   sub(pref, "child_removed", s => {
     if (s.key === myId && !room.leaving) { room.drop.recover(s.val() || room.players[myId] || null); return; }
     const gone = room.players[s.key];
-    if (gone && !gone.bot && gone.inRound && room.status === "playing") round.quitSides[gone.role === "zombie" || gone.infected ? "zombie" : "human"] = true;
-    delete room.players[s.key]; removeAvatar(s.key);
+    if (gone && !gone.bot && gone.inRound && room.status === "playing") zombieRejoin.otherDropped(gone);
+    delete room.players[s.key]; removeAvatar(s.key); zombieStateCache.remove(s.key);
     if (s.key === myId && !room.leaving) { exitToStart("방에서 나가게 되었습니다."); return; }
     checkHost(); playersChanged();
   });
@@ -3294,8 +3300,9 @@ function enterRoom(code) {
   sub(ref.child("quitSide"), "value", s => { room.quitSide = s.val(); if (screenNow === "result") renderResult(); });
   sub(ref.child("status"), "value", s => onStatus(s.val()));
   const stRef = ref.child("st");
-  sub(stRef, "child_added", s => onRemoteState(s.key, s.val()));
-  sub(stRef, "child_changed", s => onRemoteState(s.key, s.val()));
+  sub(stRef, "child_added", s => { zombieStateCache.set(s.key, s.val()); onRemoteState(s.key, s.val()); });
+  sub(stRef, "child_changed", s => { zombieStateCache.set(s.key, s.val()); onRemoteState(s.key, s.val()); });
+  sub(stRef, "child_removed", s => zombieStateCache.remove(s.key));
   setText($("lobbyCode"), code);
   showScreen("lobby");
 }
@@ -3317,7 +3324,7 @@ function checkHost() {
 function leaveRoom() {
   if (!room.ref) return;
   const ref = room.ref;
-  room.leaving = true; unsubAll(); resumeStore.clear();
+  room.leaving = true; unsubAll(); resumeStore.clear(); zombiePoseKeeper.clear();
   try { ref.child("players/" + myId).onDisconnect().cancel(); ref.child("st/" + myId).onDisconnect().cancel(); } catch (e) {}
   ref.child("st/" + myId).remove().catch(() => {});
   ref.child("players/" + myId).remove().then(() => ref.child("players").once("value")).then(s => {
@@ -3333,7 +3340,7 @@ function leaveRoom() {
 }
 function exitToStart(msg) {
   if (room.ref) {
-    room.leaving = true; unsubAll(); resumeStore.clear();
+    room.leaving = true; unsubAll(); resumeStore.clear(); zombiePoseKeeper.clear();
     try { room.ref.child("players/" + myId).onDisconnect().cancel(); room.ref.child("st/" + myId).onDisconnect().cancel(); } catch (e) {}
   }
   resetRoomLocal();
@@ -3693,7 +3700,56 @@ const round = {
 };
 const me = { x: 0, y: 0, z: 0, vy: 0 };
 
-function removeAvatar(id) { if (avatars[id]) { avatars[id].dispose(); delete avatars[id]; } }
+function removeAvatar(id) { zombieNameTags.drop(id); if (avatars[id]) { avatars[id].dispose(); delete avatars[id]; } }
+
+class ZombieStateCache {
+  constructor() { this.poses = new Map(); }
+  set(id, text) { this.poses.set(id, text); }
+  remove(id) { this.poses.delete(id); }
+  clear() { this.poses.clear(); }
+  parsed(id) {
+    const a = String(this.poses.get(id) || "").split(",");
+    if (a.length < 5) return null;
+    const pose = { x: +a[0], y: +a[1], z: +a[2], face: +a[3] * Math.PI / 180, motion: +a[4] };
+    return isFinite(pose.x) && isFinite(pose.z) ? pose : null;
+  }
+}
+const zombieStateCache = new ZombieStateCache();
+
+class ZombiePoseKeeper {
+  static KEY = "zombie_pose_v1";
+  static MAX_AGE_MS = 180000;
+  save(startAt, x, y, z, face) {
+    try { sessionStorage.setItem(ZombiePoseKeeper.KEY, JSON.stringify({ startAt, x, y, z, face, savedAt: Date.now() })); } catch (e) {}
+  }
+  restore(startAt) {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(ZombiePoseKeeper.KEY) || "null");
+      if (!saved || saved.startAt !== startAt || Date.now() - saved.savedAt > ZombiePoseKeeper.MAX_AGE_MS) return null;
+      return [saved.x, saved.y, saved.z, saved.face].every(isFinite) ? saved : null;
+    } catch (e) { return null; }
+  }
+  clear() { try { sessionStorage.removeItem(ZombiePoseKeeper.KEY); } catch (e) {} }
+}
+const zombiePoseKeeper = new ZombiePoseKeeper();
+
+class ZombieRejoin {
+  static GRACE_MS = 12000;
+  constructor() { this.graceUntil = 0; }
+  graceOn() { return performance.now() < this.graceUntil; }
+  otherDropped(gone) {
+    this.graceUntil = performance.now() + ZombieRejoin.GRACE_MS;
+    round.quitSides[gone.role === "zombie" || gone.infected ? "zombie" : "human"] = true;
+  }
+  otherCameBack(id) {
+    round.quitSides = {};
+    const p = room.players[id];
+    if (!round.active || room.status !== "playing" || !p || !p.inRound || avatars[id]) return;
+    addRoundAvatar(id, roundIds());
+    zombieNameTags.build(roundIds());
+  }
+}
+const zombieRejoin = new ZombieRejoin();
 function clearRound() {
   zombieNameTags.clear();
   for (const id in avatars) removeAvatar(id);
@@ -3707,6 +3763,15 @@ function spawnPointFor(id, ids) {
   const k = humans.indexOf(id), a = (k / Math.max(1, humans.length)) * Math.PI * 2 + 0.4;
   return { x: SPAWN.x + Math.sin(a) * 3, z: SPAWN.z + Math.cos(a) * 3 };
 }
+function addRoundAvatar(id, ids) {
+  const p = room.players[id];
+  const av = avatars[id] = new Avatar(id, p.nickname || "이름 없음", id === myId);
+  const sp = spawnPointFor(id, ids), known = id === myId ? null : zombieStateCache.parsed(id);
+  av.pos.x = known ? known.x : sp.x; av.pos.z = known ? known.z : sp.z; av.pos.y = known ? known.y : 0; av.face = known ? known.face : 0;
+  av.prevPos.x = av.pos.x; av.prevPos.z = av.pos.z;
+  if (known) { av.netFrom = av.netTo = { x: known.x, y: known.y, z: known.z, face: known.face }; av.netT0 = performance.now(); av.remoteMotion = known.motion; }
+  if (p.infected) round.knownInfected[id] = true;
+}
 function beginLocalRound() {
   clearRound();
   const ids = roundIds();
@@ -3717,15 +3782,12 @@ function beginLocalRound() {
   round.turnStart = 0; round.lastSent = ""; round.forceNet = true; round.knownInfected = {}; round.becameZombieShown = false;
   round.endRequested = false; round.quitSides = {}; round.spectateIndex = 0; round.resultSaved = null;
   round.camYaw = 0; round.camElev = 0.3; round.fov = BASE_FOV;
-  ids.forEach(id => {
-    const p = room.players[id];
-    const av = avatars[id] = new Avatar(id, p.nickname || "이름 없음", id === myId);
-    const sp = spawnPointFor(id, ids);
-    av.pos.x = sp.x; av.pos.z = sp.z; av.pos.y = 0; av.face = 0;
-    av.prevPos.x = sp.x; av.prevPos.z = sp.z;
-    if (p.infected) round.knownInfected[id] = true;
-  });
-  if (round.iAmIn) { const av = avatars[myId]; me.x = av.pos.x; me.z = av.pos.z; me.y = 0; me.vy = 0; }
+  ids.forEach(id => addRoundAvatar(id, ids));
+  if (round.iAmIn) {
+    const av = avatars[myId], saved = zombiePoseKeeper.restore(room.startAt);
+    if (saved) { av.pos.x = saved.x; av.pos.y = saved.y; av.pos.z = saved.z; av.face = saved.face; av.prevPos.x = saved.x; av.prevPos.z = saved.z; }
+    me.x = av.pos.x; me.z = av.pos.z; me.y = av.pos.y; me.vy = 0;
+  }
   zombieNameTags.build(ids);
   zombieRoster.reset();
   $("vignette").className = "";
@@ -4034,6 +4096,7 @@ function netTick(nowMs, t) {
   const s = poseString(me.x, me.y, me.z, av.face, motion);
   round.lastNet = nowMs; round.forceNet = false;
   if (s === round.lastSent) return;
+  zombiePoseKeeper.save(room.startAt, me.x, me.y, me.z, av.face);
   round.lastSent = s;
   room.ref.child("st/" + myId).set(s);
 }
@@ -4589,7 +4652,14 @@ class ZombieNameTags {
     this.order = ids.filter(id => this.tags.has(id));
   }
   clear() { this.tags.forEach(tag => tag.dispose()); this.tags.clear(); this.order = []; this.cursor = 0; }
+  drop(id) {
+    const tag = this.tags.get(id);
+    if (tag) { tag.dispose(); this.tags.delete(id); }
+    this.order = this.order.filter(other => other !== id);
+    this.cursor = 0;
+  }
   judge(id, tag, focusId) {
+    if (!tag) return;
     const av = avatars[id];
     if (id === focusId || !av || !av.root.visible) { tag.shown = false; return; }
     const chest = this.chest; chest.x = av.pos.x; chest.y = av.pos.y + ZombieBodySight.CHEST_HEIGHT; chest.z = av.pos.z;
@@ -4603,6 +4673,7 @@ class ZombieNameTags {
     this.judge(id, this.tags.get(id), focusId);
     const prewarm = t < room.startAt;
     this.tags.forEach((tag, tagId) => {
+      if (!avatars[tagId]) { tag.shown = false; tag.fade(dt, false); return; }
       if (tagId === focusId) tag.shown = false;
       tag.setZombie(!!isZombieNow(tagId, t));
       tag.followHead(avatars[tagId].kind);
@@ -4714,7 +4785,7 @@ function checkRoundEnd(t) {
   const humans = humansLeft().length;
   const zombies = ids.filter(id => room.players[id].role === "zombie").length;
   const quitSide = sideAllQuit(ids);
-  const shouldEnd = left <= 0 || humans === 0 || zombies === 0 || !!quitSide;
+  const shouldEnd = left <= 0 || (!zombieRejoin.graceOn() && (humans === 0 || zombies === 0 || !!quitSide));
   if (!shouldEnd) return;
   if (!isHost() && left > -2000) return;
   round.endRequested = true;
@@ -4985,8 +5056,22 @@ function syncTouchPad() {
   TOUCH.shown = show; $("touchPad").hidden = !show;
   releaseTouch();
 }
+class ZombieFrameGuard {
+  static REPORT_EVERY_MS = 5000;
+  constructor() { this.lastReportMs = 0; }
+  run(step, nowMs) {
+    try { step(); } catch (error) {
+      if (nowMs - this.lastReportMs > ZombieFrameGuard.REPORT_EVERY_MS) { this.lastReportMs = nowMs; console.error("프레임 오류(화면은 계속 그립니다):", error); }
+    }
+  }
+}
+const zombieFrameGuard = new ZombieFrameGuard();
 function frame(nowMs) {
   requestAnimationFrame(frame);
+  zombieFrameGuard.run(() => stepWorld(nowMs), nowMs);
+  renderer.render(scene, camera);
+}
+function stepWorld(nowMs) {
   syncTouchPad();
   const dt = Math.min(0.05, (nowMs - lastFrame) / 1000);
   QG.update((nowMs - lastFrame) / 1000);
@@ -5023,7 +5108,6 @@ function frame(nowMs) {
   updateSky();
   cullAvatars();
   if (screenNow === "game" && round.active) zombieNameTags.update(t, dt); else zombieNameTags.hide();
-  renderer.render(scene, camera);
 }
 requestAnimationFrame(frame);
 window.__zo = { THREE, scene, camera, renderer, round, tour, TOUR_SHOTS, curtainMeshes, updateCurtains, eerieSounds, flashLightning, playHeartbeat };
