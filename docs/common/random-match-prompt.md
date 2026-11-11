@@ -343,3 +343,13 @@
 - **승률 구간 매칭은 24번(1인)에만 있다**(`MkWinBandVersusMatcher`). 2인 이상 팀 게임은 `MkVersusMatcher` 라 처음부터 없다.
 - **검사**: `node tools/match-sim.js`(`unitCrowdSpread` 8개 포함 223개). 대기 분포는 `node tools/match-wait-sim.js [분] [시드 수] [단계 초]` — 가상 시계로 3명 팀을 돌려 기존/새 규칙의 대기·재대결 비율을 비교한다.
   결과(180분×6, 판 3~4분): 7팀 최근2판 재대결 28.8%→8.1%, 평균 대기 33→36초, 상위10% 82→88초, 최대 153초 그대로. 8팀 38.4→9.4%, 9팀 22.0→2.5%, 10팀 24.2→7.1%. 홀수 팀(7·9)은 AI 판이 늘어난다(7팀 156→185, 9팀 38→59).
+
+## ★ 새로고침 복구 (2026-11-11, 방 게임 공통 — 새 게임도 반드시)
+
+`ts/common/room-kit.ts` 의 `RkReloadResume`·`RkSession` 이 맡는다. 새 매칭 게임은 아래 네 줄만 붙인다.
+- `myId = RkReloadResume.identity(규칙)` — 새로고침해도 같은 아이디.
+- 에셋을 다 불러온 직후 `RkReloadResume.resumeInto(this.backend, 규칙, code => this.enterRoom(code, false, ""))`.
+- 경기 화면(Match)을 만든 직후 `session.replayStates()` — 늦게 만들어져 놓친 다른 사람들의 마지막 위치를 다시 넣는다.
+- `pagehide` 에서 `session.removeMineOnUnload()` (이미 있는 규칙).
+`RkSession` 은 (1) 내 방·아이디를 탭 `sessionStorage` 에 적어 두고 직접 나가면 지우며, (2) 경기 중 사람이 사라져도 `REJOIN_GRACE_MS`(20초) 안에 돌아오면 자리를 그대로 둔다(로비는 즉시 제거). 방장이 새로고침하면 방장은 즉시 넘어가고(`onHostTakeover`), 돌아온 사람은 일반 참가자로 이어진다.
+34번은 자체 `VbRoomSession` 사본을 쓰므로 같은 규칙을 그쪽에도 넣어 두었다(`VbReloadResume`). 방장 쪽 계산(물리·AI)을 이어받는 방식은 게임마다 다르다(34·35 `takeOverAsHost`, 36·38·39 는 대기실 복귀).

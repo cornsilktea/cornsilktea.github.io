@@ -125,7 +125,23 @@ class VbBotLooks {
   }
 }
 
+class VbReloadResume {
+  static identity(): string {
+    return new RoomResumeStore(VbConfig.ROOT).identity();
+  }
+
+  static resumeInto(backend: VbBackend, enter: (code: string) => void): void {
+    const store = new RoomResumeStore(VbConfig.ROOT);
+    if (!backend.database || !store.read()) return;
+    store.rejoin(backend.database, VbConfig.ROOT).then((code) => { if (code) enter(code); else store.clear(); }).catch(() => store.clear());
+  }
+}
+
 class VbRoomSession {
+  static readonly REJOIN_GRACE_MS = 20000;
+  private readonly resume = new RoomResumeStore(VbConfig.ROOT);
+  private readonly pendingRemovals = new Map<string, number>();
+  private readonly lastStates = new Map<string, VbRemoteState>();
   readonly players = new Map<string, VbPlayerRecord>();
   hostId: string | null = null;
   hostLoaded = false;
@@ -191,6 +207,7 @@ class VbRoomSession {
 
   connect(): void {
     this.armDisconnect();
+    this.resume.keepFresh(() => (this.leaving ? null : { code: this.code, myId: this.myId, record: this.mineAsRecord() }));
     this.subscribe(this.database.ref(".info/connected"), "value", (snapshot) => {
       if (snapshot.val<boolean>() === true && !this.leaving) this.armDisconnect();
     });
@@ -221,7 +238,10 @@ class VbRoomSession {
     const stateRef = this.ref.child("st");
     const onState = (snapshot: FirebaseSnapshot) => {
       const state = VbStateCodec.decode(snapshot.val());
-      if (state && snapshot.key !== this.myId) this.onRemoteState(snapshot.key, state);
+      if (state && snapshot.key !== this.myId) {
+        this.lastStates.set(snapshot.key, state);
+        this.onRemoteState(snapshot.key, state);
+      }
     };
     this.subscribe(stateRef, "child_added", onState);
     this.subscribe(stateRef, "child_changed", onState);
@@ -254,7 +274,26 @@ class VbRoomSession {
     this.ref.child("rally").set(record);
   }
 
+  replayStates(): void {
+    this.lastStates.forEach((state, id) => this.onRemoteState(id, state));
+  }
+
+  private mineAsRecord(): Record<string, unknown> | null {
+    return (this.players.get(this.myId) as unknown as Record<string, unknown>) || null;
+  }
+
+  private saveResume(): void {
+    this.resume.save(this.code, this.myId, this.mineAsRecord());
+  }
+
+  private forgetResume(): void {
+    this.resume.clear();
+    this.pendingRemovals.forEach((timer) => window.clearTimeout(timer));
+    this.pendingRemovals.clear();
+  }
+
   leave(): void {
+    this.forgetResume();
     this.leaving = true;
     this.unsubscribeAll();
     this.cancelDisconnect();
@@ -264,6 +303,7 @@ class VbRoomSession {
   }
 
   silentClose(): void {
+    this.forgetResume();
     this.leaving = true;
     this.succession.cancel();
     this.unsubscribeAll();
@@ -271,6 +311,7 @@ class VbRoomSession {
   }
 
   removeMineOnUnload(): void {
+    this.saveResume();
     if (this.isHost()) this.succession.handOver();
     this.removeMine();
   }
@@ -322,17 +363,42 @@ class VbRoomSession {
     if (!record) return;
     record.look = CharacterLooks.clean(record.look);
     this.players.set(snapshot.key, record);
+    this.cancelPendingRemoval(snapshot.key);
+    if (snapshot.key === this.myId) this.saveResume();
     this.onChange("players");
+  }
+
+  private cancelPendingRemoval(id: string): void {
+    const timer = this.pendingRemovals.get(id);
+    if (timer === undefined) return;
+    window.clearTimeout(timer);
+    this.pendingRemovals.delete(id);
   }
 
   private removePlayer(snapshot: FirebaseSnapshot): void {
     if (snapshot.key === this.myId && !this.leaving) {
-      this.dropRecovery.recover(snapshot.val<Record<string, unknown>>() || (this.players.get(this.myId) as unknown as Record<string, unknown>) || null);
+      this.dropRecovery.recover(snapshot.val<Record<string, unknown>>() || this.mineAsRecord());
       return;
     }
-    this.players.delete(snapshot.key);
+    const id = snapshot.key;
+    const record = this.players.get(id);
+    const humanInMatch = !!record && !record.isBot && this.status !== "lobby" && !this.leaving;
+    if (!humanInMatch) {
+      this.finishRemoval(id);
+      return;
+    }
+    this.cancelPendingRemoval(id);
+    this.pendingRemovals.set(id, window.setTimeout(() => {
+      this.pendingRemovals.delete(id);
+      this.finishRemoval(id);
+    }, VbRoomSession.REJOIN_GRACE_MS));
+  }
+
+  private finishRemoval(id: string): void {
+    this.players.delete(id);
+    this.lastStates.delete(id);
     this.succession.check();
-    this.onPlayerRemoved(snapshot.key);
+    this.onPlayerRemoved(id);
     this.onChange("players");
   }
 }
@@ -1709,7 +1775,7 @@ class VolleyballGame {
   private readonly lobbyView = new VbLobbyView();
   private readonly endView = new VbEndView();
   private readonly editor: ProfileEditor;
-  private readonly myId = "p" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+  private readonly myId = VbReloadResume.identity();
   private readonly random: MkRandomFlow;
   private session: VbRoomSession | null = null;
   private match: VolleyballMatch | null = null;
@@ -1760,6 +1826,7 @@ class VolleyballGame {
       this.editor.setActive(true);
       this.editor.onChange(() => this.pushProfile());
       this.updateStartButtons();
+      VbReloadResume.resumeInto(this.backend, (code) => this.enterRoom(code, false, ""));
     } catch (error) {
       VbDom.setText(VbDom.byId("loadNote"), "캐릭터를 불러오지 못했어요. 새로고침해 주세요.");
     }
@@ -1926,6 +1993,7 @@ class VolleyballGame {
     } else if (session.status === "play" && session.match && !this.match && session.me()) {
       this.editor.setActive(false);
       this.match = new VolleyballMatch(this.services, session);
+      session.replayStates();
       this.screens.show("game", !session.isSpectator());
     } else if (session.status === "end" && session.end && this.screens.current !== "end") {
       if (this.match) this.match.markEnded();

@@ -613,7 +613,7 @@ class WbGame {
   private readonly directory = new RkDirectory<WbPlayerRecord>(this.backend, WbRoomRules.RULES);
   private readonly seatPlan = new RkSeatPlan(WbRoomRules.RULES);
   private readonly meter = new WbNetMeter();
-  private readonly myId = "p" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+  private readonly myId = RkReloadResume.identity(WbRoomRules.RULES);
   private lobby: WbLobbyView | null = null;
   private world: WbWorldView | null = null;
   private ui: WbGameUi | null = null;
@@ -669,7 +669,10 @@ class WbGame {
     window.addEventListener("pagehide", () => { if (this.session) this.session.removeMineOnUnload(); });
     this.fillSoloForm();
     if (this.options.autoSolo) this.startSolo();
-    else { this.showScreen("start"); this.updateStartButtons(); }
+    else {
+      this.showScreen("start"); this.updateStartButtons();
+      RkReloadResume.resumeInto(this.backend, WbRoomRules.RULES, (code) => this.enterRoom(code, false));
+    }
     this.lastMs = performance.now();
     requestAnimationFrame((ms) => this.frame(ms));
     window.setInterval(() => { const now = performance.now(); if (now - this.lastMs > WbGame.STALL_MS) this.step(now); }, WbGame.WATCHDOG_MS);

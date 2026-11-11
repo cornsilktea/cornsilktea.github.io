@@ -578,7 +578,7 @@ class SnGame {
   private readonly seatPlan = new RkSeatPlan(SnRoomRules.RULES);
   private readonly lobby = new SnLobbyView();
   private readonly meter = new SnNetMeter();
-  private readonly myId = "p" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+  private readonly myId = RkReloadResume.identity(SnRoomRules.RULES);
   private readonly touch = matchMedia("(pointer: coarse)").matches;
   private ui: SnGameUi | null = null;
   private profile: PlayerProfile | null = null;
@@ -625,7 +625,10 @@ class SnGame {
     SnDom.show(SnDom.el("loading"), false);
     window.addEventListener("pagehide", () => { if (this.session) this.session.removeMineOnUnload(); });
     if (this.options.offline) this.startOffline();
-    else { this.showScreen("start"); this.updateStartButtons(); }
+    else {
+      this.showScreen("start"); this.updateStartButtons();
+      RkReloadResume.resumeInto(this.backend, SnRoomRules.RULES, (code) => this.enterRoom(code, false));
+    }
     this.lastMs = performance.now();
     requestAnimationFrame((ms) => this.frame(ms));
     window.setInterval(() => { const now = performance.now(); if (now - this.lastMs > SnGame.STALL_MS) this.step(now); }, SnGame.WATCHDOG_MS);

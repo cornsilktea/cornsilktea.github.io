@@ -132,7 +132,38 @@ class RkSeatPlan {
   }
 }
 
+/* 새로고침·탭 복원 뒤 같은 방·같은 아이디로 돌아오는 규칙(모든 매칭 게임 공통). 게임은 두 줄만 쓴다:
+   myId 를 RkReloadResume.identity(규칙) 로 만들고, 에셋을 다 불러온 뒤 RkReloadResume.rejoinCode(백엔드, 규칙) 가 코드를 주면 enterRoom(code, false, "") 한다.
+   저장·지우기·경기 중 자리 유지는 RkSession 이 알아서 한다. */
+class RkReloadResume {
+  static store(rules: RkRoomRules): RoomResumeStore {
+    return new RoomResumeStore(rules.root);
+  }
+
+  static identity(rules: RkRoomRules): string {
+    return RkReloadResume.store(rules).identity();
+  }
+
+  /* 에셋을 다 불러온 직후 한 줄로 부른다: 저장된 방이 남아 있으면 enter(코드)로 다시 들어간다. 실패해도 시작 화면은 그대로 쓸 수 있다. */
+  static resumeInto(backend: RkBackend, rules: RkRoomRules, enter: (code: string) => void): void {
+    RkReloadResume.rejoinCode(backend, rules).then((code) => { if (code) enter(code); }).catch(() => RkReloadResume.store(rules).clear());
+  }
+
+  static async rejoinCode(backend: RkBackend, rules: RkRoomRules): Promise<string | null> {
+    const store = RkReloadResume.store(rules);
+    if (!backend.database || !store.read()) return null;
+    const code = await store.rejoin(backend.database as FirebaseDatabase, rules.root);
+    if (!code) store.clear();
+    return code;
+  }
+}
+
 class RkSession<P extends RkPlayerRecord> {
+  /* 경기 중 누가 방에서 사라져도 이 시간 안에 돌아오면 자리를 그대로 둔다(새로고침 복구). 지나면 그때 나간 것으로 처리한다. */
+  static readonly REJOIN_GRACE_MS = 20000;
+  private readonly resume: RoomResumeStore;
+  private readonly pendingRemovals = new Map<string, number>();
+  private readonly lastStates = new Map<string, string>();
   readonly players = new Map<string, P>();
   readonly values = new Map<string, unknown>();
   hostId: string | null = null;
@@ -161,6 +192,7 @@ class RkSession<P extends RkPlayerRecord> {
   ) {
     this.ref = (backend.database as FirebaseDatabase).ref(rules.root + "/" + code);
     this.database = backend.database as FirebaseDatabase;
+    this.resume = RkReloadResume.store(rules);
     this.succession = new RoomHostSuccession({
       myId: () => this.myId,
       players: () => this.players,
@@ -200,6 +232,7 @@ class RkSession<P extends RkPlayerRecord> {
 
   connect(): void {
     this.armDisconnect();
+    this.resume.keepFresh(() => (this.leaving ? null : { code: this.code, myId: this.myId, record: this.mineAsRecord() }));
     this.subscribe(this.database.ref(".info/connected"), "value", (snapshot) => {
       if (snapshot.val<boolean>() === true && !this.leaving) this.armDisconnect();
     });
@@ -232,7 +265,10 @@ class RkSession<P extends RkPlayerRecord> {
     const stateRef = this.ref.child("st");
     const onState = (snapshot: FirebaseSnapshot) => {
       const raw = snapshot.val();
-      if (typeof raw === "string" && snapshot.key !== this.myId) this.onRemoteState(snapshot.key, raw);
+      if (typeof raw === "string" && snapshot.key !== this.myId) {
+        this.lastStates.set(snapshot.key, raw);
+        this.onRemoteState(snapshot.key, raw);
+      }
     };
     this.subscribe(stateRef, "child_added", onState);
     this.subscribe(stateRef, "child_changed", onState);
@@ -261,7 +297,27 @@ class RkSession<P extends RkPlayerRecord> {
     this.ref.child(name).set(value);
   }
 
+  /* 경기 화면이 늦게 만들어져 놓친 다른 사람들의 마지막 위치를 다시 넣어 준다(새로고침한 사람이 모두 시작 위치로 보이는 것을 막는다). */
+  replayStates(): void {
+    this.lastStates.forEach((raw, id) => this.onRemoteState(id, raw));
+  }
+
+  private mineAsRecord(): Record<string, unknown> | null {
+    return (this.players.get(this.myId) as unknown as Record<string, unknown>) || null;
+  }
+
+  private saveResume(): void {
+    this.resume.save(this.code, this.myId, this.mineAsRecord());
+  }
+
+  private forgetResume(): void {
+    this.resume.clear();
+    this.pendingRemovals.forEach((timer) => window.clearTimeout(timer));
+    this.pendingRemovals.clear();
+  }
+
   leave(): void {
+    this.forgetResume();
     this.leaving = true;
     this.unsubscribeAll();
     this.cancelDisconnect();
@@ -271,6 +327,7 @@ class RkSession<P extends RkPlayerRecord> {
   }
 
   silentClose(): void {
+    this.forgetResume();
     this.leaving = true;
     this.succession.cancel();
     this.unsubscribeAll();
@@ -278,6 +335,7 @@ class RkSession<P extends RkPlayerRecord> {
   }
 
   removeMineOnUnload(): void {
+    this.saveResume();
     if (this.isHost()) this.succession.handOver();
     this.removeMine();
   }
@@ -329,17 +387,42 @@ class RkSession<P extends RkPlayerRecord> {
     if (!record) return;
     record.look = CharacterLooks.clean(record.look);
     this.players.set(snapshot.key, record);
+    this.cancelPendingRemoval(snapshot.key);
+    if (snapshot.key === this.myId) this.saveResume();
     this.onChange("players");
+  }
+
+  private cancelPendingRemoval(id: string): void {
+    const timer = this.pendingRemovals.get(id);
+    if (timer === undefined) return;
+    window.clearTimeout(timer);
+    this.pendingRemovals.delete(id);
   }
 
   private removePlayer(snapshot: FirebaseSnapshot): void {
     if (snapshot.key === this.myId && !this.leaving) {
-      this.dropRecovery.recover(snapshot.val<Record<string, unknown>>() || (this.players.get(this.myId) as unknown as Record<string, unknown>) || null);
+      this.dropRecovery.recover(snapshot.val<Record<string, unknown>>() || this.mineAsRecord());
       return;
     }
-    this.players.delete(snapshot.key);
+    const id = snapshot.key;
+    const record = this.players.get(id);
+    const humanInMatch = !!record && !record.isBot && this.status !== "lobby" && !this.leaving;
+    if (!humanInMatch) {
+      this.finishRemoval(id);
+      return;
+    }
+    this.cancelPendingRemoval(id);
+    this.pendingRemovals.set(id, window.setTimeout(() => {
+      this.pendingRemovals.delete(id);
+      this.finishRemoval(id);
+    }, RkSession.REJOIN_GRACE_MS));
+  }
+
+  private finishRemoval(id: string): void {
+    this.players.delete(id);
+    this.lastStates.delete(id);
     this.succession.check();
-    this.onPlayerRemoved(snapshot.key);
+    this.onPlayerRemoved(id);
     this.onChange("players");
   }
 }

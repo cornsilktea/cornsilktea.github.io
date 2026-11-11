@@ -947,7 +947,7 @@ class SoccerGame {
         this.screens = new SocScreens(this.touchDevice);
         this.lobbyView = new SocLobbyView();
         this.endView = new SocEndView();
-        this.myId = "p" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+        this.myId = RkReloadResume.identity(SocRoomRules.RULES);
         this.session = null;
         this.match = null;
         this.assetsReady = false;
@@ -1000,6 +1000,7 @@ class SoccerGame {
             this.editor.setActive(true);
             this.editor.onChange(() => this.pushProfile());
             this.updateStartButtons();
+            RkReloadResume.resumeInto(this.backend, SocRoomRules.RULES, (code) => this.enterRoom(code, false, ""));
         }
         catch (error) {
             RkDom.setText(RkDom.byId("loadNote"), "캐릭터를 불러오지 못했어요. 새로고침해 주세요.");
@@ -1187,6 +1188,7 @@ class SoccerGame {
         else if (session.status === "play" && session.value("match") && !this.match && session.me()) {
             this.editor.setActive(false);
             this.match = new SoccerMatch(this.services, session);
+            session.replayStates();
             this.screens.show("game", !session.isSpectator());
         }
         else if (session.status === "end" && end && this.screens.current !== "end") {

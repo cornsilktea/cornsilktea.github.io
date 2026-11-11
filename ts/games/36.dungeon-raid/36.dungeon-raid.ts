@@ -1466,7 +1466,7 @@ class RdGame {
   private readonly lobbyView = new RdLobbyView();
   private readonly resultView = new RdResultView();
   private readonly editor: ProfileEditor;
-  private readonly myId = "p" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+  private readonly myId = RkReloadResume.identity(RdRoomRules.RULES);
   private session: RkSession<RdPlayerRecord> | null = null;
   private match: RdMatch | null = null;
   private assetsReady = false;
@@ -1507,6 +1507,7 @@ class RdGame {
       this.editor.setActive(true);
       this.editor.onChange(() => this.pushProfile());
       this.updateStartButtons();
+      RkReloadResume.resumeInto(this.backend, RdRoomRules.RULES, (code) => this.enterRoom(code, false, ""));
     } catch (error) {
       RkDom.setText(RkDom.byId("loadNote"), "캐릭터를 불러오지 못했어요. 새로고침해 주세요.");
     }
@@ -1645,6 +1646,7 @@ class RdGame {
     } else if (session.status === "play" && session.value<RdMatchRecord>("match") && !this.match && session.me()) {
       this.editor.setActive(false);
       this.match = new RdMatch(this.services, session, () => undefined);
+      session.replayStates();
       this.screens.show("game", !session.isSpectator());
     } else if (session.status === "end" && end && this.screens.current !== "end") {
       if (this.match) this.match.markEnded();

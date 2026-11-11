@@ -639,7 +639,7 @@ class SnGame {
         this.seatPlan = new RkSeatPlan(SnRoomRules.RULES);
         this.lobby = new SnLobbyView();
         this.meter = new SnNetMeter();
-        this.myId = "p" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+        this.myId = RkReloadResume.identity(SnRoomRules.RULES);
         this.touch = matchMedia("(pointer: coarse)").matches;
         this.ui = null;
         this.profile = null;
@@ -694,6 +694,7 @@ class SnGame {
         else {
             this.showScreen("start");
             this.updateStartButtons();
+            RkReloadResume.resumeInto(this.backend, SnRoomRules.RULES, (code) => this.enterRoom(code, false));
         }
         this.lastMs = performance.now();
         requestAnimationFrame((ms) => this.frame(ms));

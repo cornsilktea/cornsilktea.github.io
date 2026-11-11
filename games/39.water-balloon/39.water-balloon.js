@@ -620,7 +620,7 @@ class WbGame {
         this.directory = new RkDirectory(this.backend, WbRoomRules.RULES);
         this.seatPlan = new RkSeatPlan(WbRoomRules.RULES);
         this.meter = new WbNetMeter();
-        this.myId = "p" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
+        this.myId = RkReloadResume.identity(WbRoomRules.RULES);
         this.lobby = null;
         this.world = null;
         this.ui = null;
@@ -679,6 +679,7 @@ class WbGame {
         else {
             this.showScreen("start");
             this.updateStartButtons();
+            RkReloadResume.resumeInto(this.backend, WbRoomRules.RULES, (code) => this.enterRoom(code, false));
         }
         this.lastMs = performance.now();
         requestAnimationFrame((ms) => this.frame(ms));
