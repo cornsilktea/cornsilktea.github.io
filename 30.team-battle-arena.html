@@ -12697,23 +12697,55 @@ SinglePassMaterials.enable(THREE);
     }
     text() { return this.items.join(",").slice(0, SignalGapLog.TEXT_LEN); }
   }
+  class RedDotTally {
+    static MAX_STEP_MS = 1000;
+    constructor() { this.reset(); }
+    reset() { this.ms = 0; this.episodes = 0; this.lastAt = 0; this.on = false; }
+    note(on, now) {
+      var step = now - this.lastAt;
+      if (this.on && this.lastAt && step <= RedDotTally.MAX_STEP_MS) this.ms += step;
+      if (on && !this.on) this.episodes++;
+      this.on = on; this.lastAt = now;
+    }
+  }
+  class HiddenSpan {
+    constructor() { this.reset(); }
+    reset() { this.ms = 0; this.since = document.hidden ? performance.now() : 0; }
+    change(hidden, now) {
+      if (hidden) { if (!this.since) this.since = now; return; }
+      if (this.since) this.ms += now - this.since;
+      this.since = 0;
+    }
+    total(now) { return this.ms + (this.since ? now - this.since : 0); }
+  }
   class PerfProbe {
-    static BUILD = "lag25";
+    static BUILD = "lag26";
+    static UID_LEN = 40;
     static PATH = "perfDiag/teambattle/";
     static RTT_KEEP = 50;
     static RECORDS = !Environment.SILENT_RUN;
     static ERR_LEN = 60;
     constructor(services) {
-      this.services = services; this.frames = new FrameTally(); this.arrivals = new ArrivalTally(); this.gaps = new SignalGapLog(); this.rtts = new SampleTally(); this.snaps = 0; this.startAt = 0; this.sentFor = 0; this.endError = ""; this.awayAt = 0;
+      this.services = services; this.frames = new FrameTally(); this.arrivals = new ArrivalTally(); this.gaps = new SignalGapLog(); this.rtts = new SampleTally(); this.snaps = 0; this.startAt = 0; this.sentFor = 0; this.endError = ""; this.awayAt = 0; this.hidden = new HiddenSpan();
       var probe = this;
-      document.addEventListener("visibilitychange", function () { probe.awayAt = performance.now(); });
+      document.addEventListener("visibilitychange", function () { probe.awayAt = performance.now(); probe.hidden.change(document.hidden, probe.awayAt); });
     }
+    redDots() { var banner = this.services.badConnection; return banner ? banner.tally : null; }
+    ownKey() { var services = this.services, d = services.session.players[services.session.myId];
+      return d && d.slot ? services.netstate.stKey(d.team, d.slot) : ""; }
+    ownerFields() { var user = window.PORTAL_USER, key = this.ownKey(), dots = this.redDots(), hiddenMs = this.hidden.total(performance.now()), out = {};
+      if (user && user.uid) out.uid = String(user.uid).slice(0, PerfProbe.UID_LEN);
+      if (key) out.me = key;
+      if (dots && dots.episodes) { out.red = MathKit.r1(Math.min(3600, dots.ms / 1000)); out.redN = this.cap(dots.episodes, 1000); }
+      if (hiddenMs > 0) out.hid = MathKit.r1(Math.min(3600, hiddenMs / 1000));
+      return out; }
     noteEndError(step, e) { if (!this.endError) this.endError = (step + ": " + String((e && e.message) || e)).slice(0, PerfProbe.ERR_LEN); }
     playing() { var room = this.services.session.room; return !!(room && room.status === "playing" && this.services.match.game); }
     followMatch() {
       var room = this.services.session.room;
       if (!room || !room.startAt || room.startAt === this.startAt) return;
-      this.startAt = room.startAt; this.frames.reset(); this.arrivals.reset(); this.gaps.reset(); this.snaps = 0;
+      this.startAt = room.startAt; this.frames.reset(); this.arrivals.reset(); this.gaps.reset(); this.hidden.reset(); this.snaps = 0;
+      if (this.redDots()) this.redDots().reset();
       DeviceInfo.learnOnce(this.services.cameraRig.renderer);
     }
     frame(frameMs) { this.followMatch(); if (this.playing() && !document.hidden) this.frames.add(frameMs); }
@@ -12748,7 +12780,7 @@ SinglePassMaterials.enable(THREE);
         st50: probe.cap(this.arrivals.all.quantile(0.5), 60000), st95: probe.cap(this.arrivals.all.quantile(0.95), 60000),
         stMax: probe.cap(this.arrivals.all.max(), 600000), st95w: probe.cap(this.arrivals.worstQuantile(0.95), 60000),
         snap: probe.cap(this.snaps, 10000), rttN: probe.cap(this.rtts.count(), 1000), rtt50: probe.cap(this.rtts.quantile(0.5), 10000), rttMax: probe.cap(this.rtts.max(), 10000)
-      }, DeviceInfo.summary(), this.endError ? { err: this.endError } : {}, this.gaps.total ? { gapN: probe.cap(this.gaps.total, 1000), gaps: this.gaps.text(), m: this.startAt } : {});
+      }, DeviceInfo.summary(), this.endError ? { err: this.endError } : {}, this.ownerFields(), this.gaps.total ? { gapN: probe.cap(this.gaps.total, 1000), gaps: this.gaps.text(), m: this.startAt } : {});
     }
     matchEnded() {
       this.followMatch();
@@ -12877,7 +12909,7 @@ SinglePassMaterials.enable(THREE);
     static NEEDED_KEYS = 2;
     static DOT_PX = 9;
     static FORCED = /[?&]badnet(&|$)/.test(location.search) && !Environment.SILENT_RUN;
-    constructor(services) { this.services = services; this.box = null; this.checkedAt = 0; this.badSince = 0; this.lastBadAt = 0; this.visible = false; }
+    constructor(services) { this.services = services; this.box = null; this.checkedAt = 0; this.badSince = 0; this.lastBadAt = 0; this.visible = false; this.tally = new RedDotTally(); }
     frame() {
       var now = performance.now();
       if (now - this.checkedAt < BadConnectionBanner.CHECK_MS) return;
@@ -12890,6 +12922,7 @@ SinglePassMaterials.enable(THREE);
       }
       if (bad) this.lastBadAt = now;
       this.setVisible(bad || (this.visible && now - this.lastBadAt < BadConnectionBanner.CLEAR_MS));
+      this.tally.note(this.visible && probe.playing() && !document.hidden, now);
       if (this.visible) this.placeBesideRoomCode();
     }
     makeBox() {

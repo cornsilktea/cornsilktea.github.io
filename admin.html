@@ -627,7 +627,7 @@
         </div>
 
         <!-- 30번 렉 진단: 학생 기기가 경기 끝에 perfDiag/teambattle/<YYYYMMDD>/<push 키> 에 진단 요약 한 줄을 씁니다
-             (로그인한 기기만, 연습모드 포함, 닉네임·uid 없음). 날짜를 고르고 불러오기를 누를 때 그날 기록을 한 번만 읽습니다(폴링 없음).
+             (로그인한 기기만, 연습모드 포함. 빌드 lag26부터 uid 도 남기며 교사 계정만 읽는다). 날짜를 고르고 불러오기를 누를 때 그날 기록을 한 번만 읽습니다(폴링 없음).
              필드 뜻과 보는 법은 docs/30.team-battle/30.team-battle-notes.md 의 "렉 진단 기록" 절. -->
         <div id="lagBody" hidden>
           <p class="hint">
@@ -644,6 +644,8 @@
           <div id="lagTable" class="stats-box"></div>
           <p class="msg" id="lagGapMsg"></p>
           <div id="lagGaps" class="stats-box"></div>
+          <p class="msg" id="lagStudentMsg"></p>
+          <div id="lagStudents" class="stats-box"></div>
         </div>
 
         <!-- 30번 캐릭터별 MVP율(2026-11-09 선생님 요청): 불러오기를 누를 때 classStats 한 번 + 판 기록이 있는 학생마다 users/<uid>/stats/teambattle/c 를 한 번씩 읽어
@@ -1888,6 +1890,8 @@ class LagDiagPanel {
     $("lagTable").textContent = "";
     $("lagGaps").textContent = "";
     $("lagGapMsg").textContent = "";
+    $("lagStudents").textContent = "";
+    $("lagStudentMsg").textContent = "";
     say("lagMsg", "불러오는 중…");
     try {
       const r = await fetch(await authedUrl("perfDiag/teambattle/" + day), { cache: "no-store" });
@@ -1895,10 +1899,23 @@ class LagDiagPanel {
       const data = (await r.json()) || {};
       if (this.loadedDay !== day) return;
       this.rows = Object.keys(data).map((k) => data[k] || {});
+      this.names = this.rows.some((row) => row.uid) ? await this.loadNames() : new Map();
+      if (this.loadedDay !== day) return;
       this.render();
     } catch (e) {
       if (this.loadedDay === day) say("lagMsg", e.message);
     }
+  }
+
+  /* 학생 이름은 classStats/<반>/<uid>.n 에서 가져온다(이미 반 별 통계가 읽는 곳). 못 읽으면 uid 앞부분으로 보인다 */
+  async loadNames() {
+    const names = new Map();
+    try {
+      const r = await fetch(await authedUrl("classStats"), { cache: "no-store" });
+      const all = r.ok ? ((await r.json()) || {}) : {};
+      Object.keys(all).forEach((cls) => Object.keys(all[cls] || {}).forEach((uid) => { if (all[cls][uid] && all[cls][uid].n) names.set(uid, String(all[cls][uid].n)); }));
+    } catch (e) { /* 이름 없이 uid 로 보인다 */ }
+    return names;
   }
 
   groups() {
@@ -1926,6 +1943,84 @@ class LagDiagPanel {
     });
     box.appendChild(table);
     new LagGapReport(this.rows).render($("lagGaps"), $("lagGapMsg"));
+    new LagStudentReport(this.rows, this.names || new Map()).render($("lagStudents"), $("lagStudentMsg"));
+  }
+}
+
+/* 학생별 네트워크 신호 보고서(빌드 lag26~): 기록에 남은 uid·me(자기 캐릭터 키)·red(빨간 불 켜진 초)·redN(켜진 횟수)·hid(화면 숨김 초)로
+   학생마다 모은다. "남들이 못 받은 횟수" 는 다른 기기가 gaps 에 적은 캐릭터 키를 같은 판(반/m)의 me 와 이어 그 학생이 보낸 신호가
+   끊긴 횟수로 센다(여러 기기가 같은 순간을 적어도 한 번으로 합침). 빨간 불은 그 학생 자신의 수신이 나빴던 시간이다. */
+class LagStudentReport {
+  static SHOWN = 40;
+  static COLUMNS = ["학생", "반", "판 수", "빨간 불 켜진 판", "빨간 불 합계(초)", "빨간 불 횟수", "남들이 못 받은 횟수", "그중 가장 긴 공백", "화면 숨김(초)"];
+  constructor(rows, names) { this.rows = rows; this.names = names; }
+
+  nameOf(uid) { return this.names.get(uid) || uid.slice(0, 6); }
+
+  senderOf() {
+    const owner = new Map();
+    this.rows.forEach((row) => { if (row.uid && row.me && +row.m > 0) owner.set((row.cls || "") + "/" + row.m + "|" + row.me, row.uid); });
+    return owner;
+  }
+
+  /* 같은 판·같은 캐릭터 키의 공백 중 시간이 겹치는 것은 하나로 합쳐 학생별로 센다 */
+  missedBy() {
+    const owner = this.senderOf(), byKey = new Map();
+    new LagGapReport(this.rows).events().forEach((e) => {
+      const id = e.match + "|" + e.key;
+      if (!owner.has(id)) return;
+      if (!byKey.has(id)) byKey.set(id, []);
+      byKey.get(id).push(e);
+    });
+    const out = new Map();
+    byKey.forEach((events, id) => {
+      const uid = owner.get(id);
+      if (!out.has(uid)) out.set(uid, { count: 0, longest: 0 });
+      const mine = out.get(uid);
+      let end = -1;
+      events.sort((a, b) => a.start - b.start).forEach((e) => {
+        if (e.start > end) mine.count++;
+        end = Math.max(end, e.end);
+        mine.longest = Math.max(mine.longest, e.gap);
+      });
+    });
+    return out;
+  }
+
+  students() {
+    const missed = this.missedBy(), map = new Map();
+    this.rows.forEach((row) => {
+      if (!row.uid) return;
+      if (!map.has(row.uid)) map.set(row.uid, { uid: row.uid, cls: row.cls || "", plays: 0, redPlays: 0, red: 0, redN: 0, hid: 0 });
+      const s = map.get(row.uid);
+      s.plays++; s.red += +row.red || 0; s.redN += +row.redN || 0; s.hid += +row.hid || 0;
+      if (+row.red > 0) s.redPlays++;
+      if (row.cls) s.cls = row.cls;
+    });
+    missed.forEach((m, uid) => { if (!map.has(uid)) map.set(uid, { uid, cls: "", plays: 0, redPlays: 0, red: 0, redN: 0, hid: 0 }); });
+    return Array.from(map.values()).map((s) => Object.assign(s, { missed: (missed.get(s.uid) || { count: 0 }).count, longest: (missed.get(s.uid) || { longest: 0 }).longest }))
+      .filter((s) => s.red > 0 || s.missed > 0 || s.hid > 0)
+      .sort((a, b) => b.red - a.red || b.missed - a.missed);
+  }
+
+  render(box, msg) {
+    box.textContent = "";
+    const withUid = this.rows.filter((r) => r.uid).length;
+    if (!withUid) { msg.textContent = "학생별 신호: 이 날짜에는 학생 번호(uid)가 남은 기록(빌드 lag26~)이 없습니다."; return; }
+    const list = this.students();
+    msg.textContent = "학생별 신호(빌드 lag26~): 기록 " + this.rows.length + "개 중 " + withUid + "개에 학생 번호가 있음 · 빨간 불·끊김·화면 숨김이 있던 학생 " + list.length + "명" +
+      (list.length ? " (빨간 불 합계 순 위 " + Math.min(LagStudentReport.SHOWN, list.length) + "명 표시)" : "");
+    if (!list.length) return;
+    const table = el("table"), head = el("tr");
+    LagStudentReport.COLUMNS.forEach((t) => head.appendChild(el("th", null, t)));
+    table.appendChild(head);
+    list.slice(0, LagStudentReport.SHOWN).forEach((s) => {
+      const tr = el("tr");
+      [this.nameOf(s.uid), s.cls || "-", String(s.plays), String(s.redPlays), s.red.toFixed(1), String(s.redN), String(s.missed), s.longest ? (s.longest / 1000).toFixed(1) + "초" : "-", s.hid.toFixed(1)]
+        .forEach((t) => tr.appendChild(el("td", null, t)));
+      table.appendChild(tr);
+    });
+    box.appendChild(table);
   }
 }
 

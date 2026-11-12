@@ -1013,6 +1013,11 @@
             "gapN": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000" },
             "gaps": { ".validate": "newData.isString() && newData.val().length <= 400" },
             "m": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+            "uid": { ".validate": "newData.isString() && newData.val() === auth.uid && newData.val().length <= 40" },
+            "me": { ".validate": "newData.isString() && newData.val().length <= 6" },
+            "red": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 3600" },
+            "redN": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 1000" },
+            "hid": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 3600" },
             "$other": { ".validate": false }
           }
         }
