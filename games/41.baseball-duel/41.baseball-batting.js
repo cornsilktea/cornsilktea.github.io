@@ -9,11 +9,11 @@ class BbBatterAbilityModel {
 }
 BbBatterAbilityModel.BASE = 3;
 BbBatterAbilityModel.LENIENCY_STEP = 0.1;
-BbBatterAbilityModel.EXIT_SPEED_STEP = 4;
-BbBatterAbilityModel.TOP_WEIGHT_STEP = 0.12;
-BbBatterAbilityModel.RUN_SPEED_STEP = 0.25;
-BbBatterAbilityModel.FIRST_BASE_STEP = 0.07;
-BbBatterAbilityModel.MARGIN_STEP = 0.04;
+BbBatterAbilityModel.EXIT_SPEED_STEP = 1.15;
+BbBatterAbilityModel.TOP_WEIGHT_STEP = 0.037;
+BbBatterAbilityModel.RUN_SPEED_STEP = 0.6;
+BbBatterAbilityModel.FIRST_BASE_STEP = 0.15;
+BbBatterAbilityModel.MARGIN_STEP = 0.1;
 class BbStrikeZoneJudge {
     static isStrike(point) { return Math.abs(point.u) <= 1 && Math.abs(point.v) <= 1; }
     static inside(point, hand) { return hand === "R" ? point.u : -point.u; }
@@ -98,7 +98,7 @@ class BbExitSpeedModel {
 }
 BbExitSpeedModel.TOP_PARTS = 2;
 BbExitSpeedModel.CENTER_BONUS = 10;
-BbExitSpeedModel.PITCH_SPEED_FACTOR = 0.15;
+BbExitSpeedModel.PITCH_SPEED_FACTOR = 0.08;
 BbExitSpeedModel.MIX = {
     perfect: [{ weight: 18, mean: 170, deviation: 6 }, { weight: 30, mean: 160, deviation: 7 }, { weight: 27, mean: 149, deviation: 8 }, { weight: 17, mean: 134, deviation: 10 }, { weight: 8, mean: 114, deviation: 12 }],
     good: [{ weight: 8, mean: 158, deviation: 8 }, { weight: 24, mean: 146, deviation: 9 }, { weight: 34, mean: 132, deviation: 10 }, { weight: 24, mean: 114, deviation: 12 }, { weight: 10, mean: 94, deviation: 14 }],

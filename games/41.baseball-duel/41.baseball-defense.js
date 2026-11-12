@@ -45,6 +45,7 @@ BbFielderMotion.INFIELD_DIVE = 1.3;
 BbFielderMotion.OUTFIELD_DIVE = 2;
 BbFielderMotion.LINER_DIVE_BONUS = 1;
 class BbThrowDecision {
+    static rangeDelay(moved) { return Math.min(BbThrowDecision.RANGE_SECONDS_LIMIT, moved * BbThrowDecision.RANGE_SECONDS_PER_METER); }
     secondsTo(from, base) {
         const distance = BbDiamond.distance(from, BbDiamond.base(base)), deep = BbDiamond.fromHome(from) >= BbThrowDecision.OUTFIELD_DEPTH;
         const release = deep ? BbThrowDecision.OUTFIELD_RELEASE : BbThrowDecision.INFIELD_RELEASE, speed = deep ? BbThrowDecision.OUTFIELD_SPEED : BbThrowDecision.INFIELD_SPEED;
@@ -61,7 +62,9 @@ BbThrowDecision.OUTFIELD_SPEED = 36;
 BbThrowDecision.RELAY_BEYOND = 60;
 BbThrowDecision.RELAY_SECONDS = 0.5;
 BbThrowDecision.OUTFIELD_DEPTH = 46;
-BbThrowDecision.PIVOT_SECONDS = 1.25;
+BbThrowDecision.PIVOT_SECONDS = 0.95;
+BbThrowDecision.RANGE_SECONDS_PER_METER = 0.08;
+BbThrowDecision.RANGE_SECONDS_LIMIT = 0.8;
 class BbCoverageTable {
     static secondBaseCover(sprayDegrees) { return sprayDegrees < 0 ? "2B" : "SS"; }
     static relayLead(sprayDegrees) { return sprayDegrees < 0 ? "SS" : "2B"; }
@@ -128,7 +131,7 @@ class BbAutoFielding {
                 }
             });
             if (best)
-                return { by: best, at: ballAt, spot };
+                return { by: best, at: ballAt, spot, moved: BbDiamond.distance(spots.get(best), spot) };
         }
         if (stop > toDistance)
             return null;
@@ -141,7 +144,7 @@ class BbAutoFielding {
                 nearestSeconds = seconds;
             }
         });
-        return { by: nearest, at: Math.max(stoppedAt, nearestSeconds), spot: rest };
+        return { by: nearest, at: Math.max(stoppedAt, nearestSeconds), spot: rest, moved: BbDiamond.distance(spots.get(nearest), rest) };
     }
     retrieve(ball, spots, fence, wallBall) {
         const limit = fence - 1.5;

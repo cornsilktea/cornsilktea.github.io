@@ -256,19 +256,16 @@ class BbAimLimiter {
 class BbPitchLocationSampler {
     static sample(aim, kind, abilities, hand, random) {
         const long = kind.longDeviation(abilities), short = kind.shortDeviation(abilities), angle = kind.axisRadians(hand), limit = kind.cutRadius * kind.cutRadius;
-        let along = 0, across = 0;
-        for (let attempt = 0; attempt < 64; attempt++) {
-            along = random.gaussian();
-            across = random.gaussian();
-            if (along * along + across * across <= limit)
-                break;
-            if (attempt === 63) {
-                along = 0;
-                across = 0;
-            }
+        const cos = Math.cos(angle), sin = Math.sin(angle), wall = BbPitchTuning.AIM_LIMIT;
+        for (let attempt = 0; attempt < 96; attempt++) {
+            const along = random.gaussian(), across = random.gaussian();
+            if (along * along + across * across > limit)
+                continue;
+            const point = { u: aim.u + along * long * cos - across * short * sin, v: aim.v + along * long * sin + across * short * cos };
+            if (Math.abs(point.u) <= wall && Math.abs(point.v) <= wall)
+                return point;
         }
-        const cos = Math.cos(angle), sin = Math.sin(angle);
-        return { u: aim.u + along * long * cos - across * short * sin, v: aim.v + along * long * sin + across * short * cos };
+        return { u: aim.u, v: aim.v };
     }
 }
 class BbPitchRoller {

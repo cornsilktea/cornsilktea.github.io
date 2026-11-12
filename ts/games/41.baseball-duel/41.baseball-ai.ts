@@ -64,19 +64,24 @@ class BbAiBatter {
   static readonly TWO_STRIKE_REACH = 1.15;
   static readonly THREE_BALL_REACH = 0.7;
   static readonly NORMAL_REACH = 0.92;
+  static readonly BREAK_READ_STEP = 0.5;
+  static readonly SPEED_RUSH = 0.05;
+  static readonly COMFORT_SPEED = 136.5;
   static readonly SPEED_CHANGE_BIAS = 0.0012;
   static readonly BIAS_LIMIT = 0.03;
 
   constructor(private readonly level: BbAiTuning) {}
 
-  decide(roll: BbPitchRoll, balls: number, strikes: number, hand: BbHand, previousSpeed: number | null, random: BbSeededRandom): number | null {
-    const seen = { u: roll.arrive.u + random.gaussian(0, this.level.readDeviation), v: roll.arrive.v + random.gaussian(0, this.level.readDeviation) };
+  decide(roll: BbPitchRoll, balls: number, strikes: number, hand: BbHand, previousSpeed: number | null, pitcher: BbPitcherAbilities, random: BbSeededRandom): number | null {
+    const kind = BbPitchCatalog.of(roll.pitch), blur = this.level.readDeviation * (kind.isBreaking ? 1 + BbAiBatter.BREAK_READ_STEP * (pitcher.breaking - 1) : 1);
+    const seen = { u: roll.arrive.u + random.gaussian(0, blur), v: roll.arrive.v + random.gaussian(0, blur) };
     const reach = strikes >= 2 ? BbAiBatter.TWO_STRIKE_REACH : balls >= 3 ? BbAiBatter.THREE_BALL_REACH : BbAiBatter.NORMAL_REACH;
     if (BbStrikeZoneJudge.offCenter(seen) > reach) return null;
     const change = previousSpeed === null ? 0 : (roll.speed - previousSpeed) * BbAiBatter.SPEED_CHANGE_BIAS;
     const bias = Math.max(-BbAiBatter.BIAS_LIMIT, Math.min(BbAiBatter.BIAS_LIMIT, change));
     const ideal = BbTimingModel.idealShift(BbStrikeZoneJudge.inside(roll.arrive, hand), roll.timingNoise);
-    return ideal + random.gaussian(bias, this.level.timingDeviation);
+    const rush = 1 + BbAiBatter.SPEED_RUSH * (roll.speed - BbAiBatter.COMFORT_SPEED);
+    return ideal + random.gaussian(bias, this.level.timingDeviation * Math.max(0.6, rush));
   }
 }
 
@@ -102,7 +107,7 @@ class BbAiMatchRunner {
       const pitcher = this.teams[fieldingIndex].pitchers[0], batter = lineups[battingIndex].current();
       const call = new BbAiPitcher(this.pitcherLevels[fieldingIndex]).choose(state.balls, state.strikes, pitcher, lastPitch, random);
       const roll = BbPitchRoller.roll(call.pitch, call.aim, pitcher.abilities, pitcher.hand, random.seed());
-      const offset = new BbAiBatter(this.batterLevels[battingIndex]).decide(roll, state.balls, state.strikes, batter.hand, previousSpeed, random);
+      const offset = new BbAiBatter(this.batterLevels[battingIndex]).decide(roll, state.balls, state.strikes, batter.hand, previousSpeed, pitcher.abilities, random);
       const outcome = this.judge.judge(state, roll, offset, batter), note = this.rules.apply(state, outcome);
       if (onPitch) onPitch(state, outcome, note, battingIndex);
       lastPitch = note.plateAppearanceOver ? null : call.pitch;

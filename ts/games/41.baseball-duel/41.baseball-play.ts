@@ -180,9 +180,10 @@ class BbPlayResolver {
       script.outsAdded++;
     };
     const runnerInto = (base: number) => (shifted.find((entry) => entry.to === base && entry.from === base - 1) as BbAdvance).runner;
-    const firstAt = pick.at + this.throws.secondsTo(pick.spot, 1);
+    const readyAt = pick.at + BbThrowDecision.rangeDelay(pick.moved);
+    const firstAt = readyAt + this.throws.secondsTo(pick.spot, 1);
     if (situation.outs < 2 && doubleBase) {
-      const leadAt = pick.at + this.throws.secondsTo(pick.spot, doubleBase);
+      const leadAt = readyAt + this.throws.secondsTo(pick.spot, doubleBase);
       if (leadAt < runnerAt) {
         out(runnerInto(doubleBase), doubleBase, leadAt);
         script.events.push({ t: pick.at, kind: "throw", who: pick.by, base: doubleBase, arriveT: leadAt });
@@ -201,7 +202,7 @@ class BbPlayResolver {
       return this.closeInfieldPlay(script, situation, shifted);
     }
     if (leadForce) {
-      const leadAt = pick.at + this.throws.secondsTo(pick.spot, leadForce);
+      const leadAt = readyAt + this.throws.secondsTo(pick.spot, leadForce);
       if (leadAt < runnerAt) {
         out(runnerInto(leadForce), leadForce, leadAt);
         script.events.push({ t: pick.at, kind: "throw", who: pick.by, base: leadForce, arriveT: leadAt });

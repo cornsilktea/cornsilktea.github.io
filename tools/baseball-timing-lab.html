@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>41번 야구 타이밍 연습장</title>
+<style>
+  html,body{margin:0;height:100%;background:#16221c;color:#fff;font-family:"Nanum Gothic","Malgun Gothic",sans-serif;overflow:hidden}
+  #stage{position:fixed;left:0;top:0;right:300px;bottom:0}
+  canvas{display:block;width:100%;height:100%;touch-action:none}
+  #panel{position:fixed;right:0;top:0;bottom:0;width:300px;box-sizing:border-box;padding:12px;background:rgba(10,14,12,.92);overflow:auto;font-size:13px}
+  #panel h1{font-size:16px;margin:0 0 8px}
+  .row{margin:8px 0}
+  .row label{display:flex;justify-content:space-between}
+  .row input{width:100%}
+  #stats{margin-top:10px;line-height:1.7;border-top:1px solid #33443b;padding-top:8px}
+  #swing{position:fixed;right:320px;bottom:20px;width:150px;height:150px;border-radius:50%;border:0;background:#D97B4F;color:#fff;font:800 28px "Nanum Gothic","Malgun Gothic",sans-serif;touch-action:none}
+  #export{width:100%;height:90px;background:#0c120f;color:#9fe6b0;border:1px solid #33443b;font-size:11px}
+  button.small{border:0;border-radius:8px;padding:8px 10px;background:#2d3f35;color:#fff;font:inherit;font-weight:700}
+  @media (orientation:portrait){#stage{right:0;bottom:46%}#panel{left:0;top:54%;width:auto}#swing{right:16px;bottom:47%;width:110px;height:110px}}
+</style>
+<script charset="utf-8" src="../games/41.baseball-duel/41.baseball-motion.js?v=2"></script>
+<script charset="utf-8" src="../games/41.baseball-duel/41.baseball-field.js?v=2"></script>
+<script charset="utf-8" src="../games/41.baseball-duel/41.baseball-pitch.js?v=2"></script>
+<script charset="utf-8" src="../games/41.baseball-duel/41.baseball-batting.js?v=2"></script>
+<script charset="utf-8" src="../games/41.baseball-duel/41.baseball-running.js?v=2"></script>
+<script charset="utf-8" src="../games/41.baseball-duel/41.baseball-defense.js?v=2"></script>
+<script charset="utf-8" src="../games/41.baseball-duel/41.baseball-play.js?v=2"></script>
+<script charset="utf-8" src="../games/41.baseball-duel/41.baseball-game.js?v=2"></script>
+<script charset="utf-8" src="../games/41.baseball-duel/41.baseball-ai.js?v=2"></script>
+</head>
+<body>
+<div id="stage"><canvas id="view"></canvas></div>
+<button id="swing">스윙</button>
+<div id="panel">
+  <h1>타이밍 연습장</h1>
+  <div>Space · Enter · 화면 터치 · 스윙 버튼으로 칩니다. 값을 바꾸면 다음 공부터 적용됩니다.</div>
+  <div id="sliders"></div>
+  <div class="row"><button class="small" id="reset">기록 지우기</button> <button class="small" id="guide">가이드 링 끄기</button></div>
+  <div id="stats"></div>
+  <div class="row">설정값 (TimingModel 로 옮길 값)</div>
+  <textarea id="export" readonly></textarea>
+</div>
+<script>
+class LabSetting {
+  constructor(key, label, low, high, step, read, write, unit) { Object.assign(this, { key, label, low, high, step, read, write, unit }); }
+}
+
+class LabSettings {
+  constructor(box, onChange) {
+    this.widthScale = 1;
+    this.contactPoints = 3;
+    this.baseWidths = BbTimingModel.WIDTH_POINTS.map(([off, seconds]) => [off, seconds]);
+    this.items = [
+      new LabSetting("swingDelayMs", "스윙 지연 SWING_DELAY", 0, 250, 5, () => BbTimingModel.SWING_DELAY * 1000, (value) => { BbTimingModel.SWING_DELAY = value / 1000; }, "ms"),
+      new LabSetting("flightScale", "비행 시간 배율 FLIGHT_SCALE", 1, 4, 0.1, () => BbPitchTuning.FLIGHT_SCALE, (value) => { BbPitchTuning.FLIGHT_SCALE = value; }, "배"),
+      new LabSetting("widthScale", "정타 폭 표 배율", 0.4, 2.5, 0.05, () => this.widthScale, (value) => { this.widthScale = value; BbTimingModel.WIDTH_POINTS = this.baseWidths.map(([off, seconds]) => [off, seconds * value]); }, "배"),
+      new LabSetting("sideShiftMs", "몸쪽·바깥쪽 보정", 0, 60, 1, () => BbTimingModel.SIDE_SHIFT * 1000, (value) => { BbTimingModel.SIDE_SHIFT = value / 1000; }, "ms"),
+      new LabSetting("contactPoints", "컨택 포인트", 1, 7, 1, () => this.contactPoints, (value) => { this.contactPoints = value; }, "")
+    ];
+    this.items.forEach((item) => {
+      const row = document.createElement("div"), label = document.createElement("label"), name = document.createElement("span"), shown = document.createElement("b"), input = document.createElement("input");
+      row.className = "row";
+      name.textContent = item.label;
+      Object.assign(input, { type: "range", min: item.low, max: item.high, step: item.step, value: item.read() });
+      const show = () => { shown.textContent = Number(input.value) + item.unit; };
+      input.addEventListener("input", () => { item.write(Number(input.value)); show(); onChange(); });
+      show();
+      label.append(name, shown);
+      row.append(label, input);
+      box.appendChild(row);
+    });
+  }
+
+  exported() {
+    const values = {};
+    this.items.forEach((item) => { values[item.key] = Number(item.read().toFixed(3)); });
+    values.widthPointsMs = BbTimingModel.WIDTH_POINTS.map(([off, seconds]) => [off, Math.round(seconds * 1000)]);
+    return values;
+  }
+}
+
+class LabRecord {
+  constructor() { this.clear(); }
+  clear() { this.swings = 0; this.takes = 0; this.bands = { perfect: 0, good: 0, fair: 0, poor: 0, miss: 0 }; this.misses = 0; this.fouls = 0; this.fair = 0; this.errors = []; }
+  add(result) {
+    if (result.kind === "take") { this.takes++; return; }
+    this.swings++;
+    this.bands[result.band]++;
+    this.errors.push(result.adjusted * 1000);
+    if (result.kind === "miss") this.misses++;
+    else if (result.ball.foul) this.fouls++;
+    else this.fair++;
+  }
+  mean() { return this.errors.length ? this.errors.reduce((sum, value) => sum + value, 0) / this.errors.length : 0; }
+  deviation() { const mean = this.mean(); return this.errors.length ? Math.sqrt(this.errors.reduce((sum, value) => sum + (value - mean) * (value - mean), 0) / this.errors.length) : 0; }
+}
+
+class TimingLab {
+  static WINDUP_SECONDS = 0.9;
+  static REST_SECONDS = 1.3;
+  static BAND_NAMES = { perfect: "정타", good: "좋아요", fair: "보통", poor: "빗맞음", miss: "헛스윙" };
+
+  constructor() {
+    this.canvas = document.getElementById("view");
+    this.context = this.canvas.getContext("2d");
+    this.statsBox = document.getElementById("stats");
+    this.exportBox = document.getElementById("export");
+    this.record = new LabRecord();
+    this.random = new BbSeededRandom(Date.now() >>> 0);
+    this.pitcher = BbAiLevel.pitcherSheet("R");
+    this.caller = new BbAiPitcher(BbAiLevel.ALL.normal);
+    this.guideOn = true;
+    this.last = null;
+    this.settings = new LabSettings(document.getElementById("sliders"), () => this.showExport());
+    this.showExport();
+    const press = (event) => { event.preventDefault(); this.swing(); };
+    document.getElementById("swing").addEventListener("pointerdown", press);
+    this.canvas.addEventListener("pointerdown", press);
+    window.addEventListener("keydown", (event) => { if (event.code === "Space" || event.code === "Enter") { event.preventDefault(); if (!event.repeat) this.swing(); } });
+    document.getElementById("reset").addEventListener("click", () => { this.record.clear(); this.showStats(); });
+    document.getElementById("guide").addEventListener("click", (event) => { this.guideOn = !this.guideOn; event.target.textContent = this.guideOn ? "가이드 링 끄기" : "가이드 링 켜기"; });
+    window.addEventListener("resize", () => this.resize());
+    this.resize();
+    this.nextPitch(performance.now() / 1000 + 0.6);
+    this.showStats();
+    requestAnimationFrame(() => this.frame());
+  }
+
+  resize() {
+    const box = this.canvas.getBoundingClientRect(), ratio = Math.min(window.devicePixelRatio || 1, 1.5);
+    this.canvas.width = box.width * ratio;
+    this.canvas.height = box.height * ratio;
+  }
+
+  nextPitch(startAt) {
+    const call = this.caller.choose(0, 0, this.pitcher, this.last ? this.last.roll.pitch : null, this.random);
+    const roll = BbPitchRoller.roll(call.pitch, call.aim, this.pitcher.abilities, this.pitcher.hand, this.random.seed());
+    this.pitch = { roll, releaseAt: startAt + TimingLab.WINDUP_SECONDS, arriveAt: startAt + TimingLab.WINDUP_SECONDS + roll.flightSeconds, pressedAt: null, result: null, doneAt: null };
+  }
+
+  swing() {
+    const now = performance.now() / 1000, pitch = this.pitch;
+    if (!pitch || pitch.pressedAt !== null || pitch.result || now < pitch.releaseAt - 0.3) return;
+    pitch.pressedAt = now;
+    this.finish(now + BbTimingModel.SWING_DELAY - pitch.arriveAt, now);
+  }
+
+  finish(contactOffset, now) {
+    const pitch = this.pitch, abilities = { contact: this.settings.contactPoints, power: 3, speed: 3 };
+    pitch.result = new BbSwingAction().resolve({ roll: pitch.roll, batterHand: "R", abilities, contactOffset, random: new BbSeededRandom(pitch.roll.seed) });
+    pitch.doneAt = Math.max(now, pitch.arriveAt) + TimingLab.REST_SECONDS;
+    this.record.add(pitch.result);
+    this.last = pitch;
+    this.showStats();
+  }
+
+  frame() {
+    const now = performance.now() / 1000, pitch = this.pitch;
+    if (pitch && !pitch.result && now > pitch.arriveAt + 0.25) this.finish(null, now);
+    if (pitch && pitch.doneAt !== null && now > pitch.doneAt) this.nextPitch(now);
+    this.draw(now);
+    requestAnimationFrame(() => this.frame());
+  }
+
+  zoneBox() {
+    const width = this.canvas.width, height = this.canvas.height, half = Math.min(width, height) * 0.17;
+    return { x: width / 2, y: height * 0.58, half };
+  }
+
+  draw(now) {
+    const context = this.context, width = this.canvas.width, height = this.canvas.height, zone = this.zoneBox(), pitch = this.pitch;
+    context.fillStyle = "#1e3b2a";
+    context.fillRect(0, 0, width, height);
+    context.fillStyle = "#b98656";
+    context.beginPath();
+    context.ellipse(width / 2, height * 0.2, zone.half * 0.5, zone.half * 0.16, 0, 0, Math.PI * 2);
+    context.fill();
+    context.strokeStyle = "rgba(255,255,255,.85)";
+    context.lineWidth = 3;
+    context.strokeRect(zone.x - zone.half, zone.y - zone.half, zone.half * 2, zone.half * 2);
+    context.lineWidth = 1;
+    context.strokeStyle = "rgba(255,255,255,.3)";
+    for (let line = 1; line < 3; line++) {
+      const shift = -zone.half + zone.half * 2 * line / 3;
+      context.beginPath(); context.moveTo(zone.x + shift, zone.y - zone.half); context.lineTo(zone.x + shift, zone.y + zone.half); context.stroke();
+      context.beginPath(); context.moveTo(zone.x - zone.half, zone.y + shift); context.lineTo(zone.x + zone.half, zone.y + shift); context.stroke();
+    }
+    if (!pitch) return;
+    const flight = (now - pitch.releaseAt) / (pitch.arriveAt - pitch.releaseAt), targetX = zone.x - pitch.roll.arrive.u * zone.half, targetY = zone.y - pitch.roll.arrive.v * zone.half;
+    if (flight < 0) {
+      const ready = 1 + flight * (pitch.arriveAt - pitch.releaseAt) / TimingLab.WINDUP_SECONDS;
+      context.fillStyle = "#fff";
+      context.beginPath(); context.arc(width / 2, height * 0.2 - 8, 5 + 4 * Math.max(0, ready), 0, Math.PI * 2); context.fill();
+    } else if (flight <= 1.25 && !(pitch.result && pitch.result.kind === "contact")) {
+      const depth = flight * flight * 0.55 + flight * 0.45, x = width / 2 + (targetX - width / 2) * depth, y = height * 0.2 + (targetY - height * 0.2) * depth;
+      context.fillStyle = "#fff";
+      context.beginPath(); context.arc(x, y, 4 + zone.half * 0.16 * depth, 0, Math.PI * 2); context.fill();
+      context.strokeStyle = "#c8322b"; context.lineWidth = 2; context.stroke();
+    }
+    if (this.guideOn && flight > 0 && flight < 1 && !pitch.result) {
+      context.strokeStyle = "rgba(255,220,120,.8)";
+      context.lineWidth = 3;
+      context.beginPath(); context.arc(zone.x, zone.y, zone.half * (0.25 + 1.6 * (1 - flight)), 0, Math.PI * 2); context.stroke();
+    }
+    if (pitch.result) this.drawResult(pitch, targetX, targetY, zone);
+  }
+
+  drawResult(pitch, targetX, targetY, zone) {
+    const context = this.context, width = this.canvas.width, height = this.canvas.height, result = pitch.result, scale = width / 900;
+    context.fillStyle = "#f2c230";
+    context.beginPath(); context.arc(targetX, targetY, 9, 0, Math.PI * 2); context.fill();
+    context.textAlign = "center";
+    context.fillStyle = "#fff";
+    context.font = "800 " + Math.max(22, 34 * scale) + 'px "Nanum Gothic", "Malgun Gothic", sans-serif';
+    const kind = BbPitchCatalog.of(pitch.roll.pitch);
+    let title = result.kind === "take" ? (BbStrikeZoneJudge.isStrike(pitch.roll.arrive) ? "스트라이크(치지 않음)" : "볼(치지 않음)") : TimingLab.BAND_NAMES[result.band];
+    if (result.kind === "contact") title += result.ball.foul ? " · 파울" : " · " + Math.round(result.ball.exitSpeed) + "km/h " + Math.round(result.ball.launch) + "° " + Math.round(result.ball.carry) + "m";
+    if (result.kind === "miss" && result.band !== "miss") title += " · 헛스윙";
+    context.fillText(title, width / 2, height * 0.1);
+    context.font = "700 " + Math.max(14, 18 * scale) + 'px "Nanum Gothic", "Malgun Gothic", sans-serif';
+    context.fillText(kind.label + "  " + Math.round(pitch.roll.speed) + "km/h", width / 2, zone.y + zone.half + 30 * scale + 8);
+    if (result.kind === "take") return;
+    const barWidth = Math.min(width * 0.7, 620), barX = width / 2 - barWidth / 2, barY = height * 0.9, span = 0.25, toX = (seconds) => barX + barWidth * (0.5 + seconds / span / 2);
+    const leniency = BbBatterAbilityModel.leniency(this.settings.contactPoints), extra = BbTimingModel.BAND_EXTRA;
+    const bands = [[result.width + extra.poor * leniency, "#7a3b34"], [result.width + extra.fair * leniency, "#c9a33a"], [result.width + extra.good * leniency, "#9fce5a"], [result.width, "#3fbf5a"]];
+    context.fillStyle = "#26302b";
+    context.fillRect(barX, barY - 9, barWidth, 18);
+    bands.forEach(([reach, color]) => { context.fillStyle = color; const from = Math.max(barX, toX(-reach)), to = Math.min(barX + barWidth, toX(reach)); context.fillRect(from, barY - 9, to - from, 18); });
+    const mark = Math.max(barX, Math.min(barX + barWidth, toX(result.adjusted)));
+    context.fillStyle = "#fff";
+    context.beginPath(); context.moveTo(mark, barY - 12); context.lineTo(mark - 9, barY - 28); context.lineTo(mark + 9, barY - 28); context.fill();
+    context.fillText((result.adjusted < 0 ? "빨라요 " : "늦었어요 ") + Math.abs(Math.round(result.adjusted * 1000)) + "ms", width / 2, barY + 32);
+    context.textAlign = "left"; context.fillText("빠름 ◀", barX, barY - 34);
+    context.textAlign = "right"; context.fillText("▶ 늦음", barX + barWidth, barY - 34);
+  }
+
+  showStats() {
+    const record = this.record, swings = Math.max(1, record.swings), percent = (count) => (count / swings * 100).toFixed(0) + "%";
+    const histogram = new Array(11).fill(0);
+    record.errors.forEach((error) => { histogram[Math.max(0, Math.min(10, Math.round(error / 30) + 5))]++; });
+    const tallest = Math.max(1, ...histogram);
+    this.statsBox.innerHTML = "";
+    const lines = [
+      "스윙 " + record.swings + "번 · 치지 않음 " + record.takes + "번",
+      "정타 " + percent(record.bands.perfect) + " · 좋아요 " + percent(record.bands.good) + " · 보통 " + percent(record.bands.fair) + " · 빗맞음 " + percent(record.bands.poor),
+      "헛스윙 " + percent(record.misses) + " · 파울 " + percent(record.fouls) + " · 페어 " + percent(record.fair),
+      "내 타이밍 평균 " + record.mean().toFixed(0) + "ms · 흩어짐(표준편차) " + record.deviation().toFixed(0) + "ms",
+      "오차 분포 (−150ms ← 0 → +150ms)"
+    ];
+    lines.forEach((text) => { const row = document.createElement("div"); row.textContent = text; this.statsBox.appendChild(row); });
+    const bars = document.createElement("div");
+    bars.style.cssText = "display:flex;align-items:flex-end;gap:2px;height:60px";
+    histogram.forEach((count, index) => { const bar = document.createElement("div"); bar.style.cssText = "flex:1;background:" + (index === 5 ? "#3fbf5a" : "#6f8f7c") + ";height:" + Math.round(count / tallest * 100) + "%"; bars.appendChild(bar); });
+    this.statsBox.appendChild(bars);
+  }
+
+  showExport() { this.exportBox.value = JSON.stringify(this.settings.exported()); }
+}
+
+new TimingLab();
+</script>
+</body>
+</html>

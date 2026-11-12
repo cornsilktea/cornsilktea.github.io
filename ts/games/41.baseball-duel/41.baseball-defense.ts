@@ -57,7 +57,11 @@ class BbThrowDecision implements BbThrowClock {
   static readonly RELAY_BEYOND = 60;
   static readonly RELAY_SECONDS = 0.5;
   static readonly OUTFIELD_DEPTH = 46;
-  static readonly PIVOT_SECONDS = 1.25;
+  static readonly PIVOT_SECONDS = 0.95;
+  static readonly RANGE_SECONDS_PER_METER = 0.08;
+  static readonly RANGE_SECONDS_LIMIT = 0.8;
+
+  static rangeDelay(moved: number): number { return Math.min(BbThrowDecision.RANGE_SECONDS_LIMIT, moved * BbThrowDecision.RANGE_SECONDS_PER_METER); }
 
   secondsTo(from: BbSpot, base: number): number {
     const distance = BbDiamond.distance(from, BbDiamond.base(base)), deep = BbDiamond.fromHome(from) >= BbThrowDecision.OUTFIELD_DEPTH;
@@ -106,6 +110,7 @@ interface BbGroundPick {
   by: BbPosition;
   at: number;
   spot: BbSpot;
+  moved: number;
 }
 
 interface BbFieldingController {
@@ -148,7 +153,7 @@ class BbAutoFielding implements BbFieldingController {
         const seconds = BbFielderMotion.secondsTo(position, home, spot, false);
         if (seconds <= ballAt && seconds < bestSeconds) { best = position; bestSeconds = seconds; }
       });
-      if (best) return { by: best, at: ballAt, spot };
+      if (best) return { by: best, at: ballAt, spot, moved: BbDiamond.distance(spots.get(best) as BbSpot, spot) };
     }
     if (stop > toDistance) return null;
     const rest = BbDiamond.polar(Math.max(fromDistance, stop), ball.spray), stoppedAt = startSpeed / BbBattedBallPhysics.GROUND_SLOWING;
@@ -157,7 +162,7 @@ class BbAutoFielding implements BbFieldingController {
       const seconds = BbFielderMotion.secondsTo(position, spots.get(position) as BbSpot, rest, false);
       if (seconds < nearestSeconds) { nearest = position; nearestSeconds = seconds; }
     });
-    return { by: nearest, at: Math.max(stoppedAt, nearestSeconds), spot: rest };
+    return { by: nearest, at: Math.max(stoppedAt, nearestSeconds), spot: rest, moved: BbDiamond.distance(spots.get(nearest) as BbSpot, rest) };
   }
 
   retrieve(ball: BbBattedBall, spots: Map<BbPosition, BbSpot>, fence: number, wallBall: boolean): BbRetrieve {

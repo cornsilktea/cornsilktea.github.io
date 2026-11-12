@@ -7,11 +7,11 @@ interface BbBatterAbilities {
 class BbBatterAbilityModel {
   static readonly BASE = 3;
   static readonly LENIENCY_STEP = 0.1;
-  static readonly EXIT_SPEED_STEP = 4;
-  static readonly TOP_WEIGHT_STEP = 0.12;
-  static readonly RUN_SPEED_STEP = 0.25;
-  static readonly FIRST_BASE_STEP = 0.07;
-  static readonly MARGIN_STEP = 0.04;
+  static readonly EXIT_SPEED_STEP = 1.15;
+  static readonly TOP_WEIGHT_STEP = 0.037;
+  static readonly RUN_SPEED_STEP = 0.6;
+  static readonly FIRST_BASE_STEP = 0.15;
+  static readonly MARGIN_STEP = 0.1;
 
   static leniency(contact: number): number { return 1 + BbBatterAbilityModel.LENIENCY_STEP * (contact - BbBatterAbilityModel.BASE); }
   static exitBoost(power: number): number { return BbBatterAbilityModel.EXIT_SPEED_STEP * (power - BbBatterAbilityModel.BASE); }
@@ -106,7 +106,7 @@ class BbLaunchModel {
 class BbExitSpeedModel {
   static readonly TOP_PARTS = 2;
   static readonly CENTER_BONUS = 10;
-  static readonly PITCH_SPEED_FACTOR = 0.15;
+  static readonly PITCH_SPEED_FACTOR = 0.08;
   static readonly MIX: Readonly<Record<Exclude<BbTimingBand, "miss">, readonly BbMixturePart[]>> = {
     perfect: [{ weight: 18, mean: 170, deviation: 6 }, { weight: 30, mean: 160, deviation: 7 }, { weight: 27, mean: 149, deviation: 8 }, { weight: 17, mean: 134, deviation: 10 }, { weight: 8, mean: 114, deviation: 12 }],
     good: [{ weight: 8, mean: 158, deviation: 8 }, { weight: 24, mean: 146, deviation: 9 }, { weight: 34, mean: 132, deviation: 10 }, { weight: 24, mean: 114, deviation: 12 }, { weight: 10, mean: 94, deviation: 14 }],
