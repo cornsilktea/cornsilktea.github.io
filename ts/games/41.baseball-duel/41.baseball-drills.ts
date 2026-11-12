@@ -259,6 +259,11 @@ abstract class BbDrill {
     return { contactAt, contactPoint, swingEndsAt: swingAt + swing.duration };
   }
 
+  protected pitcherWatches(spot: BbVec, contactAt: number): void {
+    this.face("pitcher", spot, contactAt + 0.12);
+    this.pose("pitcher", new BbReadyPose(this.metrics, 0.2), contactAt + 0.12, null, "타구 보기");
+  }
+
   protected batterRunsToFirst(leaveAt: number, contactAt: number, overrun: boolean): number {
     const arriveAt = contactAt + 4.1;
     const bag = BbFieldGeometry.FIRST.plus(new BbVec(0.25, 0, 0.1));
@@ -278,6 +283,7 @@ class BbLineDriveDrill extends BbDrill {
     const landing = BbFieldSpace.toWorld(-20, 60, BbThrowTrajectory.BALL_RADIUS), landAt = contactAt + 2.5;
     this.fly(new BbBattedFlight(contactPoint, landing, 2.5, 8.5), contactAt, 20);
     const fieldSpot = BbFieldSpace.toWorld(-25, 71.5), pickAt = landAt + 1.25;
+    this.pitcherWatches(landing, contactAt);
     this.move("left", fieldSpot, contactAt + 0.35, pickAt - 0.45);
     this.face("left", landing, pickAt - 0.45);
     const glove = this.gloveWorld("left", pickAt, BbDrill.GROUND_GLOVE);
@@ -302,6 +308,7 @@ class BbGroundOutDrill extends BbDrill {
   protected compose(): void {
     const { contactAt, contactPoint, swingEndsAt } = this.pitchAndSwing(-0.2, -0.6);
     const fieldedAt = contactAt + 1.45, spot = BbFieldSpace.toWorld(-7.5, 28);
+    this.pitcherWatches(spot, contactAt);
     this.move("short", spot, contactAt + 0.28, fieldedAt - 0.4);
     this.face("short", contactPoint.flat(), fieldedAt - 0.4);
     const glove = this.gloveWorld("short", fieldedAt, BbDrill.GROUND_GLOVE);
@@ -330,6 +337,7 @@ class BbSacrificeFlyDrill extends BbDrill {
     this.stand("runner", BbActorPlacement.facing(third.plus(new BbVec(0.2, 0, 0.2)), home), null);
     const { contactAt, contactPoint, swingEndsAt } = this.pitchAndSwing(0, 0.35);
     const hang = 4.6, catchAt = contactAt + hang, spot = BbFieldSpace.toWorld(7, 73.6);
+    this.pitcherWatches(spot, contactAt);
     this.move("center", spot, contactAt + 0.45, catchAt - 1.3);
     this.face("center", home, catchAt - 1.3);
     const glove = this.gloveWorld("center", catchAt, BbDrill.FLY_GLOVE);

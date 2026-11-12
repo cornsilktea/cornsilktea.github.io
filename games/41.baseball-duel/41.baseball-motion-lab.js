@@ -34,9 +34,9 @@ class BbLabDirector {
     shot(view, seconds, ball) {
         const side = this.batsLeft ? -1 : 1;
         if (view === "pitcher")
-            return { position: BbFieldSpace.toWorld(this.throwsLeft ? -1.9 : 1.9, BbFieldGeometry.RUBBER_DISTANCE + 4.2, 3.5), look: BbFieldSpace.toWorld(0, 0, 0.5), fieldOfView: 26 };
+            return { position: BbFieldSpace.toWorld(-3.6, BbFieldGeometry.RUBBER_DISTANCE + 17, 7.2), look: BbFieldSpace.toWorld(0.5, 10, 0), fieldOfView: 19 };
         if (view === "batter")
-            return { position: BbFieldSpace.toWorld(side * 0.3, -2.7, 1.0), look: BbFieldSpace.toWorld(side * 0.1, 10, 0.8), fieldOfView: 30 };
+            return { position: BbFieldSpace.toWorld(0, -2.7, 1.0), look: BbFieldSpace.toWorld(0, 10, 0.8), fieldOfView: 30 };
         if (view === "swing")
             return { position: BbFieldSpace.toWorld(side * 2.9, 2.3, 1.0), look: BbFieldSpace.toWorld(-side * 0.7, 0.2, 0.62), fieldOfView: 34 };
         if (view === "mound")
@@ -173,7 +173,8 @@ class BbMotionLab {
         new BbParkLighting(this.libs).addTo(this.scene);
         this.createActors(factory, assets, gear);
         this.ball = new BbBallActor(this.libs);
-        this.scene.add(this.ball.mesh, this.ball.shadow, this.zoneFrame());
+        this.zone = this.zoneFrame();
+        this.scene.add(this.ball.mesh, this.ball.shadow, this.zone);
         const metrics = this.actors.get("batter").poser.metrics;
         this.script = BbDrillCatalog.all()[this.options.scene].build({ metrics, batsLeft: this.options.batsLeft, throwsLeft: this.options.throwsLeft });
         this.director = new BbLabDirector(this.script, this.options.scene, this.options.batsLeft, this.options.throwsLeft);
@@ -266,6 +267,7 @@ class BbMotionLab {
         });
         const state = this.script.ballAt(this.seconds), holder = state && state.holder ? this.actors.get(state.holder) : null;
         this.ball.update(state, holder, state && state.holder ? this.script.sideOf(state.holder, state.hand) : "right", deltaSeconds);
+        this.zone.visible = this.seconds < this.director.contactAt() + BbMotionLab.ZONE_LINGER_SECONDS;
         this.watchGrip();
     }
     measure(before, now) {
@@ -330,5 +332,6 @@ class BbMotionLab {
     }
 }
 BbMotionLab.ASSET_DIRECTORY = "../assets/kaykit/";
+BbMotionLab.ZONE_LINGER_SECONDS = 0.15;
 BbMotionLab.HIDDEN_BEHIND_PLATE = ["catcher", "umpire"];
 BbMotionLab.FIELDERS = ["pitcher", "catcher", "first", "second", "short", "third", "left", "center", "right"];

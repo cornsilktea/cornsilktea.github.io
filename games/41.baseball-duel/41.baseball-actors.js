@@ -265,6 +265,8 @@ class BbGearFactory {
 class BbPlayerActor {
     constructor(libs, factory, assets, gear, outfit) {
         this.libs = libs;
+        this.shownYaw = 0;
+        this.snapYaw = true;
         this.lastFrame = null;
         this.weight = 0;
         const THREE = libs.THREE;
@@ -293,7 +295,7 @@ class BbPlayerActor {
     }
     update(deltaSeconds, placement, frame, gait, speed) {
         this.root.position.set(placement.position.x, placement.position.y, placement.position.z);
-        this.root.rotation.y = placement.yaw;
+        this.turnToward(placement.yaw, deltaSeconds);
         if (gait === "walk")
             this.animator.play("Walking_A", { speed: Math.max(0.4, speed / BbPlayerActor.WALK_CLIP_SPEED) });
         else if (gait)
@@ -310,7 +312,14 @@ class BbPlayerActor {
             this.poser.apply(this.lastFrame, this.weight);
         this.placeBat(frame);
     }
+    turnToward(yaw, deltaSeconds) {
+        const gap = Math.atan2(Math.sin(yaw - this.shownYaw), Math.cos(yaw - this.shownYaw)), step = BbPlayerActor.TURN_SPEED * deltaSeconds;
+        this.shownYaw = this.snapYaw || Math.abs(gap) <= step ? yaw : this.shownYaw + Math.sign(gap) * step;
+        this.snapYaw = false;
+        this.root.rotation.y = this.shownYaw;
+    }
     snapTo(frame) {
+        this.snapYaw = true;
         this.weight = frame ? 1 : 0;
         this.lastFrame = frame;
     }
@@ -335,6 +344,7 @@ class BbPlayerActor {
 BbPlayerActor.FADE_SECONDS = 0.09;
 BbPlayerActor.RUN_CLIP_SPEED = 5.6;
 BbPlayerActor.WALK_CLIP_SPEED = 1.9;
+BbPlayerActor.TURN_SPEED = 12;
 class BbBallActor {
     constructor(libs) {
         this.heldBy = null;

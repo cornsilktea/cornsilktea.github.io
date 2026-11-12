@@ -324,6 +324,9 @@ class BbPlayerActor {
   private readonly bat: Three<"Mesh"> | null;
   private readonly batAxis: Three<"Vector3">;
   private readonly up: Three<"Vector3">;
+  private static readonly TURN_SPEED = 12;
+  private shownYaw = 0;
+  private snapYaw = true;
   private lastFrame: BbPoseFrame | null = null;
   private weight = 0;
 
@@ -352,7 +355,7 @@ class BbPlayerActor {
 
   update(deltaSeconds: number, placement: BbActorPlacement, frame: BbPoseFrame | null, gait: BbGait | null, speed: number): void {
     this.root.position.set(placement.position.x, placement.position.y, placement.position.z);
-    this.root.rotation.y = placement.yaw;
+    this.turnToward(placement.yaw, deltaSeconds);
     if (gait === "walk") this.animator.play("Walking_A", { speed: Math.max(0.4, speed / BbPlayerActor.WALK_CLIP_SPEED) });
     else if (gait) this.animator.play("Running_A", { speed: BbCurve.clamp(speed / BbPlayerActor.RUN_CLIP_SPEED, 0.5, 1.6) });
     else this.animator.play("Idle_A");
@@ -365,7 +368,15 @@ class BbPlayerActor {
     this.placeBat(frame);
   }
 
+  private turnToward(yaw: number, deltaSeconds: number): void {
+    const gap = Math.atan2(Math.sin(yaw - this.shownYaw), Math.cos(yaw - this.shownYaw)), step = BbPlayerActor.TURN_SPEED * deltaSeconds;
+    this.shownYaw = this.snapYaw || Math.abs(gap) <= step ? yaw : this.shownYaw + Math.sign(gap) * step;
+    this.snapYaw = false;
+    this.root.rotation.y = this.shownYaw;
+  }
+
   snapTo(frame: BbPoseFrame | null): void {
+    this.snapYaw = true;
     this.weight = frame ? 1 : 0;
     this.lastFrame = frame;
   }

@@ -48,8 +48,8 @@ class BbLabDirector {
 
   shot(view: BbLabView, seconds: number, ball: BbVec | null): BbLabShot {
     const side = this.batsLeft ? -1 : 1;
-    if (view === "pitcher") return { position: BbFieldSpace.toWorld(this.throwsLeft ? -1.9 : 1.9, BbFieldGeometry.RUBBER_DISTANCE + 4.2, 3.5), look: BbFieldSpace.toWorld(0, 0, 0.5), fieldOfView: 26 };
-    if (view === "batter") return { position: BbFieldSpace.toWorld(side * 0.3, -2.7, 1.0), look: BbFieldSpace.toWorld(side * 0.1, 10, 0.8), fieldOfView: 30 };
+    if (view === "pitcher") return { position: BbFieldSpace.toWorld(-3.6, BbFieldGeometry.RUBBER_DISTANCE + 17, 7.2), look: BbFieldSpace.toWorld(0.5, 10, 0), fieldOfView: 19 };
+    if (view === "batter") return { position: BbFieldSpace.toWorld(0, -2.7, 1.0), look: BbFieldSpace.toWorld(0, 10, 0.8), fieldOfView: 30 };
     if (view === "swing") return { position: BbFieldSpace.toWorld(side * 2.9, 2.3, 1.0), look: BbFieldSpace.toWorld(-side * 0.7, 0.2, 0.62), fieldOfView: 34 };
     if (view === "mound") return { position: BbFieldSpace.toWorld(-3.4, BbFieldGeometry.RUBBER_DISTANCE - 2.6, 1.3), look: BbFieldSpace.toWorld(0, BbFieldGeometry.RUBBER_DISTANCE - 0.3, 0.95), fieldOfView: 34 };
     if (view === "wide") return { position: BbFieldSpace.toWorld(0, -30, 26), look: BbFieldSpace.toWorld(0, 30, 0), fieldOfView: 46 };
@@ -63,7 +63,7 @@ class BbLabDirector {
     return { position: BbFieldSpace.toWorld(-58, 36, 34), look: BbFieldSpace.toWorld(4, 37, 0), fieldOfView: 55 };
   }
 
-  private contactAt(): number {
+  contactAt(): number {
     const contact = this.script.checkpoints.find((check) => check.kind === "contact");
     return contact ? contact.at : 2.5;
   }
@@ -138,6 +138,7 @@ class BbSyncBoard {
 
 class BbMotionLab {
   private static readonly ASSET_DIRECTORY = "../assets/kaykit/";
+  private static readonly ZONE_LINGER_SECONDS = 0.15;
   private static readonly HIDDEN_BEHIND_PLATE: readonly BbRoleId[] = ["catcher", "umpire"];
   private static readonly FIELDERS: readonly BbRoleId[] = ["pitcher", "catcher", "first", "second", "short", "third", "left", "center", "right"];
 
@@ -156,6 +157,7 @@ class BbMotionLab {
   private readonly clock: Three<"Clock">;
   private readonly actors = new Map<BbRoleId, BbPlayerActor>();
   private ball!: BbBallActor;
+  private zone!: Three<"LineLoop">;
   private script!: BbDrillScript;
   private director!: BbLabDirector;
   private board!: BbSyncBoard;
@@ -201,7 +203,8 @@ class BbMotionLab {
     new BbParkLighting(this.libs).addTo(this.scene);
     this.createActors(factory, assets, gear);
     this.ball = new BbBallActor(this.libs);
-    this.scene.add(this.ball.mesh, this.ball.shadow, this.zoneFrame());
+    this.zone = this.zoneFrame();
+    this.scene.add(this.ball.mesh, this.ball.shadow, this.zone);
     const metrics = (this.actors.get("batter") as BbPlayerActor).poser.metrics;
     this.script = BbDrillCatalog.all()[this.options.scene].build({ metrics, batsLeft: this.options.batsLeft, throwsLeft: this.options.throwsLeft });
     this.director = new BbLabDirector(this.script, this.options.scene, this.options.batsLeft, this.options.throwsLeft);
@@ -298,6 +301,7 @@ class BbMotionLab {
     });
     const state = this.script.ballAt(this.seconds), holder = state && state.holder ? this.actors.get(state.holder) as BbPlayerActor : null;
     this.ball.update(state, holder, state && state.holder ? this.script.sideOf(state.holder, state.hand) : "right", deltaSeconds);
+    this.zone.visible = this.seconds < this.director.contactAt() + BbMotionLab.ZONE_LINGER_SECONDS;
     this.watchGrip();
   }
 
