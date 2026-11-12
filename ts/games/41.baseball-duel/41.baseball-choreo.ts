@@ -12,6 +12,11 @@ interface BbCallCue {
   text: string;
 }
 
+interface BbEffectCue {
+  at: number;
+  point: BbVec;
+}
+
 interface BbPlaySetting {
   outs: number;
   runners: [string | null, string | null, string | null];
@@ -70,7 +75,9 @@ abstract class BbPitchChoreographer extends BbDrill {
   readonly duration = 0;
   readonly cameraCues: BbCameraCue[] = [];
   readonly calls: BbCallCue[] = [];
+  readonly sparks: BbEffectCue[] = [];
   protected plateAt = 0;
+  private platePoint: BbVec | null = null;
   private lastMoment = 0;
 
   constructor(protected readonly cue: BbPitchCue) {
@@ -80,6 +87,7 @@ abstract class BbPitchChoreographer extends BbDrill {
   }
 
   get arriveAt(): number { return this.plateAt; }
+  get crossedAt(): BbVec | null { return this.platePoint; }
 
   protected abstract playOut(ball: BbBattedBall, script: BbPlayScript, contactPoint: BbVec, swingEndsAt: number): void;
 
@@ -107,6 +115,7 @@ abstract class BbPitchChoreographer extends BbDrill {
     const flight = new BbPitchFlight(from, plate, roll.flightSeconds, this.breakOf(roll).plus(BbPitchChoreographer.DROP));
     this.fly(flight, releaseAt, BbPitchChoreographer.PITCH_SPIN);
     this.plateAt = this.until(releaseAt + roll.flightSeconds);
+    this.platePoint = plate;
     this.shoot(0, "pitch", BbFieldGeometry.RUBBER, BbFieldGeometry.HOME);
     this.pose("batter", new BbBatLoadPose(this.metrics), this.plateAt - BbPitchChoreographer.LOAD_LEAD, null, "로드");
     if (swing.kind === "contact" && swing.ball && outcome.script) {
@@ -170,7 +179,7 @@ class BbPlayChoreographer extends BbPitchChoreographer {
   private static readonly SLIDE_METERS = 3;
   private static readonly SLIDE_SECONDS = 0.75;
   private static readonly HELD_RUN_SPEED = 7.5;
-  private static readonly TROT_SPEED = 8;
+  private static readonly TROT_SPEED = 9;
   private static readonly COVER_SPEED = 6.5;
   private static readonly BACKUP_BEHIND = 8;
   private static readonly OVERRUN = BbFieldSpace.toWorld(22.9, 23.2);
@@ -184,6 +193,7 @@ class BbPlayChoreographer extends BbPitchChoreographer {
   private readonly busy = new Set<BbRoleId>();
   private readonly freeAt = new Map<BbRoleId, number>();
   private readonly clock = new BbThrowDecision();
+  private readonly bounds = new BbParkBounds(BbBallparkRegistry.MAIN.dimensions);
   private contactAt = 0;
   private holder: BbRoleId | null = null;
   private heldSince = 0;
@@ -246,7 +256,7 @@ class BbPlayChoreographer extends BbPitchChoreographer {
     const contactAt = this.contactAt, takenAt = handled ? contactAt + handled.t : 0, landing = BbFieldSpace.polar(ball.carry, ball.spray, BbThrowTrajectory.BALL_RADIUS);
     if (ball.flight === "ground") {
       const stop = glove || BbFieldSpace.polar(Math.max(ball.carry, BbPlayChoreographer.FOUL_ROLL_METERS), ball.spray, BbThrowTrajectory.BALL_RADIUS);
-      this.fly(new BbGroundRoll(contactPoint, stop, glove ? takenAt - contactAt : BbPlayChoreographer.FOUL_ROLL_SECONDS, 5, 0.4), contactAt, 26);
+      this.flyBatted(new BbGroundRoll(contactPoint, stop, glove ? takenAt - contactAt : BbPlayChoreographer.FOUL_ROLL_SECONDS, 5, 0.4), contactAt, 26, !glove);
       return;
     }
     if (handled && handled.kind === "catch" && glove) {
@@ -257,8 +267,16 @@ class BbPlayChoreographer extends BbPitchChoreographer {
     const share = ball.foul || overWall || ball.carry < fence ? 1 : (fence - BbPlayChoreographer.WALL_GAP) / ball.carry;
     const airSeconds = ball.hang * share, reach = ball.carry * share;
     const down = share < 1 ? BbFieldSpace.polar(reach, ball.spray, BbBattedBallPhysics.heightAt(reach, ball.carry, ball.launch)) : landing;
-    this.fly(new BbBattedFlight(contactPoint, down, airSeconds, this.apexOf(ball, share)), contactAt, 18);
+    this.flyBatted(new BbBattedFlight(contactPoint, down, airSeconds, this.apexOf(ball, share)), contactAt, 18, !glove);
+    if (overWall) this.sparks.push({ at: contactAt, point: contactPoint });
     if (glove && takenAt - contactAt - airSeconds > 0.05) this.fly(new BbGroundRoll(down, glove, takenAt - contactAt - airSeconds, 3, 0.8), contactAt + airSeconds, 18);
+  }
+
+  private flyBatted(path: BbBallPath, startAt: number, spin: number, mayLeavePark: boolean): void {
+    if (!mayLeavePark) { this.fly(path, startAt, spin); return; }
+    const blocked = new BbBlockedFlight(path, (point) => this.bounds.blocks(point));
+    this.fly(blocked, startAt, spin);
+    if (blocked.stoppedAt !== null && this.bounds.inTheSeats(blocked.stopsAt)) this.vanish(startAt + blocked.stoppedAt);
   }
 
   private apexOf(ball: BbBattedBall, share: number): number {
@@ -403,7 +421,8 @@ class BbPlayChoreographer extends BbPitchChoreographer {
       this.until(clock);
     };
     this.cue.setting.runners.forEach((id, index) => { if (id) trot(BbBasePath.RUNNER_ROLES[index], index + 1, this.contactAt + 0.6); });
-    trot("batter", 0, swingEndsAt);
+    this.face("batter", BbFieldSpace.polar(this.cue.outcome.swing.ball!.carry, this.cue.outcome.swing.ball!.spray), swingEndsAt);
+    trot("batter", 0, Math.max(swingEndsAt, landedAt));
     this.shoot(landedAt + 0.8, "bases", BbFieldGeometry.HOME, BbFieldGeometry.SECOND);
     BbPlayChoreographer.OUTFIELD.forEach((role) => {
       const spot = this.spotOf(role, this.contactAt), wall = BbFieldSpace.polar(BbBallparkRegistry.MAIN.dimensions.fenceDistance(this.cue.outcome.swing.ball!.spray) - 3, this.cue.outcome.swing.ball!.spray);

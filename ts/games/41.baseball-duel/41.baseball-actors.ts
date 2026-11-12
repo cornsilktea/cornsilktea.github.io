@@ -413,7 +413,6 @@ class BbBallActor {
   constructor(libs: ThreeLibs) {
     const THREE = libs.THREE;
     this.mesh = new THREE.Mesh(new THREE.SphereGeometry(BbBallActor.VISUAL_RADIUS, 18, 12), new THREE.MeshStandardMaterial({ map: BbBallActor.seamTexture(libs), roughness: 0.55 }));
-    this.mesh.castShadow = true;
     const shadowMaterial = new THREE.MeshBasicMaterial({ color: "#000000", transparent: true, opacity: 0.32, depthWrite: false });
     this.shadow = new THREE.Mesh(new THREE.CircleGeometry(0.13, 16), shadowMaterial);
     this.shadow.rotation.x = -Math.PI / 2;

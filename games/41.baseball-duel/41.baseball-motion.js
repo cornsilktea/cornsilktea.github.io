@@ -627,3 +627,27 @@ class BbGroundRoll {
         return along.withY(Math.max(resting, firstDrop) + bounce * BbCurve.span(ratio, 0.1, 0.14));
     }
 }
+class BbBlockedFlight {
+    constructor(path, blocks) {
+        this.path = path;
+        let stoppedAt = null;
+        for (let seconds = BbBlockedFlight.STEP; seconds <= path.duration; seconds += BbBlockedFlight.STEP) {
+            if (blocks(path.pointAt(seconds))) {
+                stoppedAt = seconds - BbBlockedFlight.STEP;
+                break;
+            }
+        }
+        this.stoppedAt = stoppedAt;
+        this.stopPoint = path.pointAt(stoppedAt === null ? path.duration : stoppedAt);
+        this.duration = stoppedAt === null ? path.duration : stoppedAt;
+    }
+    pointAt(seconds) {
+        if (this.stoppedAt === null || seconds <= this.stoppedAt)
+            return this.path.pointAt(seconds);
+        const falling = seconds - this.stoppedAt;
+        return this.stopPoint.withY(Math.max(BbThrowTrajectory.BALL_RADIUS, this.stopPoint.y - BbBlockedFlight.GRAVITY * falling * falling / 2));
+    }
+    get stopsAt() { return this.stopPoint; }
+}
+BbBlockedFlight.STEP = 1 / 60;
+BbBlockedFlight.GRAVITY = 9.8;

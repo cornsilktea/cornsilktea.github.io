@@ -38,6 +38,32 @@ class BbMainBallpark {
 }
 BbMainBallpark.CENTER_DISTANCE = 120;
 BbMainBallpark.POLE_DISTANCE = 100;
+class BbParkBounds {
+    constructor(dimensions) {
+        this.dimensions = dimensions;
+    }
+    beyond(point) {
+        const x = point.x, z = -point.z, reach = Math.hypot(x, z), degrees = Math.atan2(x, z) * 180 / Math.PI, foul = BbFieldGeometry.FOUL_LINE_DEGREES;
+        if (Math.abs(degrees) <= foul)
+            return reach - this.dimensions.fenceDistance(degrees);
+        const along = (Math.abs(x) + z) * Math.SQRT1_2, out = (Math.abs(x) - z) * Math.SQRT1_2, width = this.dimensions.foulTerritoryWidth, pole = this.dimensions.fenceDistance(foul);
+        if (along <= 0)
+            return reach - width;
+        const taperFrom = pole * BbParkBounds.SIDE_TAPER_FROM;
+        return out - (along <= taperFrom ? width : width * Math.max(0, pole - along) / (pole - taperFrom));
+    }
+    wallHeight(point) {
+        return Math.abs(Math.atan2(point.x, -point.z)) * 180 / Math.PI <= BbFieldGeometry.FOUL_LINE_DEGREES ? this.dimensions.wallHeight : BbParkBounds.SIDE_WALL_HEIGHT;
+    }
+    blocks(point) {
+        const beyond = this.beyond(point);
+        return beyond > 0 && point.y < this.wallHeight(point) + beyond * BbParkBounds.STAND_SLOPE;
+    }
+    inTheSeats(point) { return this.beyond(point) > 0 && point.y > this.wallHeight(point) - 0.1; }
+}
+BbParkBounds.SIDE_WALL_HEIGHT = 1.3;
+BbParkBounds.SIDE_TAPER_FROM = 0.62;
+BbParkBounds.STAND_SLOPE = 0.567;
 class BbBallparkRegistry {
     static find(id) {
         return BbBallparkRegistry.ALL.find((park) => park.id === id) || BbBallparkRegistry.MAIN;

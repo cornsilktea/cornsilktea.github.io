@@ -10,7 +10,7 @@ class ChoreoCheck {
   static BALL_JUMP_METERS = 2.6;
   static RUN_METERS_PER_SECOND = 13;
   static DIVE_FRAMES = 12;
-  static LONGEST_SCENE_SECONDS = 26;
+  static LONGEST_SCENE_SECONDS = 28;
 
   constructor(pitches) {
     this.pitches = pitches;

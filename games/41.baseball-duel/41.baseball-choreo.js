@@ -31,12 +31,15 @@ class BbPitchChoreographer extends BbDrill {
         this.duration = 0;
         this.cameraCues = [];
         this.calls = [];
+        this.sparks = [];
         this.plateAt = 0;
+        this.platePoint = null;
         this.lastMoment = 0;
         const roll = cue.outcome.roll;
         this.title = BbPitchCatalog.of(roll.pitch).label + " " + Math.round(roll.speed) + "km/h";
     }
     get arriveAt() { return this.plateAt; }
+    get crossedAt() { return this.platePoint; }
     until(seconds) {
         this.lastMoment = Math.max(this.lastMoment, seconds);
         return seconds;
@@ -59,6 +62,7 @@ class BbPitchChoreographer extends BbDrill {
         const flight = new BbPitchFlight(from, plate, roll.flightSeconds, this.breakOf(roll).plus(BbPitchChoreographer.DROP));
         this.fly(flight, releaseAt, BbPitchChoreographer.PITCH_SPIN);
         this.plateAt = this.until(releaseAt + roll.flightSeconds);
+        this.platePoint = plate;
         this.shoot(0, "pitch", BbFieldGeometry.RUBBER, BbFieldGeometry.HOME);
         this.pose("batter", new BbBatLoadPose(this.metrics), this.plateAt - BbPitchChoreographer.LOAD_LEAD, null, "로드");
         if (swing.kind === "contact" && swing.ball && outcome.script) {
@@ -112,6 +116,7 @@ class BbPlayChoreographer extends BbPitchChoreographer {
         this.busy = new Set();
         this.freeAt = new Map();
         this.clock = new BbThrowDecision();
+        this.bounds = new BbParkBounds(BbBallparkRegistry.MAIN.dimensions);
         this.contactAt = 0;
         this.holder = null;
         this.heldSince = 0;
@@ -178,7 +183,7 @@ class BbPlayChoreographer extends BbPitchChoreographer {
         const contactAt = this.contactAt, takenAt = handled ? contactAt + handled.t : 0, landing = BbFieldSpace.polar(ball.carry, ball.spray, BbThrowTrajectory.BALL_RADIUS);
         if (ball.flight === "ground") {
             const stop = glove || BbFieldSpace.polar(Math.max(ball.carry, BbPlayChoreographer.FOUL_ROLL_METERS), ball.spray, BbThrowTrajectory.BALL_RADIUS);
-            this.fly(new BbGroundRoll(contactPoint, stop, glove ? takenAt - contactAt : BbPlayChoreographer.FOUL_ROLL_SECONDS, 5, 0.4), contactAt, 26);
+            this.flyBatted(new BbGroundRoll(contactPoint, stop, glove ? takenAt - contactAt : BbPlayChoreographer.FOUL_ROLL_SECONDS, 5, 0.4), contactAt, 26, !glove);
             return;
         }
         if (handled && handled.kind === "catch" && glove) {
@@ -189,9 +194,21 @@ class BbPlayChoreographer extends BbPitchChoreographer {
         const share = ball.foul || overWall || ball.carry < fence ? 1 : (fence - BbPlayChoreographer.WALL_GAP) / ball.carry;
         const airSeconds = ball.hang * share, reach = ball.carry * share;
         const down = share < 1 ? BbFieldSpace.polar(reach, ball.spray, BbBattedBallPhysics.heightAt(reach, ball.carry, ball.launch)) : landing;
-        this.fly(new BbBattedFlight(contactPoint, down, airSeconds, this.apexOf(ball, share)), contactAt, 18);
+        this.flyBatted(new BbBattedFlight(contactPoint, down, airSeconds, this.apexOf(ball, share)), contactAt, 18, !glove);
+        if (overWall)
+            this.sparks.push({ at: contactAt, point: contactPoint });
         if (glove && takenAt - contactAt - airSeconds > 0.05)
             this.fly(new BbGroundRoll(down, glove, takenAt - contactAt - airSeconds, 3, 0.8), contactAt + airSeconds, 18);
+    }
+    flyBatted(path, startAt, spin, mayLeavePark) {
+        if (!mayLeavePark) {
+            this.fly(path, startAt, spin);
+            return;
+        }
+        const blocked = new BbBlockedFlight(path, (point) => this.bounds.blocks(point));
+        this.fly(blocked, startAt, spin);
+        if (blocked.stoppedAt !== null && this.bounds.inTheSeats(blocked.stopsAt))
+            this.vanish(startAt + blocked.stoppedAt);
     }
     apexOf(ball, share) {
         return ball.carry * Math.tan(Math.max(0, ball.launch) * Math.PI / 180) / 4 * share * share;
@@ -344,7 +361,8 @@ class BbPlayChoreographer extends BbPitchChoreographer {
         };
         this.cue.setting.runners.forEach((id, index) => { if (id)
             trot(BbBasePath.RUNNER_ROLES[index], index + 1, this.contactAt + 0.6); });
-        trot("batter", 0, swingEndsAt);
+        this.face("batter", BbFieldSpace.polar(this.cue.outcome.swing.ball.carry, this.cue.outcome.swing.ball.spray), swingEndsAt);
+        trot("batter", 0, Math.max(swingEndsAt, landedAt));
         this.shoot(landedAt + 0.8, "bases", BbFieldGeometry.HOME, BbFieldGeometry.SECOND);
         BbPlayChoreographer.OUTFIELD.forEach((role) => {
             const spot = this.spotOf(role, this.contactAt), wall = BbFieldSpace.polar(BbBallparkRegistry.MAIN.dimensions.fenceDistance(this.cue.outcome.swing.ball.spray) - 3, this.cue.outcome.swing.ball.spray);
@@ -414,7 +432,7 @@ BbPlayChoreographer.RELAY_SHARE = 0.45;
 BbPlayChoreographer.SLIDE_METERS = 3;
 BbPlayChoreographer.SLIDE_SECONDS = 0.75;
 BbPlayChoreographer.HELD_RUN_SPEED = 7.5;
-BbPlayChoreographer.TROT_SPEED = 8;
+BbPlayChoreographer.TROT_SPEED = 9;
 BbPlayChoreographer.COVER_SPEED = 6.5;
 BbPlayChoreographer.BACKUP_BEHIND = 8;
 BbPlayChoreographer.OVERRUN = BbFieldSpace.toWorld(22.9, 23.2);

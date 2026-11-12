@@ -71,12 +71,15 @@ class BbDrillScript {
     sideOf(role, hand) {
         return BbHandednessMirror.side(hand === "glove" ? "left" : "right", this.mirroredRoles.has(role));
     }
-    ballAt(seconds) {
+    ballAt(seconds, unseen = []) {
         let chosen = null;
-        for (const cue of this.balls)
+        for (const cue of this.balls) {
+            if (cue.holder && unseen.indexOf(cue.holder) >= 0)
+                continue;
             if (seconds >= cue.startAt && (!chosen || cue.startAt >= chosen.startAt))
                 chosen = cue;
-        if (!chosen)
+        }
+        if (!chosen || chosen.gone)
             return null;
         const sinceStart = seconds - chosen.startAt;
         if (chosen.path)
@@ -117,6 +120,9 @@ class BbDrill {
     }
     fly(path, startAt, spin) {
         this.script.balls.push({ startAt, path, holder: null, hand: "throw", spin });
+    }
+    vanish(at) {
+        this.script.balls.push({ startAt: at, path: null, holder: null, hand: "throw", spin: 0, gone: true });
     }
     check(label, kind, at, role, point) {
         this.script.checkpoints.push({ label, kind, at, role, point });

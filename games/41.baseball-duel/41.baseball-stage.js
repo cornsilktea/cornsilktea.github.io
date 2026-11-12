@@ -7,6 +7,44 @@ class BbBroadcastShots {
         return { position: BbFieldSpace.toWorld(0, -2.7, 1.0), look: BbFieldSpace.toWorld(0, 10, 0.8), fieldOfView: 30 };
     }
 }
+class BbSparkBurst {
+    constructor(libs) {
+        this.age = BbSparkBurst.SECONDS;
+        const THREE = libs.THREE, geometry = new THREE.BufferGeometry();
+        this.places = new Float32Array(BbSparkBurst.COUNT * 3);
+        this.speeds = new Float32Array(BbSparkBurst.COUNT * 3);
+        geometry.setAttribute("position", new THREE.BufferAttribute(this.places, 3));
+        this.points = new THREE.Points(geometry, new THREE.PointsMaterial({ color: "#ff2a12", size: 0.24, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+        this.points.frustumCulled = false;
+        this.points.visible = false;
+    }
+    burst(at) {
+        for (let index = 0; index < BbSparkBurst.COUNT; index++) {
+            const turn = index * 2.399963, lift = ((index * 37) % 100) / 100, speed = 2.5 + ((index * 53) % 100) / 100 * 5;
+            this.places.set([at.x, at.y, at.z], index * 3);
+            this.speeds.set([Math.cos(turn) * speed * (1 - lift * 0.5), (lift * 1.6 - 0.3) * speed, Math.sin(turn) * speed * (1 - lift * 0.5)], index * 3);
+        }
+        this.age = 0;
+        this.points.visible = true;
+    }
+    update(deltaSeconds) {
+        if (!this.points.visible)
+            return;
+        this.age += deltaSeconds;
+        for (let index = 0; index < BbSparkBurst.COUNT * 3; index += 3) {
+            this.speeds[index + 1] -= BbSparkBurst.GRAVITY * deltaSeconds;
+            for (let axis = 0; axis < 3; axis++)
+                this.places[index + axis] += this.speeds[index + axis] * deltaSeconds;
+        }
+        this.points.geometry.attributes.position.needsUpdate = true;
+        this.points.material.opacity = 1 - BbCurve.span(this.age, BbSparkBurst.SECONDS * 0.4, BbSparkBurst.SECONDS);
+        this.points.visible = this.age < BbSparkBurst.SECONDS;
+    }
+    clear() { this.age = BbSparkBurst.SECONDS; this.points.visible = false; }
+}
+BbSparkBurst.COUNT = 48;
+BbSparkBurst.SECONDS = 0.7;
+BbSparkBurst.GRAVITY = 7;
 class BbStage {
     constructor(libs, canvas) {
         this.libs = libs;
@@ -43,7 +81,9 @@ class BbStage {
         this.field(1);
         this.ball = new BbBallActor(this.libs);
         this.zone = this.zoneFrame();
-        this.scene.add(this.ball.mesh, this.ball.shadow, this.zone);
+        this.stamp = this.ballStamp();
+        this.sparks = new BbSparkBurst(this.libs);
+        this.scene.add(this.ball.mesh, this.ball.shadow, this.zone, this.stamp, this.sparks.points);
     }
     get metrics() { return this.actor("batter").poser.metrics; }
     actor(role) { return this.casts[this.fielding].get(role); }
@@ -55,6 +95,27 @@ class BbStage {
         const THREE = this.libs.THREE, corners = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([u, v]) => { const point = BbStrikeZoneBox.pointAt(u, v); return new THREE.Vector3(point.x, point.y, point.z); });
         return new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(corners), new THREE.LineBasicMaterial({ color: "#ffffff", transparent: true, opacity: 0.75 }));
     }
+    ballStamp() {
+        const THREE = this.libs.THREE, canvas = document.createElement("canvas");
+        canvas.width = canvas.height = 96;
+        const context = canvas.getContext("2d");
+        context.fillStyle = "#f6f3ea";
+        context.beginPath();
+        context.arc(48, 48, 44, 0, Math.PI * 2);
+        context.fill();
+        context.strokeStyle = "#c8322b";
+        context.lineWidth = 5;
+        context.beginPath();
+        context.arc(-6, 48, 44, -0.9, 0.9);
+        context.stroke();
+        context.beginPath();
+        context.arc(102, 48, 44, Math.PI - 0.9, Math.PI + 0.9);
+        context.stroke();
+        const stamp = new THREE.Mesh(new THREE.CircleGeometry(BbBallActor.VISUAL_RADIUS, 20), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(canvas), transparent: true, side: THREE.DoubleSide }));
+        stamp.visible = false;
+        return stamp;
+    }
+    spark(at) { this.sparks.burst(at); }
     createActors(team, factory, assets, gear, cast) {
         const mine = new PlayerProfile().look, batterFlapOnLeft = !cast.batsLeft, fieldKit = BbStage.TEAM_KITS[team], batKit = BbStage.TEAM_KITS[1 - team];
         const make = (role, outfit) => {
@@ -74,18 +135,23 @@ class BbStage {
     }
     reset(script) {
         this.ball.forgetHolder();
+        this.sparks.clear();
         this.casts[this.fielding].forEach((actor, role) => actor.snapTo(script.starts.has(role) ? script.frameOf(role, 0) : null));
     }
-    advance(script, seconds, deltaSeconds, hidden, zoneVisible) {
+    advance(script, seconds, deltaSeconds, hidden, zoneVisible, mark = null) {
         this.casts[this.fielding].forEach((actor, role) => {
             actor.root.visible = script.starts.has(role) && hidden.indexOf(role) < 0;
             if (!actor.root.visible)
                 return;
             actor.update(deltaSeconds, script.placementOf(role, seconds), script.frameOf(role, seconds), script.gaitOf(role, seconds), script.speedOf(role, seconds));
         });
-        const state = script.ballAt(seconds), holder = state && state.holder ? this.actor(state.holder) : null;
+        const state = script.ballAt(seconds, hidden), holder = state && state.holder ? this.actor(state.holder) : null;
         this.ball.update(state, holder, state && state.holder ? script.sideOf(state.holder, state.hand) : "right", deltaSeconds);
         this.zone.visible = zoneVisible;
+        this.stamp.visible = !!mark;
+        if (mark)
+            this.stamp.position.set(mark.x, mark.y, mark.z);
+        this.sparks.update(deltaSeconds);
     }
     aim(shot, frameSeconds, cut) {
         this.goalPosition.set(shot.position.x, shot.position.y, shot.position.z);

@@ -33,6 +33,7 @@ interface BbBallCue {
   holder: BbRoleId | null;
   hand: BbHandUse;
   spin: number;
+  gone?: boolean;
 }
 
 interface BbCheckpoint {
@@ -122,10 +123,13 @@ class BbDrillScript {
     return BbHandednessMirror.side(hand === "glove" ? "left" : "right", this.mirroredRoles.has(role));
   }
 
-  ballAt(seconds: number): BbBallState | null {
+  ballAt(seconds: number, unseen: readonly BbRoleId[] = []): BbBallState | null {
     let chosen: BbBallCue | null = null;
-    for (const cue of this.balls) if (seconds >= cue.startAt && (!chosen || cue.startAt >= chosen.startAt)) chosen = cue;
-    if (!chosen) return null;
+    for (const cue of this.balls) {
+      if (cue.holder && unseen.indexOf(cue.holder) >= 0) continue;
+      if (seconds >= cue.startAt && (!chosen || cue.startAt >= chosen.startAt)) chosen = cue;
+    }
+    if (!chosen || chosen.gone) return null;
     const sinceStart = seconds - chosen.startAt;
     if (chosen.path) return { holder: null, hand: chosen.hand, point: chosen.path.pointAt(sinceStart), origin: chosen.path.pointAt(0), sinceStart, spin: chosen.spin };
     const held = this.handPointOf(chosen.holder as BbRoleId, chosen.hand, seconds) || this.placementOf(chosen.holder as BbRoleId, seconds).toWorld(new BbVec(0, 0.6, 0.2));
@@ -189,6 +193,10 @@ abstract class BbDrill {
 
   protected fly(path: BbBallPath, startAt: number, spin: number): void {
     this.script.balls.push({ startAt, path, holder: null, hand: "throw", spin });
+  }
+
+  protected vanish(at: number): void {
+    this.script.balls.push({ startAt: at, path: null, holder: null, hand: "throw", spin: 0, gone: true });
   }
 
   protected check(label: string, kind: BbCheckKind, at: number, role: BbRoleId, point: BbVec): void {

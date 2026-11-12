@@ -719,3 +719,29 @@ class BbGroundRoll implements BbBallPath {
     return along.withY(Math.max(resting, firstDrop) + bounce * BbCurve.span(ratio, 0.1, 0.14));
   }
 }
+
+class BbBlockedFlight implements BbBallPath {
+  private static readonly STEP = 1 / 60;
+  private static readonly GRAVITY = 9.8;
+  readonly duration: number;
+  readonly stoppedAt: number | null;
+  private readonly stopPoint: BbVec;
+
+  constructor(private readonly path: BbBallPath, blocks: (point: BbVec) => boolean) {
+    let stoppedAt: number | null = null;
+    for (let seconds = BbBlockedFlight.STEP; seconds <= path.duration; seconds += BbBlockedFlight.STEP) {
+      if (blocks(path.pointAt(seconds))) { stoppedAt = seconds - BbBlockedFlight.STEP; break; }
+    }
+    this.stoppedAt = stoppedAt;
+    this.stopPoint = path.pointAt(stoppedAt === null ? path.duration : stoppedAt);
+    this.duration = stoppedAt === null ? path.duration : stoppedAt;
+  }
+
+  pointAt(seconds: number): BbVec {
+    if (this.stoppedAt === null || seconds <= this.stoppedAt) return this.path.pointAt(seconds);
+    const falling = seconds - this.stoppedAt;
+    return this.stopPoint.withY(Math.max(BbThrowTrajectory.BALL_RADIUS, this.stopPoint.y - BbBlockedFlight.GRAVITY * falling * falling / 2));
+  }
+
+  get stopsAt(): BbVec { return this.stopPoint; }
+}

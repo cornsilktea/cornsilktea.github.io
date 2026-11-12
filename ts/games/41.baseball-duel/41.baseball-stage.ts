@@ -20,6 +20,50 @@ class BbBroadcastShots {
   }
 }
 
+class BbSparkBurst {
+  private static readonly COUNT = 48;
+  private static readonly SECONDS = 0.7;
+  private static readonly GRAVITY = 7;
+  readonly points: Three<"Points">;
+  private readonly places: Float32Array;
+  private readonly speeds: Float32Array;
+  private age = BbSparkBurst.SECONDS;
+
+  constructor(libs: ThreeLibs) {
+    const THREE = libs.THREE, geometry = new THREE.BufferGeometry();
+    this.places = new Float32Array(BbSparkBurst.COUNT * 3);
+    this.speeds = new Float32Array(BbSparkBurst.COUNT * 3);
+    geometry.setAttribute("position", new THREE.BufferAttribute(this.places, 3));
+    this.points = new THREE.Points(geometry, new THREE.PointsMaterial({ color: "#ff2a12", size: 0.24, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+    this.points.frustumCulled = false;
+    this.points.visible = false;
+  }
+
+  burst(at: BbVec): void {
+    for (let index = 0; index < BbSparkBurst.COUNT; index++) {
+      const turn = index * 2.399963, lift = ((index * 37) % 100) / 100, speed = 2.5 + ((index * 53) % 100) / 100 * 5;
+      this.places.set([at.x, at.y, at.z], index * 3);
+      this.speeds.set([Math.cos(turn) * speed * (1 - lift * 0.5), (lift * 1.6 - 0.3) * speed, Math.sin(turn) * speed * (1 - lift * 0.5)], index * 3);
+    }
+    this.age = 0;
+    this.points.visible = true;
+  }
+
+  update(deltaSeconds: number): void {
+    if (!this.points.visible) return;
+    this.age += deltaSeconds;
+    for (let index = 0; index < BbSparkBurst.COUNT * 3; index += 3) {
+      this.speeds[index + 1] -= BbSparkBurst.GRAVITY * deltaSeconds;
+      for (let axis = 0; axis < 3; axis++) this.places[index + axis] += this.speeds[index + axis] * deltaSeconds;
+    }
+    this.points.geometry.attributes.position.needsUpdate = true;
+    (this.points.material as Three<"PointsMaterial">).opacity = 1 - BbCurve.span(this.age, BbSparkBurst.SECONDS * 0.4, BbSparkBurst.SECONDS);
+    this.points.visible = this.age < BbSparkBurst.SECONDS;
+  }
+
+  clear(): void { this.age = BbSparkBurst.SECONDS; this.points.visible = false; }
+}
+
 class BbStage {
   static readonly HIDDEN_BEHIND_PLATE: readonly BbRoleId[] = ["catcher", "umpire"];
   private static readonly FIELDERS: readonly BbRoleId[] = ["pitcher", "catcher", "first", "second", "short", "third", "left", "center", "right"];
@@ -43,6 +87,8 @@ class BbStage {
   private fielding: 0 | 1 = 1;
   private ball!: BbBallActor;
   private zone!: Three<"LineLoop">;
+  private stamp!: Three<"Mesh">;
+  private sparks!: BbSparkBurst;
 
   constructor(private readonly libs: ThreeLibs, canvas: HTMLCanvasElement) {
     const THREE = libs.THREE;
@@ -78,7 +124,9 @@ class BbStage {
     this.field(1);
     this.ball = new BbBallActor(this.libs);
     this.zone = this.zoneFrame();
-    this.scene.add(this.ball.mesh, this.ball.shadow, this.zone);
+    this.stamp = this.ballStamp();
+    this.sparks = new BbSparkBurst(this.libs);
+    this.scene.add(this.ball.mesh, this.ball.shadow, this.zone, this.stamp, this.sparks.points);
   }
 
   get metrics(): BbBodyMetrics { return this.actor("batter").poser.metrics; }
@@ -94,6 +142,23 @@ class BbStage {
     const THREE = this.libs.THREE, corners = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([u, v]) => { const point = BbStrikeZoneBox.pointAt(u, v); return new THREE.Vector3(point.x, point.y, point.z); });
     return new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(corners), new THREE.LineBasicMaterial({ color: "#ffffff", transparent: true, opacity: 0.75 }));
   }
+
+  private ballStamp(): Three<"Mesh"> {
+    const THREE = this.libs.THREE, canvas = document.createElement("canvas");
+    canvas.width = canvas.height = 96;
+    const context = canvas.getContext("2d") as CanvasRenderingContext2D;
+    context.fillStyle = "#f6f3ea";
+    context.beginPath(); context.arc(48, 48, 44, 0, Math.PI * 2); context.fill();
+    context.strokeStyle = "#c8322b";
+    context.lineWidth = 5;
+    context.beginPath(); context.arc(-6, 48, 44, -0.9, 0.9); context.stroke();
+    context.beginPath(); context.arc(102, 48, 44, Math.PI - 0.9, Math.PI + 0.9); context.stroke();
+    const stamp = new THREE.Mesh(new THREE.CircleGeometry(BbBallActor.VISUAL_RADIUS, 20), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(canvas), transparent: true, side: THREE.DoubleSide }));
+    stamp.visible = false;
+    return stamp;
+  }
+
+  spark(at: BbVec): void { this.sparks.burst(at); }
 
   private createActors(team: 0 | 1, factory: CharacterModelFactory, assets: CharacterAssets, gear: BbGearFactory, cast: BbStageCast): void {
     const mine = new PlayerProfile().look, batterFlapOnLeft = !cast.batsLeft, fieldKit = BbStage.TEAM_KITS[team], batKit = BbStage.TEAM_KITS[1 - team];
@@ -115,18 +180,22 @@ class BbStage {
 
   reset(script: BbDrillScript): void {
     this.ball.forgetHolder();
+    this.sparks.clear();
     this.casts[this.fielding].forEach((actor, role) => actor.snapTo(script.starts.has(role) ? script.frameOf(role, 0) : null));
   }
 
-  advance(script: BbDrillScript, seconds: number, deltaSeconds: number, hidden: readonly BbRoleId[], zoneVisible: boolean): void {
+  advance(script: BbDrillScript, seconds: number, deltaSeconds: number, hidden: readonly BbRoleId[], zoneVisible: boolean, mark: BbVec | null = null): void {
     this.casts[this.fielding].forEach((actor, role) => {
       actor.root.visible = script.starts.has(role) && hidden.indexOf(role) < 0;
       if (!actor.root.visible) return;
       actor.update(deltaSeconds, script.placementOf(role, seconds), script.frameOf(role, seconds), script.gaitOf(role, seconds), script.speedOf(role, seconds));
     });
-    const state = script.ballAt(seconds), holder = state && state.holder ? this.actor(state.holder) : null;
+    const state = script.ballAt(seconds, hidden), holder = state && state.holder ? this.actor(state.holder) : null;
     this.ball.update(state, holder, state && state.holder ? script.sideOf(state.holder, state.hand) : "right", deltaSeconds);
     this.zone.visible = zoneVisible;
+    this.stamp.visible = !!mark;
+    if (mark) this.stamp.position.set(mark.x, mark.y, mark.z);
+    this.sparks.update(deltaSeconds);
   }
 
   aim(shot: BbCameraShot, frameSeconds: number, cut: boolean): void {

@@ -11,13 +11,18 @@ class BbPitchShot extends BbShot {
 class BbBallChaseShot extends BbShot {
     frame(cue, view, ball) {
         const target = ball || cue.to, flat = target.flat(), booth = BbBallChaseShot.BOOTH;
-        return { position: booth.lerp(flat, BbBallChaseShot.CHASE_SHARE).withY(booth.y + flat.length() * BbBallChaseShot.RISE_PER_METER), look: flat.withY(target.y * BbBallChaseShot.LOOK_HEIGHT_SHARE), fieldOfView: 44 };
+        let share = BbBallChaseShot.CHASE_SHARE;
+        while (share > 0 && BbBallChaseShot.BOUNDS.beyond(booth.lerp(flat, share)) > -BbBallChaseShot.WALL_CLEARANCE)
+            share -= 0.05;
+        return { position: booth.lerp(flat, Math.max(0, share)).withY(booth.y + flat.length() * BbBallChaseShot.RISE_PER_METER), look: flat.withY(target.y * BbBallChaseShot.LOOK_HEIGHT_SHARE), fieldOfView: 44 };
     }
 }
 BbBallChaseShot.BOOTH = BbFieldSpace.toWorld(0, -14, 10);
 BbBallChaseShot.CHASE_SHARE = 0.4;
 BbBallChaseShot.RISE_PER_METER = 0.12;
 BbBallChaseShot.LOOK_HEIGHT_SHARE = 0.35;
+BbBallChaseShot.WALL_CLEARANCE = 5;
+BbBallChaseShot.BOUNDS = new BbParkBounds(BbBallparkRegistry.MAIN.dimensions);
 class BbThrowChaseShot extends BbShot {
     frame(cue) {
         const length = cue.from.distanceTo(cue.to), middle = cue.from.lerp(cue.to, 0.5).flat();
@@ -40,6 +45,7 @@ class BbCameraDirector {
     constructor(cues) {
         this.cues = [];
         this.shown = null;
+        this.lastBall = null;
         cues.slice().sort((a, b) => a.at - b.at).forEach((cue) => {
             const last = this.cues[this.cues.length - 1];
             this.cues.push(last ? { ...cue, at: Math.max(cue.at, last.at + BbCameraDirector.SHORTEST_HOLD) } : cue);
@@ -52,7 +58,8 @@ class BbCameraDirector {
                 cue = next;
         const cut = cue !== this.shown;
         this.shown = cue;
-        return { shot: BbCameraDirector.SHOTS[cue.kind].frame(cue, view, ball), cut, kind: cue.kind };
+        this.lastBall = ball || (cut ? null : this.lastBall);
+        return { shot: BbCameraDirector.SHOTS[cue.kind].frame(cue, view, this.lastBall), cut, kind: cue.kind };
     }
 }
 BbCameraDirector.SHORTEST_HOLD = 0.8;

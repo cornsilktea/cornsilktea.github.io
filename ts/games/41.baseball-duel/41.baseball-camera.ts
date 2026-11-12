@@ -18,10 +18,14 @@ class BbBallChaseShot extends BbShot {
   private static readonly CHASE_SHARE = 0.4;
   private static readonly RISE_PER_METER = 0.12;
   private static readonly LOOK_HEIGHT_SHARE = 0.35;
+  private static readonly WALL_CLEARANCE = 5;
+  private static readonly BOUNDS = new BbParkBounds(BbBallparkRegistry.MAIN.dimensions);
 
   frame(cue: BbCameraCue, view: BbLiveView, ball: BbVec | null): BbCameraShot {
     const target = ball || cue.to, flat = target.flat(), booth = BbBallChaseShot.BOOTH;
-    return { position: booth.lerp(flat, BbBallChaseShot.CHASE_SHARE).withY(booth.y + flat.length() * BbBallChaseShot.RISE_PER_METER), look: flat.withY(target.y * BbBallChaseShot.LOOK_HEIGHT_SHARE), fieldOfView: 44 };
+    let share = BbBallChaseShot.CHASE_SHARE;
+    while (share > 0 && BbBallChaseShot.BOUNDS.beyond(booth.lerp(flat, share)) > -BbBallChaseShot.WALL_CLEARANCE) share -= 0.05;
+    return { position: booth.lerp(flat, Math.max(0, share)).withY(booth.y + flat.length() * BbBallChaseShot.RISE_PER_METER), look: flat.withY(target.y * BbBallChaseShot.LOOK_HEIGHT_SHARE), fieldOfView: 44 };
   }
 }
 
@@ -58,6 +62,7 @@ class BbCameraDirector {
   private static readonly SHOTS: Readonly<Record<BbShotKind, BbShot>> = { pitch: new BbPitchShot(), chase: new BbBallChaseShot(), throw: new BbThrowChaseShot(), relay: new BbRelayShot(), bases: new BbBasesShot(), top: new BbTopShot() };
   private readonly cues: BbCameraCue[] = [];
   private shown: BbCameraCue | null = null;
+  private lastBall: BbVec | null = null;
 
   constructor(cues: readonly BbCameraCue[]) {
     cues.slice().sort((a, b) => a.at - b.at).forEach((cue) => {
@@ -71,6 +76,7 @@ class BbCameraDirector {
     for (const next of this.cues) if (next.at <= seconds) cue = next;
     const cut = cue !== this.shown;
     this.shown = cue;
-    return { shot: BbCameraDirector.SHOTS[cue.kind].frame(cue, view, ball), cut, kind: cue.kind };
+    this.lastBall = ball || (cut ? null : this.lastBall);
+    return { shot: BbCameraDirector.SHOTS[cue.kind].frame(cue, view, this.lastBall), cut, kind: cue.kind };
   }
 }
