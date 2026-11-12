@@ -194,7 +194,7 @@ export function createSim(api) {
           var v = p.v;
           if (p.path === "shots" && v.o === e.id) { if (v.s) c.skillShots++; else c.shots++; }
           else if (p.path === "meleeHits" && v.owner === e.id) { if (v.u) c.skillMelee++; else c.melee++; }
-          else if (p.path === "effects" && v.owner === e.id) c.effects++;
+          else if (p.path === "effects" && v.owner === e.id) { c.effects++; if (v.type === "hole") c.ults = (c.ults || 0) + 1; }
           else if (p.path === "hits/" + e.id && !v.mn) { if (v.u) c.ultHits++; else { c.basicHits++; c.basicDmg += v.d || 0; } }
         });
         return c;

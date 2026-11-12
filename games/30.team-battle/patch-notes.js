@@ -62,13 +62,15 @@ class PatchNoteText {
         return value.replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
     }
     // 패치노트 본문 꾸미기(2026-11-12 선생님 요청): 글자는 모두 안전하게 바꾼 뒤 ▲ 는 빨강(상향)·▼ 는 파랑(하향)으로,
-    // "■ " 로 시작하는 줄은 캐릭터 제목 줄로 보여 준다. 본문 규칙은 docs/30.team-battle/30.team-battle-notes.md 의 패치노트 절.
+    // "[캐릭터]" 로 시작하는 줄은 캐릭터 제목 줄(노랑), 직업군 아이콘(⚔️✨🏹🗡️)으로 시작하는 줄은 직업군 제목 줄(굵고 크게)로 보여 준다. 본문 규칙은 docs/30.team-battle/30.team-battle-notes.md 의 패치노트 절.
     static bodyHtml(value) {
         return PatchNoteText.esc(value).split("\n").map((line) => {
             const decorated = line
                 .split(PatchNoteText.UP).join('<b style="color:' + PatchNoteText.UP_COLOR + '">' + PatchNoteText.UP + "</b>")
                 .split(PatchNoteText.DOWN).join('<b style="color:' + PatchNoteText.DOWN_COLOR + '">' + PatchNoteText.DOWN + "</b>");
-            return line.startsWith(PatchNoteText.HEADING) ? '<b style="color:' + PatchNoteText.HEADING_COLOR + '">' + decorated + "</b>" : decorated;
+            if (line.startsWith(PatchNoteText.HEADING))
+                return '<b style="color:' + PatchNoteText.HEADING_COLOR + '">' + decorated + "</b>";
+            return PatchNoteText.ROLE_ICONS.some((icon) => line.startsWith(icon)) ? '<b style="font-size:1.15em">' + decorated + "</b>" : decorated;
         }).join("\n");
     }
     static when(at) {
@@ -78,7 +80,8 @@ class PatchNoteText {
 }
 PatchNoteText.UP = "▲";
 PatchNoteText.DOWN = "▼";
-PatchNoteText.HEADING = "■ ";
+PatchNoteText.HEADING = "[";
+PatchNoteText.ROLE_ICONS = ["⚔️", "✨", "🏹", "🗡️"];
 PatchNoteText.UP_COLOR = "#FF5A5A";
 PatchNoteText.DOWN_COLOR = "#5AA9FF";
 PatchNoteText.HEADING_COLOR = "#F2D06B";
