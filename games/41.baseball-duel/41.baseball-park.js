@@ -326,11 +326,11 @@ class BbBallparkBuilder {
     }
     addChalkLines() {
         const THREE = this.libs.THREE, chalk = new THREE.MeshBasicMaterial({ color: "#f3f2ea", polygonOffset: true, polygonOffsetFactor: -6, polygonOffsetUnits: -12 });
-        const length = this.spec.dimensions.fenceDistance(BbFieldGeometry.FOUL_LINE_DEGREES) - 1.2;
+        const start = BbBallparkBuilder.FOUL_LINE_START, length = this.spec.dimensions.fenceDistance(BbFieldGeometry.FOUL_LINE_DEGREES) - start;
         [1, -1].forEach((side) => {
             const line = new THREE.Mesh(new THREE.PlaneGeometry(0.1, length), chalk);
             line.rotation.set(-Math.PI / 2, 0, -side * Math.PI / 4);
-            const middle = BbParkOutline.polar(1.2 + length / 2, side * 45);
+            const middle = BbParkOutline.polar(start + length / 2, side * 45);
             line.position.set(middle[0], 0.02, -middle[1]);
             line.renderOrder = 1;
             this.group.add(line);
@@ -340,7 +340,7 @@ class BbBallparkBuilder {
         const canvas = document.createElement("canvas");
         canvas.width = 2048;
         canvas.height = 128;
-        const context = canvas.getContext("2d"), panels = BbBallparkBuilder.BANNERS.length, panelWidth = canvas.width / panels;
+        const context = canvas.getContext("2d"), panels = BbBallparkBuilder.WALL_PANELS, panelWidth = canvas.width / panels;
         for (let panel = 0; panel < panels; panel++) {
             const left = panel * panelWidth, shade = context.createLinearGradient(0, 0, 0, 128);
             shade.addColorStop(0, panel % 2 ? "#1f6a45" : "#1b5f3e");
@@ -351,11 +351,6 @@ class BbBallparkBuilder {
             context.fillRect(left, 0, 3, 128);
             context.fillStyle = "rgba(255,255,255,0.08)";
             context.fillRect(left + 3, 0, 2, 128);
-            context.fillStyle = panel % 2 ? "#f3efe2" : "#f2d26a";
-            context.font = '700 54px "Nanum Gothic", "Malgun Gothic", sans-serif';
-            context.textAlign = "center";
-            context.textBaseline = "middle";
-            context.fillText(BbBallparkBuilder.BANNERS[panel], left + panelWidth / 2, 72, panelWidth - 30);
         }
         context.fillStyle = "#f2c230";
         context.fillRect(0, 0, canvas.width, 9);
@@ -393,7 +388,7 @@ class BbBallparkBuilder {
         this.group.add(new THREE.Mesh(this.stripGeometry(sidePoints, 0, BbParkOutline.SIDE_WALL_HEIGHT, 10), padding));
         const cap = new THREE.Mesh(this.stripGeometry(sidePoints, BbParkOutline.SIDE_WALL_HEIGHT, BbParkOutline.SIDE_WALL_HEIGHT + 0.08, 10), new THREE.MeshLambertMaterial({ color: "#f2c230", side: THREE.DoubleSide }));
         this.group.add(cap);
-        [[-45, "100"], [-22.5, "110"], [0, "120"], [22.5, "110"], [45, "100"]].forEach(([degrees, label]) => {
+        [[-41, "100"], [-22.5, "110"], [0, "120"], [22.5, "110"], [41, "100"]].forEach(([degrees, label]) => {
             const canvas = document.createElement("canvas");
             canvas.width = 128;
             canvas.height = 64;
@@ -403,10 +398,11 @@ class BbBallparkBuilder {
             context.textAlign = "center";
             context.textBaseline = "middle";
             context.fillText(label, 64, 34);
-            const angle = degrees * 0.985, spot = BbParkOutline.polar(this.spec.dimensions.fenceDistance(angle) - 0.06, angle);
-            const sign = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 1.3), new THREE.MeshBasicMaterial({ map: this.textureOf(canvas, false), transparent: true }));
-            sign.position.set(spot[0], 2.25, -spot[1]);
-            sign.lookAt(0, 2.25, 0);
+            const angle = degrees, spot = BbParkOutline.polar(this.spec.dimensions.fenceDistance(angle) - 0.35, angle);
+            const sign = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 1.3), new THREE.MeshBasicMaterial({ map: this.textureOf(canvas, false), transparent: true, depthWrite: false }));
+            sign.position.set(spot[0], 1.75, -spot[1]);
+            sign.lookAt(0, 1.75, 0);
+            sign.renderOrder = 3;
             this.group.add(sign);
         });
     }
@@ -554,26 +550,60 @@ class BbBallparkBuilder {
         const THREE = this.libs.THREE, canvas = document.createElement("canvas");
         canvas.width = 1024;
         canvas.height = 384;
-        const context = canvas.getContext("2d");
-        context.fillStyle = "#101816";
+        const context = canvas.getContext("2d"), font = '"Nanum Gothic", "Malgun Gothic", sans-serif';
+        context.fillStyle = "#0d1413";
         context.fillRect(0, 0, 1024, 384);
-        context.fillStyle = "#f2c230";
-        context.font = '800 84px "Nanum Gothic", "Malgun Gothic", sans-serif';
+        context.textBaseline = "middle";
         context.textAlign = "center";
-        context.fillText("동마 구장", 512, 104);
-        context.strokeStyle = "#2f4a40";
-        context.lineWidth = 3;
-        for (let column = 0; column <= 12; column++) {
+        context.fillStyle = "#f2c230";
+        context.font = "800 40px " + font;
+        context.fillText("동마 구장", 512, 38);
+        const nameLeft = 36, inningLeft = 226, inningWidth = 56, totalLeft = 752, totalWidth = 78, top = 76, rowHeight = 68;
+        context.strokeStyle = "#2c4039";
+        context.lineWidth = 2;
+        for (let row = 0; row <= 3; row++) {
             context.beginPath();
-            context.moveTo(60 + column * 75, 150);
-            context.lineTo(60 + column * 75, 340);
+            context.moveTo(nameLeft, top + row * rowHeight);
+            context.lineTo(totalLeft + totalWidth * 3, top + row * rowHeight);
             context.stroke();
         }
-        [150, 213, 276, 340].forEach((y) => { context.beginPath(); context.moveTo(60, y); context.lineTo(960, y); context.stroke(); });
-        context.fillStyle = "#9fe6b0";
-        context.font = '700 40px "Nanum Gothic", "Malgun Gothic", sans-serif';
+        const columnEdges = [nameLeft];
+        for (let inning = 0; inning <= 9; inning++)
+            columnEdges.push(inningLeft + inning * inningWidth);
+        for (let total = 0; total <= 3; total++)
+            columnEdges.push(totalLeft + total * totalWidth);
+        columnEdges.forEach((x) => { context.beginPath(); context.moveTo(x, top); context.lineTo(x, top + rowHeight * 3); context.stroke(); });
+        context.fillStyle = "#cfd8d4";
+        context.font = "700 34px " + font;
         for (let inning = 1; inning <= 9; inning++)
-            context.fillText(String(inning), 172 + inning * 75 - 75 + 37, 196);
+            context.fillText(String(inning), inningLeft + (inning - 0.5) * inningWidth, top + rowHeight / 2);
+        ["R", "H", "E"].forEach((label, index) => context.fillText(label, totalLeft + (index + 0.5) * totalWidth, top + rowHeight / 2));
+        ["원정", "홈"].forEach((team, row) => {
+            const middle = top + rowHeight * (row + 1.5);
+            context.fillStyle = "#ffffff";
+            context.font = "800 38px " + font;
+            context.fillText(team, (nameLeft + inningLeft) / 2, middle);
+            context.fillStyle = "#ffd75e";
+            context.font = "800 42px " + font;
+            for (let total = 0; total < 3; total++)
+                context.fillText("0", totalLeft + (total + 0.5) * totalWidth, middle);
+        });
+        const lampTop = 332;
+        [["B", 3, "#3fbf5a"], ["S", 2, "#f2c230"], ["O", 2, "#e2513f"]].forEach(([label, count, color], group) => {
+            const left = 250 + group * 200;
+            context.fillStyle = "#cfd8d4";
+            context.font = "800 36px " + font;
+            context.fillText(label, left, lampTop);
+            for (let lamp = 0; lamp < count; lamp++) {
+                context.beginPath();
+                context.arc(left + 44 + lamp * 40, lampTop, 14, 0, Math.PI * 2);
+                context.fillStyle = "#1d2a27";
+                context.fill();
+                context.strokeStyle = color;
+                context.lineWidth = 3;
+                context.stroke();
+            }
+        });
         const spot = BbParkOutline.polar(this.spec.dimensions.fenceDistance(0) + 24, 0);
         const board = new THREE.Mesh(new THREE.BoxGeometry(34, 12.75, 1.2), [new THREE.MeshLambertMaterial({ color: "#1b2422" }), new THREE.MeshLambertMaterial({ color: "#1b2422" }), new THREE.MeshLambertMaterial({ color: "#1b2422" }), new THREE.MeshLambertMaterial({ color: "#1b2422" }), new THREE.MeshBasicMaterial({ map: this.textureOf(canvas, false) }), new THREE.MeshLambertMaterial({ color: "#1b2422" })]);
         board.position.set(spot[0], 22, -spot[1]);
@@ -588,10 +618,10 @@ class BbBallparkBuilder {
         const THREE = this.libs.THREE, steel = new THREE.MeshLambertMaterial({ color: "#59616a" }), lamp = new THREE.MeshBasicMaterial({ color: "#fff6d8" });
         [[-28, 152], [28, 152], [-108, 78], [108, 78]].forEach(([degrees, distance]) => {
             const spot = BbParkOutline.polar(distance, degrees);
-            const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.9, 42, 8), steel);
-            pole.position.set(spot[0], 21, -spot[1]);
+            const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.9, 40, 8), steel);
+            pole.position.set(spot[0], 20, -spot[1]);
             const bank = new THREE.Mesh(new THREE.BoxGeometry(9, 5, 0.8), steel);
-            bank.position.set(spot[0], 43, -spot[1]);
+            bank.position.set(spot[0], 43.4, -spot[1]);
             bank.lookAt(0, 10, -40);
             const glow = new THREE.Mesh(new THREE.PlaneGeometry(8.2, 4.2), lamp);
             glow.position.copy(bank.position);
@@ -662,7 +692,8 @@ class BbBallparkBuilder {
 BbBallparkBuilder.SEAT_COLORS = ["#2d5fa8", "#2a579b", "#31649f"];
 BbBallparkBuilder.SHIRT_COLORS = ["#e9e6dc", "#d9534f", "#3b6fb6", "#f0c040", "#4caf7a", "#8e6bbf", "#f08a3e", "#2f3640", "#e8a0b8", "#7fb6d9"];
 BbBallparkBuilder.SKIN_COLORS = ["#FFE0C8", "#F6C09C", "#E2A981", "#C98A62", "#A86A48"];
-BbBallparkBuilder.BANNERS = ["동마중학교", "DONGMA", "옥수수차", "코딩 동아리", "과학실", "도서관", "방과후 야구", "급식 맛집"];
+BbBallparkBuilder.WALL_PANELS = 16;
+BbBallparkBuilder.FOUL_LINE_START = 1.72;
 BbBallparkBuilder.TIER_DEPTH = 1.5;
 BbBallparkBuilder.TIER_RISE = 0.85;
 class BbParkLighting {

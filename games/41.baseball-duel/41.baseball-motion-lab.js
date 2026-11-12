@@ -34,9 +34,9 @@ class BbLabDirector {
     shot(view, seconds, ball) {
         const side = this.batsLeft ? -1 : 1;
         if (view === "pitcher")
-            return { position: BbFieldSpace.toWorld(this.throwsLeft ? -1.5 : 1.5, BbFieldGeometry.RUBBER_DISTANCE + 4.2, 3.1), look: BbFieldSpace.toWorld(0, 0, 0.5), fieldOfView: 26 };
+            return { position: BbFieldSpace.toWorld(this.throwsLeft ? -1.9 : 1.9, BbFieldGeometry.RUBBER_DISTANCE + 4.2, 3.5), look: BbFieldSpace.toWorld(0, 0, 0.5), fieldOfView: 26 };
         if (view === "batter")
-            return { position: BbFieldSpace.toWorld(0, -4.6, 2.45), look: BbFieldSpace.toWorld(0, 14, 0.9), fieldOfView: 40 };
+            return { position: BbFieldSpace.toWorld(side * 0.3, -2.7, 1.0), look: BbFieldSpace.toWorld(side * 0.1, 10, 0.8), fieldOfView: 30 };
         if (view === "swing")
             return { position: BbFieldSpace.toWorld(side * 2.9, 2.3, 1.0), look: BbFieldSpace.toWorld(-side * 0.7, 0.2, 0.62), fieldOfView: 34 };
         if (view === "mound")
@@ -71,10 +71,8 @@ class BbLabDirector {
         }
         if (this.sceneIndex === 2) {
             const caught = this.script.checkpoints.find((check) => check.label === "중견수 플라이 포구"), catchAt = caught ? caught.at : contactAt + 4.6;
-            if (seconds < catchAt - 1.1)
-                return { position: BbFieldSpace.toWorld(-16, 22, 9), look: ball.lerp(BbFieldSpace.toWorld(7, 73, 1), 0.35), fieldOfView: 46 };
             if (seconds < catchAt + 0.45)
-                return { position: BbFieldSpace.toWorld(3.5, 67.5, 1.9), look: BbFieldSpace.toWorld(7.1, 73.8, 1.0), fieldOfView: 36 };
+                return { position: BbFieldSpace.toWorld(-12, 34, 13), look: ball.lerp(BbFieldSpace.toWorld(7, 73, 1), 0.45), fieldOfView: 46 };
             if (seconds < catchAt + 2.0)
                 return this.relayShot();
             return { position: BbFieldSpace.toWorld(5.5, -5.5, 2.4), look: BbFieldSpace.toWorld(-1.6, 3, 0.5), fieldOfView: 42 };
@@ -175,7 +173,7 @@ class BbMotionLab {
         new BbParkLighting(this.libs).addTo(this.scene);
         this.createActors(factory, assets, gear);
         this.ball = new BbBallActor(this.libs);
-        this.scene.add(this.ball.mesh, this.ball.shadow);
+        this.scene.add(this.ball.mesh, this.ball.shadow, this.zoneFrame());
         const metrics = this.actors.get("batter").poser.metrics;
         this.script = BbDrillCatalog.all()[this.options.scene].build({ metrics, batsLeft: this.options.batsLeft, throwsLeft: this.options.throwsLeft });
         this.director = new BbLabDirector(this.script, this.options.scene, this.options.batsLeft, this.options.throwsLeft);
@@ -189,6 +187,10 @@ class BbMotionLab {
             this.freeze(this.options.freezeAt);
         this.renderer.setAnimationLoop(() => this.tick());
     }
+    zoneFrame() {
+        const THREE = this.libs.THREE, corners = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([u, v]) => { const point = BbStrikeZoneBox.pointAt(u, v); return new THREE.Vector3(point.x, point.y, point.z); });
+        return new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(corners), new THREE.LineBasicMaterial({ color: "#ffffff", transparent: true, opacity: 0.75 }));
+    }
     createActors(factory, assets, gear) {
         const mine = new PlayerProfile().look, batterFlapOnLeft = !this.options.batsLeft;
         const make = (role, outfit) => {
@@ -201,7 +203,7 @@ class BbMotionLab {
             const gloveSide = role === "pitcher" && this.options.throwsLeft ? "right" : "left";
             make(role, { look, kit: BbTeamKits.HOME, headGear: role === "catcher" ? "mask" : "cap", gloveSide, chestProtector: role === "catcher", carriesBat: false, flapOnLeft: false });
         });
-        make("umpire", { look: CharacterLooks.clean({ c: 3, p: { skin: 2, hair: 0 } }), kit: BbTeamKits.UMPIRE, headGear: "mask", gloveSide: null, chestProtector: true, carriesBat: false, flapOnLeft: false });
+        make("umpire", { look: CharacterLooks.clean({ c: 3, p: { skin: 2, hair: 0 } }), kit: BbTeamKits.UMPIRE, headGear: "mask", gloveSide: null, chestProtector: false, carriesBat: false, flapOnLeft: false });
         make("batter", { look: mine, kit: BbTeamKits.AWAY, headGear: "helmet", gloveSide: null, chestProtector: false, carriesBat: true, flapOnLeft: batterFlapOnLeft });
         make("runner", { look: mine, kit: BbTeamKits.AWAY, headGear: "helmet", gloveSide: null, chestProtector: false, carriesBat: false, flapOnLeft: batterFlapOnLeft });
     }
@@ -257,7 +259,7 @@ class BbMotionLab {
         this.seconds += deltaSeconds;
         this.measure(before, this.seconds);
         this.actors.forEach((actor, role) => {
-            actor.root.visible = this.script.starts.has(role);
+            actor.root.visible = this.script.starts.has(role) && !(this.view === "batter" && BbMotionLab.HIDDEN_BEHIND_PLATE.indexOf(role) >= 0);
             if (!actor.root.visible)
                 return;
             actor.update(deltaSeconds, this.script.placementOf(role, this.seconds), this.script.frameOf(role, this.seconds), this.script.gaitOf(role, this.seconds), this.script.speedOf(role, this.seconds));
@@ -328,4 +330,5 @@ class BbMotionLab {
     }
 }
 BbMotionLab.ASSET_DIRECTORY = "../assets/kaykit/";
+BbMotionLab.HIDDEN_BEHIND_PLATE = ["catcher", "umpire"];
 BbMotionLab.FIELDERS = ["pitcher", "catcher", "first", "second", "short", "third", "left", "center", "right"];

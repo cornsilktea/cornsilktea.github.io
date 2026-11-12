@@ -140,6 +140,8 @@ class BbDrill {
     throwFrom(role, startAt, target, speed, crowHop, label) {
         const pose = new BbFieldThrowPose(this.metrics, crowHop);
         this.face(role, target, startAt);
+        const standing = this.script.placementOf(role, startAt).position, stride = crowHop ? BbDrill.CROW_HOP_STRIDE : BbDrill.THROW_STRIDE;
+        this.move(role, standing.plus(target.minus(standing).flat().unit().times(stride)), startAt, startAt + pose.keyTime + 0.14, "walk");
         this.pose(role, pose, startAt, startAt + pose.keyTime, label);
         this.hold(role, "throw", startAt);
         const releaseAt = startAt + pose.keyTime, from = this.handWorld(role, "throw", releaseAt);
@@ -158,7 +160,7 @@ class BbDrill {
         spots.forEach(([role, x, z]) => this.stand(role, BbActorPlacement.facing(BbFieldSpace.toWorld(x, z), home), ready()));
         this.stand("pitcher", BbActorPlacement.facing(BbFieldGeometry.RUBBER, home.withY(BbFieldGeometry.MOUND_HEIGHT)), new BbReadyPose(this.metrics, 0));
         const catcherSpot = BbActorPlacement.facing(BbFieldSpace.toWorld(0, -1.25), BbFieldGeometry.RUBBER.withY(0));
-        this.stand("catcher", catcherSpot, new BbCatcherCrouchPose(this.metrics, new BbVec(0.03, 0.5, 0.4)));
+        this.stand("catcher", catcherSpot, new BbCatcherCrouchPose(this.metrics, BbDrill.CATCHER_TARGET));
         this.stand("umpire", BbActorPlacement.facing(BbFieldSpace.toWorld(0.25, -2.2), BbFieldGeometry.RUBBER.withY(0)), new BbReadyPose(this.metrics, 0.8));
         const boxX = this.setup.batsLeft ? BbFieldGeometry.BATTER_BOX_OFFSET : -BbFieldGeometry.BATTER_BOX_OFFSET;
         const batterSpot = BbFieldSpace.toWorld(boxX, 0.25);
@@ -193,6 +195,10 @@ BbDrill.PITCH_FLIGHT = 1.05;
 BbDrill.GROUND_GLOVE = new BbVec(0.05, 0.075, 0.42);
 BbDrill.CHEST_GLOVE = new BbVec(0.1, 0.72, 0.4);
 BbDrill.FLY_GLOVE = new BbVec(0.08, 1.12, 0.2);
+BbDrill.CATCHER_TARGET = new BbVec(0.22, 0.5, 0.6);
+BbDrill.THROW_STRIDE = 1.1;
+BbDrill.CROW_HOP_STRIDE = 2.2;
+BbDrill.THROW_AFTER_CATCH = 0.4;
 class BbLineDriveDrill extends BbDrill {
     constructor() {
         super(...arguments);
@@ -214,7 +220,7 @@ class BbLineDriveDrill extends BbDrill {
         this.move("short", BbFieldSpace.toWorld(-11, 50), contactAt + 0.4, contactAt + 3.2);
         this.face("short", fieldSpot, contactAt + 3.2);
         const target = this.gloveWorld("second", pickAt + 1, BbDrill.CHEST_GLOVE);
-        const thrown = this.throwFrom("left", pickAt + 0.5, target, BbThrowTrajectory.OUTFIELD_SPEED, true, "좌익수 송구");
+        const thrown = this.throwFrom("left", pickAt + BbDrill.THROW_AFTER_CATCH, target, BbThrowTrajectory.OUTFIELD_SPEED, true, "좌익수 송구");
         this.catchWith("second", "chest", BbDrill.CHEST_GLOVE, thrown.arriveAt, "2루 포구");
         this.batterRunsToFirst(swingEndsAt - 0.15, contactAt, false);
         this.face("batter", BbFieldGeometry.SECOND, contactAt + 4.2);
@@ -239,7 +245,7 @@ class BbGroundOutDrill extends BbDrill {
         this.face("first", spot, contactAt + 1.5);
         const stretchGlove = new BbVec(0.06, 0.68, 0.5);
         const target = this.gloveWorld("first", fieldedAt + 1, stretchGlove);
-        const thrown = this.throwFrom("short", fieldedAt + 0.5, target, BbThrowTrajectory.INFIELD_SPEED, false, "유격수 1루 송구");
+        const thrown = this.throwFrom("short", fieldedAt + BbDrill.THROW_AFTER_CATCH, target, BbThrowTrajectory.INFIELD_SPEED, false, "유격수 1루 송구");
         this.catchWith("first", "stretch", stretchGlove, thrown.arriveAt, "1루수 포구");
         this.move("right", BbFieldSpace.toWorld(27, 14), contactAt + 0.3, contactAt + 5.4);
         this.move("catcher", BbFieldSpace.toWorld(14, 4), contactAt + 0.5, contactAt + 3.6);
@@ -286,13 +292,13 @@ class BbSacrificeFlyDrill extends BbDrill {
         this.move("left", BbFieldSpace.toWorld(-20, 76), contactAt + 0.5, contactAt + 4.2);
         this.move("right", BbFieldSpace.toWorld(22, 78), contactAt + 0.5, contactAt + 4);
         const relayGlove = this.gloveWorld("second", catchAt + 1, BbDrill.CHEST_GLOVE);
-        const first = this.throwFrom("center", catchAt + 0.5, relayGlove, BbThrowTrajectory.OUTFIELD_SPEED, true, "중견수 중계 송구");
+        const first = this.throwFrom("center", catchAt + BbDrill.THROW_AFTER_CATCH, relayGlove, BbThrowTrajectory.OUTFIELD_SPEED, true, "중견수 중계 송구");
         this.catchWith("second", "chest", BbDrill.CHEST_GLOVE, first.arriveAt, "중계 포구");
         this.move("catcher", BbFieldSpace.toWorld(0.35, 0.75), contactAt + 1, contactAt + 2, "walk");
         this.face("catcher", relaySpot, contactAt + 2);
         this.pose("catcher", new BbReadyPose(this.metrics, 0.5), contactAt + 1, null, "홈 대기");
         const homeGlove = new BbVec(0.1, 0.5, 0.4), plateGlove = this.gloveWorld("catcher", first.arriveAt + 1, homeGlove);
-        const second = this.throwFrom("second", first.arriveAt + 0.5, plateGlove, BbThrowTrajectory.INFIELD_SPEED, false, "중계수 홈 송구");
+        const second = this.throwFrom("second", first.arriveAt + BbDrill.THROW_AFTER_CATCH, plateGlove, BbThrowTrajectory.INFIELD_SPEED, false, "중계수 홈 송구");
         this.catchWith("catcher", "chest", homeGlove, second.arriveAt, "포수 포구");
         this.move("batter", BbFieldSpace.toWorld(11, 11.5), swingEndsAt - 0.15, contactAt + 2.4);
         this.face("batter", spot, contactAt + 2.4);

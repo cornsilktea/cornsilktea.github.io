@@ -103,7 +103,7 @@ class SyncCheck {
     }
     const ground = new BbCatchPose(this.metrics, "ground", gloves.ground);
     this.report.add("포구", "땅볼 몸 낮추기 시작이 도착 0.3~0.4초 전", Math.abs(ground.keyTime - 0.35), 0.05, "s");
-    const others = [["태그", new BbTagPose(this.metrics, new BbVec(0.1, 0.15, 0.45)), 0.55], ["슬라이딩", new BbSlidePose(this.metrics, 0.75), 1.1], ["수비 대기", new BbReadyPose(this.metrics, 0.35), 2], ["심판 자세", new BbReadyPose(this.metrics, 0.8), 2], ["포수 앉기", new BbCatcherCrouchPose(this.metrics, new BbVec(0.03, 0.5, 0.4)), 2]];
+    const others = [["태그", new BbTagPose(this.metrics, new BbVec(0.1, 0.15, 0.45)), 0.55], ["슬라이딩", new BbSlidePose(this.metrics, 0.75), 1.1], ["수비 대기", new BbReadyPose(this.metrics, 0.35), 2], ["심판 자세", new BbReadyPose(this.metrics, 0.8), 2], ["포수 앉기", new BbCatcherCrouchPose(this.metrics, new BbVec(0.22, 0.5, 0.6)), 2]];
     for (const [name, pose, until] of others) this.report.add("그 밖 자세", name + " 팔다리 닿음", this.worstStretch(pose, 0, until), SyncCheck.STRETCH_LIMIT, "m");
   }
 

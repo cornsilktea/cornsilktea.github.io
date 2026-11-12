@@ -181,7 +181,7 @@ class BbGearFactory {
   private readonly glovePalm: Three<"SphereGeometry">;
   private readonly gloveThumb: Three<"SphereGeometry">;
   private readonly maskCage: Three<"SphereGeometry">;
-  private readonly chestPad: Three<"BoxGeometry">;
+  private readonly chestPad: Three<"SphereGeometry">;
   private readonly belt: Three<"TorusGeometry">;
   private readonly batGeometry: Three<"LatheGeometry">;
   private readonly batMaterial: Three<"MeshStandardMaterial">;
@@ -196,7 +196,7 @@ class BbGearFactory {
     this.glovePalm = new THREE.SphereGeometry(0.17, 14, 10);
     this.gloveThumb = new THREE.SphereGeometry(0.075, 10, 8);
     this.maskCage = new THREE.SphereGeometry(0.66, 12, 8, Math.PI * 0.08, Math.PI * 0.84, Math.PI * 0.2, Math.PI * 0.62);
-    this.chestPad = new THREE.BoxGeometry(0.64, 0.62, 0.12, 3, 3, 1);
+    this.chestPad = new THREE.SphereGeometry(0.3, 14, 10);
     this.belt = new THREE.TorusGeometry(0.43, 0.04, 6, 22);
     this.batGeometry = new THREE.LatheGeometry(BbBatShape.PROFILE.map(([radius, along]) => new THREE.Vector2(radius, along)), 20);
     this.batMaterial = new THREE.MeshStandardMaterial({ map: this.batTexture(), roughness: 0.48, metalness: 0.02 });
@@ -249,7 +249,8 @@ class BbGearFactory {
 
   chestProtector(color: string): Three<"Mesh"> {
     const mesh = new this.libs.THREE.Mesh(this.chestPad, this.material(color, 0.8));
-    mesh.position.set(0, 0.0, 0.4);
+    mesh.position.set(0, -0.02, 0.33);
+    mesh.scale.set(1, 1.05, 0.34);
     return mesh;
   }
 
@@ -388,7 +389,7 @@ class BbPlayerActor {
 }
 
 class BbBallActor {
-  static readonly VISUAL_RADIUS = 0.045;
+  static readonly VISUAL_RADIUS = 0.07;
   private static readonly RELEASE_BLEND_SECONDS = 0.1;
 
   readonly mesh: Three<"Mesh">;
@@ -403,7 +404,7 @@ class BbBallActor {
     this.mesh = new THREE.Mesh(new THREE.SphereGeometry(BbBallActor.VISUAL_RADIUS, 18, 12), new THREE.MeshStandardMaterial({ map: BbBallActor.seamTexture(libs), roughness: 0.55 }));
     this.mesh.castShadow = true;
     const shadowMaterial = new THREE.MeshBasicMaterial({ color: "#000000", transparent: true, opacity: 0.32, depthWrite: false });
-    this.shadow = new THREE.Mesh(new THREE.CircleGeometry(0.09, 16), shadowMaterial);
+    this.shadow = new THREE.Mesh(new THREE.CircleGeometry(0.13, 16), shadowMaterial);
     this.shadow.rotation.x = -Math.PI / 2;
     this.shadow.renderOrder = 2;
     this.slot = new THREE.Vector3();
