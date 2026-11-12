@@ -61,11 +61,27 @@ class PatchNoteText {
     static esc(value) {
         return value.replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
     }
+    // 패치노트 본문 꾸미기(2026-11-12 선생님 요청): 글자는 모두 안전하게 바꾼 뒤 ▲ 는 빨강(상향)·▼ 는 파랑(하향)으로,
+    // "■ " 로 시작하는 줄은 캐릭터 제목 줄로 보여 준다. 본문 규칙은 docs/30.team-battle/30.team-battle-notes.md 의 패치노트 절.
+    static bodyHtml(value) {
+        return PatchNoteText.esc(value).split("\n").map((line) => {
+            const decorated = line
+                .split(PatchNoteText.UP).join('<b style="color:' + PatchNoteText.UP_COLOR + '">' + PatchNoteText.UP + "</b>")
+                .split(PatchNoteText.DOWN).join('<b style="color:' + PatchNoteText.DOWN_COLOR + '">' + PatchNoteText.DOWN + "</b>");
+            return line.startsWith(PatchNoteText.HEADING) ? '<b style="color:' + PatchNoteText.HEADING_COLOR + '">' + decorated + "</b>" : decorated;
+        }).join("\n");
+    }
     static when(at) {
         const d = new Date(at);
         return (d.getMonth() + 1) + "월 " + d.getDate() + "일";
     }
 }
+PatchNoteText.UP = "▲";
+PatchNoteText.DOWN = "▼";
+PatchNoteText.HEADING = "■ ";
+PatchNoteText.UP_COLOR = "#FF5A5A";
+PatchNoteText.DOWN_COLOR = "#5AA9FF";
+PatchNoteText.HEADING_COLOR = "#F2D06B";
 /* 게임 화면 위 창: 30번 결과 창과 같은 어두운 반투명 판·주황 윗선(common/theme.css 색 토큰과 나눔고딕) */
 class PatchNoteDialog {
     show(gameTitle, note, onClose) {
@@ -76,7 +92,7 @@ class PatchNoteDialog {
         back.setAttribute("aria-modal", "true");
         back.innerHTML = '<div class="pn-box"><div class="pn-head"><div class="pn-tag">📢 ' + PatchNoteText.esc(gameTitle) + " 패치노트" + (note.at ? " · " + PatchNoteText.when(note.at) : "") + "</div>" +
             '<div class="pn-title">' + PatchNoteText.esc(note.title || "새 패치 안내") + "</div></div>" +
-            '<div class="pn-body">' + PatchNoteText.esc(note.body) + "</div>" +
+            '<div class="pn-body">' + PatchNoteText.bodyHtml(note.body) + "</div>" +
             '<div class="pn-foot"><button class="pn-ok" type="button">확인</button></div></div>';
         const close = () => { back.remove(); onClose(); };
         back.querySelector(".pn-ok").addEventListener("click", close);
@@ -214,7 +230,7 @@ class PatchNoteEditor {
         const title = this.el(this.ids.title).value.trim() || "새 패치 안내";
         const body = this.el(this.ids.body).value.trim();
         this.el(this.ids.preview).innerHTML = body
-            ? '<div class="pn-tag">📢 ' + PatchNoteText.esc(this.gameTitle()) + ' 패치노트</div><div class="pn-title">' + PatchNoteText.esc(title) + '</div><div class="pn-body">' + PatchNoteText.esc(body) + "</div>"
+            ? '<div class="pn-tag">📢 ' + PatchNoteText.esc(this.gameTitle()) + ' 패치노트</div><div class="pn-title">' + PatchNoteText.esc(title) + '</div><div class="pn-body">' + PatchNoteText.bodyHtml(body) + "</div>"
             : "";
     }
     async publish() {

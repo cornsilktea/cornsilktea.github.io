@@ -5,7 +5,7 @@
 <script charset="utf-8" src="common/access-guard.js" data-game="teambattle"></script>
 <script charset="utf-8" src="common/quality-governor.js"></script>
 <script charset="utf-8" src="common/fullscreen-keeper.js"></script>
-<script charset="utf-8" src="common/match-kit.js?v=20261103a"></script>
+<script charset="utf-8" src="common/match-kit.js?v=20261112b"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>3v3 팀 배틀 아레나</title>
@@ -324,7 +324,7 @@
 <script charset="utf-8" src="common/account-stats.js?v=20261109a"></script>
 <script charset="utf-8" src="games/30.team-battle/30.team-battle-versus.js?v=20261104a"></script>
 <script charset="utf-8" src="games/30.team-battle/30.team-battle-fx.js?v=20261106h"></script>
-<script charset="utf-8" src="games/30.team-battle/patch-notes.js?v=20261029b"></script>
+<script charset="utf-8" src="games/30.team-battle/patch-notes.js?v=20261112a"></script>
 <script type="module">
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
@@ -1786,9 +1786,11 @@ SinglePassMaterials.enable(THREE);
       { id: "v1", path: "teambattle/modestats/cup" },
       { id: "v2", path: "teambattle/patchstats/v2" },
       { id: "v3", path: "teambattle/patchstats/v3" },
-      { id: "v4", path: "teambattle/patchstats/v4" }
+      { id: "v4", path: "teambattle/patchstats/v4" },
+      { id: "v5", path: "teambattle/patchstats/v5" }
     ];
     static get current() { return StatsPatches.LIST[StatsPatches.LIST.length - 1]; }
+    static get number() { return Number(StatsPatches.current.id.slice(1)) || 0; }
     static of(id) { return StatsPatches.LIST.find(function (p) { return p.id === id; }) || StatsPatches.current; }
     static isCurrent(id) { return StatsPatches.of(id) === StatsPatches.current; }
     static labelOf(id) { return StatsPatches.of(id).id + (StatsPatches.isCurrent(id) ? " (현재)" : ""); }
@@ -2696,7 +2698,7 @@ SinglePassMaterials.enable(THREE);
     static ULT = {
       rmDur: GameTime.gameMs(4), rmRate: 1000 / GameTime.gameMs(0.5), rmDashMs: GameTime.gameMs(0.4), rmDashRange: 100
     };
-    static STATS = { name: "결투가", role: "assassin", icon: "🤺", hp: 130, speed: GameTime.gameSpeed(175), cd: GameTime.gameMs(1), dmg: 35, range: 100,
+    static STATS = { name: "결투가", role: "assassin", icon: "🤺", hp: 130, speed: GameTime.gameSpeed(175), cd: GameTime.gameMs(1), dmg: 32, range: 100,
                dashRange: 250, dashMs: GameTime.gameMs(0.5), stab: true, selfHeal: 10, ultName: "르미즈", heals: true };
     get botRole() { return "flank"; }
     isRiposting(E, t) { return E.buffUntil > t; }
@@ -2808,7 +2810,7 @@ SinglePassMaterials.enable(THREE);
       mbDelay: GameTime.gameMs(1), mbR: 250, mbDmg: 110, mbDmgMin: 75, mbCast: 550, mbMin: 60, mbStunMs: GameTime.gameMs(1.7),
       mbStunMin: GameTime.gameMs(0.9), mbSteps: 5
     };
-    static STATS = { name: "화염술사", role: "caster", icon: "🔥", hp: 115, speed: GameTime.gameSpeed(170), cd: GameTime.gameMs(1.4), dmg: 5, range: 350, pSpeed: 700, pr: 9, burn: { ms: GameTime.gameMs(6), maxHpRate: 0.025 }, ultName: "메테오", ultAim: true };
+    static STATS = { name: "화염술사", role: "caster", icon: "🔥", hp: 115, speed: GameTime.gameSpeed(170), cd: GameTime.gameMs(1.4), dmg: 5, range: 350, pSpeed: 1000, pr: 9, burn: { ms: GameTime.gameMs(6), maxHpRate: 0.025 }, ultName: "메테오", ultAim: true };
     showAimGuide(E, ult, c) { var services = this.services;
       if (!ult) return false;
       services.aimGuide.showAimCircle(services.input.aimReach(E, "ult"), MageType.ULT.mbR);
@@ -2830,11 +2832,12 @@ SinglePassMaterials.enable(THREE);
     skillGlow(E, t) { return E.ultUntil > t ? 0x661000 : 0; }
     playSkillClip(v, E, t) { var services = this.services; services.fighterMotion.playOnce(v, "Ranged_Magic_Spellcasting_Long", 2.6, t); }
     get shotName() { return "불꽃 구슬"; }
-    get startsSkillTimer() { return false; }
+    get startsSkillTimer() { return true; }
     cast(E, ang, reach, t) { var services = this.services;
       var spot = services.attack.burstSpot(E, ang, reach);
       E.angle = Math.atan2(spot.y - E.y, spot.x - E.x);
       E.ultUntil = t + 450;
+      E.skillDur = MageType.ULT.mbDelay;
       services.session.room.ref.child("effects").push({ type: "burst", team: E.team, owner: E.id, x: Math.round(spot.x), y: Math.round(spot.y),
                                        r: MageType.ULT.mbR, dmg: MageType.ULT.mbDmg, delay: MageType.ULT.mbDelay, createdAt: t });
       services.vision.revealBriefly(E.id, t);
@@ -2859,7 +2862,7 @@ SinglePassMaterials.enable(THREE);
     static ULT = {
       asSmokeMs: 400, asDur: GameTime.gameMs(21)
     };
-    static STATS = { name: "은신자", role: "assassin", icon: "🗡️", hp: 140, speed: GameTime.gameSpeed(175), ultSpeed: GameTime.gameSpeed(280), cd: GameTime.gameMs(1.1), dmg: 32, range: 110, arc: Math.PI * 0.6, hits: 2, hitGap: 160, ambushDmg: 45, throwDmg: 25, throwRange: 350, pSpeed: 1080, pr: 8, ultName: "은신" };
+    static STATS = { name: "은신자", role: "assassin", icon: "🗡️", hp: 150, speed: GameTime.gameSpeed(175), ultSpeed: GameTime.gameSpeed(280), cd: GameTime.gameMs(1.1), dmg: 32, range: 110, arc: Math.PI * 0.6, hits: 2, hitGap: 160, ambushDmg: 45, throwDmg: 25, throwRange: 350, pSpeed: 1080, pr: 8, ultName: "은신" };
     skillSpeed(E, t) { return E.stealthUntil > t ? this.data.ultSpeed : null; }
     ambush(E, t) { var services = this.services;
       if (E.stealthUntil <= t) return null;
@@ -3085,7 +3088,7 @@ SinglePassMaterials.enable(THREE);
       bsLeapMinMs: GameTime.gameMs(0.3), bsLeapMaxMs: GameTime.gameMs(1.5), bsR: 200, bsDmg: 45, bsStunMs: GameTime.gameMs(1.5), bsCast: 450, bsMin: 60,
       bsHop: 45
     };
-    static STATS = { name: "대장장이", role: "fighter", icon: "🔨", hp: 445, speed: GameTime.gameSpeed(150), cd: GameTime.gameMs(1.8), dmg: 30, range: 180, width: 150, windup: GameTime.gameMs(0.5), fx: { stunMs: GameTime.gameMs(0.5) }, ultName: "내려찍기", ultAim: true };
+    static STATS = { name: "대장장이", role: "fighter", icon: "🔨", hp: 430, speed: GameTime.gameSpeed(150), cd: GameTime.gameMs(1.8), dmg: 30, range: 180, width: 150, windup: GameTime.gameMs(0.5), fx: { stunMs: GameTime.gameMs(0.5) }, ultName: "내려찍기", ultAim: true };
     get hidesBasicEdge() { return true; }
     onStrikeShown(d) { if (d.len && !d.zone) this.services.impactBlasts.hammerBasic(d); }
     isHammerLeaping(E, t) { return E.ultUntil > t; }
@@ -3174,8 +3177,8 @@ SinglePassMaterials.enable(THREE);
                rightRecolor: [[1, 5, 1, "#4A4258", "#141019"], [1, 6, 1, "#3A3446", "#0E0C12"], [0, 2, 1, "#4A4258", "#141019"], [0, 3, 1, "#3A3446", "#0E0C12"], [0, 4, 1, "#D0303A", "#6A0E14"]],
                leftRecolor: [[1, 5, 1, "#4A4258", "#141019"], [1, 6, 1, "#3A3446", "#0E0C12"], [0, 2, 1, "#4A4258", "#141019"], [0, 3, 1, "#3A3446", "#0E0C12"], [0, 4, 1, "#D0303A", "#6A0E14"]] };
     static ULT = {
-      dmR: 400, dmGrowMs: GameTime.gameMs(2), dmDur: GameTime.gameMs(8), dmStunMs: GameTime.gameMs(1), dmBoltDmg: 20, dmStrikeMaxHpRate: 0.22,
-      dmStrikeStunMs: GameTime.gameMs(0.7), dmStunGraceMs: 40, cuStacks: 3, cuBoomDmg: 30, cuBoomMs: 500, cuExpireMs: GameTime.gameMs(4)
+      dmR: 320, dmGrowMs: GameTime.gameMs(2), dmDur: GameTime.gameMs(8), dmStunMs: GameTime.gameMs(1), dmBoltDmg: 30, dmStrikeMaxHpRate: 0.22,
+      dmStrikeStunMs: GameTime.gameMs(0.7), dmStunGraceMs: 40, cuStacks: 3, cuBoomDmg: 40, cuBoomMs: 500, cuExpireMs: GameTime.gameMs(4)
     };
     static STATS = { name: "주술사", role: "shooter", icon: "👊", hp: 115, speed: GameTime.gameSpeed(160), cd: GameTime.gameMs(1.3), dmg: 5, range: 400, width: 100, ultName: "영역전개" };
     static WAVE = { life: 724, travel: 564 };
@@ -3366,10 +3369,10 @@ SinglePassMaterials.enable(THREE);
     static MODEL = { file: "Mage", portraitPlant: true, plantLean: 0.2, plantShrink: 0.68, right: "staff_A", left: "spellbook_closed",
                recolor: [[1, 0, 1, "#F2F6FA", "#C9D6E2"], [1, 1, 1, "#8FD8F0", "#4FA9D9"], [1, 2, 1, "#8FD8F0", "#4FA9D9"], [2, 1, 1, "#8FD8F0", "#4FA9D9"], [0, 5, 1, "#F2F6FA", "#C9D6E2"]] };
     static ULT = {
-      frSlowMs: GameTime.gameMs(1.5), frSlowMul: 0.8, frSlowStep: 0.2, frFreezeMs: GameTime.gameMs(1), frFreezeMaxHpRate: 0.1, frBzHides: true, frBzR: 400,
-      frBzDur: GameTime.gameMs(9), frBzDmg: 7, frBzTick: GameTime.gameMs(1), frBzDelay: 400
+      frSlowMs: GameTime.gameMs(2), frSlowMul: 0.7, frSlowStep: 0.3, frFreezeMs: GameTime.gameMs(1), frFreezeMaxHpRate: 0.2, frBzHides: true, frBzR: 300,
+      frBzDur: GameTime.gameMs(9), frBzDmg: 5, frBzTick: GameTime.gameMs(1), frBzDelay: 400
     };
-    static STATS = { name: "얼음술사", role: "caster", icon: "❄️", hp: 115, speed: GameTime.gameSpeed(170), cd: GameTime.gameMs(1.4), dmg: 11, range: 350, pSpeed: 750, pr: 8, ultName: "눈보라" };
+    static STATS = { name: "얼음술사", role: "caster", icon: "❄️", hp: 115, speed: GameTime.gameSpeed(170), cd: GameTime.gameMs(1.4), dmg: 11, range: 350, pSpeed: 1000, pr: 8, ultName: "눈보라" };
     projectileEffect(d, T, immune, fx) { var services = this.services; return !d.isSkill && !immune && !T.minion ? services.status.frostStackFx(T) : fx; }
     hitColor(d) { return "#BFEFFF"; }
     get tintsHit() { return true; }
@@ -3564,7 +3567,7 @@ SinglePassMaterials.enable(THREE);
     static ULT = {
       drR: 150, drDur: 3600000, drTick: GameTime.gameMs(1), drHeal: 18, drCast: 450, drMin: 60, drSelfHeal: 18, drSelfGauge: 1, drRiseMs: 350, drCastMs: 500
     };
-    static STATS = { name: "드루이드", role: "caster", icon: "🌿", hp: 110, speed: GameTime.gameSpeed(165), cd: GameTime.gameMs(1.4), dmg: 14, range: 350, pSpeed: 728, pr: 12, lanes: 2, fx: { slowMs: GameTime.gameMs(1.5), slowMul: 0.7 },
+    static STATS = { name: "드루이드", role: "caster", icon: "🌿", hp: 110, speed: GameTime.gameSpeed(165), cd: GameTime.gameMs(1.4), dmg: 14, range: 350, pSpeed: 1000, pr: 12, lanes: 2, fx: { slowMs: GameTime.gameMs(1.5), slowMul: 0.7 },
                ultName: "덩굴 부쉬", ultAim: true, heals: true };
     get startsSkillTimer() { return false; }
     get shotName() { return "덩굴 가시"; }
@@ -3662,8 +3665,8 @@ SinglePassMaterials.enable(THREE);
                   recolor: [[1, 0, 2, "#2E2038", "#0A060F"], [1, 2, 1, "#C58BFF", "#6A2BC4"], [2, 1, 1, "#C58BFF", "#6A2BC4"], [0, 5, 1, "#C58BFF", "#6A2BC4"]],
                   leftRecolor: [[1, 2, 1, "#C58BFF", "#6A2BC4"], [2, 1, 1, "#C58BFF", "#6A2BC4"]] };
     static ULT = {
-      sfMin: 60, sfDelay: GameTime.gameMs(0.6 / 1.3), sfR: 100, sfStunEvery: 4, sfStunMs: GameTime.gameMs(1), agCast: 400, agMin: 60, agDur: GameTime.gameMs(3),
-      agR: 350, agPull: 260, agGap: 70, agBoomDmg: 25
+      sfMin: 60, sfDelay: GameTime.gameMs(0.6 / 1.3), sfR: 90, sfStunEvery: 4, sfStunMs: GameTime.gameMs(1), agCast: 400, agMin: 60, agDur: GameTime.gameMs(3),
+      agR: 280, agPull: 260, agGap: 70, agBoomDmg: 25
     };
     static STATS = { name: "점성술사", role: "caster", icon: "🌠", hp: 115, speed: GameTime.gameSpeed(170), cd: GameTime.gameMs(1.4), dmg: 15, range: 380, ultName: "가르강튀아", ultAim: true };
     get startsSkillTimer() { return true; }
@@ -3702,7 +3705,7 @@ SinglePassMaterials.enable(THREE);
     static MODEL = { file: "Barbarian_Large", right: "Skeleton_Mace_Large", scale: 0.85, portraitFit: 0.94, portraitShiftX: 0.12 };
     static ULT = {
       gjCast: 300, gjMin: 60, gjTransformMs: GameTime.gameMs(1.2), gjDur: GameTime.gameMs(6), gjDef: 0.65, gjR: 150, gjTick: GameTime.gameMs(1),
-      gjTickDmg: 20, gjMaceRange: 200, gjMaceDmg: 23
+      gjTickDmg: 20, gjMaceRange: 200, gjMaceDmg: 23, gjHeal: 100
     };
     static STATS = { name: "거신", role: "fighter", icon: "🗿", hp: 500, speed: GameTime.gameSpeed(135), cd: GameTime.gameMs(1.6), dmg: 23, range: 120, arc: Math.PI * 0.6, bodyR: 36, ultName: "골렘 강림", ultAim: true, blocks: true };
     static HEAD_Y = 150;
@@ -3756,7 +3759,7 @@ SinglePassMaterials.enable(THREE);
       services.fighterMotion.playOnce(v, "Melee_2H_Slam", MathKit.clamp(GiantType.SLAM_IMPACT_SEC * 1000 / leapMs, 1, 4.5), t);
     }
     ultDesc() { var services = this.services;
-      return "지정한 곳(최대 " + GiantType.ULT.gjCast + ")으로 점프해 " + services.skilltext.secs(GiantType.ULT.gjDur) + "간 골렘으로 변신. 자신을 중심으로 반경 " + GiantType.ULT.gjR + "에 하늘빛 폭풍이 일어 적은 1초당 " + GiantType.ULT.gjTickDmg +
+      return "지정한 곳(최대 " + GiantType.ULT.gjCast + ")으로 점프해 " + services.skilltext.secs(GiantType.ULT.gjDur) + "간 골렘으로 변신하며 체력 " + GiantType.ULT.gjHeal + " 회복. 자신을 중심으로 반경 " + GiantType.ULT.gjR + "에 하늘빛 폭풍이 일어 적은 1초당 " + GiantType.ULT.gjTickDmg +
              "의 피해. 변신 중 기본 공격은 반경 " + GiantType.ULT.gjMaceRange + " 안의 가장 가까운 적 1명을 철퇴로 쳐 " + GiantType.ULT.gjMaceDmg + "의 피해";
     }
     passiveDesc() { var services = this.services;
@@ -4000,10 +4003,10 @@ SinglePassMaterials.enable(THREE);
     static MODEL = { file: "Mage", portraitPlant: true, plantAtHand: true, rightBuilt: "trident", rightScale: 1.2, rightRot: [0.4, -0.2, 0.95], hide: ["Mage_Hat"],
                 recolor: [[1, 0, 1, "#1C7F8C", "#0F4A5C"], [1, 1, 1, "#173A63", "#0B1F3C"], [1, 2, 1, "#38B6C8", "#1B6F86"], [2, 1, 1, "#173A63", "#0B1F3C"], [0, 5, 1, "#38B6C8", "#1B6F86"]] };
     static ULT = {
-      mrFlyMs: GameTime.gameMs(0.3), mrHeal: 10, mrChainR: 300, mrDmg: 20, mrKb: 150, mrStunMs: GameTime.gameMs(0.5), mrWaveHeal: 10, mrLanes: 6, mrLen: 600,
+      mrFlyMs: GameTime.gameMs(0.3), mrHeal: 12, mrChainR: 300, mrDmg: 30, mrKb: 150, mrStunMs: GameTime.gameMs(0.5), mrWaveHeal: 10, mrLanes: 6, mrLen: 600,
       mrBotPushR: 150, mrBotMinFoes: 2, mrBotAllyHp: 0.5, mrWindMs: GameTime.gameMs(0.5)
     };
-    static STATS = { name: "마리나", role: "caster", icon: "🌊", hp: 110, speed: GameTime.gameSpeed(170), cd: GameTime.gameMs(1.4), dmg: 10, range: 380, noAim: true, ultName: "해일", ultAim: true, heals: true };
+    static STATS = { name: "마리나", role: "caster", icon: "🌊", hp: 110, speed: GameTime.gameSpeed(170), cd: GameTime.gameMs(1.4), dmg: 12, range: 380, noAim: true, ultName: "해일", ultAim: true, heals: true };
     static WAVE = { travel: GameTime.gameMs(3), life: GameTime.gameMs(3) + 300 };
     get showsHealRange() { return true; }
     get startsSkillTimer() { return false; }
@@ -7160,6 +7163,7 @@ SinglePassMaterials.enable(THREE);
       E.skillUntil = t + GiantType.ULT.gjDur;
       E.ultUntil = t + GiantType.ULT.gjTransformMs;
       E.pending = null;
+      services.fieldFx.healSelf(E, GiantType.ULT.gjHeal, t);
       services.session.room.ref.child("effects").push({ type: "gale", team: E.team, owner: E.id, x: Math.round(E.x), y: Math.round(E.y), r: GiantType.ULT.gjR, dur: GiantType.ULT.gjDur, tick: GiantType.ULT.gjTick, dmg: GiantType.ULT.gjTickDmg,
                                        follow: 1, createdAt: t });
       services.vision.revealBriefly(E.id, t);
@@ -13472,10 +13476,11 @@ SinglePassMaterials.enable(THREE);
       var leader = party.isLeader(), searching = !!party.searching();
       this.code.textContent = party.code;
       this.seats.innerHTML = "<h3>우리 팀</h3>" + this.slotRows(party, party.record ? party.record.leaderId : "", leader && !searching);
-      this.matchButton.textContent = searching ? "매칭 취소" : "매칭 시작";
+      var outdated = searching ? "" : this.outdatedMessage(party);
+      this.matchButton.textContent = searching ? "매칭 취소" : outdated || "매칭 시작";
       this.matchButton.classList.toggle("primary", !searching);
       this.matchButton.classList.toggle("cancel", searching);
-      this.matchButton.disabled = !leader;
+      this.matchButton.disabled = !leader || !!outdated;
       this.aiNowButton.hidden = !this.options.aiFallbackMs || !searching || !leader;
       this.aiNowButton.disabled = false;
       var crowdText = !searching || waiting === null ? "" : waiting > 0 ? "👥 지금 " + waiting + "개 팀이 기다리는 중" : "👥 지금 기다리는 팀이 없어요";
@@ -13484,7 +13489,7 @@ SinglePassMaterials.enable(THREE);
       var streakNote = this.streakNote();
       var fallback = Math.ceil(this.options.aiFallbackMs / 1000) - party.searchSeconds();
       var fallbackNote = waitingForOthers ? " · 다른 팀 경기가 끝나길 기다리는 중(같은 상대와 연달아 만나지 않게)" : fallback > 0 ? " · " + fallback + "초 뒤 AI와 시작해요" : " · AI와 시작하는 중…";
-      var hint = searching ? "상대를 찾는 중… " + party.searchSeconds() + "초" + fallbackNote + streakNote : leader ? "" : "팀장이 매칭을 시작하길 기다리는 중이에요…";
+      var hint = searching ? "상대를 찾는 중… " + party.searchSeconds() + "초" + fallbackNote + streakNote : outdated ? "최신 버전이 아닌 학생은 페이지를 새로고침(Ctrl+F5)한 뒤 팀에 다시 들어오세요." : leader ? "" : "팀장이 매칭을 시작하길 기다리는 중이에요…";
       if (this.hint.textContent !== hint) this.hint.textContent = hint;
     }
   }
@@ -13498,7 +13503,7 @@ SinglePassMaterials.enable(THREE);
     constructor(services) { this.services = services; this.flow = null; this.quiet = false; }
     ready() { var services = this.services;
       if (this.flow || !services.backend.db) return this.flow;
-      var options = { gameRoot: "teambattle", queue: "teambattle", partyLimit: ArenaRandomMatch.PARTY_LIMIT, matcher: new MkVersusMatcher(ArenaRandomMatch.PARTY_LIMIT, ArenaRandomMatch.MATCHER_TIMING), allowBots: true, aiFallbackMs: ArenaRandomMatch.AI_FALLBACK_MS, actionsMount: Dom.$("partyActions"), stats: new AccountStatsOpener(function () { services.myStats.open(); }, new AccountLazyGuard(function () { return services.accountRecorder.guard; })),
+      var options = { gameRoot: "teambattle", queue: "teambattle", clientVersion: StatsPatches.number, partyLimit: ArenaRandomMatch.PARTY_LIMIT, matcher: new MkVersusMatcher(ArenaRandomMatch.PARTY_LIMIT, ArenaRandomMatch.MATCHER_TIMING), allowBots: true, aiFallbackMs: ArenaRandomMatch.AI_FALLBACK_MS, actionsMount: Dom.$("partyActions"), stats: new AccountStatsOpener(function () { services.myStats.open(); }, new AccountLazyGuard(function () { return services.accountRecorder.guard; })),
         intro: "팀을 짜고(빈 자리는 🤖 AI 추가) 매칭 시작을 누르면 아무 팀과 3대3 대회모드로 만나요. 맵은 무작위예요." };
       var panel = new ArenaPartyPanel(Dom.$("scrParty"), Dom.$("partyMount"), options);
       this.flow = new MkRandomFlow(services.backend.db, { now: function () { return services.clock.now(); } }, services.session.myId, options, this, panel);

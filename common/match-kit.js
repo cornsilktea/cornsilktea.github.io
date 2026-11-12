@@ -12,6 +12,23 @@
 //  - 대기열은 on('value') 구독으로만 본다(폴링 없음). 3초 대기는 기기 안 타이머로 다시 계산만 한다.
 // 이 파일은 화면과 무관한 부분(Node 시뮬레이터 tools/match-sim.js 가 그대로 불러 검사)과
 // 계정별 연승(MkPersonalStreak)·연승 표시(MkStreakBadge)로 나뉜다. 모양은 common/theme.css 의 .mk-* .
+// 팀원 중 게임 버전이 가장 높은 기기보다 낮은 학생을 찾는다(2026-11-12 선생님 요청).
+// 버전이 다른 기기끼리는 같은 판을 하면 규칙이 달라지므로, 팀에 낮은 버전이 있으면 팀장이 매칭을 시작하지 못하게 한다.
+// 추가 통신 없이 팀 대기실에 이미 동기화되는 members 로 비교하며, 버전을 쓰지 않는 게임(clientVersion 없음)은 건너뛴다.
+class MkVersionGate {
+    static outdated(members, enabled) {
+        if (!enabled)
+            return [];
+        const newest = members.reduce((high, [, member]) => Math.max(high, Number(member.ver) || 0), 0);
+        return members.filter(([, member]) => (Number(member.ver) || 0) < newest).map(([, member]) => member);
+    }
+    static message(low) {
+        if (!low.length)
+            return "";
+        const names = low.length <= 2 ? low.map((member) => member.nick).join(", ") : low[0].nick + " 외 " + (low.length - 1) + "명";
+        return names + " 학생의 버전이 낮습니다.";
+    }
+}
 // 랜덤 매칭 맵 고르기(2026-10-28 선생님 요청: 24번 맵이 계속 비슷하게 나온다).
 // 매칭된 모든 사람의 바로 전 맵을 빼고 남은 맵 중에서 plan.seed 로 고른다. 다 빠지면 전체에서 고른다.
 class MkRecentMaps {
@@ -587,7 +604,7 @@ class MkParty {
     }
     updateMe(member) {
         if (this.record && this.record.members && this.record.members[this.myId])
-            this.ref.child("members/" + this.myId).update({ nick: member.nick, look: member.look || null, rate: MkWinBand.clean(member.rate), recentMaps: MkRecentMaps.clean(member.recentMaps) });
+            this.ref.child("members/" + this.myId).update({ nick: member.nick, look: member.look || null, rate: MkWinBand.clean(member.rate), recentMaps: MkRecentMaps.clean(member.recentMaps), ver: member.ver || null });
     }
     markSearching(since) {
         return this.ref.child("search").set(since === null ? null : { since });
@@ -1179,6 +1196,10 @@ class MkPartyPanel {
         buttons.append(this.aiNowButton, this.matchButton);
         mount.append(leave, top, this.seats, this.notice, this.crowd, buttons, this.hint);
     }
+    // 팀에 버전이 낮은 학생이 있으면 "○○ 학생의 버전이 낮습니다."(버튼 글자), 없거나 버전을 안 쓰는 게임이면 빈 글자. 화면을 따로 그리는 게임도 이걸 쓴다.
+    outdatedMessage(party) {
+        return MkVersionGate.message(MkVersionGate.outdated(party.members(), this.options.clientVersion !== undefined));
+    }
     setNotice(text) {
         if (this.notice.textContent !== text)
             this.notice.textContent = text;
@@ -1226,10 +1247,11 @@ class MkPartyPanel {
             else
                 this.seats.appendChild(MkPartyPanel.seat("div", "mk-seat empty", "빈 자리", "", ""));
         }
-        this.matchButton.textContent = searching ? "매칭 취소" : "매칭 시작";
+        const outdated = searching ? "" : this.outdatedMessage(party);
+        this.matchButton.textContent = searching ? "매칭 취소" : outdated || "매칭 시작";
         this.matchButton.classList.toggle("primary", !searching);
         this.matchButton.classList.toggle("cancel", searching);
-        this.matchButton.disabled = !leader;
+        this.matchButton.disabled = !leader || !!outdated;
         this.aiNowButton.hidden = !this.options.aiFallbackMs || !searching || !leader;
         this.aiNowButton.disabled = false;
         const unit = this.options.solo ? { some: "명이", none: "학생이" } : { some: "개 팀이", none: "팀이" };
@@ -1241,7 +1263,7 @@ class MkPartyPanel {
         const fallback = this.options.aiFallbackMs ? Math.ceil(this.options.aiFallbackMs / 1000) - party.searchSeconds() : 0;
         const fallbackNote = waitingForOthers ? " · 다른 팀 경기가 끝나길 기다리는 중(같은 상대와 연달아 만나지 않게)"
             : !this.options.aiFallbackMs ? "" : fallback > 0 ? " · " + fallback + "초 뒤 AI와 시작해요" : " · AI와 시작하는 중…";
-        const hint = searching ? "상대를 찾는 중… " + party.searchSeconds() + "초" + fallbackNote + streakNote : leader ? "" : "팀장이 매칭을 시작하길 기다리는 중이에요…";
+        const hint = searching ? "상대를 찾는 중… " + party.searchSeconds() + "초" + fallbackNote + streakNote : outdated ? "최신 버전이 아닌 학생은 페이지를 새로고침(Ctrl+F5)한 뒤 팀에 다시 들어오세요." : leader ? "" : "팀장이 매칭을 시작하길 기다리는 중이에요…";
         if (this.hint.textContent !== hint)
             this.hint.textContent = hint;
     }
@@ -1300,6 +1322,11 @@ class MkRandomFlow {
             this.party.setBots(this.party.bots() - 1); };
         panel.onAiNow = () => this.startWithAiNow();
     }
+    // 게임이 준 내 정보에 이 기기의 게임 버전을 붙여 팀 대기실에 올린다(MkVersionGate).
+    memberNow() {
+        const member = this.hooks.member();
+        return this.options.clientVersion === undefined ? member : { ...member, ver: this.options.clientVersion };
+    }
     inParty() {
         return !!this.party;
     }
@@ -1314,7 +1341,7 @@ class MkRandomFlow {
         return !!this.current;
     }
     async create() {
-        const member = this.hooks.member();
+        const member = this.memberNow();
         const kept = this.memory.recall(member.nick);
         if (kept && (await this.directory.reclaim(kept.code, this.myId, member, kept.id))) {
             this.memory.remember(kept.code, member.nick, this.myId);
@@ -1331,7 +1358,7 @@ class MkRandomFlow {
     async tryJoin(code) {
         if (this.options.solo || !(await this.directory.exists(code)))
             return { handled: false, message: "" };
-        const outcome = await this.directory.join(code, this.myId, this.hooks.member());
+        const outcome = await this.directory.join(code, this.myId, this.memberNow());
         if (outcome.ok)
             this.attach(code);
         return { handled: true, message: outcome.message };
@@ -1341,7 +1368,7 @@ class MkRandomFlow {
     }
     updateMe() {
         if (this.party)
-            this.party.updateMe(this.hooks.member());
+            this.party.updateMe(this.memberNow());
     }
     render() {
         if (!this.party)
@@ -1479,6 +1506,8 @@ class MkRandomFlow {
         const party = this.party;
         if (!party || !party.isLeader())
             return;
+        if (!party.searching() && MkVersionGate.outdated(party.members(), this.options.clientVersion !== undefined).length)
+            return;
         this.panel.setBusy(true);
         try {
             if (party.searching()) {
@@ -1493,7 +1522,7 @@ class MkRandomFlow {
                 this.queue = new MkQueue(this.database, this.clock, this.paths, this.options.matcher, this.hooks);
                 this.queue.onError = (message) => this.panel.setNotice(message);
                 this.queue.onEntries = () => this.render();
-                await this.queue.enter(party, this.hooks.member());
+                await this.queue.enter(party, this.memberNow());
             }
         }
         catch (error) {

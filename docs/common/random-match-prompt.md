@@ -358,3 +358,5 @@
 - `RkSession.writeState` 가 내 마지막 위치 글자를 탭에 적고(`판 번호`와 함께), 새로고침 뒤 경기 화면을 만들 때 `session.savedOwnState()` 로 꺼내 쓴다(35·34 `savedOwnPose`, 39 `WbGuestBody`). 36·38번은 방장 스냅샷에 내 마지막 위치가 있어 따로 저장하지 않는다.
 - 38·39번은 방장이 사라지면(`onHostTakeover` → `continueAsNewHost`) 대기실로 돌리지 않고, 화면용으로 맞춰 두던 엔진(`SnClientDriver`/`WbGuestDriver` 의 mirror)을 방장 엔진으로 바꿔 판을 이어 간다. 스냅샷에 없는 방장 장부는 38번 `hsave`(2초마다, `SnHostSave`), 39번 `WbEngine.resumeAsHost`(돌발 커서·풍선 번호·숨은 아이템 다시 만들기)가 채운다. 이어받을 수 없으면(아직 스냅샷을 못 받음) 예전처럼 대기실로 돌린다.
 - 36번은 아직 대기실로 돌아간다.
+
+- **게임 버전 검사(2026-11-12, 30번만 적용)**: `MkFlowOptions.clientVersion`(올라가기만 하는 정수)을 주면 팀원끼리 `members/<아이디>/ver` 를 비교해 낮은 학생이 있을 때 매칭 시작 버튼이 `○○ 학생의 버전이 낮습니다.`로 바뀌고 눌리지 않는다(`MkVersionGate`). 안 주는 게임은 영향 없음. 30번은 `StatsPatches.number`(패치 번호)를 쓴다.

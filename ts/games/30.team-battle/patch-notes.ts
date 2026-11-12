@@ -71,8 +71,26 @@ class PatchNoteSeen {
 }
 
 class PatchNoteText {
+  static readonly UP = "▲";
+  static readonly DOWN = "▼";
+  static readonly HEADING = "■ ";
+  static readonly UP_COLOR = "#FF5A5A";
+  static readonly DOWN_COLOR = "#5AA9FF";
+  static readonly HEADING_COLOR = "#F2D06B";
+
   static esc(value: string): string {
     return value.replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" } as Record<string, string>)[ch]);
+  }
+
+  // 패치노트 본문 꾸미기(2026-11-12 선생님 요청): 글자는 모두 안전하게 바꾼 뒤 ▲ 는 빨강(상향)·▼ 는 파랑(하향)으로,
+  // "■ " 로 시작하는 줄은 캐릭터 제목 줄로 보여 준다. 본문 규칙은 docs/30.team-battle/30.team-battle-notes.md 의 패치노트 절.
+  static bodyHtml(value: string): string {
+    return PatchNoteText.esc(value).split("\n").map((line) => {
+      const decorated = line
+        .split(PatchNoteText.UP).join('<b style="color:' + PatchNoteText.UP_COLOR + '">' + PatchNoteText.UP + "</b>")
+        .split(PatchNoteText.DOWN).join('<b style="color:' + PatchNoteText.DOWN_COLOR + '">' + PatchNoteText.DOWN + "</b>");
+      return line.startsWith(PatchNoteText.HEADING) ? '<b style="color:' + PatchNoteText.HEADING_COLOR + '">' + decorated + "</b>" : decorated;
+    }).join("\n");
   }
 
   static when(at: number): string {
@@ -104,7 +122,7 @@ class PatchNoteDialog {
     back.setAttribute("aria-modal", "true");
     back.innerHTML = '<div class="pn-box"><div class="pn-head"><div class="pn-tag">📢 ' + PatchNoteText.esc(gameTitle) + " 패치노트" + (note.at ? " · " + PatchNoteText.when(note.at) : "") + "</div>" +
       '<div class="pn-title">' + PatchNoteText.esc(note.title || "새 패치 안내") + "</div></div>" +
-      '<div class="pn-body">' + PatchNoteText.esc(note.body) + "</div>" +
+      '<div class="pn-body">' + PatchNoteText.bodyHtml(note.body) + "</div>" +
       '<div class="pn-foot"><button class="pn-ok" type="button">확인</button></div></div>';
     const close = () => { back.remove(); onClose(); };
     (back.querySelector(".pn-ok") as HTMLButtonElement).addEventListener("click", close);
@@ -236,7 +254,7 @@ class PatchNoteEditor {
     const title = this.el<HTMLInputElement>(this.ids.title).value.trim() || "새 패치 안내";
     const body = this.el<HTMLTextAreaElement>(this.ids.body).value.trim();
     this.el(this.ids.preview).innerHTML = body
-      ? '<div class="pn-tag">📢 ' + PatchNoteText.esc(this.gameTitle()) + ' 패치노트</div><div class="pn-title">' + PatchNoteText.esc(title) + '</div><div class="pn-body">' + PatchNoteText.esc(body) + "</div>"
+      ? '<div class="pn-tag">📢 ' + PatchNoteText.esc(this.gameTitle()) + ' 패치노트</div><div class="pn-title">' + PatchNoteText.esc(title) + '</div><div class="pn-body">' + PatchNoteText.bodyHtml(body) + "</div>"
       : "";
   }
 
