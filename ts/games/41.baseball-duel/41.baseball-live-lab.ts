@@ -39,7 +39,7 @@ class BbLiveLabAddress {
 }
 
 class BbLiveScoreLine {
-  private shown: BbLiveBoard = { inning: 7, half: 0, outs: 0, balls: 0, strikes: 0, score: [0, 0] };
+  private shown: BbLiveBoard = { inning: 7, half: 0, outs: 0, balls: 0, strikes: 0, score: [0, 0], pitches: 0 };
   private title = "";
 
   constructor(private readonly box: HTMLElement) {}
@@ -72,6 +72,7 @@ interface BbLiveSegment {
   director: BbCameraDirector;
   calls: readonly BbCallCue[];
   sparks: readonly BbEffectCue[];
+  tracks: readonly BbRunnerTrack[];
   mark: BbVec | null;
   arriveAt: number;
   fielding: 0 | 1;
@@ -91,6 +92,7 @@ class BbLiveLab {
   private readonly stage: BbStage;
   private readonly feed: BbAiGameFeed;
   private readonly score: BbLiveScoreLine;
+  private readonly hud: BbScoreHud;
   private readonly waiting: BbLiveSegment[] = [];
   private segment!: BbLiveSegment;
   private directed!: BbDirectedShot;
@@ -106,6 +108,8 @@ class BbLiveLab {
     this.stage = new BbStage(libs, document.getElementById("labView") as HTMLCanvasElement);
     this.feed = new BbAiGameFeed(BbBallparkRegistry.MAIN.dimensions, this.options.batsLeft ? "L" : "R", this.options.throwsLeft ? "L" : "R", this.options.seed);
     this.score = new BbLiveScoreLine(this.status);
+    this.hud = new BbScoreHud(document.getElementById("hudTop") as HTMLElement);
+    this.hud.players("손님", "방장");
     this.start().catch((error: Error) => { this.status.textContent = "불러오지 못했어요: " + error.message; });
   }
 
@@ -158,12 +162,12 @@ class BbLiveLab {
 
   private queuePitch(): void {
     const live = this.feed.next(), play = new BbPlayChoreographer(live), script = play.build(this.setup());
-    this.waiting.push({ script, director: new BbCameraDirector(play.cameraCues), calls: play.calls, sparks: play.sparks, mark: play.crossedAt, arriveAt: play.arriveAt, fielding: live.fieldingIndex, live, title: play.title });
+    this.waiting.push({ script, director: new BbCameraDirector(play.cameraCues), calls: play.calls, sparks: play.sparks, tracks: play.runnerTracks, mark: play.crossedAt, arriveAt: play.arriveAt, fielding: live.fieldingIndex, live, title: play.title });
     if (!live.halfOver) return;
     const incoming: 0 | 1 = live.fieldingIndex === 0 ? 1 : 0;
     ([[false, live.fieldingIndex], [true, incoming]] as Array<[boolean, 0 | 1]>).forEach(([entering, team]) => {
       const swap = new BbSwapChoreographer(entering, BbLiveLab.DUGOUT_SIDES[team]);
-      this.waiting.push({ script: swap.build(this.setup()), director: new BbCameraDirector(swap.cameraCues), calls: swap.calls, sparks: [], mark: null, arriveAt: swap.arriveAt, fielding: team, live: null, title: swap.title });
+      this.waiting.push({ script: swap.build(this.setup()), director: new BbCameraDirector(swap.cameraCues), calls: swap.calls, sparks: [], tracks: swap.runnerTracks, mark: null, arriveAt: swap.arriveAt, fielding: team, live: null, title: swap.title });
     });
   }
 
@@ -172,7 +176,7 @@ class BbLiveLab {
     this.segment = this.waiting.shift() as BbLiveSegment;
     this.seconds = 0;
     this.cut = true;
-    if (this.segment.live) this.score.pitching(this.segment.live, this.segment.title);
+    if (this.segment.live) { this.score.pitching(this.segment.live, this.segment.title); this.hud.show(this.segment.live.boardBefore); }
     else this.score.swapping();
     this.stage.field(this.segment.fielding);
     this.stage.reset(this.segment.script);
@@ -194,8 +198,14 @@ class BbLiveLab {
     const pitching = this.directed.kind === "pitch";
     this.stage.advance(segment.script, this.seconds, deltaSeconds, this.view === "batter" && pitching ? BbStage.HIDDEN_BEHIND_PLATE : [], pitching && this.seconds < segment.arriveAt + BbLiveLab.ZONE_LINGER_SECONDS, pitching && this.seconds >= segment.arriveAt ? segment.mark : null);
     segment.sparks.forEach((spark) => { if (before < spark.at && this.seconds >= spark.at) this.stage.spark(spark.point); });
-    if (segment.live && before < segment.arriveAt && this.seconds >= segment.arriveAt) this.score.called(segment.live);
+    if (segment.live && before < segment.arriveAt && this.seconds >= segment.arriveAt) { this.score.called(segment.live); this.showCalled(segment.live); }
+    this.hud.follow(segment.script, segment.tracks, this.seconds);
     segment.calls.forEach((call) => { if (before < call.at && this.seconds >= call.at) this.score.shout(call.text); });
+  }
+
+  private showCalled(live: BbLivePitch): void {
+    const sameHalf = live.board.inning === live.boardBefore.inning && live.board.half === live.boardBefore.half;
+    this.hud.show(sameHalf ? live.board : { ...live.boardBefore, score: live.board.score, pitches: live.boardBefore.pitches + 1, outs: live.halfOver ? 3 : live.boardBefore.outs });
   }
 
   private tick(frameSeconds: number): void {

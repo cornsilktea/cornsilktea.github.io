@@ -7,13 +7,14 @@
 <style>
   html,body{margin:0;height:100%;background:#1c2a22;font-family:"Nanum Gothic","Malgun Gothic",sans-serif;color:#fff;overflow:hidden}
   canvas{display:block;width:100%;height:100%;touch-action:none}
-  #labBar{position:fixed;left:8px;top:8px;right:8px;display:flex;flex-wrap:wrap;gap:5px;align-items:center}
+  #labBar{position:fixed;left:8px;bottom:52px;right:8px;display:flex;flex-wrap:wrap;gap:5px;align-items:center}
   #labBar button{border:0;border-radius:8px;padding:8px 11px;background:rgba(20,24,22,.8);color:#fff;font:inherit;font-size:13px;font-weight:700;cursor:pointer;border-bottom:3px solid transparent}
   #labBar button.on{border-bottom-color:#D97B4F;background:rgba(60,40,28,.92)}
   .lab-gap{width:8px}
   #labStatus{position:fixed;left:8px;right:8px;bottom:8px;padding:8px 12px;border-radius:10px;background:rgba(20,24,22,.8);border-left:4px solid #D97B4F;font-size:14px;font-weight:700}
   body.plain #labBar,body.plain #labStatus{display:none}
 </style>
+<link rel="stylesheet" href="../games/41.baseball-duel/41.baseball-hud.css?v=4">
 <script type="importmap">
 { "imports": {
   "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js",
@@ -21,26 +22,28 @@
 } }
 </script>
 <script charset="utf-8" src="../common/character-kit.js"></script>
-<script charset="utf-8" src="../games/41.baseball-duel/41.baseball-motion.js?v=3"></script>
-<script charset="utf-8" src="../games/41.baseball-duel/41.baseball-field.js?v=3"></script>
-<script charset="utf-8" src="../games/41.baseball-duel/41.baseball-pitch.js?v=3"></script>
-<script charset="utf-8" src="../games/41.baseball-duel/41.baseball-batting.js?v=3"></script>
-<script charset="utf-8" src="../games/41.baseball-duel/41.baseball-running.js?v=3"></script>
-<script charset="utf-8" src="../games/41.baseball-duel/41.baseball-defense.js?v=3"></script>
-<script charset="utf-8" src="../games/41.baseball-duel/41.baseball-play.js?v=3"></script>
-<script charset="utf-8" src="../games/41.baseball-duel/41.baseball-game.js?v=3"></script>
-<script charset="utf-8" src="../games/41.baseball-duel/41.baseball-ai.js?v=3"></script>
-<script charset="utf-8" src="../games/41.baseball-duel/41.baseball-drills.js?v=3"></script>
-<script charset="utf-8" src="../games/41.baseball-duel/41.baseball-choreo.js?v=3"></script>
-<script charset="utf-8" src="../games/41.baseball-duel/41.baseball-actors.js?v=3"></script>
-<script charset="utf-8" src="../games/41.baseball-duel/41.baseball-park.js?v=3"></script>
-<script charset="utf-8" src="../games/41.baseball-duel/41.baseball-stage.js?v=3"></script>
-<script charset="utf-8" src="../games/41.baseball-duel/41.baseball-camera.js?v=3"></script>
-<script charset="utf-8" src="../games/41.baseball-duel/41.baseball-live.js?v=3"></script>
-<script charset="utf-8" src="../games/41.baseball-duel/41.baseball-live-lab.js?v=3"></script>
+<script charset="utf-8" src="../games/41.baseball-duel/41.baseball-motion.js?v=4"></script>
+<script charset="utf-8" src="../games/41.baseball-duel/41.baseball-field.js?v=4"></script>
+<script charset="utf-8" src="../games/41.baseball-duel/41.baseball-pitch.js?v=4"></script>
+<script charset="utf-8" src="../games/41.baseball-duel/41.baseball-batting.js?v=4"></script>
+<script charset="utf-8" src="../games/41.baseball-duel/41.baseball-running.js?v=4"></script>
+<script charset="utf-8" src="../games/41.baseball-duel/41.baseball-defense.js?v=4"></script>
+<script charset="utf-8" src="../games/41.baseball-duel/41.baseball-play.js?v=4"></script>
+<script charset="utf-8" src="../games/41.baseball-duel/41.baseball-game.js?v=4"></script>
+<script charset="utf-8" src="../games/41.baseball-duel/41.baseball-ai.js?v=4"></script>
+<script charset="utf-8" src="../games/41.baseball-duel/41.baseball-drills.js?v=4"></script>
+<script charset="utf-8" src="../games/41.baseball-duel/41.baseball-choreo.js?v=4"></script>
+<script charset="utf-8" src="../games/41.baseball-duel/41.baseball-actors.js?v=4"></script>
+<script charset="utf-8" src="../games/41.baseball-duel/41.baseball-park.js?v=4"></script>
+<script charset="utf-8" src="../games/41.baseball-duel/41.baseball-stage.js?v=4"></script>
+<script charset="utf-8" src="../games/41.baseball-duel/41.baseball-camera.js?v=4"></script>
+<script charset="utf-8" src="../games/41.baseball-duel/41.baseball-hud.js?v=4"></script>
+<script charset="utf-8" src="../games/41.baseball-duel/41.baseball-live.js?v=4"></script>
+<script charset="utf-8" src="../games/41.baseball-duel/41.baseball-live-lab.js?v=4"></script>
 </head>
 <body>
 <canvas id="labView"></canvas>
+<div id="hudTop"></div>
 <div id="labBar"></div>
 <div id="labStatus">불러오는 중… (계속 이 글자만 보이면 파일을 직접 연 것입니다. 주소 cornsilktea.github.io/tools/baseball-live-lab.html 또는 미리보기 서버로 열어 주세요)</div>
 <script type="module">

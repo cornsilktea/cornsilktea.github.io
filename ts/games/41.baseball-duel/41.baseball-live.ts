@@ -1,11 +1,4 @@
-interface BbLiveBoard {
-  inning: number;
-  half: 0 | 1;
-  outs: number;
-  balls: number;
-  strikes: number;
-  score: [number, number];
-}
+type BbLiveBoard = BbBoardSnapshot;
 
 interface BbLivePitch extends BbPitchCue {
   toast: string;
@@ -13,6 +6,7 @@ interface BbLivePitch extends BbPitchCue {
   fieldingIndex: 0 | 1;
   halfOver: boolean;
   board: BbLiveBoard;
+  boardBefore: BbLiveBoard;
 }
 
 class BbAiGameFeed {
@@ -30,6 +24,10 @@ class BbAiGameFeed {
     return this.queue.shift() as BbLivePitch;
   }
 
+  private static boardOf(state: BbGameState, fieldingIndex: 0 | 1): BbLiveBoard {
+    return { inning: state.inning, half: state.half, outs: state.outs, balls: state.balls, strikes: state.strikes, score: [state.score[0], state.score[1]], pitches: state.box[fieldingIndex].pit.pitches };
+  }
+
   private static settingOf(state: BbGameState): BbPlaySetting {
     return { outs: state.outs, runners: [state.bases[0] ? state.bases[0].id : null, state.bases[1] ? state.bases[1].id : null, state.bases[2] ? state.bases[2].id : null] };
   }
@@ -38,15 +36,17 @@ class BbAiGameFeed {
     const level = BbAiLevel.ALL.normal, batter = BbAiLevel.batterSheet(this.batterHand), format = new BbThreeInningFormat();
     const team: BbTeamSheet = { lineup: [batter], pitchers: [BbAiLevel.pitcherSheet(this.pitcherHand)] };
     const runner = new BbAiMatchRunner(format, this.dimensions, new BbInfieldGroundBallErrorPolicy(BbAiGameFeed.ERROR_CHANCE), [team, team], [level, level], [level, level]);
-    let setting = BbAiGameFeed.settingOf(new BbMatchRules(format).start());
+    const opening = new BbMatchRules(format).start();
+    let setting = BbAiGameFeed.settingOf(opening), boardBefore = BbAiGameFeed.boardOf(opening, 1);
     runner.play(new BbSeededRandom(this.seeds.seed()), (state, outcome, note, battingIndex) => {
       const called = outcome.script ? BbPlayCodes.LABELS[outcome.script.result] : BbAiGameFeed.PLAIN_CALLS[outcome.kind];
       this.queue.push({
         outcome, setting, toast: note.toast || called, pitcherHand: this.pitcherHand, batterHand: this.batterHand, abilities: batter.abilities,
-        fieldingIndex: battingIndex === 0 ? 1 : 0, halfOver: note.halfOver,
-        board: { inning: state.inning, half: state.half, outs: state.outs, balls: state.balls, strikes: state.strikes, score: [state.score[0], state.score[1]] }
+        fieldingIndex: battingIndex === 0 ? 1 : 0, halfOver: note.halfOver, boardBefore,
+        board: BbAiGameFeed.boardOf(state, battingIndex === 0 ? 1 : 0)
       });
       setting = BbAiGameFeed.settingOf(state);
+      boardBefore = BbAiGameFeed.boardOf(state, state.half === 0 ? 1 : 0);
     });
   }
 }

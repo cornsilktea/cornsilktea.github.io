@@ -158,7 +158,7 @@ class BbPitchTuning {
   static readonly SIGMA_BY_CONTROL: readonly number[] = [0, 0.55, 0.46, 0.38, 0.32, 0.27, 0.23, 0.2];
   static readonly AIM_LIMIT = 2.2;
   static readonly FLIGHT_METERS = 17;
-  static readonly FLIGHT_SCALE = 2.4;
+  static readonly FLIGHT_SCALE = 1.68;
   static readonly WINDUP_SECONDS = 0.9;
 
   static sigmaFor(control: number): number { return BbPitchTuning.SIGMA_BY_CONTROL[Math.max(1, Math.min(7, Math.round(control)))]; }

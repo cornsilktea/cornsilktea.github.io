@@ -121,7 +121,7 @@ class BbPitchTuning {
 BbPitchTuning.SIGMA_BY_CONTROL = [0, 0.55, 0.46, 0.38, 0.32, 0.27, 0.23, 0.2];
 BbPitchTuning.AIM_LIMIT = 2.2;
 BbPitchTuning.FLIGHT_METERS = 17;
-BbPitchTuning.FLIGHT_SCALE = 2.4;
+BbPitchTuning.FLIGHT_SCALE = 1.68;
 BbPitchTuning.WINDUP_SECONDS = 0.9;
 class BbFastball extends BbPitchKind {
     constructor() {
