@@ -238,7 +238,7 @@ class SwingAct extends PitchAndSwing {
     this.cue(this.contactAt, "라인드라이브 — 좌중간으로", () => ball.fly(this.contactAt, this.contactAt + 3.2, platePoint, landing, 22, 0));
     this.cue(this.contactAt + 0.35, "타자 1루로 질주", () => { batter.play("Running_A", { speed: 1.0 }); batter.face(19.4, 19.4); });
     this.track(batter, [-0.95, 0], [19.4, 19.4], this.contactAt + 0.35, this.contactAt + 4.4);
-    this.cue(this.contactAt + 4.5, "베이스를 밟고 환호", () => { batter.play("Cheering"); batter.face(0, 0); });
+    this.cue(this.contactAt + 4.5, "", () => { batter.play("Idle_A"); batter.face(0, 0); });
   }
   camera() {
     const ball = this.app.stage.ball.mesh.position;
