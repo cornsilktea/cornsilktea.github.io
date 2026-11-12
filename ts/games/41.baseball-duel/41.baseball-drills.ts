@@ -1,4 +1,4 @@
-type BbRoleId = "pitcher" | "catcher" | "umpire" | "first" | "second" | "short" | "third" | "left" | "center" | "right" | "batter" | "runner";
+type BbRoleId = "pitcher" | "catcher" | "umpire" | "first" | "second" | "short" | "third" | "left" | "center" | "right" | "batter" | "runner" | "runnerFirst" | "runnerSecond" | "runnerThird";
 type BbGait = "run" | "walk" | "slide";
 type BbHandUse = "throw" | "glove";
 type BbCheckKind = "release" | "contact" | "catch" | "touch";
@@ -67,7 +67,7 @@ class BbDrillScript {
   readonly checkpoints: BbCheckpoint[] = [];
   readonly mirroredRoles = new Set<BbRoleId>();
 
-  constructor(readonly title: string, readonly duration: number) {}
+  constructor(readonly title: string, public duration: number) {}
 
   roles(): BbRoleId[] { return Array.from(this.starts.keys()); }
 

@@ -2,6 +2,7 @@ interface BbCameraShot {
   position: BbVec;
   look: BbVec;
   fieldOfView: number;
+  keepsWidth?: boolean;
 }
 
 interface BbStageCast {
@@ -22,7 +23,11 @@ class BbBroadcastShots {
 class BbStage {
   static readonly HIDDEN_BEHIND_PLATE: readonly BbRoleId[] = ["catcher", "umpire"];
   private static readonly FIELDERS: readonly BbRoleId[] = ["pitcher", "catcher", "first", "second", "short", "third", "left", "center", "right"];
+  private static readonly RUNNERS: readonly BbRoleId[] = ["runner", "runnerFirst", "runnerSecond", "runnerThird"];
+  private static readonly TEAM_KITS: readonly BbTeamKit[] = [BbTeamKits.AWAY, BbTeamKits.HOME];
   private static readonly CUT_DISTANCE = 30;
+  private static readonly WIDTH_KEPT_ASPECT = 1.6;
+  private static readonly WIDEST_VIEW = 100;
   private static readonly MOVE_FOLLOW = 5.5;
   private static readonly LOOK_FOLLOW = 8;
   private static readonly LONGEST_FRAME_SECONDS = 0.05;
@@ -34,7 +39,8 @@ class BbStage {
   private readonly goalPosition: Three<"Vector3">;
   private readonly goalLook: Three<"Vector3">;
   private readonly clock: Three<"Clock">;
-  private readonly actors = new Map<BbRoleId, BbPlayerActor>();
+  private readonly casts: ReadonlyArray<Map<BbRoleId, BbPlayerActor>> = [new Map<BbRoleId, BbPlayerActor>(), new Map<BbRoleId, BbPlayerActor>()];
+  private fielding: 0 | 1 = 1;
   private ball!: BbBallActor;
   private zone!: Three<"LineLoop">;
 
@@ -67,7 +73,9 @@ class BbStage {
     const factory = new CharacterModelFactory(this.libs, assets), gear = new BbGearFactory(this.libs);
     this.scene.add(new BbBallparkBuilder(this.libs, park).build());
     new BbParkLighting(this.libs).addTo(this.scene);
-    this.createActors(factory, assets, gear, cast);
+    this.createActors(0, factory, assets, gear, cast);
+    this.createActors(1, factory, assets, gear, cast);
+    this.field(1);
     this.ball = new BbBallActor(this.libs);
     this.zone = this.zoneFrame();
     this.scene.add(this.ball.mesh, this.ball.shadow, this.zone);
@@ -75,37 +83,43 @@ class BbStage {
 
   get metrics(): BbBodyMetrics { return this.actor("batter").poser.metrics; }
 
-  actor(role: BbRoleId): BbPlayerActor { return this.actors.get(role) as BbPlayerActor; }
+  actor(role: BbRoleId): BbPlayerActor { return this.casts[this.fielding].get(role) as BbPlayerActor; }
+
+  field(team: 0 | 1): void {
+    this.fielding = team;
+    this.casts.forEach((cast, index) => cast.forEach((actor) => { actor.root.visible = index === team; }));
+  }
 
   private zoneFrame(): Three<"LineLoop"> {
     const THREE = this.libs.THREE, corners = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([u, v]) => { const point = BbStrikeZoneBox.pointAt(u, v); return new THREE.Vector3(point.x, point.y, point.z); });
     return new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(corners), new THREE.LineBasicMaterial({ color: "#ffffff", transparent: true, opacity: 0.75 }));
   }
 
-  private createActors(factory: CharacterModelFactory, assets: CharacterAssets, gear: BbGearFactory, cast: BbStageCast): void {
-    const mine = new PlayerProfile().look, batterFlapOnLeft = !cast.batsLeft;
+  private createActors(team: 0 | 1, factory: CharacterModelFactory, assets: CharacterAssets, gear: BbGearFactory, cast: BbStageCast): void {
+    const mine = new PlayerProfile().look, batterFlapOnLeft = !cast.batsLeft, fieldKit = BbStage.TEAM_KITS[team], batKit = BbStage.TEAM_KITS[1 - team];
     const make = (role: BbRoleId, outfit: BbActorOutfit) => {
       const actor = new BbPlayerActor(this.libs, factory, assets, gear, outfit);
       this.scene.add(actor.root);
-      this.actors.set(role, actor);
+      actor.root.visible = false;
+      this.casts[team].set(role, actor);
     };
     BbStage.FIELDERS.forEach((role, index) => {
       const look = role === "pitcher" ? mine : CharacterLooks.clean({ c: index % 6, p: { skin: index % 5, hair: (index * 3) % 8 } });
       const gloveSide: BbSide = role === "pitcher" && cast.throwsLeft ? "right" : "left";
-      make(role, { look, kit: BbTeamKits.HOME, headGear: role === "catcher" ? "mask" : "cap", gloveSide, chestProtector: role === "catcher", carriesBat: false, flapOnLeft: false });
+      make(role, { look, kit: fieldKit, headGear: role === "catcher" ? "mask" : "cap", gloveSide, chestProtector: role === "catcher", carriesBat: false, flapOnLeft: false });
     });
     make("umpire", { look: CharacterLooks.clean({ c: 3, p: { skin: 2, hair: 0 } }), kit: BbTeamKits.UMPIRE, headGear: "mask", gloveSide: null, chestProtector: false, carriesBat: false, flapOnLeft: false });
-    make("batter", { look: mine, kit: BbTeamKits.AWAY, headGear: "helmet", gloveSide: null, chestProtector: false, carriesBat: true, flapOnLeft: batterFlapOnLeft });
-    make("runner", { look: mine, kit: BbTeamKits.AWAY, headGear: "helmet", gloveSide: null, chestProtector: false, carriesBat: false, flapOnLeft: batterFlapOnLeft });
+    make("batter", { look: mine, kit: batKit, headGear: "helmet", gloveSide: null, chestProtector: false, carriesBat: true, flapOnLeft: batterFlapOnLeft });
+    BbStage.RUNNERS.forEach((role) => make(role, { look: mine, kit: batKit, headGear: "helmet", gloveSide: null, chestProtector: false, carriesBat: false, flapOnLeft: batterFlapOnLeft }));
   }
 
   reset(script: BbDrillScript): void {
     this.ball.forgetHolder();
-    this.actors.forEach((actor, role) => actor.snapTo(script.starts.has(role) ? script.frameOf(role, 0) : null));
+    this.casts[this.fielding].forEach((actor, role) => actor.snapTo(script.starts.has(role) ? script.frameOf(role, 0) : null));
   }
 
   advance(script: BbDrillScript, seconds: number, deltaSeconds: number, hidden: readonly BbRoleId[], zoneVisible: boolean): void {
-    this.actors.forEach((actor, role) => {
+    this.casts[this.fielding].forEach((actor, role) => {
       actor.root.visible = script.starts.has(role) && hidden.indexOf(role) < 0;
       if (!actor.root.visible) return;
       actor.update(deltaSeconds, script.placementOf(role, seconds), script.frameOf(role, seconds), script.gaitOf(role, seconds), script.speedOf(role, seconds));
@@ -122,7 +136,9 @@ class BbStage {
     this.camera.position.lerp(this.goalPosition, jump ? 1 : 1 - Math.exp(-frameSeconds * BbStage.MOVE_FOLLOW));
     this.cameraLook.lerp(this.goalLook, jump ? 1 : 1 - Math.exp(-frameSeconds * BbStage.LOOK_FOLLOW));
     this.camera.lookAt(this.cameraLook);
-    if (Math.abs(this.camera.fov - shot.fieldOfView) > 0.01) { this.camera.fov = shot.fieldOfView; this.camera.updateProjectionMatrix(); }
+    const narrow = shot.keepsWidth ? Math.max(1, BbStage.WIDTH_KEPT_ASPECT / this.camera.aspect) : 1;
+    const fieldOfView = Math.min(BbStage.WIDEST_VIEW, 2 * Math.atan(Math.tan(shot.fieldOfView * Math.PI / 360) * narrow) * 180 / Math.PI);
+    if (Math.abs(this.camera.fov - fieldOfView) > 0.01) { this.camera.fov = fieldOfView; this.camera.updateProjectionMatrix(); }
   }
 
   run(onFrame: (frameSeconds: number) => void): void {
