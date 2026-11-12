@@ -1,0 +1,531 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>41번 야구 동작 시연</title>
+<style>
+  html,body{margin:0;height:100%;background:#1c2a22;font-family:"Nanum Gothic","Malgun Gothic",sans-serif;color:#fff;overflow:hidden}
+  canvas{display:block;width:100%;height:100%}
+  #bar{position:fixed;left:10px;top:10px;display:flex;flex-wrap:wrap;gap:6px;max-width:calc(100% - 20px)}
+  #bar button{border:0;border-radius:8px;padding:9px 13px;background:rgba(20,24,22,.78);color:#fff;font:inherit;font-weight:700;cursor:pointer;border-bottom:3px solid transparent}
+  #bar button.on{border-bottom-color:#D97B4F;background:rgba(60,40,28,.9)}
+  #caption{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);padding:10px 18px;border-radius:10px;background:rgba(20,24,22,.8);font-size:18px;font-weight:700;border-left:4px solid #D97B4F;white-space:nowrap}
+  #status{position:fixed;right:12px;top:12px;font-size:13px;opacity:.8;background:rgba(20,24,22,.6);padding:6px 10px;border-radius:8px}
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<canvas id="view"></canvas>
+<div id="bar"></div>
+<div id="caption">불러오는 중…</div>
+<div id="status"></div>
+<script type="module">
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
+
+class FieldSpace {
+  static toWorld(x, z, y = 0) { return new THREE.Vector3(x, y, -z); }
+}
+
+class ClipLibrary {
+  static FILES = ["teambattle_anims", "rig_medium_general", "rig_medium_simulation"];
+  clips = new Map();
+  async load(loader, directory) {
+    for (const file of ClipLibrary.FILES) {
+      const gltf = await loader.loadAsync(directory + file + ".glb");
+      gltf.animations.forEach((clip) => { if (!this.clips.has(clip.name)) this.clips.set(clip.name, clip); });
+    }
+  }
+}
+
+class Actor {
+  constructor(template, clips, scale = 0.8) {
+    this.clips = clips;
+    this.root = new THREE.Group();
+    this.model = SkeletonUtils.clone(template);
+    this.model.scale.setScalar(scale);
+    this.root.add(this.model);
+    this.mixer = new THREE.AnimationMixer(this.model);
+    this.current = null;
+    this.handRight = this.findBone("handslotr");
+    this.hideCarriedItems();
+  }
+  findBone(simpleName) {
+    let found = null;
+    this.model.traverse((node) => { if (!found && node.name.toLowerCase().replace(/[._]/g, "") === simpleName) found = node; });
+    return found;
+  }
+  hideCarriedItems() {
+    ["handslotr", "handslotl"].forEach((name) => {
+      const slot = this.findBone(name);
+      if (slot) slot.children.slice().forEach((child) => { child.visible = false; });
+    });
+    this.model.traverse((node) => {
+      if (node.isMesh && /sword|shield|axe|staff|bow|crossbow|dagger|wand|spellbook|mug|knife|hammer|quiver|cape|hood/i.test(node.name)) node.visible = false;
+    });
+  }
+  play(name, { once = false, fade = 0.12, speed = 1 } = {}) {
+    const clip = this.clips.get(name);
+    if (!clip) { console.warn("클립 없음", name); return 0; }
+    const action = this.mixer.clipAction(clip);
+    action.reset();
+    action.setLoop(once ? THREE.LoopOnce : THREE.LoopRepeat, Infinity);
+    action.clampWhenFinished = once;
+    action.timeScale = speed;
+    action.fadeIn(fade).play();
+    if (this.current && this.current !== action) this.current.fadeOut(fade);
+    this.current = action;
+    return clip.duration / speed;
+  }
+  place(x, z) { this.root.position.copy(FieldSpace.toWorld(x, z)); }
+  face(x, z) {
+    const delta = FieldSpace.toWorld(x, z).sub(this.root.position);
+    this.root.rotation.y = Math.atan2(delta.x, delta.z);
+  }
+  lean(radians) { this.model.rotation.x = radians; }
+  handWorld(target) { (this.handRight || this.root).getWorldPosition(target); return target; }
+  update(dt) { this.mixer.update(dt); }
+}
+
+class Props {
+  static bat() {
+    const points = [[0.0, 0], [0.018, 0.0], [0.022, 0.22], [0.024, 0.5], [0.037, 0.74], [0.037, 0.86], [0, 0.86]]
+      .map(([radius, height]) => new THREE.Vector2(radius, height));
+    const mesh = new THREE.Mesh(new THREE.LatheGeometry(points, 10), new THREE.MeshStandardMaterial({ color: "#c58b4e", roughness: 0.7, side: THREE.DoubleSide }));
+    mesh.name = "bat";
+    mesh.scale.setScalar(1.25);
+    return mesh;
+  }
+  static helmet(color) {
+    const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.2, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.55), new THREE.MeshStandardMaterial({ color, roughness: 0.5 }));
+    mesh.name = "helmet";
+    return mesh;
+  }
+}
+
+class BallActor {
+  constructor() {
+    this.mesh = new THREE.Mesh(new THREE.SphereGeometry(0.075, 14, 10), new THREE.MeshStandardMaterial({ color: "#fafafa", roughness: 0.4 }));
+    this.mesh.castShadow = false;
+    this.segments = [];
+    this.holder = null;
+    this.scratch = new THREE.Vector3();
+  }
+  reset() { this.segments = []; this.holder = null; this.mesh.visible = false; }
+  hold(actor) { this.holder = actor; this.mesh.visible = true; }
+  fly(t0, t1, from, to, arc, bounces = 0) {
+    this.holder = null;
+    this.mesh.visible = true;
+    this.segments.push({ t0, t1, from: from.clone(), to: to.clone(), arc, bounces });
+  }
+  update(t) {
+    if (this.holder) { this.holder.handWorld(this.mesh.position); return; }
+    for (let i = this.segments.length - 1; i >= 0; i--) {
+      const s = this.segments[i];
+      if (t < s.t0) continue;
+      const k = Math.min(1, (t - s.t0) / (s.t1 - s.t0));
+      this.mesh.position.lerpVectors(s.from, s.to, k);
+      if (s.bounces > 0) {
+        const phase = k * s.bounces;
+        this.mesh.position.y += s.arc * Math.abs(Math.sin(phase * Math.PI)) * (1 - k * 0.7);
+      } else {
+        this.mesh.position.y += s.arc * 4 * k * (1 - k);
+      }
+      this.mesh.position.y = Math.max(0.075, this.mesh.position.y);
+      return;
+    }
+  }
+}
+
+class DustPool {
+  constructor(scene, size = 14) {
+    this.puffs = [];
+    for (let i = 0; i < size; i++) {
+      const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.28, 8, 6), new THREE.MeshBasicMaterial({ color: "#c9a77a", transparent: true, opacity: 0 }));
+      mesh.visible = false;
+      scene.add(mesh);
+      this.puffs.push({ mesh, age: 99, velocity: new THREE.Vector3() });
+    }
+    this.cursor = 0;
+  }
+  burst(position, count = 6) {
+    for (let i = 0; i < count; i++) {
+      const puff = this.puffs[this.cursor++ % this.puffs.length];
+      puff.age = 0;
+      puff.mesh.visible = true;
+      puff.mesh.position.copy(position).add(new THREE.Vector3((Math.random() - 0.5) * 0.6, 0.1, (Math.random() - 0.5) * 0.6));
+      puff.velocity.set((Math.random() - 0.5) * 1.2, 0.7 + Math.random() * 0.6, (Math.random() - 0.5) * 1.2);
+    }
+  }
+  update(dt) {
+    this.puffs.forEach((puff) => {
+      if (puff.age > 1) { puff.mesh.visible = false; return; }
+      puff.age += dt * 1.4;
+      puff.mesh.position.addScaledVector(puff.velocity, dt);
+      puff.mesh.scale.setScalar(0.6 + puff.age * 1.8);
+      puff.mesh.material.opacity = 0.55 * (1 - puff.age);
+    });
+  }
+}
+
+class Track {
+  constructor(actor, from, to, t0, t1, ease = "linear") { Object.assign(this, { actor, from, to, t0, t1, ease }); }
+  apply(t) {
+    if (t < this.t0) return;
+    let k = Math.min(1, (t - this.t0) / (this.t1 - this.t0));
+    if (this.ease === "out") k = 1 - (1 - k) * (1 - k);
+    this.actor.place(this.from[0] + (this.to[0] - this.from[0]) * k, this.from[1] + (this.to[1] - this.from[1]) * k);
+  }
+}
+
+class Act {
+  constructor(app) { this.app = app; this.tracks = []; this.cues = []; this.t = 0; }
+  get title() { return ""; }
+  get duration() { return 8; }
+  cue(t, caption, run = () => {}) { this.cues.push({ t, caption, run, fired: false }); }
+  track(actor, from, to, t0, t1, ease) { this.tracks.push(new Track(actor, from, to, t0, t1, ease)); }
+  restart() {
+    this.t = 0;
+    this.tracks = [];
+    this.cues = [];
+    this.app.resetStage();
+    this.build();
+    this.cues.sort((a, b) => a.t - b.t);
+  }
+  build() {}
+  update(dt) {
+    this.t += dt;
+    this.cues.forEach((cue) => { if (!cue.fired && this.t >= cue.t) { cue.fired = true; if (cue.caption) this.app.setCaption(cue.caption); cue.run(); } });
+    this.tracks.forEach((track) => track.apply(this.t));
+  }
+  camera() { return { position: FieldSpace.toWorld(0, 12, 8), look: FieldSpace.toWorld(0, 20, 1) }; }
+  get finished() { return this.t > this.duration; }
+}
+
+class PitchAndSwing extends Act {
+  static RELEASE_AT = 1.15;
+  static FLIGHT = 0.85;
+  static CONTACT_IN_CLIP = 0.46;
+  get contactAt() { return PitchAndSwing.RELEASE_AT + PitchAndSwing.FLIGHT; }
+  setupBatterAndPitcher() {
+    const { pitcher, batter, ball } = this.app.stage;
+    pitcher.place(0, 18.44); pitcher.face(0, 0); pitcher.play("Idle_A");
+    batter.place(-0.95, 0); batter.face(0, 0); batter.play("Melee_2H_Idle");
+    const releasePoint = FieldSpace.toWorld(0.35, 18.0, 1.75);
+    const platePoint = FieldSpace.toWorld(0.05, 0.3, 0.95);
+    this.cue(0.4, "투수 와인드업", () => pitcher.play("Throw", { once: true, speed: 1.0 }));
+    this.cue(PitchAndSwing.RELEASE_AT, "릴리스 — 공이 날아온다", () => ball.fly(PitchAndSwing.RELEASE_AT, this.contactAt, releasePoint, platePoint, 0.15));
+    this.cue(this.contactAt - PitchAndSwing.CONTACT_IN_CLIP, "스윙 시작", () => batter.play("Melee_2H_Attack_Slice", { once: true, speed: 1.0, fade: 0.08 }));
+    this.cue(this.contactAt, "접촉!", () => this.app.dust.burst(FieldSpace.toWorld(0, 0.2, 0.9), 2));
+    return { platePoint };
+  }
+}
+
+class SwingAct extends PitchAndSwing {
+  get title() { return "① 투구 → 스윙 → 타구"; }
+  get duration() { return 8.5; }
+  build() {
+    const { ball, batter } = this.app.stage;
+    const { platePoint } = this.setupBatterAndPitcher();
+    const landing = FieldSpace.toWorld(-18, 78, 0);
+    this.cue(this.contactAt, "라인드라이브 — 좌중간으로", () => ball.fly(this.contactAt, this.contactAt + 3.2, platePoint, landing, 22, 0));
+    this.cue(this.contactAt + 0.35, "타자 1루로 질주", () => { batter.play("Running_A", { speed: 1.0 }); batter.face(19.4, 19.4); });
+    this.track(batter, [-0.95, 0], [19.4, 19.4], this.contactAt + 0.35, this.contactAt + 4.4);
+    this.cue(this.contactAt + 4.5, "베이스를 밟고 환호", () => { batter.play("Cheering"); batter.face(0, 0); });
+  }
+  camera() {
+    const ball = this.app.stage.ball.mesh.position;
+    if (this.t < this.contactAt + 0.1) return { position: FieldSpace.toWorld(1.6, -6.5, 2.1), look: FieldSpace.toWorld(-0.6, 8, 1.0) };
+    return { position: FieldSpace.toWorld(-22, 6, 11), look: ball.clone() };
+  }
+}
+
+class GroundOutAct extends PitchAndSwing {
+  get title() { return "② 땅볼 → 수비 → 1루 아웃"; }
+  get duration() { return 11; }
+  build() {
+    const { ball, batter, shortstop, firstBaseman } = this.app.stage;
+    const { platePoint } = this.setupBatterAndPitcher();
+    const c = this.contactAt;
+    const fieldedAt = [-7.5, 28];
+    shortstop.place(-10, 31); shortstop.face(0, 0); shortstop.play("Idle_A");
+    firstBaseman.place(19.0, 19.9); firstBaseman.face(0, 0); firstBaseman.play("Idle_A");
+    const groundTarget = FieldSpace.toWorld(fieldedAt[0], fieldedAt[1], 0);
+    this.cue(c, "강한 땅볼 — 유격수 쪽", () => ball.fly(c, c + 1.45, platePoint, groundTarget, 0.5, 4));
+    this.cue(c + 0.25, "유격수 앞으로 전진", () => { shortstop.play("Running_A"); shortstop.face(fieldedAt[0], fieldedAt[1]); });
+    this.track(shortstop, [-10, 31], fieldedAt, c + 0.25, c + 1.35);
+    this.cue(c + 1.35, "포구 자세 — 몸을 낮춰 잡는다", () => { shortstop.play("PickUp", { once: true, speed: 1.5 }); ball.hold(shortstop); });
+    this.cue(c + 2.0, "방향 전환 후 송구", () => { shortstop.face(19.4, 19.4); shortstop.play("Throw", { once: true, speed: 1.35 }); });
+    this.cue(c + 2.55, "1루로 송구", () => {
+      const from = shortstop.handWorld(new THREE.Vector3());
+      ball.fly(c + 2.55, c + 3.35, from, FieldSpace.toWorld(19.2, 19.7, 1.1), 1.3, 0);
+    });
+    this.cue(c + 3.35, "1루수 포구 — 아웃!", () => { firstBaseman.play("Interact", { once: true, speed: 1.5 }); ball.hold(firstBaseman); });
+    this.cue(c + 0.35, "타자 주자 1루 질주", () => { batter.play("Running_A"); batter.face(20.2, 19.4); });
+    this.track(batter, [-0.95, 0], [20.2, 19.4], c + 0.35, c + 4.55);
+    this.cue(c + 4.55, "1루를 지나 오버런", () => batter.face(24, 24));
+    this.track(batter, [20.2, 19.4], [22.8, 22.4], c + 4.55, c + 5.5, "out");
+    this.cue(c + 5.5, "타자 아웃 — 걸어서 돌아간다", () => { batter.play("Walking_A"); batter.face(0, 0); });
+  }
+  camera() {
+    const stage = this.app.stage;
+    if (this.t < this.contactAt + 0.1) return { position: FieldSpace.toWorld(-1.0, -4.4, 1.7), look: FieldSpace.toWorld(-0.2, 12, 1.2) };
+    return { position: FieldSpace.toWorld(10, 6, 14), look: stage.ball.mesh.position.clone().lerp(FieldSpace.toWorld(6, 24, 1), 0.35) };
+  }
+}
+
+class SacrificeFlyAct extends PitchAndSwing {
+  get title() { return "③ 플라이 포구 · 리터치 · 태그업 · 홈 슬라이딩"; }
+  get duration() { return 17; }
+  build() {
+    const { ball, batter, outfielder, relay, catcher, runner } = this.app.stage;
+    const { platePoint } = this.setupBatterAndPitcher();
+    const c = this.contactAt;
+    const landing = [7, 74];
+    outfielder.place(-8, 84); outfielder.face(0, 0); outfielder.play("Idle_A");
+    relay.place(0, 42); relay.face(0, 80); relay.play("Idle_A");
+    catcher.place(0, -1.4); catcher.face(0, 18); catcher.play("Idle_A");
+    runner.place(-19.4, 19.4); runner.face(0, 0); runner.play("Idle_A");
+    const landingPoint = FieldSpace.toWorld(landing[0], landing[1], 1.6);
+    const flyTime = 4.6;
+    this.cue(c, "높이 뜬 외야 플라이", () => ball.fly(c, c + flyTime, platePoint, landingPoint, 34, 0));
+    this.cue(c + 0.4, "타자 달리기", () => { batter.play("Running_A"); batter.face(19.4, 19.4); });
+    this.track(batter, [-0.95, 0], [10, 10], c + 0.4, c + 1.6);
+    this.cue(c + 1.6, "타자 멈춤 (플라이라 아웃 예상)", () => { batter.play("Idle_A"); batter.face(landing[0], landing[1]); });
+    this.cue(c + 0.5, "중견수 낙하점으로 이동", () => { outfielder.play("Running_A"); outfielder.face(landing[0], landing[1]); });
+    this.track(outfielder, [-8, 84], [landing[0] + 0.4, landing[1] + 0.3], c + 0.5, c + 3.2);
+    this.cue(c + 3.2, "포구 준비 — 글러브를 든다", () => { outfielder.play("Idle_A"); outfielder.face(0, 0); });
+    this.cue(c + 1.0, "3루 주자: 리드(베이스에서 떨어짐)", () => { runner.play("Walking_A", { speed: 0.7 }); runner.face(-17.2, 17.2); });
+    this.track(runner, [-19.4, 19.4], [-17.6, 17.6], c + 1.0, c + 2.4);
+    this.cue(c + 2.4, "공이 떠 있는 동안 리터치: 베이스로 복귀", () => { runner.play("Walking_A", { speed: 0.9 }); runner.face(-19.4, 19.4); });
+    this.track(runner, [-17.6, 17.6], [-19.4, 19.4], c + 2.4, c + 3.7);
+    this.cue(c + 3.7, "베이스에 발을 대고 대기", () => { runner.play("Idle_A"); runner.face(0, 0); });
+    this.cue(c + flyTime - 0.35, "중견수 포구!", () => { outfielder.play("Interact", { once: true, speed: 1.6 }); });
+    this.cue(c + flyTime - 0.05, "", () => ball.hold(outfielder));
+    const catchAt = c + flyTime;
+    this.cue(catchAt, "포구 순간 — 3루 주자 태그업 출발!", () => { runner.play("Running_A"); runner.face(0, 0); });
+    const slideFrom = [-2.26, 2.26];
+    this.track(runner, [-19.4, 19.4], slideFrom, catchAt + 0.2, catchAt + 3.15);
+    this.cue(catchAt + 3.15, "홈 앞에서 슬라이딩", () => {
+      runner.play("Sit_Floor_Down", { once: true, speed: 1.8, fade: 0.05 });
+      runner.lean(-0.35);
+      this.app.dust.burst(runner.root.position, 7);
+    });
+    this.track(runner, slideFrom, [-0.15, 0.15], catchAt + 3.15, catchAt + 3.95, "out");
+    this.cue(catchAt + 3.9, "홈 플레이트에 닿음 — 세이프!", () => this.app.dust.burst(runner.root.position, 8));
+    this.cue(catchAt + 0.3, "중견수 → 중계(유격수)로 송구", () => { outfielder.face(0, 42); outfielder.play("Throw", { once: true, speed: 1.2 }); });
+    this.cue(catchAt + 0.85, "", () => ball.fly(catchAt + 0.85, catchAt + 2.3, outfielder.handWorld(new THREE.Vector3()), FieldSpace.toWorld(0, 42, 1.5), 10, 0));
+    this.cue(catchAt + 2.3, "중계 포구 후 홈으로", () => { relay.play("Interact", { once: true, speed: 1.6 }); ball.hold(relay); });
+    this.cue(catchAt + 2.8, "", () => { relay.face(0, 0); relay.play("Throw", { once: true, speed: 1.35 }); });
+    this.cue(catchAt + 3.3, "", () => ball.fly(catchAt + 3.3, catchAt + 4.3, relay.handWorld(new THREE.Vector3()), FieldSpace.toWorld(0.1, -1.0, 1.0), 3, 0));
+    this.cue(catchAt + 4.3, "포수 포구 — 이미 득점(희생플라이)", () => { catcher.play("Interact", { once: true, speed: 1.4 }); ball.hold(catcher); });
+  }
+  camera() {
+    const stage = this.app.stage;
+    const catchAt = this.contactAt + 4.6;
+    if (this.t < this.contactAt + 0.1) return { position: FieldSpace.toWorld(0.5, -4.4, 1.55), look: FieldSpace.toWorld(-0.2, 12, 1.2) };
+    if (this.t < catchAt - 1.2) return { position: FieldSpace.toWorld(-28, 34, 12), look: stage.ball.mesh.position.clone().lerp(stage.outfielder.root.position, 0.4) };
+    if (this.t < catchAt + 2.4) return { position: FieldSpace.toWorld(-14, 62, 4), look: stage.outfielder.root.position.clone().lerp(stage.runner.root.position, 0.1) };
+    return { position: FieldSpace.toWorld(-8.5, 6.5, 2.1), look: stage.runner.root.position.clone().add(new THREE.Vector3(1.4, 0.9, -1)) };
+  }
+}
+
+class Stage {
+  constructor(scene, characterTemplates, clips) {
+    this.ball = new BallActor();
+    scene.add(this.ball.mesh);
+    const make = (file, helmetColor) => {
+      const actor = new Actor(characterTemplates.get(file), clips);
+      scene.add(actor.root);
+      if (helmetColor) this.addHelmet(actor, helmetColor);
+      return actor;
+    };
+    this.pitcher = make("Rogue", "#3a6fb5");
+    this.batter = make("Knight", "#c24a3a");
+    this.shortstop = make("Rogue", "#3a6fb5");
+    this.firstBaseman = make("Rogue", "#3a6fb5");
+    this.outfielder = make("Rogue", "#3a6fb5");
+    this.relay = make("Rogue", "#3a6fb5");
+    this.catcher = make("Rogue", "#3a6fb5");
+    this.runner = make("Knight", "#c24a3a");
+    this.addBat(this.batter);
+    this.actors = [this.pitcher, this.batter, this.shortstop, this.firstBaseman, this.outfielder, this.relay, this.catcher, this.runner];
+  }
+  addBat(actor) {
+    const slot = actor.handRight;
+    if (!slot) return;
+    const bat = Props.bat();
+    bat.rotation.set(0, 0, Math.PI * 0.5);
+    slot.add(bat);
+  }
+  addHelmet(actor, color) {
+    const head = actor.findBone("head");
+    if (!head) return;
+    const helmet = Props.helmet(color);
+    helmet.position.set(0, 0.04, 0);
+    head.add(helmet);
+  }
+  reset() {
+    this.ball.reset();
+    this.actors.forEach((actor) => { actor.lean(0); actor.place(0, -40); actor.current = null; actor.mixer.stopAllAction(); });
+  }
+  update(dt, t) {
+    this.actors.forEach((actor) => actor.update(dt));
+    this.ball.update(t);
+  }
+}
+
+class FieldBuilder {
+  build(scene) {
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), new THREE.MeshStandardMaterial({ color: "#4f8f3d", roughness: 1 }));
+    ground.rotation.x = -Math.PI / 2;
+    scene.add(ground);
+    const dirt = new THREE.Mesh(new THREE.CircleGeometry(29, 48), new THREE.MeshStandardMaterial({ color: "#b98a5a", roughness: 1 }));
+    dirt.rotation.x = -Math.PI / 2; dirt.position.copy(FieldSpace.toWorld(0, 17, 0.01));
+    scene.add(dirt);
+    const infieldGrass = new THREE.Mesh(new THREE.PlaneGeometry(22.5, 22.5), new THREE.MeshStandardMaterial({ color: "#5aa046", roughness: 1 }));
+    infieldGrass.rotation.x = -Math.PI / 2; infieldGrass.rotation.z = Math.PI / 4;
+    infieldGrass.position.copy(FieldSpace.toWorld(0, 19.4, 0.02));
+    scene.add(infieldGrass);
+    const base = (x, z) => {
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.1, 0.45), new THREE.MeshStandardMaterial({ color: "#f5f5f0" }));
+      mesh.position.copy(FieldSpace.toWorld(x, z, 0.06)); mesh.rotation.y = Math.PI / 4;
+      scene.add(mesh);
+    };
+    base(19.4, 19.4); base(0, 38.8); base(-19.4, 19.4);
+    const plate = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.06, 5), new THREE.MeshStandardMaterial({ color: "#ffffff" }));
+    plate.position.copy(FieldSpace.toWorld(0, 0, 0.05)); plate.rotation.y = Math.PI;
+    scene.add(plate);
+    const mound = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 2.74, 0.25, 24), new THREE.MeshStandardMaterial({ color: "#b98a5a" }));
+    mound.position.copy(FieldSpace.toWorld(0, 18.44, 0.12));
+    scene.add(mound);
+    const chalk = new THREE.LineBasicMaterial({ color: "#ffffff" });
+    [[1, 1], [-1, 1]].forEach(([sx, sz]) => {
+      const geometry = new THREE.BufferGeometry().setFromPoints([FieldSpace.toWorld(0, 0, 0.03), FieldSpace.toWorld(sx * 95, sz * 95, 0.03)]);
+      scene.add(new THREE.Line(geometry, chalk));
+    });
+    const fence = new THREE.Mesh(new THREE.CylinderGeometry(122, 122, 3, 64, 1, true, -Math.PI * 0.25, Math.PI * 0.5), new THREE.MeshStandardMaterial({ color: "#2f6b3a", side: THREE.DoubleSide }));
+    fence.position.copy(FieldSpace.toWorld(0, 0, 1.5));
+    fence.rotation.y = Math.PI;
+    scene.add(fence);
+  }
+}
+
+class MotionDemo {
+  constructor() {
+    this.canvas = document.getElementById("view");
+    this.bar = document.getElementById("bar");
+    this.caption = document.getElementById("caption");
+    this.statusBox = document.getElementById("status");
+    this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true });
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+    this.scene = new THREE.Scene();
+    this.scene.background = new THREE.Color("#8fc4e8");
+    this.scene.fog = new THREE.Fog("#8fc4e8", 120, 300);
+    this.camera = new THREE.PerspectiveCamera(48, 1, 0.1, 500);
+    this.cameraGoal = { position: new THREE.Vector3(), look: new THREE.Vector3() };
+    this.cameraLook = new THREE.Vector3();
+    this.speed = 1;
+    this.acts = [];
+    this.activeIndex = 0;
+    this.clock = new THREE.Clock();
+    this.scene.add(new THREE.HemisphereLight("#ffffff", "#6a7a5a", 1.6));
+    const sun = new THREE.DirectionalLight("#fff3dd", 2.0);
+    sun.position.set(-30, 60, 20);
+    this.scene.add(sun);
+    new FieldBuilder().build(this.scene);
+    window.addEventListener("resize", () => this.resize());
+    this.resize();
+    this.start();
+  }
+  resize() {
+    this.renderer.setSize(window.innerWidth, window.innerHeight, false);
+    this.camera.aspect = window.innerWidth / window.innerHeight;
+    this.camera.updateProjectionMatrix();
+  }
+  setCaption(text) { if (text) this.caption.textContent = text; }
+  resetStage() { this.stage.reset(); }
+  async start() {
+    const loader = new GLTFLoader();
+    const base = "../../assets/kaykit/";
+    const library = new ClipLibrary();
+    await library.load(loader, base + "animations/");
+    const templates = new Map();
+    for (const file of ["Knight", "Rogue"]) templates.set(file, (await loader.loadAsync(base + "characters/" + file + ".glb")).scene);
+    this.dust = new DustPool(this.scene);
+    this.stage = new Stage(this.scene, templates, library.clips);
+    this.acts = [new SwingAct(this), new GroundOutAct(this), new SacrificeFlyAct(this)];
+    this.buildButtons();
+    const requested = Number(new URLSearchParams(location.search).get("act") || 1) - 1;
+    this.select(Math.max(0, Math.min(this.acts.length - 1, requested)));
+    this.statusBox.textContent = "클립 " + library.clips.size + "종 사용 가능";
+    this.cameraLook.copy(this.cameraGoal.look);
+    const freezeAt = new URLSearchParams(location.search).get("freeze");
+    if (freezeAt !== null) this.freezeAt(Number(freezeAt));
+    this.loop();
+  }
+  freezeAt(seconds) {
+    const act = this.acts[this.activeIndex];
+    const step = 1 / 60;
+    for (let t = 0; t < seconds; t += step) {
+      act.update(step);
+      this.stage.update(step, act.t);
+      this.dust.update(step);
+      const goal = act.camera();
+      this.camera.position.lerp(goal.position, 0.06);
+      this.cameraLook.lerp(goal.look, 0.06);
+    }
+    this.frozen = true;
+  }
+  buildButtons() {
+    this.acts.forEach((act, index) => {
+      const button = document.createElement("button");
+      button.textContent = act.title;
+      button.addEventListener("click", () => this.select(index));
+      this.bar.appendChild(button);
+    });
+    const slow = document.createElement("button");
+    slow.textContent = "느리게 ×0.5";
+    slow.addEventListener("click", () => { this.speed = this.speed === 1 ? 0.5 : 1; slow.classList.toggle("on", this.speed !== 1); });
+    this.bar.appendChild(slow);
+    const replay = document.createElement("button");
+    replay.textContent = "↻ 다시";
+    replay.addEventListener("click", () => this.select(this.activeIndex));
+    this.bar.appendChild(replay);
+  }
+  select(index) {
+    this.activeIndex = index;
+    [...this.bar.querySelectorAll("button")].forEach((button, i) => { if (i < this.acts.length) button.classList.toggle("on", i === index); });
+    this.acts[index].restart();
+    const goal = this.acts[index].camera();
+    this.camera.position.copy(goal.position);
+    this.cameraLook.copy(goal.look);
+  }
+  loop() {
+    requestAnimationFrame(() => this.loop());
+    const dt = this.frozen ? 0 : Math.min(0.05, this.clock.getDelta()) * this.speed;
+    const act = this.acts[this.activeIndex];
+    act.update(dt);
+    this.stage.update(dt, act.t);
+    this.dust.update(dt);
+    if (act.finished) this.select((this.activeIndex + 1) % this.acts.length);
+    const goal = act.camera();
+    const follow = 1 - Math.exp(-dt * 3.2);
+    this.camera.position.lerp(goal.position, follow);
+    this.cameraLook.lerp(goal.look, follow);
+    this.camera.lookAt(this.cameraLook);
+    this.renderer.render(this.scene, this.camera);
+  }
+}
+
+new MotionDemo();
+</script>
+</body>
+</html>
