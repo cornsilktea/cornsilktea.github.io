@@ -110,7 +110,7 @@ class SimReport {
     this.line();
     this.line("| 지표 | 결과 | 목표 | 판정 |");
     this.line("|---|---|---|---|");
-    const rows = [["타율", f.average(bat), 0.4, 0.03], ["출루율", f.onBase(bat), 0.45, 0.03], ["장타율", f.slugging(bat), 0.6, 0.05], ["타석당 홈런", bat.hr / pa, 0.1, 0.02]];
+    const rows = [["타율", f.average(bat), 0.4, 0.03], ["출루율", f.onBase(bat), 0.45, 0.03], ["장타율", f.slugging(bat), 0.78, 0.05], ["타석당 홈런", bat.hr / pa, 0.1, 0.02]];
     for (const [name, value, goal, slack] of rows) this.line("| " + name + " | " + (name === "타석당 홈런" ? this.percent(value) : this.rate(value)) + " | " + (name === "타석당 홈런" ? this.percent(goal) : this.rate(goal)) + " ± " + (name === "타석당 홈런" ? "2.0%p" : this.rate(slack)) + " | " + (Math.abs(value - goal) <= slack ? "맞음" : "벗어남") + " |");
     this.line();
     this.line("## 2. 그 밖의 값");

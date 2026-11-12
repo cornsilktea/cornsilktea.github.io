@@ -34,9 +34,9 @@ class BbLabDirector {
     shot(view, seconds, ball) {
         const side = this.batsLeft ? -1 : 1;
         if (view === "pitcher")
-            return { position: BbFieldSpace.toWorld(-3.6, BbFieldGeometry.RUBBER_DISTANCE + 17, 7.2), look: BbFieldSpace.toWorld(0.5, 10, 0), fieldOfView: 19 };
+            return BbBroadcastShots.pitcher();
         if (view === "batter")
-            return { position: BbFieldSpace.toWorld(0, -2.7, 1.0), look: BbFieldSpace.toWorld(0, 10, 0.8), fieldOfView: 30 };
+            return BbBroadcastShots.batter();
         if (view === "swing")
             return { position: BbFieldSpace.toWorld(side * 2.9, 2.3, 1.0), look: BbFieldSpace.toWorld(-side * 0.7, 0.2, 0.62), fieldOfView: 34 };
         if (view === "mound")
@@ -131,51 +131,22 @@ class BbSyncBoard {
 }
 class BbMotionLab {
     constructor(libs) {
-        this.libs = libs;
         this.options = BbLabAddress.read();
-        this.canvas = document.getElementById("labView");
         this.bar = document.getElementById("labBar");
         this.status = document.getElementById("labStatus");
-        this.actors = new Map();
         this.seconds = 0;
         this.paused = false;
         this.lastView = null;
-        const THREE = libs.THREE;
         this.speed = this.options.speed;
         this.view = this.options.view;
-        this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true });
-        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
-        this.renderer.shadowMap.enabled = true;
-        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-        this.scene = new THREE.Scene();
-        this.scene.fog = new THREE.Fog("#cfe4f4", 260, 1000);
-        this.camera = new THREE.PerspectiveCamera(44, 1, 0.1, 2400);
-        this.cameraLook = new THREE.Vector3();
-        this.goalPosition = new THREE.Vector3();
-        this.goalLook = new THREE.Vector3();
-        this.probe = new THREE.Vector3();
-        this.probeOther = new THREE.Vector3();
-        this.clock = new THREE.Clock();
-        window.addEventListener("resize", () => this.resize());
-        this.resize();
+        this.stage = new BbStage(libs, document.getElementById("labView"));
+        this.probe = new libs.THREE.Vector3();
+        this.probeOther = new libs.THREE.Vector3();
         this.start().catch((error) => { this.status.textContent = "불러오지 못했어요: " + error.message; });
     }
-    resize() {
-        this.renderer.setSize(window.innerWidth, window.innerHeight, false);
-        this.camera.aspect = window.innerWidth / window.innerHeight;
-        this.camera.updateProjectionMatrix();
-    }
     async start() {
-        const assets = new CharacterAssets(this.libs, BbMotionLab.ASSET_DIRECTORY);
-        await assets.load();
-        const factory = new CharacterModelFactory(this.libs, assets), gear = new BbGearFactory(this.libs);
-        this.scene.add(new BbBallparkBuilder(this.libs, BbBallparkRegistry.MAIN).build());
-        new BbParkLighting(this.libs).addTo(this.scene);
-        this.createActors(factory, assets, gear);
-        this.ball = new BbBallActor(this.libs);
-        this.zone = this.zoneFrame();
-        this.scene.add(this.ball.mesh, this.ball.shadow, this.zone);
-        const metrics = this.actors.get("batter").poser.metrics;
+        await this.stage.load(BbMotionLab.ASSET_DIRECTORY, BbBallparkRegistry.MAIN, this.options);
+        const metrics = this.stage.metrics;
         this.script = BbDrillCatalog.all()[this.options.scene].build({ metrics, batsLeft: this.options.batsLeft, throwsLeft: this.options.throwsLeft });
         this.director = new BbLabDirector(this.script, this.options.scene, this.options.batsLeft, this.options.throwsLeft);
         this.board = new BbSyncBoard(document.getElementById("labSync"), this.script);
@@ -186,27 +157,7 @@ class BbMotionLab {
         this.restart();
         if (this.options.freezeAt !== null)
             this.freeze(this.options.freezeAt);
-        this.renderer.setAnimationLoop(() => this.tick());
-    }
-    zoneFrame() {
-        const THREE = this.libs.THREE, corners = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([u, v]) => { const point = BbStrikeZoneBox.pointAt(u, v); return new THREE.Vector3(point.x, point.y, point.z); });
-        return new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(corners), new THREE.LineBasicMaterial({ color: "#ffffff", transparent: true, opacity: 0.75 }));
-    }
-    createActors(factory, assets, gear) {
-        const mine = new PlayerProfile().look, batterFlapOnLeft = !this.options.batsLeft;
-        const make = (role, outfit) => {
-            const actor = new BbPlayerActor(this.libs, factory, assets, gear, outfit);
-            this.scene.add(actor.root);
-            this.actors.set(role, actor);
-        };
-        BbMotionLab.FIELDERS.forEach((role, index) => {
-            const look = role === "pitcher" ? mine : CharacterLooks.clean({ c: index % 6, p: { skin: index % 5, hair: (index * 3) % 8 } });
-            const gloveSide = role === "pitcher" && this.options.throwsLeft ? "right" : "left";
-            make(role, { look, kit: BbTeamKits.HOME, headGear: role === "catcher" ? "mask" : "cap", gloveSide, chestProtector: role === "catcher", carriesBat: false, flapOnLeft: false });
-        });
-        make("umpire", { look: CharacterLooks.clean({ c: 3, p: { skin: 2, hair: 0 } }), kit: BbTeamKits.UMPIRE, headGear: "mask", gloveSide: null, chestProtector: false, carriesBat: false, flapOnLeft: false });
-        make("batter", { look: mine, kit: BbTeamKits.AWAY, headGear: "helmet", gloveSide: null, chestProtector: false, carriesBat: true, flapOnLeft: batterFlapOnLeft });
-        make("runner", { look: mine, kit: BbTeamKits.AWAY, headGear: "helmet", gloveSide: null, chestProtector: false, carriesBat: false, flapOnLeft: batterFlapOnLeft });
+        this.stage.run((frameSeconds) => this.tick(frameSeconds));
     }
     button(label, active, onPress) {
         const button = document.createElement("button");
@@ -245,8 +196,7 @@ class BbMotionLab {
     restart() {
         this.seconds = 0;
         this.board.reset();
-        this.ball.forgetHolder();
-        this.actors.forEach((actor, role) => actor.snapTo(this.script.starts.has(role) ? this.script.frameOf(role, 0) : null));
+        this.stage.reset(this.script);
         this.advance(0);
     }
     freeze(seconds) {
@@ -259,22 +209,14 @@ class BbMotionLab {
         const before = this.seconds;
         this.seconds += deltaSeconds;
         this.measure(before, this.seconds);
-        this.actors.forEach((actor, role) => {
-            actor.root.visible = this.script.starts.has(role) && !(this.view === "batter" && BbMotionLab.HIDDEN_BEHIND_PLATE.indexOf(role) >= 0);
-            if (!actor.root.visible)
-                return;
-            actor.update(deltaSeconds, this.script.placementOf(role, this.seconds), this.script.frameOf(role, this.seconds), this.script.gaitOf(role, this.seconds), this.script.speedOf(role, this.seconds));
-        });
-        const state = this.script.ballAt(this.seconds), holder = state && state.holder ? this.actors.get(state.holder) : null;
-        this.ball.update(state, holder, state && state.holder ? this.script.sideOf(state.holder, state.hand) : "right", deltaSeconds);
-        this.zone.visible = this.seconds < this.director.contactAt() + BbMotionLab.ZONE_LINGER_SECONDS;
+        this.stage.advance(this.script, this.seconds, deltaSeconds, this.view === "batter" ? BbStage.HIDDEN_BEHIND_PLATE : [], this.seconds < this.director.contactAt() + BbMotionLab.ZONE_LINGER_SECONDS);
         this.watchGrip();
     }
     measure(before, now) {
         this.script.checkpoints.forEach((check) => {
             if (!(before < check.at && check.at <= now))
                 return;
-            const actor = this.actors.get(check.role), placement = this.script.placementOf(check.role, check.at), frame = this.script.frameOf(check.role, check.at);
+            const actor = this.stage.actor(check.role), placement = this.script.placementOf(check.role, check.at), frame = this.script.frameOf(check.role, check.at);
             actor.snapTo(frame);
             actor.update(0, placement, frame, null, 0);
             let gap = 0, limit = 0.02;
@@ -294,7 +236,7 @@ class BbMotionLab {
         });
     }
     watchGrip() {
-        const batter = this.actors.get("batter"), frame = this.script.frameOf("batter", this.seconds);
+        const batter = this.stage.actor("batter"), frame = this.script.frameOf("batter", this.seconds);
         if (!frame || !frame.bat)
             return;
         const bottom = this.script.sideOf("batter", "glove"), top = this.script.sideOf("batter", "throw");
@@ -305,33 +247,16 @@ class BbMotionLab {
         const topGrip = batter.batPointWorld(BbBatShape.TOP_HAND_AT, this.probe);
         this.board.grip(Math.max(bottomGap, topGrip.distanceTo(batter.slotWorld(top, this.probeOther))), this.seconds);
     }
-    tick() {
-        const frameSeconds = Math.min(0.05, this.clock.getDelta());
+    tick(frameSeconds) {
         if (!this.paused) {
             this.advance(frameSeconds * this.speed);
             if (this.seconds > this.script.duration)
                 this.restart();
         }
-        this.aimCamera(frameSeconds);
-        this.renderer.render(this.scene, this.camera);
-    }
-    aimCamera(frameSeconds) {
-        const state = this.script.ballAt(this.seconds), shot = this.director.shot(this.view, this.seconds, state ? state.point : null);
-        this.goalPosition.set(shot.position.x, shot.position.y, shot.position.z);
-        this.goalLook.set(shot.look.x, shot.look.y, shot.look.z);
-        const cut = this.lastView !== this.view || this.paused || this.goalPosition.distanceTo(this.camera.position) > 30;
-        const follow = cut ? 1 : 1 - Math.exp(-frameSeconds * 5.5);
-        this.camera.position.lerp(this.goalPosition, follow);
-        this.cameraLook.lerp(this.goalLook, cut ? 1 : 1 - Math.exp(-frameSeconds * 8));
-        this.camera.lookAt(this.cameraLook);
-        if (Math.abs(this.camera.fov - shot.fieldOfView) > 0.01) {
-            this.camera.fov = shot.fieldOfView;
-            this.camera.updateProjectionMatrix();
-        }
+        const state = this.script.ballAt(this.seconds);
+        this.stage.aim(this.director.shot(this.view, this.seconds, state ? state.point : null), frameSeconds, this.lastView !== this.view || this.paused);
         this.lastView = this.view;
     }
 }
 BbMotionLab.ASSET_DIRECTORY = "../assets/kaykit/";
 BbMotionLab.ZONE_LINGER_SECONDS = 0.15;
-BbMotionLab.HIDDEN_BEHIND_PLATE = ["catcher", "umpire"];
-BbMotionLab.FIELDERS = ["pitcher", "catcher", "first", "second", "short", "third", "left", "center", "right"];
