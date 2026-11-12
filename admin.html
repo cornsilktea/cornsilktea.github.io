@@ -1952,7 +1952,7 @@ class LagDiagPanel {
    끊긴 횟수로 센다(여러 기기가 같은 순간을 적어도 한 번으로 합침). 빨간 불은 그 학생 자신의 수신이 나빴던 시간이다. */
 class LagStudentReport {
   static SHOWN = 40;
-  static COLUMNS = ["학생", "반", "판 수", "빨간 불 켜진 판", "빨간 불 합계(초)", "빨간 불 횟수", "남들이 못 받은 횟수", "그중 가장 긴 공백", "화면 숨김(초)"];
+  static COLUMNS = ["학생", "반", "판 수", "빨간 불 판", "빨간 불(초)", "빨간 불 횟수", "남들이 못 받음", "가장 긴 공백", "화면 숨김(초)"];
   constructor(rows, names) { this.rows = rows; this.names = names; }
 
   nameOf(uid) { return this.names.get(uid) || uid.slice(0, 6); }
