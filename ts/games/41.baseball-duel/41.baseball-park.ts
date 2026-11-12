@@ -1,0 +1,699 @@
+type BbFieldPoint = readonly [x: number, z: number];
+
+class BbScatter {
+  private state: number;
+  constructor(seed: number) { this.state = seed >>> 0; }
+
+  next(): number {
+    this.state = (this.state + 0x6D2B79F5) >>> 0;
+    let mixed = this.state;
+    mixed = Math.imul(mixed ^ (mixed >>> 15), mixed | 1);
+    mixed ^= mixed + Math.imul(mixed ^ (mixed >>> 7), mixed | 61);
+    return ((mixed ^ (mixed >>> 14)) >>> 0) / 4294967296;
+  }
+
+  between(low: number, high: number): number { return low + (high - low) * this.next(); }
+  pick<T>(items: readonly T[]): T { return items[Math.floor(this.next() * items.length)]; }
+}
+
+class BbParkOutline {
+  static readonly SIDE_WALL_HEIGHT = 1.3;
+  readonly fence: BbFieldPoint[] = [];
+  readonly rightSide: BbFieldPoint[] = [];
+  readonly back: BbFieldPoint[] = [];
+  readonly leftSide: BbFieldPoint[] = [];
+  readonly loop: BbFieldPoint[];
+
+  constructor(readonly dimensions: BbFieldDimensions) {
+    const foul = BbFieldGeometry.FOUL_LINE_DEGREES, width = dimensions.foulTerritoryWidth, diagonal = Math.SQRT1_2;
+    for (let degrees = -foul; degrees <= foul + 1e-6; degrees += 1.5) this.fence.push(BbParkOutline.polar(dimensions.fenceDistance(degrees), degrees));
+    const poleDistance = dimensions.fenceDistance(foul);
+    const alongRight = (along: number, out: number): BbFieldPoint => [along * diagonal + out * diagonal, along * diagonal - out * diagonal];
+    this.rightSide.push(alongRight(poleDistance, 0), alongRight(poleDistance * 0.62, width), alongRight(0, width));
+    for (let degrees = 135 + 7.5; degrees < 225 - 1e-6; degrees += 7.5) this.back.push(BbParkOutline.polar(width, degrees));
+    this.leftSide = this.rightSide.map(([x, z]) => [-x, z] as BbFieldPoint).reverse();
+    this.loop = [...this.fence, ...this.rightSide.slice(1), ...this.back, ...this.leftSide.slice(0, -1)];
+  }
+
+  static polar(distance: number, degrees: number): BbFieldPoint {
+    const radians = degrees * Math.PI / 180;
+    return [distance * Math.sin(radians), distance * Math.cos(radians)];
+  }
+
+  outward(index: number): BbFieldPoint {
+    const count = this.loop.length, before = this.loop[(index + count - 1) % count], after = this.loop[(index + 1) % count];
+    const dx = after[0] - before[0], dz = after[1] - before[1], size = Math.hypot(dx, dz) || 1;
+    return [-dz / size, dx / size];
+  }
+
+  wallHeightAt(index: number): number {
+    return index < this.fence.length ? this.dimensions.wallHeight : BbParkOutline.SIDE_WALL_HEIGHT;
+  }
+}
+
+class BbFieldCanvas {
+  readonly canvas: HTMLCanvasElement;
+  readonly context: CanvasRenderingContext2D;
+  readonly pixelsPerMeter: number;
+
+  constructor(readonly pixels: number, readonly centerX: number, readonly centerZ: number, readonly span: number) {
+    this.canvas = document.createElement("canvas");
+    this.canvas.width = this.canvas.height = pixels;
+    this.context = this.canvas.getContext("2d") as CanvasRenderingContext2D;
+    this.pixelsPerMeter = pixels / span;
+  }
+
+  x(fieldX: number): number { return (fieldX - this.centerX + this.span / 2) * this.pixelsPerMeter; }
+  y(fieldZ: number): number { return (this.centerZ + this.span / 2 - fieldZ) * this.pixelsPerMeter; }
+  size(meters: number): number { return meters * this.pixelsPerMeter; }
+
+  trace(points: readonly BbFieldPoint[], close: boolean): void {
+    const context = this.context;
+    context.beginPath();
+    points.forEach(([x, z], index) => { if (index) context.lineTo(this.x(x), this.y(z)); else context.moveTo(this.x(x), this.y(z)); });
+    if (close) context.closePath();
+  }
+
+  disc(fieldX: number, fieldZ: number, radius: number): void {
+    this.context.beginPath();
+    this.context.arc(this.x(fieldX), this.y(fieldZ), this.size(radius), 0, Math.PI * 2);
+  }
+}
+
+class BbGroundPainter {
+  private static readonly GRASS_LIGHT = "#5fa648";
+  private static readonly GRASS_DARK = "#4f9440";
+  private static readonly INFIELD_LIGHT = "#66ad4c";
+  private static readonly INFIELD_DARK = "#579e43";
+  private static readonly DIRT = "#b98656";
+  private static readonly DIRT_WORN = "#c79a6c";
+  private static readonly TRACK = "#a8744a";
+  private static readonly APRON = "#6f7377";
+  private static readonly CHALK = "#f7f6f0";
+  private static readonly STRIPE_WIDTH = 4.6;
+  private static readonly PATH_INSET = 1.25;
+  private static readonly BASE_CUTOUT = 3.3;
+
+  constructor(private readonly outline: BbParkOutline) {}
+
+  paint(surface: BbFieldCanvas, fineDetail: boolean): void {
+    const context = surface.context;
+    context.fillStyle = BbGroundPainter.APRON;
+    context.fillRect(0, 0, surface.pixels, surface.pixels);
+    context.save();
+    surface.trace(this.outline.loop, true);
+    context.clip();
+    this.paintOutfield(surface);
+    this.paintWarningTrack(surface);
+    this.paintInfield(surface);
+    this.paintWear(surface);
+    this.speckle(surface, fineDetail);
+    this.paintWallShade(surface);
+    if (fineDetail) this.paintChalk(surface);
+    context.restore();
+  }
+
+  private paintOutfield(surface: BbFieldCanvas): void {
+    const context = surface.context;
+    context.fillStyle = BbGroundPainter.GRASS_DARK;
+    context.fillRect(0, 0, surface.pixels, surface.pixels);
+    context.lineWidth = surface.size(BbGroundPainter.STRIPE_WIDTH);
+    context.strokeStyle = BbGroundPainter.GRASS_LIGHT;
+    for (let radius = BbGroundPainter.STRIPE_WIDTH / 2; radius < 150; radius += BbGroundPainter.STRIPE_WIDTH * 2) {
+      surface.disc(0, 0, radius);
+      context.stroke();
+    }
+  }
+
+  private paintWarningTrack(surface: BbFieldCanvas): void {
+    const context = surface.context;
+    context.lineJoin = "round";
+    context.strokeStyle = BbGroundPainter.TRACK;
+    context.lineWidth = surface.size(this.outline.dimensions.warningTrackWidth * 2);
+    surface.trace(this.outline.loop, true);
+    context.stroke();
+  }
+
+  private paintInfield(surface: BbFieldCanvas): void {
+    const context = surface.context, offset = BbFieldGeometry.BASE_OFFSET, inset = BbGroundPainter.PATH_INSET * Math.SQRT2;
+    context.save();
+    surface.trace([[0, -4], [-40, 34], [-40, 60], [40, 60], [40, 34]], true);
+    context.clip();
+    context.fillStyle = BbGroundPainter.DIRT;
+    surface.disc(0, BbFieldGeometry.RUBBER_DISTANCE, BbFieldGeometry.INFIELD_DIRT_RADIUS);
+    context.fill();
+    context.restore();
+    const diamond: BbFieldPoint[] = [[0, inset], [offset - inset, offset], [0, offset * 2 - inset], [-offset + inset, offset]];
+    context.save();
+    surface.trace(diamond, true);
+    context.clip();
+    context.fillStyle = BbGroundPainter.INFIELD_DARK;
+    context.fillRect(0, 0, surface.pixels, surface.pixels);
+    context.strokeStyle = BbGroundPainter.INFIELD_LIGHT;
+    context.lineWidth = surface.size(2.2);
+    for (let shift = -44; shift <= 44; shift += 4.4) {
+      surface.trace([[shift - 30, -10], [shift + 30, 50]], false);
+      context.stroke();
+    }
+    context.restore();
+    context.fillStyle = BbGroundPainter.DIRT;
+    const cutouts: BbFieldPoint[] = [[offset, offset], [0, offset * 2], [-offset, offset]];
+    cutouts.forEach(([x, z]) => { surface.disc(x, z, BbGroundPainter.BASE_CUTOUT); context.fill(); });
+    surface.disc(0, 0, BbFieldGeometry.HOME_DIRT_RADIUS); context.fill();
+    surface.disc(0, BbFieldGeometry.RUBBER_DISTANCE, BbFieldGeometry.MOUND_RADIUS); context.fill();
+    context.strokeStyle = BbGroundPainter.DIRT;
+    context.lineWidth = surface.size(1.9);
+    surface.trace([[0, 0], [offset, offset]], false); context.stroke();
+    surface.trace([[0, 0], [-offset, offset]], false); context.stroke();
+  }
+
+  private paintWear(surface: BbFieldCanvas): void {
+    const context = surface.context, offset = BbFieldGeometry.BASE_OFFSET;
+    const worn: Array<[number, number, number]> = [[offset, offset, 1.6], [0, offset * 2, 1.6], [-offset, offset, 1.6], [-0.95, 0.2, 1.1], [0.95, 0.2, 1.1], [0, -1.3, 1.2], [0, BbFieldGeometry.RUBBER_DISTANCE - 1.3, 1.1], [0, BbFieldGeometry.RUBBER_DISTANCE, 0.9]];
+    worn.forEach(([x, z, radius]) => {
+      const glow = context.createRadialGradient(surface.x(x), surface.y(z), 0, surface.x(x), surface.y(z), surface.size(radius));
+      glow.addColorStop(0, BbGroundPainter.DIRT_WORN);
+      glow.addColorStop(1, "rgba(199,154,108,0)");
+      context.fillStyle = glow;
+      surface.disc(x, z, radius);
+      context.fill();
+    });
+    context.save();
+    context.globalAlpha = 0.1;
+    context.strokeStyle = "#6e4a2a";
+    context.lineWidth = Math.max(1, surface.size(0.05));
+    surface.trace([[0, -4], [-40, 34], [-40, 60], [40, 60], [40, 34]], true);
+    context.clip();
+    for (let radius = BbFieldGeometry.INFIELD_DIRT_RADIUS - 0.4; radius > 19; radius -= 0.42) {
+      surface.disc(0, BbFieldGeometry.RUBBER_DISTANCE, radius);
+      context.stroke();
+    }
+    context.restore();
+  }
+
+  private speckle(surface: BbFieldCanvas, fineDetail: boolean): void {
+    const context = surface.context, random = new BbScatter(4141), count = fineDetail ? 26000 : 60000;
+    for (let index = 0; index < count; index++) {
+      const x = random.next() * surface.pixels, y = random.next() * surface.pixels, size = random.between(1, fineDetail ? 3.4 : 2.2);
+      context.fillStyle = random.next() < 0.5 ? "rgba(255,255,220,0.045)" : "rgba(20,40,10,0.05)";
+      context.fillRect(x, y, size, size);
+    }
+  }
+
+  private paintWallShade(surface: BbFieldCanvas): void {
+    const context = surface.context;
+    context.save();
+    context.strokeStyle = "rgba(0,0,0,0.22)";
+    context.lineWidth = surface.size(2.4);
+    context.filter = "blur(" + Math.max(1, surface.size(0.6)) + "px)";
+    surface.trace(this.outline.loop, true);
+    context.stroke();
+    context.filter = "blur(" + Math.max(1, surface.size(0.35)) + "px)";
+    context.fillStyle = "rgba(0,0,0,0.18)";
+    surface.disc(0.25, BbFieldGeometry.RUBBER_DISTANCE - 0.25, BbFieldGeometry.MOUND_RADIUS * 0.96);
+    context.fill();
+    context.restore();
+  }
+
+  private paintChalk(surface: BbFieldCanvas): void {
+    const context = surface.context, line = Math.max(1.5, surface.size(0.075));
+    context.strokeStyle = BbGroundPainter.CHALK;
+    context.lineWidth = line;
+    context.lineJoin = "miter";
+    const boxInner = BbFieldGeometry.PLATE_WIDTH / 2 + 0.15, boxWidth = 1.22, boxFront = 0.215 + 0.915, boxBack = 0.215 - 0.915;
+    [1, -1].forEach((side) => {
+      surface.trace([[side * boxInner, boxBack], [side * (boxInner + boxWidth), boxBack], [side * (boxInner + boxWidth), boxFront], [side * boxInner, boxFront]], true);
+      context.stroke();
+      surface.disc(side * 11.3, -3.6, 0.76);
+      context.stroke();
+      surface.trace([[side * 0.55, boxBack], [side * 0.55, -2.44]], false);
+      context.stroke();
+    });
+    surface.trace([[-0.55, -2.44], [0.55, -2.44]], false);
+    context.stroke();
+    const half = BbFieldGeometry.BASE_OFFSET / 2, lane = 0.91 * Math.SQRT1_2;
+    surface.trace([[half + lane, half - lane], [BbFieldGeometry.BASE_OFFSET + lane, BbFieldGeometry.BASE_OFFSET - lane]], false);
+    context.stroke();
+  }
+}
+
+class BbBallparkBuilder {
+  private static readonly SEAT_COLORS: readonly string[] = ["#2d5fa8", "#2a579b", "#31649f"];
+  private static readonly SHIRT_COLORS: readonly string[] = ["#e9e6dc", "#d9534f", "#3b6fb6", "#f0c040", "#4caf7a", "#8e6bbf", "#f08a3e", "#2f3640", "#e8a0b8", "#7fb6d9"];
+  private static readonly SKIN_COLORS: readonly string[] = ["#FFE0C8", "#F6C09C", "#E2A981", "#C98A62", "#A86A48"];
+  private static readonly BANNERS: readonly string[] = ["동마중학교", "DONGMA", "옥수수차", "코딩 동아리", "과학실", "도서관", "방과후 야구", "급식 맛집"];
+  private static readonly TIER_DEPTH = 1.5;
+  private static readonly TIER_RISE = 0.85;
+
+  readonly group: Three<"Group">;
+  private readonly outline: BbParkOutline;
+  private readonly random = new BbScatter(20261112);
+
+  constructor(private readonly libs: ThreeLibs, private readonly spec: BbBallparkSpec) {
+    this.group = new libs.THREE.Group();
+    this.outline = new BbParkOutline(spec.dimensions);
+  }
+
+  build(): Three<"Group"> {
+    this.addGround();
+    this.addMound();
+    this.addBasesAndPlate();
+    this.addChalkLines();
+    this.addWalls();
+    this.addBackstop();
+    this.addFoulPoles();
+    this.addStands();
+    this.addDugouts();
+    this.addScoreboard();
+    this.addLightTowers();
+    this.addSky();
+    this.addSurroundings();
+    return this.group;
+  }
+
+  private textureOf(canvas: HTMLCanvasElement, repeat: boolean): Three<"CanvasTexture"> {
+    const THREE = this.libs.THREE, texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.anisotropy = 8;
+    if (repeat) texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+    return texture;
+  }
+
+  private addGround(): void {
+    const THREE = this.libs.THREE, painter = new BbGroundPainter(this.outline);
+    const apron = new THREE.Mesh(new THREE.PlaneGeometry(2400, 2400), new THREE.MeshLambertMaterial({ color: "#59635a" }));
+    apron.rotation.x = -Math.PI / 2;
+    apron.position.y = -0.06;
+    this.group.add(apron);
+    const layers: Array<[pixels: number, centerZ: number, span: number, fine: boolean]> = [[2048, 52, 300, false], [2048, 19.4, 74, true], [1024, 1.4, 15, true]];
+    layers.forEach(([pixels, centerZ, span, fine], index) => {
+      const surface = new BbFieldCanvas(pixels, 0, centerZ, span);
+      painter.paint(surface, fine);
+      const material = new THREE.MeshLambertMaterial({ map: this.textureOf(surface.canvas, false), polygonOffset: true, polygonOffsetFactor: -index, polygonOffsetUnits: -index * 2 });
+      const plane = new THREE.Mesh(new THREE.PlaneGeometry(span, span), material);
+      plane.rotation.x = -Math.PI / 2;
+      plane.position.set(0, index * 0.004, -centerZ);
+      plane.receiveShadow = true;
+      plane.renderOrder = index - 5;
+      this.group.add(plane);
+    });
+  }
+
+  private dirtTexture(): Three<"CanvasTexture"> {
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = 256;
+    const context = canvas.getContext("2d") as CanvasRenderingContext2D, random = new BbScatter(77);
+    context.fillStyle = "#bd8b5b";
+    context.fillRect(0, 0, 256, 256);
+    for (let index = 0; index < 5000; index++) {
+      context.fillStyle = random.next() < 0.5 ? "rgba(255,235,200,0.07)" : "rgba(70,40,15,0.08)";
+      context.fillRect(random.next() * 256, random.next() * 256, random.between(1, 3), random.between(1, 3));
+    }
+    return this.textureOf(canvas, true);
+  }
+
+  private addMound(): void {
+    const THREE = this.libs.THREE, height = BbFieldGeometry.MOUND_HEIGHT, radius = BbFieldGeometry.MOUND_RADIUS;
+    const profile = [[0, height], [0.75, height], [1.3, height * 0.86], [2, height * 0.42], [radius, 0.004]].map(([r, y]) => new THREE.Vector2(r, y));
+    const texture = this.dirtTexture();
+    texture.repeat.set(6, 2);
+    const mound = new THREE.Mesh(new THREE.LatheGeometry(profile, 40), new THREE.MeshLambertMaterial({ map: texture }));
+    mound.position.set(0, 0, -BbFieldGeometry.RUBBER_DISTANCE);
+    mound.receiveShadow = true;
+    const rubber = new THREE.Mesh(new THREE.BoxGeometry(0.61, 0.04, 0.15), new THREE.MeshLambertMaterial({ color: "#f4f2ea" }));
+    rubber.position.set(0, height + 0.012, -BbFieldGeometry.RUBBER_DISTANCE);
+    rubber.receiveShadow = true;
+    this.group.add(mound, rubber);
+  }
+
+  private addBasesAndPlate(): void {
+    const THREE = this.libs.THREE, white = new THREE.MeshLambertMaterial({ color: "#f7f5ee" }), size = BbFieldGeometry.BASE_SIZE;
+    [BbFieldGeometry.FIRST, BbFieldGeometry.SECOND, BbFieldGeometry.THIRD].forEach((spot) => {
+      const base = new THREE.Mesh(new THREE.BoxGeometry(size, 0.08, size), white);
+      base.position.set(spot.x, 0.045, spot.z);
+      base.rotation.y = Math.PI / 4;
+      base.castShadow = base.receiveShadow = true;
+      this.group.add(base);
+    });
+    const half = BbFieldGeometry.PLATE_WIDTH / 2, shape = new THREE.Shape();
+    shape.moveTo(-half, half * 2); shape.lineTo(half, half * 2); shape.lineTo(half, half); shape.lineTo(0, 0); shape.lineTo(-half, half); shape.closePath();
+    const plate = new THREE.Mesh(new THREE.ExtrudeGeometry(shape, { depth: 0.02, bevelEnabled: false }), white);
+    plate.rotation.x = -Math.PI / 2;
+    plate.position.y = 0.012;
+    plate.receiveShadow = true;
+    this.group.add(plate);
+  }
+
+  private addChalkLines(): void {
+    const THREE = this.libs.THREE, chalk = new THREE.MeshBasicMaterial({ color: "#f3f2ea", polygonOffset: true, polygonOffsetFactor: -6, polygonOffsetUnits: -12 });
+    const length = this.spec.dimensions.fenceDistance(BbFieldGeometry.FOUL_LINE_DEGREES) - 1.2;
+    [1, -1].forEach((side) => {
+      const line = new THREE.Mesh(new THREE.PlaneGeometry(0.1, length), chalk);
+      line.rotation.set(-Math.PI / 2, 0, -side * Math.PI / 4);
+      const middle = BbParkOutline.polar(1.2 + length / 2, side * 45);
+      line.position.set(middle[0], 0.02, -middle[1]);
+      line.renderOrder = 1;
+      this.group.add(line);
+    });
+  }
+
+  private wallTexture(): Three<"CanvasTexture"> {
+    const canvas = document.createElement("canvas");
+    canvas.width = 2048; canvas.height = 128;
+    const context = canvas.getContext("2d") as CanvasRenderingContext2D, panels = BbBallparkBuilder.BANNERS.length, panelWidth = canvas.width / panels;
+    for (let panel = 0; panel < panels; panel++) {
+      const left = panel * panelWidth, shade = context.createLinearGradient(0, 0, 0, 128);
+      shade.addColorStop(0, panel % 2 ? "#1f6a45" : "#1b5f3e");
+      shade.addColorStop(1, panel % 2 ? "#17523a" : "#144a33");
+      context.fillStyle = shade;
+      context.fillRect(left, 0, panelWidth, 128);
+      context.fillStyle = "rgba(0,0,0,0.25)";
+      context.fillRect(left, 0, 3, 128);
+      context.fillStyle = "rgba(255,255,255,0.08)";
+      context.fillRect(left + 3, 0, 2, 128);
+      context.fillStyle = panel % 2 ? "#f3efe2" : "#f2d26a";
+      context.font = '700 54px "Nanum Gothic", "Malgun Gothic", sans-serif';
+      context.textAlign = "center";
+      context.textBaseline = "middle";
+      context.fillText(BbBallparkBuilder.BANNERS[panel], left + panelWidth / 2, 72, panelWidth - 30);
+    }
+    context.fillStyle = "#f2c230";
+    context.fillRect(0, 0, canvas.width, 9);
+    context.fillStyle = "rgba(0,0,0,0.35)";
+    context.fillRect(0, 118, canvas.width, 10);
+    return this.textureOf(canvas, true);
+  }
+
+  private stripGeometry(points: readonly BbFieldPoint[], bottom: number, top: number, metersPerRepeat: number) {
+    const THREE = this.libs.THREE, positions: number[] = [], uvs: number[] = [], indices: number[] = [];
+    let travelled = 0;
+    points.forEach(([x, z], index) => {
+      if (index) travelled += Math.hypot(x - points[index - 1][0], z - points[index - 1][1]);
+      positions.push(x, bottom, -z, x, top, -z);
+      uvs.push(travelled / metersPerRepeat, 0, travelled / metersPerRepeat, 1);
+      if (index) { const base = index * 2; indices.push(base - 2, base, base - 1, base, base + 1, base - 1); }
+    });
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+    geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+    geometry.setIndex(indices);
+    geometry.computeVertexNormals();
+    return geometry;
+  }
+
+  private addWalls(): void {
+    const THREE = this.libs.THREE, outline = this.outline, height = this.spec.dimensions.wallHeight;
+    const fence = new THREE.Mesh(this.stripGeometry(outline.fence, 0, height, 96), new THREE.MeshLambertMaterial({ map: this.wallTexture(), side: THREE.DoubleSide }));
+    fence.receiveShadow = true;
+    this.group.add(fence);
+    const sidePoints = [...outline.rightSide, ...outline.back, ...outline.leftSide];
+    const padding = new THREE.MeshLambertMaterial({ color: "#1c5a3c", side: THREE.DoubleSide });
+    this.group.add(new THREE.Mesh(this.stripGeometry(sidePoints, 0, BbParkOutline.SIDE_WALL_HEIGHT, 10), padding));
+    const cap = new THREE.Mesh(this.stripGeometry(sidePoints, BbParkOutline.SIDE_WALL_HEIGHT, BbParkOutline.SIDE_WALL_HEIGHT + 0.08, 10), new THREE.MeshLambertMaterial({ color: "#f2c230", side: THREE.DoubleSide }));
+    this.group.add(cap);
+    [[-45, "100"], [-22.5, "110"], [0, "120"], [22.5, "110"], [45, "100"]].forEach(([degrees, label]) => {
+      const canvas = document.createElement("canvas");
+      canvas.width = 128; canvas.height = 64;
+      const context = canvas.getContext("2d") as CanvasRenderingContext2D;
+      context.fillStyle = "#f6f1dc";
+      context.font = '800 54px "Nanum Gothic", "Malgun Gothic", sans-serif';
+      context.textAlign = "center"; context.textBaseline = "middle";
+      context.fillText(label as string, 64, 34);
+      const angle = (degrees as number) * 0.985, spot = BbParkOutline.polar(this.spec.dimensions.fenceDistance(angle) - 0.06, angle);
+      const sign = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 1.3), new THREE.MeshBasicMaterial({ map: this.textureOf(canvas, false), transparent: true }));
+      sign.position.set(spot[0], 2.25, -spot[1]);
+      sign.lookAt(0, 2.25, 0);
+      this.group.add(sign);
+    });
+  }
+
+  private addBackstop(): void {
+    const THREE = this.libs.THREE, canvas = document.createElement("canvas");
+    canvas.width = canvas.height = 64;
+    const context = canvas.getContext("2d") as CanvasRenderingContext2D;
+    context.strokeStyle = "rgba(235,240,235,0.55)";
+    context.lineWidth = 2;
+    context.strokeRect(0, 0, 64, 64);
+    const net = this.textureOf(canvas, true);
+    net.repeat.set(1, 28);
+    const material = new THREE.MeshBasicMaterial({ map: net, transparent: true, side: THREE.DoubleSide, depthWrite: false });
+    material.forceSinglePass = true;
+    const points = [this.outline.rightSide[2], ...this.outline.back, this.outline.leftSide[0]];
+    this.group.add(new THREE.Mesh(this.stripGeometry(points, BbParkOutline.SIDE_WALL_HEIGHT, 9, 0.3), material));
+    const post = new THREE.CylinderGeometry(0.09, 0.09, 9, 8), steel = new THREE.MeshLambertMaterial({ color: "#3d4a45" });
+    points.forEach(([x, z], index) => {
+      if (index % 2) return;
+      const mesh = new THREE.Mesh(post, steel);
+      mesh.position.set(x, 4.5, -z);
+      this.group.add(mesh);
+    });
+  }
+
+  private addFoulPoles(): void {
+    const THREE = this.libs.THREE, yellow = new THREE.MeshBasicMaterial({ color: "#f2c230" });
+    [-45, 45].forEach((degrees) => {
+      const spot = BbParkOutline.polar(this.spec.dimensions.fenceDistance(degrees) + 0.1, degrees);
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 15, 10), yellow);
+      pole.position.set(spot[0], 7.5, -spot[1]);
+      const wing = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 9), new THREE.MeshBasicMaterial({ color: "#f2c230", transparent: true, opacity: 0.55, side: THREE.DoubleSide }));
+      const inward = BbParkOutline.polar(this.spec.dimensions.fenceDistance(degrees) + 0.1, degrees * 0.99);
+      wing.position.set((spot[0] + inward[0]) / 2 + Math.sign(-degrees) * 0.4, 10.5, -(spot[1] + inward[1]) / 2);
+      wing.lookAt(0, 10.5, 0);
+      this.group.add(pole, wing);
+    });
+  }
+
+  private tiersAt(index: number): number {
+    const fenceCount = this.outline.fence.length;
+    if (index < fenceCount) return 8 + Math.round(3 * Math.sin(index / (fenceCount - 1) * Math.PI));
+    return 15;
+  }
+
+  private addStands(): void {
+    const THREE = this.libs.THREE, outline = this.outline, loop = outline.loop, count = loop.length;
+    const positions: number[] = [], colors: number[] = [], indices: number[] = [], color = new THREE.Color();
+    const bodies: number[] = [], depth = BbBallparkBuilder.TIER_DEPTH, rise = BbBallparkBuilder.TIER_RISE;
+    const cornerAt = (index: number, tier: number): [number, number, number] => {
+      const wrapped = (index + count) % count, point = loop[wrapped], normal = outline.outward(wrapped);
+      const out = 0.6 + tier * depth, base = outline.wallHeightAt(wrapped) + 0.5;
+      return [point[0] + normal[0] * out, base + (tier - 1) * rise,point[1] + normal[1] * out];
+    };
+    const quad = (a: number[], b: number[], c: number[], d: number[], hex: string, shade: number) => {
+      const base = positions.length / 3;
+      [a, b, c, d].forEach((corner) => {
+        positions.push(corner[0], corner[1], -corner[2]);
+        color.set(hex).multiplyScalar(shade);
+        colors.push(color.r, color.g, color.b);
+      });
+      indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
+    };
+    for (let index = 0; index < count; index++) {
+      const next = index + 1, tiers = Math.min(this.tiersAt(index), this.tiersAt(next % count));
+      const aisle = index % 9 === 4;
+      for (let tier = 0; tier < tiers; tier++) {
+        const lowA = cornerAt(index, tier), lowB = cornerAt(next, tier), highA = cornerAt(index, tier + 1), highB = cornerAt(next, tier + 1);
+        const seat = aisle ? "#8b8f94" : BbBallparkBuilder.SEAT_COLORS[(tier + Math.floor(index / 9)) % 3];
+        quad([lowA[0], lowA[1], lowA[2]], [lowB[0], lowB[1], lowB[2]], [lowB[0], highB[1], lowB[2]], [lowA[0], highA[1], lowA[2]], "#7d8288", 0.72);
+        quad([lowA[0], highA[1], lowA[2]], [lowB[0], highB[1], lowB[2]], [highB[0], highB[1], highB[2]], [highA[0], highA[1], highA[2]], seat, 0.8 + tier * 0.012);
+        if (aisle) continue;
+        const width = Math.hypot(lowB[0] - lowA[0], lowB[2] - lowA[2]), seats = Math.floor(width / 0.72);
+        for (let seatIndex = 0; seatIndex < seats; seatIndex++) {
+          if (this.random.next() > 0.6) continue;
+          const along = (seatIndex + 0.5) / seats, inward = 0.55;
+          bodies.push(
+            BbCurve.mix(BbCurve.mix(lowA[0], lowB[0], along), BbCurve.mix(highA[0], highB[0], along), inward),
+            BbCurve.mix(highA[1], highB[1], along),
+            BbCurve.mix(BbCurve.mix(lowA[2], lowB[2], along), BbCurve.mix(highA[2], highB[2], along), inward)
+          );
+        }
+      }
+      const top = cornerAt(index, tiers), topNext = cornerAt(next, tiers);
+      quad([top[0], top[1], top[2]], [topNext[0], topNext[1], topNext[2]], [topNext[0], topNext[1] + 3.2, topNext[2]], [top[0], top[1] + 3.2, top[2]], "#5d6670", 0.9);
+      const foot = cornerAt(index, 0), footNext = cornerAt(next, 0);
+      quad([loop[index][0], 0, loop[index][1]], [loop[next % count][0], 0, loop[next % count][1]], [footNext[0], footNext[1], footNext[2]], [foot[0], foot[1], foot[2]], "#4b5258", 0.8);
+    }
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+    geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+    geometry.setIndex(indices);
+    geometry.computeVertexNormals();
+    this.group.add(new THREE.Mesh(geometry, new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide })));
+    this.addCrowd(bodies);
+  }
+
+  private addCrowd(seats: readonly number[]): void {
+    const THREE = this.libs.THREE, total = seats.length / 3, matrix = new THREE.Matrix4(), color = new THREE.Color();
+    const torsos = new THREE.InstancedMesh(new THREE.BoxGeometry(0.44, 0.52, 0.3), new THREE.MeshLambertMaterial(), total);
+    const heads = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.17, 0), new THREE.MeshLambertMaterial(), total);
+    for (let index = 0; index < total; index++) {
+      const x = seats[index * 3], y = seats[index * 3 + 1], z = -seats[index * 3 + 2], lift = this.random.between(0, 0.07);
+      matrix.makeTranslation(x, y + 0.36 + lift, z);
+      torsos.setMatrixAt(index, matrix);
+      torsos.setColorAt(index, color.set(this.random.pick(BbBallparkBuilder.SHIRT_COLORS)));
+      matrix.makeTranslation(x, y + 0.8 + lift, z);
+      heads.setMatrixAt(index, matrix);
+      heads.setColorAt(index, color.set(this.random.pick(BbBallparkBuilder.SKIN_COLORS)));
+    }
+    torsos.frustumCulled = heads.frustumCulled = false;
+    this.group.add(torsos, heads);
+  }
+
+  private addDugouts(): void {
+    const THREE = this.libs.THREE, width = this.spec.dimensions.foulTerritoryWidth;
+    const concrete = new THREE.MeshLambertMaterial({ color: "#3b4148" }), wood = new THREE.MeshLambertMaterial({ color: "#9a6a3c" });
+    [[1, BbTeamKits.HOME], [-1, BbTeamKits.AWAY]].forEach(([sideValue, kitValue]) => {
+      const side = sideValue as number, kit = kitValue as BbTeamKit, dugout = new THREE.Group();
+      const roof = new THREE.Mesh(new THREE.BoxGeometry(13, 0.22, 3.4), new THREE.MeshLambertMaterial({ color: kit.cap }));
+      roof.position.set(0, 2.5, 0);
+      const back = new THREE.Mesh(new THREE.BoxGeometry(13, 2.5, 0.2), concrete);
+      back.position.set(0, 1.25, 1.6);
+      const floor = new THREE.Mesh(new THREE.BoxGeometry(13, 0.1, 3.4), concrete);
+      floor.position.y = 0.03;
+      const bench = new THREE.Mesh(new THREE.BoxGeometry(11.5, 0.1, 0.5), wood);
+      bench.position.set(0, 0.55, 1.1);
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(13, 0.08, 0.08), new THREE.MeshLambertMaterial({ color: "#d8d8d8" }));
+      rail.position.set(0, 1.05, -1.65);
+      dugout.add(roof, back, floor, bench, rail);
+      for (let post = -6; post <= 6; post += 3) {
+        const pillar = new THREE.Mesh(new THREE.BoxGeometry(0.14, 2.5, 0.14), concrete);
+        pillar.position.set(post, 1.25, -1.6);
+        dugout.add(pillar);
+        const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshLambertMaterial({ color: kit.cap }));
+        helmet.position.set(post + 1.4, 1.75, 1.45);
+        dugout.add(helmet);
+      }
+      const cooler = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 0.6, 12), new THREE.MeshLambertMaterial({ color: "#f08a3e" }));
+      cooler.position.set(5.6, 0.95, 1.05);
+      dugout.add(cooler);
+      const along = 15, out = width + 1.9, diagonal = Math.SQRT1_2;
+      dugout.position.set(side * (along * diagonal + out * diagonal), 0, -(along * diagonal - out * diagonal));
+      dugout.rotation.y = side * Math.PI / 4 + (side > 0 ? Math.PI : 0) + Math.PI;
+      dugout.traverse((node) => { node.castShadow = false; });
+      this.group.add(dugout);
+    });
+  }
+
+  private addScoreboard(): void {
+    const THREE = this.libs.THREE, canvas = document.createElement("canvas");
+    canvas.width = 1024; canvas.height = 384;
+    const context = canvas.getContext("2d") as CanvasRenderingContext2D;
+    context.fillStyle = "#101816";
+    context.fillRect(0, 0, 1024, 384);
+    context.fillStyle = "#f2c230";
+    context.font = '800 84px "Nanum Gothic", "Malgun Gothic", sans-serif';
+    context.textAlign = "center";
+    context.fillText("동마 구장", 512, 104);
+    context.strokeStyle = "#2f4a40";
+    context.lineWidth = 3;
+    for (let column = 0; column <= 12; column++) { context.beginPath(); context.moveTo(60 + column * 75, 150); context.lineTo(60 + column * 75, 340); context.stroke(); }
+    [150, 213, 276, 340].forEach((y) => { context.beginPath(); context.moveTo(60, y); context.lineTo(960, y); context.stroke(); });
+    context.fillStyle = "#9fe6b0";
+    context.font = '700 40px "Nanum Gothic", "Malgun Gothic", sans-serif';
+    for (let inning = 1; inning <= 9; inning++) context.fillText(String(inning), 172 + inning * 75 - 75 + 37, 196);
+    const spot = BbParkOutline.polar(this.spec.dimensions.fenceDistance(0) + 24, 0);
+    const board = new THREE.Mesh(new THREE.BoxGeometry(34, 12.75, 1.2), [new THREE.MeshLambertMaterial({ color: "#1b2422" }), new THREE.MeshLambertMaterial({ color: "#1b2422" }), new THREE.MeshLambertMaterial({ color: "#1b2422" }), new THREE.MeshLambertMaterial({ color: "#1b2422" }), new THREE.MeshBasicMaterial({ map: this.textureOf(canvas, false) }), new THREE.MeshLambertMaterial({ color: "#1b2422" })]);
+    board.position.set(spot[0], 22, -spot[1]);
+    this.group.add(board);
+    [-12, 12].forEach((shift) => {
+      const leg = new THREE.Mesh(new THREE.BoxGeometry(1, 16, 1), new THREE.MeshLambertMaterial({ color: "#39423f" }));
+      leg.position.set(shift, 8, -spot[1] - 0.4);
+      this.group.add(leg);
+    });
+  }
+
+  private addLightTowers(): void {
+    const THREE = this.libs.THREE, steel = new THREE.MeshLambertMaterial({ color: "#59616a" }), lamp = new THREE.MeshBasicMaterial({ color: "#fff6d8" });
+    [[-28, 152], [28, 152], [-108, 78], [108, 78]].forEach(([degrees, distance]) => {
+      const spot = BbParkOutline.polar(distance, degrees);
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.9, 42, 8), steel);
+      pole.position.set(spot[0], 21, -spot[1]);
+      const bank = new THREE.Mesh(new THREE.BoxGeometry(9, 5, 0.8), steel);
+      bank.position.set(spot[0], 43, -spot[1]);
+      bank.lookAt(0, 10, -40);
+      const glow = new THREE.Mesh(new THREE.PlaneGeometry(8.2, 4.2), lamp);
+      glow.position.copy(bank.position);
+      glow.lookAt(0, 10, -40);
+      glow.translateZ(0.45);
+      this.group.add(pole, bank, glow);
+    });
+  }
+
+  private addSky(): void {
+    const THREE = this.libs.THREE, canvas = document.createElement("canvas");
+    canvas.width = 8; canvas.height = 256;
+    const context = canvas.getContext("2d") as CanvasRenderingContext2D, gradient = context.createLinearGradient(0, 0, 0, 256);
+    gradient.addColorStop(0, "#2f6fc4");
+    gradient.addColorStop(0.42, "#78aee6");
+    gradient.addColorStop(0.5, "#cfe4f4");
+    gradient.addColorStop(1, "#cfe4f4");
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, 8, 256);
+    const dome = new THREE.Mesh(new THREE.SphereGeometry(1100, 24, 16), new THREE.MeshBasicMaterial({ map: this.textureOf(canvas, false), side: THREE.BackSide, fog: false, depthWrite: false }));
+    dome.renderOrder = -10;
+    this.group.add(dome);
+    const puff = document.createElement("canvas");
+    puff.width = 256; puff.height = 128;
+    const puffContext = puff.getContext("2d") as CanvasRenderingContext2D;
+    for (let blob = 0; blob < 9; blob++) {
+      const x = this.random.between(50, 206), y = this.random.between(50, 84), radius = this.random.between(26, 46);
+      const soft = puffContext.createRadialGradient(x, y, 0, x, y, radius);
+      soft.addColorStop(0, "rgba(255,255,255,0.9)");
+      soft.addColorStop(1, "rgba(255,255,255,0)");
+      puffContext.fillStyle = soft;
+      puffContext.fillRect(0, 0, 256, 128);
+    }
+    const cloudMaterial = new THREE.MeshBasicMaterial({ map: this.textureOf(puff, false), transparent: true, depthWrite: false, fog: false });
+    for (let cloud = 0; cloud < 16; cloud++) {
+      const angle = this.random.between(0, Math.PI * 2), distance = this.random.between(520, 900), size = this.random.between(180, 330);
+      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(size, size * 0.45), cloudMaterial);
+      mesh.position.set(Math.sin(angle) * distance, this.random.between(150, 330), Math.cos(angle) * distance);
+      mesh.lookAt(0, 20, -40);
+      mesh.renderOrder = -9;
+      this.group.add(mesh);
+    }
+  }
+
+  private addSurroundings(): void {
+    const THREE = this.libs.THREE, matrix = new THREE.Matrix4(), color = new THREE.Color(), scale = new THREE.Vector3(), position = new THREE.Vector3(), turn = new THREE.Quaternion();
+    const treeCount = 420, towerCount = 110;
+    const leaves = new THREE.InstancedMesh(new THREE.ConeGeometry(3.4, 9, 7), new THREE.MeshLambertMaterial(), treeCount);
+    const towers = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshLambertMaterial(), towerCount);
+    for (let index = 0; index < treeCount; index++) {
+      const angle = this.random.between(0, Math.PI * 2), distance = this.random.between(205, 330), size = this.random.between(0.8, 1.9);
+      position.set(Math.sin(angle) * distance, 4.5 * size, -55 + Math.cos(angle) * distance);
+      matrix.compose(position, turn, scale.set(size, size, size));
+      leaves.setMatrixAt(index, matrix);
+      leaves.setColorAt(index, color.set(this.random.pick(["#2f6b3a", "#3a7a42", "#2a5f35", "#4a8a48"])));
+    }
+    for (let index = 0; index < towerCount; index++) {
+      const angle = this.random.between(0, Math.PI * 2), distance = this.random.between(340, 620), height = this.random.between(22, 95);
+      position.set(Math.sin(angle) * distance, height / 2, -55 + Math.cos(angle) * distance);
+      matrix.compose(position, turn, scale.set(this.random.between(18, 40), height, this.random.between(18, 40)));
+      towers.setMatrixAt(index, matrix);
+      towers.setColorAt(index, color.set(this.random.pick(["#aab4c2", "#9aa7b8", "#c4c9cf", "#8f9db0", "#b9c2c9"])));
+    }
+    leaves.frustumCulled = towers.frustumCulled = false;
+    this.group.add(leaves, towers);
+  }
+}
+
+class BbParkLighting {
+  readonly sun: Three<"DirectionalLight">;
+  readonly sky: Three<"HemisphereLight">;
+
+  constructor(libs: ThreeLibs) {
+    const THREE = libs.THREE;
+    this.sky = new THREE.HemisphereLight("#eaf3ff", "#6f8a5c", 1.55);
+    this.sun = new THREE.DirectionalLight("#fff1d6", 2.3);
+    this.sun.position.set(-34, 60, 22);
+    this.sun.target.position.set(0, 0, -9);
+    this.sun.castShadow = true;
+    this.sun.shadow.mapSize.set(1024, 1024);
+    const frustum = this.sun.shadow.camera;
+    frustum.left = -17; frustum.right = 17; frustum.top = 17; frustum.bottom = -17; frustum.near = 10; frustum.far = 140;
+    this.sun.shadow.bias = -0.0006;
+    this.sun.shadow.normalBias = 0.02;
+  }
+
+  addTo(scene: Three<"Object3D">): void { scene.add(this.sky, this.sun, this.sun.target); }
+}
