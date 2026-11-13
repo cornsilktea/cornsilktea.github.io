@@ -33,3 +33,49 @@
   .bb-lamp{width:9px;height:9px}
   .bb-score-pitches{font-size:11px;min-width:40px}
 }
+#bbControls{position:fixed;inset:0;z-index:15;pointer-events:none;font-family:"Nanum Gothic","Malgun Gothic",sans-serif;color:#fff}
+#bbControls button{pointer-events:auto;font-family:inherit;color:#fff;cursor:pointer}
+.bb-pad{position:absolute;left:3vw;bottom:14px;transform:translateY(24px);display:flex;gap:8px;opacity:0;visibility:hidden;transition:transform .18s,opacity .18s}
+.bb-pad.open{transform:translateY(0);opacity:1;visibility:visible}
+.bb-pitch-key{position:relative;width:min(14vw,150px);min-width:56px;padding:8px 6px 6px;border-radius:12px;border:2px solid transparent;background:rgba(14,20,17,.82);display:flex;flex-direction:column;align-items:center;gap:2px}
+.bb-pitch-key.on{border-color:#D97B4F;background:rgba(60,40,28,.92)}
+.bb-pitch-key:disabled{opacity:.32;cursor:default}
+.bb-pitch-letter{position:absolute;left:8px;top:6px;font-size:13px;font-weight:800;color:#D97B4F}
+.bb-pitch-name{font-size:clamp(13px,1.9vw,20px);font-weight:800}
+.bb-pitch-icon{width:min(9vw,64px);height:min(7.6vw,54px)}
+.bb-pitch-icon-zone{fill:rgba(255,255,255,.08);stroke:rgba(255,255,255,.55);stroke-width:1}
+.bb-pitch-icon-path{fill:none;stroke:#D97B4F;stroke-width:2;stroke-linecap:round}
+.bb-pitch-icon-ball{fill:#fff}
+.bb-aim{position:absolute;right:3vw;top:43%;width:min(52vh,440px);transform:translateY(-50%) scale(.4);transform-origin:center;opacity:0;visibility:hidden;transition:transform .18s,opacity .18s;pointer-events:none}
+.bb-aim.open{transform:translateY(-50%) scale(1);opacity:1;visibility:visible;pointer-events:auto}
+.bb-aim-zone{display:block;width:100%;aspect-ratio:1;border-radius:14px;background:rgba(14,20,17,.8);touch-action:none;cursor:crosshair}
+.bb-aim-allowed{fill:rgba(255,255,255,.07);stroke:rgba(255,255,255,.3);stroke-width:.02;stroke-dasharray:.08 .06}
+.bb-aim-strike{fill:rgba(255,255,255,.06);stroke:#fff;stroke-width:.045}
+.bb-aim-grid{stroke:rgba(255,255,255,.4);stroke-width:.02}
+.bb-aim-reach{fill:rgba(255,255,255,.28);stroke:rgba(255,255,255,.8);stroke-width:.025;stroke-dasharray:.07 .05;pointer-events:none}
+.bb-aim-ball{fill:#fff;stroke:#D97B4F;stroke-width:.05;pointer-events:none}
+.bb-aim-info{margin-top:6px;padding:6px 10px;border-radius:10px;background:rgba(14,20,17,.8);border-left:4px solid #D97B4F;font-size:16px;font-weight:800;white-space:pre}
+.bb-action{position:absolute;right:max(18px,3vw);bottom:max(18px,3vh);width:clamp(96px,15vw,150px);height:clamp(96px,15vw,150px);border-radius:50%;border:4px solid #fff;background:#D97B4F;font-size:clamp(20px,3vw,30px);font-weight:800;touch-action:none;opacity:0;visibility:hidden;transition:opacity .12s}
+.bb-action.open{opacity:1;visibility:visible}
+.bb-action.spent{opacity:.35}
+.bb-toast{position:absolute;left:50%;top:24%;transform:translateX(-50%);text-align:center;opacity:0;transition:opacity .15s;white-space:nowrap}
+.bb-toast.open{opacity:1}
+.bb-toast-call{font-size:clamp(28px,5vw,56px);font-weight:800;transform:skewX(-8deg);text-shadow:-3px -3px 0 #14201a,3px -3px 0 #14201a,-3px 3px 0 #14201a,3px 3px 0 #14201a,5px 6px 0 #D97B4F}
+.bb-toast-pitch{display:inline-block;margin-top:8px;padding:4px 12px;border-radius:10px;background:rgba(14,20,17,.78);font-size:clamp(13px,1.8vw,18px);font-weight:800}
+.bb-toast-pitch:empty{display:none}
+.bb-gauge{position:absolute;left:50%;bottom:max(20px,4vh);width:min(56vw,420px);transform:translateX(-50%);padding:8px 14px 6px;border-radius:12px;background:rgba(14,20,17,.82);opacity:0;transition:opacity .15s}
+.bb-gauge.open{opacity:1}
+.bb-gauge-label{text-align:center;font-size:18px;font-weight:800;margin-bottom:5px}
+.bb-gauge-bar{position:relative;height:16px;border-radius:8px;background:rgba(255,255,255,.14)}
+.bb-gauge-band{position:absolute;left:50%;top:0;height:100%;transform:translateX(-50%);border-radius:8px}
+.bb-gauge-fair{background:#F2C94C}
+.bb-gauge-good{background:#B5DD6A}
+.bb-gauge-perfect{background:#4FBF6B}
+.bb-gauge-marker{position:absolute;top:100%;transform:translateX(-50%);font-size:13px;line-height:13px;color:#fff}
+.bb-gauge-ends{display:flex;justify-content:space-between;margin-top:12px;font-size:11px;font-weight:700;opacity:.8}
+@media (orientation:portrait){
+  .bb-aim{right:auto;left:7vw;width:86vw;top:42%}
+  .bb-pad{gap:4px;bottom:calc(clamp(96px,15vw,150px) + 30px)}
+  .bb-pitch-key{width:17.5vw}
+  .bb-gauge{bottom:calc(clamp(96px,15vw,150px) + 40px);width:80vw}
+}

@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>41번 야구 조작 시험장</title>
+<style>
+  html,body{margin:0;height:100%;background:#1c2a22;font-family:"Nanum Gothic","Malgun Gothic",sans-serif;color:#fff;overflow:hidden}
+  canvas{display:block;width:100%;height:100%;touch-action:none}
+  #labBar{position:fixed;left:8px;bottom:52px;right:8px;display:flex;flex-wrap:wrap;gap:5px;align-items:center}
+  #labBar button{border:0;border-radius:8px;padding:8px 11px;background:rgba(20,24,22,.8);color:#fff;font:inherit;font-size:13px;font-weight:700;cursor:pointer;border-bottom:3px solid transparent}
+  #labBar button.on{border-bottom-color:#D97B4F;background:rgba(60,40,28,.92)}
+  .lab-gap{width:8px}
+  #labLoading{position:fixed;left:8px;right:8px;bottom:8px;padding:8px 12px;border-radius:10px;background:rgba(20,24,22,.8);border-left:4px solid #D97B4F;font-size:14px;font-weight:700}
+  body.plain #labBar,body.plain #labLoading{display:none}
+</style>
+<link rel="stylesheet" href="../games/41.baseball-duel/41.baseball-hud.css?v=5">
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+<script charset="utf-8" src="../common/character-kit.js"></script>
+<script charset="utf-8" src="../games/41.baseball-duel/41.baseball-motion.js?v=5"></script>
+<script charset="utf-8" src="../games/41.baseball-duel/41.baseball-field.js?v=5"></script>
+<script charset="utf-8" src="../games/41.baseball-duel/41.baseball-pitch.js?v=5"></script>
+<script charset="utf-8" src="../games/41.baseball-duel/41.baseball-batting.js?v=5"></script>
+<script charset="utf-8" src="../games/41.baseball-duel/41.baseball-running.js?v=5"></script>
+<script charset="utf-8" src="../games/41.baseball-duel/41.baseball-defense.js?v=5"></script>
+<script charset="utf-8" src="../games/41.baseball-duel/41.baseball-play.js?v=5"></script>
+<script charset="utf-8" src="../games/41.baseball-duel/41.baseball-game.js?v=5"></script>
+<script charset="utf-8" src="../games/41.baseball-duel/41.baseball-ai.js?v=5"></script>
+<script charset="utf-8" src="../games/41.baseball-duel/41.baseball-drills.js?v=5"></script>
+<script charset="utf-8" src="../games/41.baseball-duel/41.baseball-choreo.js?v=5"></script>
+<script charset="utf-8" src="../games/41.baseball-duel/41.baseball-actors.js?v=5"></script>
+<script charset="utf-8" src="../games/41.baseball-duel/41.baseball-park.js?v=5"></script>
+<script charset="utf-8" src="../games/41.baseball-duel/41.baseball-stage.js?v=5"></script>
+<script charset="utf-8" src="../games/41.baseball-duel/41.baseball-camera.js?v=5"></script>
+<script charset="utf-8" src="../games/41.baseball-duel/41.baseball-hud.js?v=5"></script>
+<script charset="utf-8" src="../games/41.baseball-duel/41.baseball-session.js?v=5"></script>
+<script charset="utf-8" src="../games/41.baseball-duel/41.baseball-scene.js?v=5"></script>
+<script charset="utf-8" src="../games/41.baseball-duel/41.baseball-controls.js?v=5"></script>
+<script charset="utf-8" src="../games/41.baseball-duel/41.baseball-play-lab.js?v=5"></script>
+</head>
+<body>
+<canvas id="labView"></canvas>
+<div id="hudTop"></div>
+<div id="bbControls"></div>
+<div id="labLoading">불러오는 중… (계속 이 글자만 보이면 파일을 직접 연 것입니다. 주소 cornsilktea.github.io/tools/baseball-play-lab.html 또는 미리보기 서버로 열어 주세요)</div>
+<script type="module">
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
+new BbPlayLab({ THREE, GLTFLoader, SkeletonUtils });
+</script>
+</body>
+</html>
