@@ -38,6 +38,59 @@ interface BbPitchCue {
   setting: BbPlaySetting;
 }
 
+interface BbPitchLookSpec {
+  reach: number;
+  lateness: number;
+  arc: number;
+  wobble: number;
+  spin: number;
+  axis: readonly [number, number, number];
+}
+
+class BbPitchLook {
+  private static readonly PEAK = 0.6;
+  private static readonly SPECS: Readonly<Record<BbPitchId, BbPitchLookSpec>> = {
+    ft: { reach: 0, lateness: 2, arc: 0.12, wobble: 0, spin: 62, axis: [1, 0.22, 0] },
+    cv: { reach: 2, lateness: 2.4, arc: 0.85, wobble: 0, spin: 40, axis: [-1, 0.35, 0] },
+    sl: { reach: 1.5, lateness: 3.4, arc: 0.22, wobble: 0, spin: 54, axis: [0.3, 0.25, -0.9] },
+    ch: { reach: 1.25, lateness: 2.6, arc: 0.4, wobble: 0, spin: 30, axis: [0.75, 0.65, 0] },
+    kn: { reach: 0, lateness: 2, arc: 0.5, wobble: 0.3, spin: 0, axis: [1, 0, 0] }
+  };
+  private readonly spec: BbPitchLookSpec;
+  private readonly angle: number;
+  private readonly side: number;
+
+  constructor(kind: BbPitchKind, hand: BbHand) {
+    this.spec = BbPitchLook.SPECS[kind.id];
+    this.angle = kind.axisRadians(hand);
+    this.side = hand === "R" ? 1 : -1;
+  }
+
+  drift(ratio: number): BbZonePoint {
+    const spec = this.spec, inside = Math.min(ratio, 1), power = spec.lateness, top = Math.pow(power / (power + 1), power) / (power + 1);
+    const late = Math.pow(ratio, power) * (1 - inside) / top * BbPitchLook.PEAK * spec.reach, fade = 1 - inside;
+    return {
+      u: Math.cos(this.angle) * late + spec.wobble * Math.sin(ratio * Math.PI * 3) * fade,
+      v: Math.sin(this.angle) * late + spec.arc * 4 * inside * fade + spec.wobble * 0.6 * Math.sin(ratio * Math.PI * 5) * fade
+    };
+  }
+
+  spinRate(flightSeconds: number): number { return this.spec.spin || 2 * Math.PI / flightSeconds; }
+
+  spinAxis(): BbVec { return new BbVec(this.spec.axis[0], this.spec.axis[1] * this.side, this.spec.axis[2] * this.side); }
+}
+
+class BbShapedPitchFlight extends BbPitchFlight {
+  private static readonly PAST_PLATE = 1.35;
+
+  constructor(from: BbVec, to: BbVec, duration: number, private readonly look: BbPitchLook) { super(from, to, duration, new BbVec(0, 0, 0)); }
+
+  pointAt(seconds: number): BbVec {
+    const ratio = BbCurve.clamp(seconds / this.duration, 0, BbShapedPitchFlight.PAST_PLATE), drift = this.look.drift(ratio);
+    return this.from.lerp(this.to, ratio).plus(BbStrikeZoneBox.pointAt(drift.u, drift.v).minus(BbStrikeZoneBox.pointAt(0, 0)));
+  }
+}
+
 class BbCatcherReceivePose extends BbActionPose {
   readonly duration = Infinity;
   readonly keyTime: number;
@@ -122,9 +175,6 @@ class BbRunningLane {
 }
 
 abstract class BbPitchChoreographer extends BbDrill {
-  private static readonly DROP = new BbVec(0, -0.12, 0);
-  private static readonly BREAK_SCALE = 1.2;
-  private static readonly PITCH_SPIN = 30;
   private static readonly LOAD_LEAD = 0.75;
   private static readonly MISS_GAP = 0.14;
   private static readonly SWING_SLIP_LIMIT = 0.18;
@@ -178,6 +228,13 @@ abstract class BbPitchChoreographer extends BbDrill {
 
   protected compose(): void {
     const outcome = this.cue.outcome, roll = outcome.roll, swing = outcome.swing;
+    const held: BbBases = [null, null, null];
+    this.cue.setting.runners.forEach((id, index) => { if (id) held[index] = { id, earned: true }; });
+    const depth = BbFielderPositions.standard(held, this.cue.setting.outs);
+    BbDrill.FIELD_ROLES.forEach(([role, position]) => {
+      const spot = depth.get(position as BbPosition) as BbSpot;
+      this.script.starts.set(role, BbActorPlacement.facing(BbFieldSpace.toWorld(spot.x, spot.z), BbFieldGeometry.HOME));
+    });
     this.cue.setting.runners.forEach((id, index) => {
       if (!id) return;
       this.stand(BbBasePath.RUNNER_ROLES[index], BbActorPlacement.facing(BbBasePath.leadSpot(index + 1), BbFieldGeometry.HOME), null);
@@ -187,8 +244,8 @@ abstract class BbPitchChoreographer extends BbDrill {
     this.hold("pitcher", "throw", 0);
     this.pose("pitcher", pitchPose, BbDrill.WINDUP_AT, releaseAt, "투구");
     const from = this.handWorld("pitcher", "throw", releaseAt), plate = BbStrikeZoneBox.pointAt(roll.arrive.u, roll.arrive.v);
-    const flight = new BbPitchFlight(from, plate, roll.flightSeconds, this.breakOf(roll).plus(BbPitchChoreographer.DROP));
-    this.fly(flight, releaseAt, BbPitchChoreographer.PITCH_SPIN);
+    const look = new BbPitchLook(BbPitchCatalog.of(roll.pitch), this.cue.pitcherHand), flight = new BbShapedPitchFlight(from, plate, roll.flightSeconds, look);
+    this.fly(flight, releaseAt, look.spinRate(roll.flightSeconds), look.spinAxis());
     this.plateAt = this.until(releaseAt + roll.flightSeconds);
     this.platePoint = plate;
     this.shoot(0, "pitch", BbFieldGeometry.RUBBER, BbFieldGeometry.HOME);
@@ -204,13 +261,6 @@ abstract class BbPitchChoreographer extends BbDrill {
       this.until(this.receive(flight, releaseAt) + BbPitchChoreographer.TAIL_AFTER_CATCH);
     }
     this.script.duration = this.lastMoment;
-  }
-
-  private breakOf(roll: BbPitchRoll): BbVec {
-    const kind = BbPitchCatalog.of(roll.pitch);
-    if (!kind.isBreaking) return new BbVec(0, 0, 0);
-    const angle = kind.axisRadians(this.cue.pitcherHand);
-    return BbStrikeZoneBox.pointAt(-Math.cos(angle), -Math.sin(angle)).minus(BbStrikeZoneBox.pointAt(0, 0)).times(BbPitchChoreographer.BREAK_SCALE);
   }
 
   private swingAt(point: BbVec, at: number, style: BbSwingStyle): number {
@@ -267,6 +317,8 @@ class BbPlayChoreographer extends BbPitchChoreographer {
   private static readonly ROUNDING_WIDE = new BbVec(0.9, 0, 0);
   private static readonly ROUNDING_BACK_SECONDS = 1.4;
   private static readonly FIRST_TOUCH = new BbVec(0.32, 0, 0.12);
+  private static readonly FOUL_SHORT = 14;
+  private static readonly FOUL_DEEP = 48;
   private static readonly COVER_SPEED = 6.5;
   private static readonly BACKUP_BEHIND = 8;
   private static readonly OVERRUN = BbFieldSpace.toWorld(22.9, 23.2);
@@ -293,6 +345,7 @@ class BbPlayChoreographer extends BbPitchChoreographer {
     this.ballTravels(ball, script, contactPoint, handled, glove);
     this.shoot(this.contactAt + 0.12, "chase", contactPoint, glove || BbFieldSpace.polar(ball.carry, ball.spray));
     if (fumbled && glove && handled) this.ballGetsThrough(handled, glove, ball, script);
+    if (ball.foul && !handled) this.chaseFoul(ball);
     if (!this.busy.has("pitcher")) this.pitcherWatches(glove || BbFieldSpace.polar(ball.carry, ball.spray), this.contactAt);
     script.events.filter((event) => event.kind === "throw").forEach((event) => this.throwPlay(event, ball));
     if (script.result === "SAC_FLY" || script.events.some((event) => event.kind === "tagUp")) this.throwAfterTagUp(script, ball);
@@ -318,6 +371,21 @@ class BbPlayChoreographer extends BbPitchChoreographer {
     if (!reached || script.result === "HOME_RUN" || script.events.some((event) => event.kind === "callOut" && event.who === reached.who)) return;
     const safe = BbPlayChoreographer.SAFE_CALLS.indexOf(script.result) >= 0;
     if (safe || BbPlayCodes.isHit(script.result)) this.call(contactAt + (reached.arriveT as number), safe ? "세이프!" : BbPlayCodes.LABELS[script.result], null);
+  }
+
+  private chaseFoul(ball: BbBattedBall): void {
+    const landing = BbFieldSpace.polar(ball.carry, ball.spray), right = ball.spray > 0, deep = ball.carry >= BbPlayChoreographer.FOUL_DEEP;
+    const role: BbRoleId = ball.carry < BbPlayChoreographer.FOUL_SHORT ? "catcher" : right ? (deep ? "right" : "first") : (deep ? "left" : "third");
+    const leaveAt = this.contactAt + 0.25, from = this.spotOf(role, leaveAt), seconds = Math.min(ball.hang, BbPlayChoreographer.LONGEST_FOUL) + 0.3;
+    let reach = Math.min(from.distanceTo(landing), BbPlayChoreographer.CHASE_SPEED * seconds * 0.85), goal = from;
+    for (; reach > 1; reach -= 1.5) {
+      goal = from.plus(landing.minus(from).unit().times(reach));
+      if (!this.bounds.blocks(goal.withY(0.5))) break;
+    }
+    if (reach <= 1) return;
+    this.busy.add(role);
+    this.move(role, goal, leaveAt, leaveAt + Math.max(0.5, reach / BbPlayChoreographer.CHASE_SPEED));
+    this.face(role, landing, leaveAt + Math.max(0.5, reach / BbPlayChoreographer.CHASE_SPEED));
   }
 
   private positionOf(role: BbRoleId): string | undefined { return Object.keys(BbPlayChoreographer.ROLE_OF).find((key) => this.role(key) === role); }

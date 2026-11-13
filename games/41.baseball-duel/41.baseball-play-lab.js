@@ -70,7 +70,7 @@ class BbPlayLab {
     showCards() {
         if (document.body.classList.contains("lobby"))
             this.session = this.newSession();
-        this.cards.show(this.names[this.session.battingIndex], this.session.batter(), this.names[this.session.fieldingIndex], this.session.pitcher());
+        this.cards.show(this.names[this.session.battingIndex], this.session.batter(), this.names[this.session.fieldingIndex], this.session.pitcher(), this.session.board().pitches);
     }
     skipScene() {
         const pending = this.pending;
@@ -157,6 +157,7 @@ class BbPlayLab {
         const settled = pending.settled, outcome = settled.outcome, play = outcome.script;
         pending.announced = true;
         this.ticker.thrown(!!play && play.result !== "FOUL");
+        this.showCards();
         const verdict = play ? BbPlayLab.IN_PLAY_VERDICT : settled.note.toast || BbPlayLab.PLAIN_CALLS[outcome.kind];
         this.report.show(pending.roll, verdict, outcome.swing, pending.leniency, this.player.view);
         if (play)

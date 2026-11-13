@@ -44,8 +44,8 @@
 .bb-pitch-icon-zone{fill:rgba(255,255,255,.08);stroke:rgba(255,255,255,.55);stroke-width:1}
 .bb-pitch-icon-path{fill:none;stroke:#D97B4F;stroke-width:2;stroke-linecap:round}
 .bb-pitch-icon-ball{fill:#fff}
-.bb-aim{position:absolute;right:3vw;top:43%;width:min(52vh,440px);transform:translateY(-50%) scale(.4);transform-origin:center;opacity:0;visibility:hidden;transition:transform .18s,opacity .18s;pointer-events:none}
-.bb-aim.open{transform:translateY(-50%) scale(1);opacity:1;visibility:visible;pointer-events:auto}
+.bb-aim{position:absolute;left:50%;top:46%;width:min(52vh,440px);transform:translate(-50%,-50%) scale(.4);transform-origin:center;opacity:0;visibility:hidden;transition:transform .18s,opacity .18s;pointer-events:none}
+.bb-aim.open{transform:translate(-50%,-50%) scale(1);opacity:1;visibility:visible;pointer-events:auto}
 .bb-aim-zone{display:block;width:100%;aspect-ratio:1;border-radius:14px;background:rgba(14,20,17,.8);touch-action:none;cursor:crosshair}
 .bb-aim-allowed{fill:rgba(255,255,255,.07);stroke:rgba(255,255,255,.3);stroke-width:.02;stroke-dasharray:.08 .06}
 .bb-aim-strike{fill:rgba(255,255,255,.06);stroke:#fff;stroke-width:.045}
@@ -62,7 +62,7 @@
 .bb-toast-pitch{display:inline-block;margin-top:8px;padding:4px 12px;border-radius:10px;background:rgba(14,20,17,.78);font-size:clamp(13px,1.8vw,18px);font-weight:800}
 .bb-toast-pitch:empty{display:none}
 .bb-card{position:absolute;width:clamp(150px,19vw,240px);padding:7px 10px 6px;border-radius:12px;background:rgba(14,20,17,.78);border-bottom:3px solid #D97B4F}
-.bb-card-left{left:8px;top:104px}
+.bb-card-left{left:292px;top:8px}
 .bb-card-right{right:54px;top:8px}
 .bb-card-head{display:flex;align-items:center;gap:7px;margin-bottom:5px}
 .bb-card-role{padding:2px 7px;border-radius:7px;background:#D97B4F;font-size:11px;font-weight:800}
@@ -78,7 +78,7 @@
 .bb-card-stat-value{font-size:13px;font-weight:800}
 @media (max-height:520px),(orientation:portrait){
   .bb-card{width:clamp(120px,24vw,180px);padding:5px 8px 4px}
-  .bb-card-left{top:82px}
+  .bb-card-left{left:240px}
   .bb-card-head{margin-bottom:2px}
   .bb-card-name{font-size:13px}
   .bb-card-abilities{display:none}
@@ -110,13 +110,13 @@
 .bb-gauge-marker{position:absolute;top:100%;transform:translateX(-50%);font-size:11px;line-height:11px;color:#fff}
 .bb-gauge-ends{display:flex;justify-content:space-between;margin-top:11px;font-size:10px;font-weight:700;opacity:.8}
 @media (orientation:portrait){
-  .bb-aim{right:auto;left:7vw;width:86vw;top:42%}
+  .bb-aim{width:86vw;top:42%}
   .bb-pad{gap:4px;bottom:calc(clamp(96px,15vw,150px) + 30px)}
   .bb-pitch-key{width:17.5vw}
   .bb-report{top:74px;width:clamp(124px,34vw,220px)}
 }
 @media (max-height:520px){
-  .bb-aim{top:calc(50% - 14px);width:min(42vh,440px);right:calc(3vw + 112px)}
+  .bb-aim{top:calc(50% - 4px);width:min(42vh,440px)}
   .bb-aim-info{margin-top:3px;padding:3px 8px;font-size:13px}
   .bb-report{top:70px;width:clamp(110px,27vh,150px)}
 }
@@ -128,7 +128,7 @@
 #bbControls .bb-menu-item.on{background:#D97B4F}
 .bb-lobby,.bb-sheet{position:absolute;inset:0;display:none;align-items:center;justify-content:center;pointer-events:auto;background:rgba(10,16,13,.62)}
 .bb-lobby.open,.bb-sheet.open{display:flex}
-.bb-sheet{z-index:5;background:rgba(10,16,13,.78)}
+.bb-sheet{z-index:5;background:rgba(10,16,13,.78);align-items:flex-start;padding-top:max(8px,6vh)}
 .bb-lobby-card{width:min(86vw,360px);padding:22px 20px;border-radius:14px;background:rgba(14,20,17,.9);border-bottom:4px solid #D97B4F;text-align:center}
 .bb-lobby-title{font-size:20px;font-weight:800;margin-bottom:8px}
 #bbControls .bb-lobby-button{display:block;width:100%;margin-top:10px;padding:13px;border:0;border-radius:10px;background:rgba(255,255,255,.12);font-size:17px;font-weight:800}
@@ -169,6 +169,15 @@ body.lobby .bb-menu{display:none}
 @media (orientation:portrait){
   .bb-card{width:calc(50vw - 12px);overflow:hidden}
   .bb-card-stat-label{font-size:8px}
+  .bb-card-left{left:8px;top:82px}
   .bb-card-right{right:8px;top:82px}
   .bb-report{top:152px;right:8px}
+}
+@media (orientation:portrait){
+  canvas.bb-view{height:58vh !important}
+  .bb-pad{left:8px;right:8px;top:calc(58vh + 8px);bottom:auto;gap:4px}
+  .bb-pitch-key{flex:1;width:auto;min-width:0}
+  .bb-aim{width:72vw;top:34%}
+  .bb-report{left:8px;right:auto;top:auto;bottom:8px;width:46vw}
+  .bb-toast{top:18%}
 }

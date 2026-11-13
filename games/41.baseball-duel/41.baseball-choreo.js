@@ -1,4 +1,40 @@
 "use strict";
+class BbPitchLook {
+    constructor(kind, hand) {
+        this.spec = BbPitchLook.SPECS[kind.id];
+        this.angle = kind.axisRadians(hand);
+        this.side = hand === "R" ? 1 : -1;
+    }
+    drift(ratio) {
+        const spec = this.spec, inside = Math.min(ratio, 1), power = spec.lateness, top = Math.pow(power / (power + 1), power) / (power + 1);
+        const late = Math.pow(ratio, power) * (1 - inside) / top * BbPitchLook.PEAK * spec.reach, fade = 1 - inside;
+        return {
+            u: Math.cos(this.angle) * late + spec.wobble * Math.sin(ratio * Math.PI * 3) * fade,
+            v: Math.sin(this.angle) * late + spec.arc * 4 * inside * fade + spec.wobble * 0.6 * Math.sin(ratio * Math.PI * 5) * fade
+        };
+    }
+    spinRate(flightSeconds) { return this.spec.spin || 2 * Math.PI / flightSeconds; }
+    spinAxis() { return new BbVec(this.spec.axis[0], this.spec.axis[1] * this.side, this.spec.axis[2] * this.side); }
+}
+BbPitchLook.PEAK = 0.6;
+BbPitchLook.SPECS = {
+    ft: { reach: 0, lateness: 2, arc: 0.12, wobble: 0, spin: 62, axis: [1, 0.22, 0] },
+    cv: { reach: 2, lateness: 2.4, arc: 0.85, wobble: 0, spin: 40, axis: [-1, 0.35, 0] },
+    sl: { reach: 1.5, lateness: 3.4, arc: 0.22, wobble: 0, spin: 54, axis: [0.3, 0.25, -0.9] },
+    ch: { reach: 1.25, lateness: 2.6, arc: 0.4, wobble: 0, spin: 30, axis: [0.75, 0.65, 0] },
+    kn: { reach: 0, lateness: 2, arc: 0.5, wobble: 0.3, spin: 0, axis: [1, 0, 0] }
+};
+class BbShapedPitchFlight extends BbPitchFlight {
+    constructor(from, to, duration, look) {
+        super(from, to, duration, new BbVec(0, 0, 0));
+        this.look = look;
+    }
+    pointAt(seconds) {
+        const ratio = BbCurve.clamp(seconds / this.duration, 0, BbShapedPitchFlight.PAST_PLATE), drift = this.look.drift(ratio);
+        return this.from.lerp(this.to, ratio).plus(BbStrikeZoneBox.pointAt(drift.u, drift.v).minus(BbStrikeZoneBox.pointAt(0, 0)));
+    }
+}
+BbShapedPitchFlight.PAST_PLATE = 1.35;
 class BbCatcherReceivePose extends BbActionPose {
     constructor(metrics, from, to, shiftSeconds) {
         super();
@@ -114,6 +150,14 @@ class BbPitchChoreographer extends BbDrill {
     }
     compose() {
         const outcome = this.cue.outcome, roll = outcome.roll, swing = outcome.swing;
+        const held = [null, null, null];
+        this.cue.setting.runners.forEach((id, index) => { if (id)
+            held[index] = { id, earned: true }; });
+        const depth = BbFielderPositions.standard(held, this.cue.setting.outs);
+        BbDrill.FIELD_ROLES.forEach(([role, position]) => {
+            const spot = depth.get(position);
+            this.script.starts.set(role, BbActorPlacement.facing(BbFieldSpace.toWorld(spot.x, spot.z), BbFieldGeometry.HOME));
+        });
         this.cue.setting.runners.forEach((id, index) => {
             if (!id)
                 return;
@@ -124,8 +168,8 @@ class BbPitchChoreographer extends BbDrill {
         this.hold("pitcher", "throw", 0);
         this.pose("pitcher", pitchPose, BbDrill.WINDUP_AT, releaseAt, "투구");
         const from = this.handWorld("pitcher", "throw", releaseAt), plate = BbStrikeZoneBox.pointAt(roll.arrive.u, roll.arrive.v);
-        const flight = new BbPitchFlight(from, plate, roll.flightSeconds, this.breakOf(roll).plus(BbPitchChoreographer.DROP));
-        this.fly(flight, releaseAt, BbPitchChoreographer.PITCH_SPIN);
+        const look = new BbPitchLook(BbPitchCatalog.of(roll.pitch), this.cue.pitcherHand), flight = new BbShapedPitchFlight(from, plate, roll.flightSeconds, look);
+        this.fly(flight, releaseAt, look.spinRate(roll.flightSeconds), look.spinAxis());
         this.plateAt = this.until(releaseAt + roll.flightSeconds);
         this.platePoint = plate;
         this.shoot(0, "pitch", BbFieldGeometry.RUBBER, BbFieldGeometry.HOME);
@@ -143,13 +187,6 @@ class BbPitchChoreographer extends BbDrill {
         }
         this.script.duration = this.lastMoment;
     }
-    breakOf(roll) {
-        const kind = BbPitchCatalog.of(roll.pitch);
-        if (!kind.isBreaking)
-            return new BbVec(0, 0, 0);
-        const angle = kind.axisRadians(this.cue.pitcherHand);
-        return BbStrikeZoneBox.pointAt(-Math.cos(angle), -Math.sin(angle)).minus(BbStrikeZoneBox.pointAt(0, 0)).times(BbPitchChoreographer.BREAK_SCALE);
-    }
     swingAt(point, at, style) {
         const local = this.canonical("batter", this.script.placementOf("batter", at).toLocal(point));
         const pose = new BbBatSwingPose(this.metrics, local, style);
@@ -165,9 +202,6 @@ class BbPitchChoreographer extends BbDrill {
         return catchAt;
     }
 }
-BbPitchChoreographer.DROP = new BbVec(0, -0.12, 0);
-BbPitchChoreographer.BREAK_SCALE = 1.2;
-BbPitchChoreographer.PITCH_SPIN = 30;
 BbPitchChoreographer.LOAD_LEAD = 0.75;
 BbPitchChoreographer.MISS_GAP = 0.14;
 BbPitchChoreographer.SWING_SLIP_LIMIT = 0.18;
@@ -196,6 +230,8 @@ class BbPlayChoreographer extends BbPitchChoreographer {
         this.shoot(this.contactAt + 0.12, "chase", contactPoint, glove || BbFieldSpace.polar(ball.carry, ball.spray));
         if (fumbled && glove && handled)
             this.ballGetsThrough(handled, glove, ball, script);
+        if (ball.foul && !handled)
+            this.chaseFoul(ball);
         if (!this.busy.has("pitcher"))
             this.pitcherWatches(glove || BbFieldSpace.polar(ball.carry, ball.spray), this.contactAt);
         script.events.filter((event) => event.kind === "throw").forEach((event) => this.throwPlay(event, ball));
@@ -234,6 +270,22 @@ class BbPlayChoreographer extends BbPitchChoreographer {
         const safe = BbPlayChoreographer.SAFE_CALLS.indexOf(script.result) >= 0;
         if (safe || BbPlayCodes.isHit(script.result))
             this.call(contactAt + reached.arriveT, safe ? "세이프!" : BbPlayCodes.LABELS[script.result], null);
+    }
+    chaseFoul(ball) {
+        const landing = BbFieldSpace.polar(ball.carry, ball.spray), right = ball.spray > 0, deep = ball.carry >= BbPlayChoreographer.FOUL_DEEP;
+        const role = ball.carry < BbPlayChoreographer.FOUL_SHORT ? "catcher" : right ? (deep ? "right" : "first") : (deep ? "left" : "third");
+        const leaveAt = this.contactAt + 0.25, from = this.spotOf(role, leaveAt), seconds = Math.min(ball.hang, BbPlayChoreographer.LONGEST_FOUL) + 0.3;
+        let reach = Math.min(from.distanceTo(landing), BbPlayChoreographer.CHASE_SPEED * seconds * 0.85), goal = from;
+        for (; reach > 1; reach -= 1.5) {
+            goal = from.plus(landing.minus(from).unit().times(reach));
+            if (!this.bounds.blocks(goal.withY(0.5)))
+                break;
+        }
+        if (reach <= 1)
+            return;
+        this.busy.add(role);
+        this.move(role, goal, leaveAt, leaveAt + Math.max(0.5, reach / BbPlayChoreographer.CHASE_SPEED));
+        this.face(role, landing, leaveAt + Math.max(0.5, reach / BbPlayChoreographer.CHASE_SPEED));
     }
     positionOf(role) { return Object.keys(BbPlayChoreographer.ROLE_OF).find((key) => this.role(key) === role); }
     ballGetsThrough(event, glove, ball, script) {
@@ -587,6 +639,8 @@ BbPlayChoreographer.ROUNDING_SHARE = 0.22;
 BbPlayChoreographer.ROUNDING_WIDE = new BbVec(0.9, 0, 0);
 BbPlayChoreographer.ROUNDING_BACK_SECONDS = 1.4;
 BbPlayChoreographer.FIRST_TOUCH = new BbVec(0.32, 0, 0.12);
+BbPlayChoreographer.FOUL_SHORT = 14;
+BbPlayChoreographer.FOUL_DEEP = 48;
 BbPlayChoreographer.COVER_SPEED = 6.5;
 BbPlayChoreographer.BACKUP_BEHIND = 8;
 BbPlayChoreographer.OVERRUN = BbFieldSpace.toWorld(22.9, 23.2);

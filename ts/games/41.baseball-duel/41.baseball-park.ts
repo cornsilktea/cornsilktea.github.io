@@ -265,7 +265,7 @@ class BbBallparkBuilder {
   private static readonly SKIN_COLORS: readonly string[] = ["#FFE0C8", "#F6C09C", "#E2A981", "#C98A62", "#A86A48"];
   private static readonly WALL_PANELS = 16;
   private static readonly FOUL_LINE_START = 1.72;
-  private static readonly PLATE_RIM = 0.035;
+  private static readonly PLATE_RIM = 0;
   private static readonly TIER_DEPTH = 1.5;
   private static readonly TIER_RISE = 0.85;
 
@@ -365,8 +365,7 @@ class BbBallparkBuilder {
       shape.moveTo(-side, half * 2 + grow); shape.lineTo(side, half * 2 + grow); shape.lineTo(side, half - grow * (Math.SQRT2 - 1)); shape.lineTo(0, -slant); shape.lineTo(-side, half - grow * (Math.SQRT2 - 1)); shape.closePath();
       return shape;
     };
-    const dark = new THREE.MeshLambertMaterial({ color: "#1c1f1d" });
-    ([[pentagon(rim), dark, 0.014, 0.012], [pentagon(0), white, 0.03, 0.012]] as Array<[Three<"Shape">, Three<"Material">, number, number]>).forEach(([shape, material, depth, height]) => {
+    ([[pentagon(rim), white, 0.022, 0.012]] as Array<[Three<"Shape">, Three<"Material">, number, number]>).forEach(([shape, material, depth, height]) => {
       const plate = new THREE.Mesh(new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false }), material);
       plate.rotation.x = -Math.PI / 2;
       plate.position.y = height;

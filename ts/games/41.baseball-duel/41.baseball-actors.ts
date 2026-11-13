@@ -439,6 +439,8 @@ class BbBallActor {
       }
       const fade = 1 - BbCurve.span(state.sinceStart, 0, BbBallActor.RELEASE_BLEND_SECONDS);
       this.mesh.position.set(state.point.x, state.point.y, state.point.z).addScaledVector(this.releaseOffset, fade);
+      if (state.axis) this.spinAxis.set(state.axis.x, state.axis.y, state.axis.z).normalize();
+      else this.spinAxis.set(1, 0, 0);
       this.mesh.rotateOnWorldAxis(this.spinAxis, -state.spin * deltaSeconds);
     }
     const height = Math.max(0, this.mesh.position.y);

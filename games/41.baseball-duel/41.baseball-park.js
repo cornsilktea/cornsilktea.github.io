@@ -342,8 +342,7 @@ class BbBallparkBuilder {
             shape.closePath();
             return shape;
         };
-        const dark = new THREE.MeshLambertMaterial({ color: "#1c1f1d" });
-        [[pentagon(rim), dark, 0.014, 0.012], [pentagon(0), white, 0.03, 0.012]].forEach(([shape, material, depth, height]) => {
+        [[pentagon(rim), white, 0.022, 0.012]].forEach(([shape, material, depth, height]) => {
             const plate = new THREE.Mesh(new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false }), material);
             plate.rotation.x = -Math.PI / 2;
             plate.position.y = height;
@@ -721,7 +720,7 @@ BbBallparkBuilder.SHIRT_COLORS = ["#e9e6dc", "#d9534f", "#3b6fb6", "#f0c040", "#
 BbBallparkBuilder.SKIN_COLORS = ["#FFE0C8", "#F6C09C", "#E2A981", "#C98A62", "#A86A48"];
 BbBallparkBuilder.WALL_PANELS = 16;
 BbBallparkBuilder.FOUL_LINE_START = 1.72;
-BbBallparkBuilder.PLATE_RIM = 0.035;
+BbBallparkBuilder.PLATE_RIM = 0;
 BbBallparkBuilder.TIER_DEPTH = 1.5;
 BbBallparkBuilder.TIER_RISE = 0.85;
 class BbParkLighting {

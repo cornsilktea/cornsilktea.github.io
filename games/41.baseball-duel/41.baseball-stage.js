@@ -1,7 +1,7 @@
 "use strict";
 class BbBroadcastShots {
     static pitcher() {
-        return { position: BbFieldSpace.toWorld(-3.6, BbFieldGeometry.RUBBER_DISTANCE + 17, 7.2), look: BbFieldSpace.toWorld(0.5, 10, 0), fieldOfView: 19 };
+        return { position: BbFieldSpace.toWorld(-3.6, BbFieldGeometry.RUBBER_DISTANCE + 17, 7.2), look: BbFieldSpace.toWorld(0.5, 10, 0), fieldOfView: 19, keepsWidth: true };
     }
     static batter() {
         return { position: BbFieldSpace.toWorld(0, -2.7, 1.0), look: BbFieldSpace.toWorld(0, 10, -0.45), fieldOfView: 30 };
@@ -62,12 +62,14 @@ class BbStage {
         this.goalPosition = new THREE.Vector3();
         this.goalLook = new THREE.Vector3();
         this.clock = new THREE.Clock();
+        this.renderer.domElement.classList.add("bb-view");
         window.addEventListener("resize", () => this.resize());
         this.resize();
     }
     resize() {
-        this.renderer.setSize(window.innerWidth, window.innerHeight, false);
-        this.camera.aspect = window.innerWidth / window.innerHeight;
+        const canvas = this.renderer.domElement, width = canvas.clientWidth || window.innerWidth, height = canvas.clientHeight || window.innerHeight;
+        this.renderer.setSize(width, height, false);
+        this.camera.aspect = width / height;
         this.camera.updateProjectionMatrix();
     }
     async load(assetDirectory, park, cast) {

@@ -15,6 +15,13 @@ class BbFieldSpace {
   }
 }
 
+class BbDefenseDepth {
+  static readonly SPOTS: Readonly<Record<string, { x: number; z: number }>> = {
+    P: { x: 0, z: 18.44 }, C: { x: 0, z: -1.6 }, "1B": { x: 17.8, z: 25.5 }, "2B": { x: 10, z: 38 }, SS: { x: -10, z: 38 }, "3B": { x: -17.8, z: 25.5 },
+    LF: { x: -38, z: 75 }, CF: { x: 0, z: 82 }, RF: { x: 38, z: 75 }
+  };
+}
+
 class BbFieldGeometry {
   static readonly BASE_GAP = 27.43;
   static readonly BASE_OFFSET = 19.4;

@@ -1,12 +1,13 @@
 "use strict";
 class BbFielderPositions {
+    static spot(position) { return BbFielderPositions.BASE[position]; }
     static standard(bases, outs) {
         const spots = new Map();
         BbFielderPositions.ALL.forEach((position) => spots.set(position, { ...BbFielderPositions.BASE[position] }));
         if (bases[0] && outs < 2) {
-            spots.set("2B", { x: 8.2, z: 32 });
-            spots.set("SS", { x: -8.2, z: 32 });
-            spots.set("1B", { x: 18.6, z: 20 });
+            spots.set("2B", { x: 8.2, z: 35 });
+            spots.set("SS", { x: -8.2, z: 35 });
+            spots.set("1B", { x: 18.6, z: 20.6 });
         }
         if (outs >= 2)
             BbFielderPositions.OUTFIELD.forEach((position) => {
@@ -20,10 +21,7 @@ class BbFielderPositions {
 BbFielderPositions.ALL = ["P", "C", "1B", "2B", "SS", "3B", "LF", "CF", "RF"];
 BbFielderPositions.INFIELD = ["P", "C", "1B", "2B", "SS", "3B"];
 BbFielderPositions.OUTFIELD = ["LF", "CF", "RF"];
-BbFielderPositions.BASE = {
-    P: { x: 0, z: 18.44 }, C: { x: 0, z: -1.6 }, "1B": { x: 17.5, z: 21 }, "2B": { x: 10, z: 31 }, SS: { x: -10, z: 31 }, "3B": { x: -17.5, z: 21 },
-    LF: { x: -38, z: 75 }, CF: { x: 0, z: 82 }, RF: { x: 38, z: 75 }
-};
+BbFielderPositions.BASE = BbDefenseDepth.SPOTS;
 class BbFielderMotion {
     static secondsTo(position, from, to, liner) {
         const outfield = BbFielderPositions.isOutfield(position);
@@ -34,7 +32,7 @@ class BbFielderMotion {
         return reaction + Math.max(0, BbDiamond.distance(from, to) - dive) / speed;
     }
 }
-BbFielderMotion.INFIELD_SPEED = 6.6;
+BbFielderMotion.INFIELD_SPEED = 5.4;
 BbFielderMotion.OUTFIELD_SPEED = 7.4;
 BbFielderMotion.CATCHER_SPEED = 5.4;
 BbFielderMotion.INFIELD_REACTION = 0.28;
@@ -43,7 +41,7 @@ BbFielderMotion.CATCHER_REACTION = 0.5;
 BbFielderMotion.LINER_REACTION = 0.15;
 BbFielderMotion.INFIELD_DIVE = 1.3;
 BbFielderMotion.OUTFIELD_DIVE = 2;
-BbFielderMotion.LINER_DIVE_BONUS = 1;
+BbFielderMotion.LINER_DIVE_BONUS = 0.5;
 class BbThrowDecision {
     static rangeDelay(moved) { return Math.min(BbThrowDecision.RANGE_SECONDS_LIMIT, moved * BbThrowDecision.RANGE_SECONDS_PER_METER); }
     secondsTo(from, base) {

@@ -1,22 +1,21 @@
 "use strict";
 class BbPitchIcon {
     static path(kind, hand) {
-        const start = BbPitchIcon.START;
-        if (kind.arrivalJitterSeconds > 0)
-            return "M20 5 Q14 10 20 14 Q26 18 20 22 Q16 25 20 28";
-        const angle = kind.axisRadians(hand), reach = kind.isBreaking ? BbPitchIcon.BREAK_PIXELS : 0;
-        const endX = 20 - Math.cos(angle) * reach, endY = 22 + Math.sin(angle) * reach;
-        return "M" + start.x + " " + start.y + " Q20 " + (kind.isBreaking ? 15 : 13) + " " + endX.toFixed(1) + " " + endY.toFixed(1);
+        const look = new BbPitchLook(kind, hand), center = BbPitchIcon.CENTER, startX = center.x + (hand === "R" ? 1 : -1) * BbPitchIcon.RELEASE.side, startY = BbPitchIcon.RELEASE.y;
+        const points = [];
+        for (let step = 0; step <= BbPitchIcon.STEPS; step++) {
+            const ratio = step / BbPitchIcon.STEPS, drift = look.drift(ratio);
+            const x = startX + (center.x - startX) * ratio + drift.u * BbPitchIcon.UNIT_PIXELS, y = startY + (center.y - startY) * ratio - drift.v * BbPitchIcon.UNIT_PIXELS;
+            points.push((step ? "L" : "M") + x.toFixed(1) + " " + y.toFixed(1));
+        }
+        return points.join(" ");
     }
-    static end(kind, hand) {
-        if (kind.arrivalJitterSeconds > 0)
-            return { x: 20, y: 28 };
-        const angle = kind.axisRadians(hand), reach = kind.isBreaking ? BbPitchIcon.BREAK_PIXELS : 0;
-        return { x: 20 - Math.cos(angle) * reach, y: 22 + Math.sin(angle) * reach };
-    }
+    static end() { return BbPitchIcon.CENTER; }
 }
-BbPitchIcon.START = { x: 20, y: 5 };
-BbPitchIcon.BREAK_PIXELS = 9;
+BbPitchIcon.CENTER = { x: 20, y: 20 };
+BbPitchIcon.RELEASE = { side: 6, y: 2 };
+BbPitchIcon.UNIT_PIXELS = 9;
+BbPitchIcon.STEPS = 16;
 class BbZoneAimWindow {
     constructor(host) {
         this.sheet = null;
@@ -133,7 +132,7 @@ class BbPitchPad {
         this.usable = sheet.pitches;
         this.aim.begin(sheet);
         BbPitchCatalog.ALL.forEach((kind, index) => {
-            const end = BbPitchIcon.end(kind, sheet.hand);
+            const end = BbPitchIcon.end();
             this.keys[index].disabled = sheet.pitches.indexOf(kind.id) < 0;
             this.keys[index].classList.remove("on");
             this.paths[index].setAttribute("d", BbPitchIcon.path(kind, sheet.hand));
@@ -327,6 +326,8 @@ class BbCallToast extends BbFadingNote {
     constructor(host) {
         super(BbHudParts.box("bb-toast", host));
         this.headline = BbHudParts.box("bb-toast-call", this.element);
+        if (document.fonts)
+            document.fonts.load("10px \"Black Han Sans\"", "아웃세이프").catch(() => undefined);
         this.detail = BbHudParts.box("bb-toast-pitch", this.element);
     }
     show(text, detail = "", seconds = BbCallToast.SECONDS) {

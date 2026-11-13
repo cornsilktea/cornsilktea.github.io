@@ -33,6 +33,7 @@ interface BbBallCue {
   holder: BbRoleId | null;
   hand: BbHandUse;
   spin: number;
+  axis?: BbVec;
   gone?: boolean;
 }
 
@@ -57,6 +58,7 @@ interface BbBallState {
   origin: BbVec;
   sinceStart: number;
   spin: number;
+  axis: BbVec | null;
 }
 
 class BbDrillScript {
@@ -131,9 +133,9 @@ class BbDrillScript {
     }
     if (!chosen || chosen.gone) return null;
     const sinceStart = seconds - chosen.startAt;
-    if (chosen.path) return { holder: null, hand: chosen.hand, point: chosen.path.pointAt(sinceStart), origin: chosen.path.pointAt(0), sinceStart, spin: chosen.spin };
+    if (chosen.path) return { holder: null, hand: chosen.hand, point: chosen.path.pointAt(sinceStart), origin: chosen.path.pointAt(0), sinceStart, spin: chosen.spin, axis: chosen.axis || null };
     const held = this.handPointOf(chosen.holder as BbRoleId, chosen.hand, seconds) || this.placementOf(chosen.holder as BbRoleId, seconds).toWorld(new BbVec(0, 0.6, 0.2));
-    return { holder: chosen.holder, hand: chosen.hand, point: held, origin: held, sinceStart, spin: 0 };
+    return { holder: chosen.holder, hand: chosen.hand, point: held, origin: held, sinceStart, spin: 0, axis: null };
   }
 }
 
@@ -147,6 +149,7 @@ abstract class BbDrill {
   protected static readonly THROW_STRIDE = 1.1;
   protected static readonly CROW_HOP_STRIDE = 2.2;
   protected static readonly THROW_AFTER_CATCH = 0.4;
+  protected static readonly FIELD_ROLES: ReadonlyArray<readonly [BbRoleId, string]> = [["first", "1B"], ["second", "2B"], ["short", "SS"], ["third", "3B"], ["left", "LF"], ["center", "CF"], ["right", "RF"]];
 
   abstract readonly title: string;
   abstract readonly duration: number;
@@ -191,8 +194,8 @@ abstract class BbDrill {
     this.script.balls.push({ startAt, path: null, holder: role, hand, spin: 0 });
   }
 
-  protected fly(path: BbBallPath, startAt: number, spin: number): void {
-    this.script.balls.push({ startAt, path, holder: null, hand: "throw", spin });
+  protected fly(path: BbBallPath, startAt: number, spin: number, axis?: BbVec): void {
+    this.script.balls.push({ startAt, path, holder: null, hand: "throw", spin, axis });
   }
 
   protected vanish(at: number): void {
@@ -241,8 +244,10 @@ abstract class BbDrill {
     const home = BbFieldGeometry.HOME, ready = () => new BbReadyPose(this.metrics, 0.35);
     if (this.setup.throwsLeft) this.script.mirroredRoles.add("pitcher");
     if (this.setup.batsLeft) this.script.mirroredRoles.add("batter");
-    const spots: Array<[BbRoleId, number, number]> = [["first", 17.5, 21], ["second", 10, 31], ["short", -10, 31], ["third", -17.5, 21], ["left", -38, 75], ["center", 0, 82], ["right", 38, 75]];
-    spots.forEach(([role, x, z]) => this.stand(role, BbActorPlacement.facing(BbFieldSpace.toWorld(x, z), home), ready()));
+    BbDrill.FIELD_ROLES.forEach(([role, position]) => {
+      const spot = BbDefenseDepth.SPOTS[position];
+      this.stand(role, BbActorPlacement.facing(BbFieldSpace.toWorld(spot.x, spot.z), home), ready());
+    });
     this.stand("pitcher", BbActorPlacement.facing(BbFieldGeometry.RUBBER, home.withY(BbFieldGeometry.MOUND_HEIGHT)), new BbReadyPose(this.metrics, 0));
     const catcherSpot = BbActorPlacement.facing(BbFieldSpace.toWorld(0, -1.25), BbFieldGeometry.RUBBER.withY(0));
     this.stand("catcher", catcherSpot, new BbCatcherCrouchPose(this.metrics, BbDrill.CATCHER_TARGET));

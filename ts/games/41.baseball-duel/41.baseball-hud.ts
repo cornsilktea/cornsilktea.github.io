@@ -138,12 +138,12 @@ class BbMatchupCards {
 
   constructor(host: HTMLElement) {
     this.batter = new BbPlayerCard(host, "left", "타자", ["컨택", "파워", "주루"], ["타율", "출루율", "장타율", "홈런"]);
-    this.pitcher = new BbPlayerCard(host, "right", "투수", ["제구", "구위", "변화"], ["평균자책점", "WHIP", "피OPS"]);
+    this.pitcher = new BbPlayerCard(host, "right", "투수", ["제구", "구위", "변화"], ["평균자책점", "WHIP", "피OPS", "투구수"]);
   }
 
-  show(batterName: string, batter: BbBatterSheet, pitcherName: string, pitcher: BbPitcherSheet): void {
+  show(batterName: string, batter: BbBatterSheet, pitcherName: string, pitcher: BbPitcherSheet, pitches: number): void {
     this.batter.show(batterName, [batter.abilities.contact, batter.abilities.power, batter.abilities.speed]);
-    this.pitcher.show(pitcherName, [pitcher.abilities.control, pitcher.abilities.power, pitcher.abilities.breaking]);
+    this.pitcher.show(pitcherName, [pitcher.abilities.control, pitcher.abilities.power, pitcher.abilities.breaking], ["", "", "", String(pitches)]);
   }
 }
 

@@ -4,18 +4,17 @@ class BbFielderPositions {
   static readonly ALL: readonly BbPosition[] = ["P", "C", "1B", "2B", "SS", "3B", "LF", "CF", "RF"];
   static readonly INFIELD: readonly BbPosition[] = ["P", "C", "1B", "2B", "SS", "3B"];
   static readonly OUTFIELD: readonly BbPosition[] = ["LF", "CF", "RF"];
-  private static readonly BASE: Readonly<Record<BbPosition, BbSpot>> = {
-    P: { x: 0, z: 18.44 }, C: { x: 0, z: -1.6 }, "1B": { x: 17.5, z: 21 }, "2B": { x: 10, z: 31 }, SS: { x: -10, z: 31 }, "3B": { x: -17.5, z: 21 },
-    LF: { x: -38, z: 75 }, CF: { x: 0, z: 82 }, RF: { x: 38, z: 75 }
-  };
+  private static readonly BASE: Readonly<Record<string, BbSpot>> = BbDefenseDepth.SPOTS;
+
+  static spot(position: BbPosition): BbSpot { return BbFielderPositions.BASE[position]; }
 
   static standard(bases: BbBases, outs: number): Map<BbPosition, BbSpot> {
     const spots = new Map<BbPosition, BbSpot>();
     BbFielderPositions.ALL.forEach((position) => spots.set(position, { ...BbFielderPositions.BASE[position] }));
     if (bases[0] && outs < 2) {
-      spots.set("2B", { x: 8.2, z: 32 });
-      spots.set("SS", { x: -8.2, z: 32 });
-      spots.set("1B", { x: 18.6, z: 20 });
+      spots.set("2B", { x: 8.2, z: 35 });
+      spots.set("SS", { x: -8.2, z: 35 });
+      spots.set("1B", { x: 18.6, z: 20.6 });
     }
     if (outs >= 2) BbFielderPositions.OUTFIELD.forEach((position) => {
       const spot = spots.get(position) as BbSpot, depth = BbDiamond.fromHome(spot);
@@ -28,7 +27,7 @@ class BbFielderPositions {
 }
 
 class BbFielderMotion {
-  static readonly INFIELD_SPEED = 6.6;
+  static readonly INFIELD_SPEED = 5.4;
   static readonly OUTFIELD_SPEED = 7.4;
   static readonly CATCHER_SPEED = 5.4;
   static readonly INFIELD_REACTION = 0.28;
@@ -37,7 +36,7 @@ class BbFielderMotion {
   static readonly LINER_REACTION = 0.15;
   static readonly INFIELD_DIVE = 1.3;
   static readonly OUTFIELD_DIVE = 2;
-  static readonly LINER_DIVE_BONUS = 1;
+  static readonly LINER_DIVE_BONUS = 0.5;
 
   static secondsTo(position: BbPosition, from: BbSpot, to: BbSpot, liner: boolean): number {
     const outfield = BbFielderPositions.isOutfield(position);

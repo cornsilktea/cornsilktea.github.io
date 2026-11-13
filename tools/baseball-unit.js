@@ -184,7 +184,7 @@ class BaseballUnit {
   fieldPlays() {
     const c = this.code, check = this.check;
     check.section("5b. 타구 처리");
-    let script = this.play(0, [true, false, false], this.ball(150, -2, -22));
+    let script = this.play(0, [true, false, false], this.ball(150, -2, -13));
     check.ok(script.result === "DOUBLE_PLAY" && script.outsAdded === 2 && !script.basesAfter[0] && !script.basesAfter[1], "주자 1루 강한 유격수 땅볼 → 병살");
     script = this.play(0, [true, false, false], this.ball(70, -2, -22));
     check.ok(script.result !== "DOUBLE_PLAY", "느린 땅볼은 병살이 안 됨 (" + script.result + ")");
@@ -204,7 +204,7 @@ class BaseballUnit {
     check.ok(script.result === "HOME_RUN" && script.scored.length === 4, "만루 홈런 4점");
     check.ok(this.play(0, [false, false, false], this.ball(175, 28, 60)).result === "FOUL", "폴 바깥으로 넘어간 타구는 파울");
     const always = new c.BbInfieldGroundBallErrorPolicy(1);
-    script = this.play(0, [true, false, false], this.ball(150, -2, -22), always);
+    script = this.play(0, [true, false, false], this.ball(150, -2, -13), always);
     check.ok(script.result === "ERROR" && script.outsAdded === 0 && script.basesAfter[0] && script.basesAfter[1] && script.batterReached === 1, "실책: 타자 1루, 밀린 주자 한 베이스");
     check.ok(this.play(0, [false, false, false], this.ball(150, 30, 0), always).result !== "ERROR", "외야 뜬공에는 실책 없음");
     let errors = 0;
