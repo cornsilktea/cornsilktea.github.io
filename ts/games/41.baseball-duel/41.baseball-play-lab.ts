@@ -41,6 +41,8 @@ class BbPlayLab {
   private static readonly HUMAN_TEAM = 1;
   private static readonly SWING_CLOSES_AFTER = 0;
   private static readonly END_TOAST_SECONDS = 600;
+  private static readonly FAST_PACE = 2.2;
+  private static readonly IN_PLAY_VERDICT = "타격";
   private static readonly PLAIN_CALLS: Readonly<Record<BbOutcomeKind, string>> = { ball: "볼", calledStrike: "스트라이크!", swingMiss: "헛스윙", foul: "파울", inPlay: "" };
 
   private readonly options = BbPlayLabAddress.read();
@@ -48,7 +50,9 @@ class BbPlayLab {
   private readonly hud: BbScoreHud;
   private readonly player: BbScenePlayer;
   private readonly scenes: BbSceneFactory;
-  private readonly session: BbDuelSession;
+  private session: BbDuelSession;
+  private readonly sheet: BbSheetDialog;
+  private fast = false;
   private readonly pad: BbPitchPad;
   private readonly swing: BbSwingButton;
   private readonly report: BbPitchReport;
@@ -63,11 +67,7 @@ class BbPlayLab {
   private over = false;
 
   constructor(libs: ThreeLibs) {
-    const controls = document.getElementById("bbControls") as HTMLElement, human = BbAiLevel.batterSheet(this.options.batsLeft ? "L" : "R");
-    const sheets: [BbTeamSheet, BbTeamSheet] = [
-      { lineup: [BbAiLevel.batterSheet("R")], pitchers: [BbAiLevel.pitcherSheet("R")] },
-      { lineup: [human], pitchers: [BbAiLevel.pitcherSheet(this.options.throwsLeft ? "L" : "R")] }
-    ];
+    const controls = document.getElementById("bbControls") as HTMLElement;
     this.level = BbAiLevel.ALL[this.options.level];
     this.stage = new BbStage(libs, document.getElementById("labView") as HTMLCanvasElement);
     this.hud = new BbScoreHud(document.getElementById("hudTop") as HTMLElement);
@@ -79,9 +79,11 @@ class BbPlayLab {
     this.ticker = new BbBoardTicker(this.hud);
     this.player = new BbScenePlayer(this.stage, this.hud, (call) => this.called(call));
     this.scenes = new BbSceneFactory(() => this.stage.metrics);
-    this.session = new BbDuelSession(new BbThreeInningFormat(), BbBallparkRegistry.MAIN.dimensions, sheets, new BbSeededRandom(this.options.seed));
+    this.session = this.newSession();
     this.pad = new BbPitchPad(controls, (call) => this.humanThrows(call));
     this.swing = new BbSwingButton(controls, () => this.humanSwings());
+    this.sheet = new BbSheetDialog(controls, () => this.showCards());
+    new BbGameMenu(controls, [{ label: "연출 빠르게", onFlip: (on) => { this.fast = on; } }], [["연출 건너뛰기", () => this.skipScene()], ["나가기", () => location.reload()]]);
     if (this.options.plain) document.body.classList.add("plain");
     this.start().catch((error: Error) => this.toast.show("불러오지 못했어요", error.message, BbPlayLab.END_TOAST_SECONDS));
   }
@@ -89,8 +91,39 @@ class BbPlayLab {
   private async start(): Promise<void> {
     await this.stage.load(BbPlayLab.ASSET_DIRECTORY, BbBallparkRegistry.MAIN, { batsLeft: this.options.batsLeft, throwsLeft: this.options.throwsLeft });
     (document.getElementById("labLoading") as HTMLElement).remove();
-    this.nextPitch();
+    if (this.options.autoPitch || this.options.autoSwingAt !== null) this.nextPitch();
+    else this.openLobby();
     this.stage.run((frameSeconds) => this.tick(frameSeconds));
+  }
+
+  private newSession(): BbDuelSession {
+    const profile = BbProfileStore.load(), batter = profile.lineup[0], pitcher = profile.pitchers[0];
+    const sheets: [BbTeamSheet, BbTeamSheet] = [
+      { lineup: [BbAiLevel.batterSheet("R")], pitchers: [BbAiLevel.pitcherSheet("R")] },
+      { lineup: [{ ...batter, hand: this.options.batsLeft ? "L" : batter.hand }], pitchers: [{ ...pitcher, hand: this.options.throwsLeft ? "L" : pitcher.hand }] }
+    ];
+    return new BbDuelSession(new BbThreeInningFormat(), BbBallparkRegistry.MAIN.dimensions, sheets, new BbSeededRandom(this.options.seed));
+  }
+
+  private openLobby(): void {
+    const controls = document.getElementById("bbControls") as HTMLElement;
+    document.body.classList.add("lobby");
+    this.waitingForCall = true;
+    this.showCards();
+    this.ticker.begin(this.session.board());
+    this.player.play(this.idleScene());
+    new BbLabLobby(controls, "야구 1대1 대전 · 조작 시험장", () => { document.body.classList.remove("lobby"); this.session = this.newSession(); this.nextPitch(); }, () => this.sheet.open());
+  }
+
+  private showCards(): void {
+    if (document.body.classList.contains("lobby")) this.session = this.newSession();
+    this.cards.show(this.names[this.session.battingIndex], this.session.batter(), this.names[this.session.fieldingIndex], this.session.pitcher());
+  }
+
+  private skipScene(): void {
+    const pending = this.pending;
+    if (this.over || this.waitingForCall || (pending && (!pending.settled || !pending.announced))) return;
+    this.player.skip();
   }
 
   private humanFields(): boolean { return this.session.fieldingIndex === BbPlayLab.HUMAN_TEAM; }
@@ -106,7 +139,8 @@ class BbPlayLab {
     if (this.session.state.finished) { this.finish(); return; }
     this.player.view = this.humanFields() ? "pitcher" : "batter";
     this.ticker.begin(this.session.board());
-    this.cards.show(this.names[this.session.battingIndex], this.session.batter(), this.names[this.session.fieldingIndex], this.session.pitcher());
+    this.showCards();
+    this.report.hide();
     if (this.humanFields() && this.options.autoPitch) {
       this.swing.hide();
       this.throwPitch(this.session.aiCall(this.level), (roll) => this.session.aiSwing(roll, this.level));
@@ -114,7 +148,6 @@ class BbPlayLab {
     }
     if (this.humanFields()) {
       this.swing.hide();
-      this.report.hide();
       this.waitingForCall = true;
       this.player.play(this.idleScene());
       this.pad.open(this.session.pitcher());
@@ -171,10 +204,11 @@ class BbPlayLab {
     const settled = pending.settled as BbSettledPitch, outcome = settled.outcome, play = outcome.script;
     pending.announced = true;
     this.ticker.thrown(!!play && play.result !== "FOUL");
-    this.report.show(pending.roll, outcome.swing, pending.leniency, this.player.view);
+    const verdict = play ? BbPlayLab.IN_PLAY_VERDICT : settled.note.toast || BbPlayLab.PLAIN_CALLS[outcome.kind];
+    this.report.show(pending.roll, verdict, outcome.swing, pending.leniency, this.player.view);
     if (play) return;
     this.ticker.settle(this.session.board());
-    this.toast.show(settled.note.toast || BbPlayLab.PLAIN_CALLS[outcome.kind]);
+    this.toast.show(verdict);
   }
 
   private finish(): void {
@@ -187,7 +221,6 @@ class BbPlayLab {
 
   private tick(frameSeconds: number): void {
     this.toast.tick(frameSeconds);
-    this.report.tick(frameSeconds);
     this.pad.tick(frameSeconds);
     if (this.over || this.waitingForCall) this.player.idle(frameSeconds);
     else this.advance(frameSeconds);
@@ -195,8 +228,8 @@ class BbPlayLab {
   }
 
   private advance(frameSeconds: number): void {
-    const pending = this.pending;
-    this.player.advance(frameSeconds);
+    const pending = this.pending, eased = this.fast && (!pending || (pending.announced && !!(pending.settled as BbSettledPitch).outcome.script));
+    this.player.advance(frameSeconds * (eased ? BbPlayLab.FAST_PACE : 1));
     const auto = this.options.autoSwingAt;
     if (pending && !pending.settled && auto !== null && this.player.seconds >= this.player.arriveAt + auto - BbTimingModel.SWING_DELAY) { this.swing.disarm(); this.humanSwings(); }
     if (pending && !pending.settled && this.player.seconds >= this.player.arriveAt + BbPlayLab.SWING_CLOSES_AFTER) {

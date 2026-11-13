@@ -351,7 +351,7 @@ class BbBallActor {
         const THREE = libs.THREE;
         this.mesh = new THREE.Mesh(new THREE.SphereGeometry(BbBallActor.VISUAL_RADIUS, 18, 12), new THREE.MeshStandardMaterial({ map: BbBallActor.seamTexture(libs), roughness: 0.55 }));
         const shadowMaterial = new THREE.MeshBasicMaterial({ color: "#000000", transparent: true, opacity: 0.32, depthWrite: false });
-        this.shadow = new THREE.Mesh(new THREE.CircleGeometry(0.13, 16), shadowMaterial);
+        this.shadow = new THREE.Mesh(new THREE.CircleGeometry(BbBallActor.SHADOW_RADIUS, 16), shadowMaterial);
         this.shadow.rotation.x = -Math.PI / 2;
         this.shadow.renderOrder = 2;
         this.slot = new THREE.Vector3();
@@ -377,9 +377,9 @@ class BbBallActor {
             this.mesh.rotateOnWorldAxis(this.spinAxis, -state.spin * deltaSeconds);
         }
         const height = Math.max(0, this.mesh.position.y);
-        this.shadow.position.set(this.mesh.position.x, 0.03, this.mesh.position.z);
-        this.shadow.scale.setScalar(1 + Math.min(height, 30) * 0.12);
-        this.shadow.material.opacity = 0.34 / (1 + height * 0.18);
+        this.shadow.position.set(this.mesh.position.x, BbBallActor.SHADOW_LIFT, this.mesh.position.z);
+        this.shadow.scale.setScalar(1 + Math.min(height, 30) * BbBallActor.SHADOW_GROWTH);
+        this.shadow.material.opacity = 0.4 / (1 + height * 0.18);
     }
     forgetHolder() {
         this.heldBy = null;
@@ -414,3 +414,6 @@ class BbBallActor {
 }
 BbBallActor.VISUAL_RADIUS = 0.07;
 BbBallActor.RELEASE_BLEND_SECONDS = 0.1;
+BbBallActor.SHADOW_RADIUS = 0.062;
+BbBallActor.SHADOW_GROWTH = 0.22;
+BbBallActor.SHADOW_LIFT = 0.012;

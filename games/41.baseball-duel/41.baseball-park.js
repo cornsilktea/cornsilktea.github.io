@@ -83,7 +83,8 @@ class BbGroundPainter {
         context.save();
         surface.trace(this.outline.loop, true);
         context.clip();
-        this.paintOutfield(surface);
+        this.mow(surface);
+        this.mottle(surface);
         this.paintWarningTrack(surface);
         this.paintInfield(surface);
         this.paintWear(surface);
@@ -93,16 +94,39 @@ class BbGroundPainter {
             this.paintChalk(surface);
         context.restore();
     }
-    paintOutfield(surface) {
-        const context = surface.context;
-        context.fillStyle = BbGroundPainter.GRASS_DARK;
+    mow(surface) {
+        const context = surface.context, width = BbGroundPainter.STRIPE_WIDTH, reach = BbGroundPainter.MOW_REACH, slant = Math.SQRT1_2;
+        context.fillStyle = BbGroundPainter.GRASS;
         context.fillRect(0, 0, surface.pixels, surface.pixels);
-        context.lineWidth = surface.size(BbGroundPainter.STRIPE_WIDTH);
-        context.strokeStyle = BbGroundPainter.GRASS_LIGHT;
-        for (let radius = BbGroundPainter.STRIPE_WIDTH / 2; radius < 150; radius += BbGroundPainter.STRIPE_WIDTH * 2) {
-            surface.disc(0, 0, radius);
-            context.stroke();
+        context.fillStyle = BbGroundPainter.MOW_SHEEN;
+        [1, -1].forEach((side) => {
+            const along = [side * slant, slant], across = [slant, -side * slant];
+            for (let shift = -reach; shift < reach; shift += width * 2) {
+                const corner = (step, sign) => [across[0] * (shift + step) + along[0] * reach * sign, across[1] * (shift + step) + along[1] * reach * sign];
+                surface.trace([corner(0, -1), corner(0, 1), corner(width, 1), corner(width, -1)], true);
+                context.fill();
+            }
+        });
+    }
+    mottle(surface) {
+        const context = surface.context, random = new BbScatter(7203);
+        for (let index = 0; index < 320; index++) {
+            const x = random.between(-110, 110), z = random.between(-25, 135), radius = random.between(3, 10), dark = random.next() < 0.5;
+            const patch = context.createRadialGradient(surface.x(x), surface.y(z), 0, surface.x(x), surface.y(z), surface.size(radius));
+            patch.addColorStop(0, dark ? "rgba(20,50,15,0.07)" : "rgba(215,235,150,0.06)");
+            patch.addColorStop(1, dark ? "rgba(20,50,15,0)" : "rgba(215,235,150,0)");
+            context.fillStyle = patch;
+            surface.disc(x, z, radius);
+            context.fill();
         }
+    }
+    dirtShape(surface) {
+        const context = surface.context;
+        context.strokeStyle = BbGroundPainter.GRASS_LIP;
+        context.lineWidth = surface.size(BbGroundPainter.LIP_WIDTH);
+        context.stroke();
+        context.fillStyle = BbGroundPainter.DIRT;
+        context.fill();
     }
     paintWarningTrack(surface) {
         const context = surface.context;
@@ -117,30 +141,25 @@ class BbGroundPainter {
         context.save();
         surface.trace([[0, -4], [-40, 34], [-40, 60], [40, 60], [40, 34]], true);
         context.clip();
-        context.fillStyle = BbGroundPainter.DIRT;
         surface.disc(0, BbFieldGeometry.RUBBER_DISTANCE, BbFieldGeometry.INFIELD_DIRT_RADIUS);
-        context.fill();
+        this.dirtShape(surface);
         context.restore();
         const diamond = [[0, inset], [offset - inset, offset], [0, offset * 2 - inset], [-offset + inset, offset]];
         context.save();
         surface.trace(diamond, true);
         context.clip();
-        context.fillStyle = BbGroundPainter.INFIELD_DARK;
-        context.fillRect(0, 0, surface.pixels, surface.pixels);
-        context.strokeStyle = BbGroundPainter.INFIELD_LIGHT;
-        context.lineWidth = surface.size(2.2);
-        for (let shift = -44; shift <= 44; shift += 4.4) {
-            surface.trace([[shift - 30, -10], [shift + 30, 50]], false);
-            context.stroke();
-        }
+        this.mow(surface);
+        context.strokeStyle = BbGroundPainter.GRASS_LIP;
+        context.lineWidth = surface.size(BbGroundPainter.LIP_WIDTH);
+        surface.trace(diamond, true);
+        context.stroke();
         context.restore();
-        context.fillStyle = BbGroundPainter.DIRT;
         const cutouts = [[offset, offset], [0, offset * 2], [-offset, offset]];
-        cutouts.forEach(([x, z]) => { surface.disc(x, z, BbGroundPainter.BASE_CUTOUT); context.fill(); });
+        cutouts.forEach(([x, z]) => { surface.disc(x, z, BbGroundPainter.BASE_CUTOUT); context.fillStyle = BbGroundPainter.DIRT; context.fill(); });
         surface.disc(0, 0, BbFieldGeometry.HOME_DIRT_RADIUS);
-        context.fill();
+        this.dirtShape(surface);
         surface.disc(0, BbFieldGeometry.RUBBER_DISTANCE, BbFieldGeometry.MOUND_RADIUS);
-        context.fill();
+        this.dirtShape(surface);
         context.strokeStyle = BbGroundPainter.DIRT;
         context.lineWidth = surface.size(1.9);
         surface.trace([[0, 0], [offset, offset]], false);
@@ -214,16 +233,17 @@ class BbGroundPainter {
         context.stroke();
     }
 }
-BbGroundPainter.GRASS_LIGHT = "#5fa648";
-BbGroundPainter.GRASS_DARK = "#4f9440";
-BbGroundPainter.INFIELD_LIGHT = "#66ad4c";
-BbGroundPainter.INFIELD_DARK = "#579e43";
+BbGroundPainter.GRASS = "#4c9140";
+BbGroundPainter.MOW_SHEEN = "rgba(170,225,120,0.15)";
+BbGroundPainter.GRASS_LIP = "rgba(38,78,30,0.38)";
+BbGroundPainter.LIP_WIDTH = 0.24;
+BbGroundPainter.MOW_REACH = 230;
 BbGroundPainter.DIRT = "#b98656";
 BbGroundPainter.DIRT_WORN = "#c79a6c";
 BbGroundPainter.TRACK = "#a8744a";
 BbGroundPainter.APRON = "#6f7377";
 BbGroundPainter.CHALK = "#f7f6f0";
-BbGroundPainter.STRIPE_WIDTH = 4.6;
+BbGroundPainter.STRIPE_WIDTH = 5.6;
 BbGroundPainter.PATH_INSET = 1.25;
 BbGroundPainter.BASE_CUTOUT = 3.3;
 class BbBallparkBuilder {

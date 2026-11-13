@@ -15,15 +15,12 @@ BbPlayLabAddress.DEFAULT_SEED = 41;
 class BbPlayLab {
     constructor(libs) {
         this.options = BbPlayLabAddress.read();
+        this.fast = false;
         this.queued = [];
         this.pending = null;
         this.waitingForCall = false;
         this.over = false;
-        const controls = document.getElementById("bbControls"), human = BbAiLevel.batterSheet(this.options.batsLeft ? "L" : "R");
-        const sheets = [
-            { lineup: [BbAiLevel.batterSheet("R")], pitchers: [BbAiLevel.pitcherSheet("R")] },
-            { lineup: [human], pitchers: [BbAiLevel.pitcherSheet(this.options.throwsLeft ? "L" : "R")] }
-        ];
+        const controls = document.getElementById("bbControls");
         this.level = BbAiLevel.ALL[this.options.level];
         this.stage = new BbStage(libs, document.getElementById("labView"));
         this.hud = new BbScoreHud(document.getElementById("hudTop"));
@@ -35,9 +32,11 @@ class BbPlayLab {
         this.ticker = new BbBoardTicker(this.hud);
         this.player = new BbScenePlayer(this.stage, this.hud, (call) => this.called(call));
         this.scenes = new BbSceneFactory(() => this.stage.metrics);
-        this.session = new BbDuelSession(new BbThreeInningFormat(), BbBallparkRegistry.MAIN.dimensions, sheets, new BbSeededRandom(this.options.seed));
+        this.session = this.newSession();
         this.pad = new BbPitchPad(controls, (call) => this.humanThrows(call));
         this.swing = new BbSwingButton(controls, () => this.humanSwings());
+        this.sheet = new BbSheetDialog(controls, () => this.showCards());
+        new BbGameMenu(controls, [{ label: "연출 빠르게", onFlip: (on) => { this.fast = on; } }], [["연출 건너뛰기", () => this.skipScene()], ["나가기", () => location.reload()]]);
         if (this.options.plain)
             document.body.classList.add("plain");
         this.start().catch((error) => this.toast.show("불러오지 못했어요", error.message, BbPlayLab.END_TOAST_SECONDS));
@@ -45,8 +44,39 @@ class BbPlayLab {
     async start() {
         await this.stage.load(BbPlayLab.ASSET_DIRECTORY, BbBallparkRegistry.MAIN, { batsLeft: this.options.batsLeft, throwsLeft: this.options.throwsLeft });
         document.getElementById("labLoading").remove();
-        this.nextPitch();
+        if (this.options.autoPitch || this.options.autoSwingAt !== null)
+            this.nextPitch();
+        else
+            this.openLobby();
         this.stage.run((frameSeconds) => this.tick(frameSeconds));
+    }
+    newSession() {
+        const profile = BbProfileStore.load(), batter = profile.lineup[0], pitcher = profile.pitchers[0];
+        const sheets = [
+            { lineup: [BbAiLevel.batterSheet("R")], pitchers: [BbAiLevel.pitcherSheet("R")] },
+            { lineup: [{ ...batter, hand: this.options.batsLeft ? "L" : batter.hand }], pitchers: [{ ...pitcher, hand: this.options.throwsLeft ? "L" : pitcher.hand }] }
+        ];
+        return new BbDuelSession(new BbThreeInningFormat(), BbBallparkRegistry.MAIN.dimensions, sheets, new BbSeededRandom(this.options.seed));
+    }
+    openLobby() {
+        const controls = document.getElementById("bbControls");
+        document.body.classList.add("lobby");
+        this.waitingForCall = true;
+        this.showCards();
+        this.ticker.begin(this.session.board());
+        this.player.play(this.idleScene());
+        new BbLabLobby(controls, "야구 1대1 대전 · 조작 시험장", () => { document.body.classList.remove("lobby"); this.session = this.newSession(); this.nextPitch(); }, () => this.sheet.open());
+    }
+    showCards() {
+        if (document.body.classList.contains("lobby"))
+            this.session = this.newSession();
+        this.cards.show(this.names[this.session.battingIndex], this.session.batter(), this.names[this.session.fieldingIndex], this.session.pitcher());
+    }
+    skipScene() {
+        const pending = this.pending;
+        if (this.over || this.waitingForCall || (pending && (!pending.settled || !pending.announced)))
+            return;
+        this.player.skip();
     }
     humanFields() { return this.session.fieldingIndex === BbPlayLab.HUMAN_TEAM; }
     hands() { return { batsLeft: this.session.batter().hand === "L", throwsLeft: this.session.pitcher().hand === "L" }; }
@@ -61,7 +91,8 @@ class BbPlayLab {
         }
         this.player.view = this.humanFields() ? "pitcher" : "batter";
         this.ticker.begin(this.session.board());
-        this.cards.show(this.names[this.session.battingIndex], this.session.batter(), this.names[this.session.fieldingIndex], this.session.pitcher());
+        this.showCards();
+        this.report.hide();
         if (this.humanFields() && this.options.autoPitch) {
             this.swing.hide();
             this.throwPitch(this.session.aiCall(this.level), (roll) => this.session.aiSwing(roll, this.level));
@@ -69,7 +100,6 @@ class BbPlayLab {
         }
         if (this.humanFields()) {
             this.swing.hide();
-            this.report.hide();
             this.waitingForCall = true;
             this.player.play(this.idleScene());
             this.pad.open(this.session.pitcher());
@@ -127,11 +157,12 @@ class BbPlayLab {
         const settled = pending.settled, outcome = settled.outcome, play = outcome.script;
         pending.announced = true;
         this.ticker.thrown(!!play && play.result !== "FOUL");
-        this.report.show(pending.roll, outcome.swing, pending.leniency, this.player.view);
+        const verdict = play ? BbPlayLab.IN_PLAY_VERDICT : settled.note.toast || BbPlayLab.PLAIN_CALLS[outcome.kind];
+        this.report.show(pending.roll, verdict, outcome.swing, pending.leniency, this.player.view);
         if (play)
             return;
         this.ticker.settle(this.session.board());
-        this.toast.show(settled.note.toast || BbPlayLab.PLAIN_CALLS[outcome.kind]);
+        this.toast.show(verdict);
     }
     finish() {
         const score = this.session.state.score, mine = score[BbPlayLab.HUMAN_TEAM], theirs = score[1 - BbPlayLab.HUMAN_TEAM];
@@ -142,7 +173,6 @@ class BbPlayLab {
     }
     tick(frameSeconds) {
         this.toast.tick(frameSeconds);
-        this.report.tick(frameSeconds);
         this.pad.tick(frameSeconds);
         if (this.over || this.waitingForCall)
             this.player.idle(frameSeconds);
@@ -151,8 +181,8 @@ class BbPlayLab {
         this.player.frame(frameSeconds);
     }
     advance(frameSeconds) {
-        const pending = this.pending;
-        this.player.advance(frameSeconds);
+        const pending = this.pending, eased = this.fast && (!pending || (pending.announced && !!pending.settled.outcome.script));
+        this.player.advance(frameSeconds * (eased ? BbPlayLab.FAST_PACE : 1));
         const auto = this.options.autoSwingAt;
         if (pending && !pending.settled && auto !== null && this.player.seconds >= this.player.arriveAt + auto - BbTimingModel.SWING_DELAY) {
             this.swing.disarm();
@@ -181,4 +211,6 @@ BbPlayLab.ASSET_DIRECTORY = "../assets/kaykit/";
 BbPlayLab.HUMAN_TEAM = 1;
 BbPlayLab.SWING_CLOSES_AFTER = 0;
 BbPlayLab.END_TOAST_SECONDS = 600;
+BbPlayLab.FAST_PACE = 2.2;
+BbPlayLab.IN_PLAY_VERDICT = "타격";
 BbPlayLab.PLAIN_CALLS = { ball: "볼", calledStrike: "스트라이크!", swingMiss: "헛스윙", foul: "파울", inPlay: "" };

@@ -63,6 +63,8 @@ class BbScenePlayer {
 
   idle(frameSeconds: number): void { this.draw(frameSeconds); }
 
+  skip(): void { if (!this.finished) this.advance(this.scene.script.duration - this.clock + 0.001); }
+
   advance(deltaSeconds: number): void {
     const before = this.clock, scene = this.scene;
     this.clock += deltaSeconds;

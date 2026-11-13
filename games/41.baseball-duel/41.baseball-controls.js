@@ -277,9 +277,9 @@ class BbTimingGauge {
 }
 BbTimingGauge.MARGIN = 0.03;
 BbTimingGauge.BAND_CLASSES = [["fair", "bb-gauge-fair"], ["good", "bb-gauge-good"]];
-class BbPitchReport extends BbFadingNote {
+class BbPitchReport {
     constructor(host) {
-        super(BbHudParts.box("bb-report", host));
+        this.element = BbHudParts.box("bb-report", host);
         const span = BbPitchReport.SPAN;
         this.side = BbHudParts.box("bb-report-side", this.element);
         const picture = BbHudParts.shape("svg", "bb-report-zone", this.element, { viewBox: [-span, -span, span * 2, span * 2].join(" ") });
@@ -288,21 +288,39 @@ class BbPitchReport extends BbFadingNote {
             BbHudParts.shape("line", "bb-aim-grid", picture, { x1: line, y1: -1, x2: line, y2: 1 });
             BbHudParts.shape("line", "bb-aim-grid", picture, { x1: -1, y1: line, x2: 1, y2: line });
         });
+        this.path = BbHudParts.shape("line", "bb-report-path", picture);
+        this.aimed = BbHudParts.shape("circle", "bb-report-aim", picture, { r: 0.09 });
         this.ball = BbHudParts.shape("circle", "bb-report-ball", picture, { r: 0.2 });
+        this.verdict = BbHudParts.box("bb-report-verdict", this.element);
         this.pitch = BbHudParts.box("bb-report-pitch", this.element);
+        this.batted = BbHudParts.box("bb-report-batted", this.element);
+        this.battedValues = BbPitchReport.BATTED_LABELS.map((label) => {
+            const row = BbHudParts.box("bb-report-row", this.batted);
+            BbHudParts.box("", row, label);
+            return BbHudParts.box("bb-report-number", row);
+        });
         this.gauge = new BbTimingGauge(this.element);
     }
-    show(roll, swing, leniency, view) {
-        const edge = BbPitchReport.SPAN - 0.2;
-        this.ball.style.transform = "translate(" + BbCurve.clamp(roll.arrive.u * BbPitchReport.SIDE_OF_VIEW[view], -edge, edge).toFixed(3) + "px," + BbCurve.clamp(-roll.arrive.v, -edge, edge).toFixed(3) + "px)";
+    show(roll, verdict, swing, leniency, view) {
+        const edge = BbPitchReport.SPAN - 0.2, side = BbPitchReport.SIDE_OF_VIEW[view], hit = swing.ball;
+        const spot = (point) => ({ x: BbCurve.clamp(point.u * side, -edge, edge), y: BbCurve.clamp(-point.v, -edge, edge) });
+        const from = spot(roll.aim), to = spot(roll.arrive);
+        this.ball.style.transform = "translate(" + to.x.toFixed(3) + "px," + to.y.toFixed(3) + "px)";
+        this.aimed.style.transform = "translate(" + from.x.toFixed(3) + "px," + from.y.toFixed(3) + "px)";
+        [["x1", from.x], ["y1", from.y], ["x2", to.x], ["y2", to.y]].forEach(([name, value]) => this.path.setAttribute(name, value.toFixed(3)));
         this.side.textContent = BbPitchReport.VIEW_NAMES[view];
+        this.verdict.textContent = verdict;
         this.pitch.textContent = BbPitchCatalog.of(roll.pitch).label + "  " + Math.round(roll.speed) + "km/h";
+        this.batted.classList.toggle("blank", !hit);
+        if (hit)
+            [Math.round(hit.exitSpeed) + "km/h", Math.round(hit.launch) + "°", Math.round(hit.carry) + "m"].forEach((text, index) => { this.battedValues[index].textContent = text; });
         this.gauge.show(swing, leniency);
-        this.reveal(BbPitchReport.SECONDS);
+        this.element.classList.add("open");
     }
+    hide() { this.element.classList.remove("open"); }
 }
-BbPitchReport.SECONDS = 4;
 BbPitchReport.SPAN = 1.9;
+BbPitchReport.BATTED_LABELS = ["타구 속도", "발사각", "비거리"];
 BbPitchReport.SIDE_OF_VIEW = { pitcher: 1, batter: -1 };
 BbPitchReport.VIEW_NAMES = { pitcher: "투수 시선", batter: "타자 시선" };
 class BbCallToast extends BbFadingNote {
