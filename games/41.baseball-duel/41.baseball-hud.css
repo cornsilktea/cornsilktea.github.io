@@ -63,19 +63,25 @@
 .bb-toast-call{font-family:"Black Han Sans","Nanum Gothic","Malgun Gothic",sans-serif;font-size:clamp(30px,5.4vw,60px);font-weight:400;transform:skewX(-8deg);text-shadow:-3px -3px 0 #14201a,3px -3px 0 #14201a,-3px 3px 0 #14201a,3px 3px 0 #14201a,5px 6px 0 #D97B4F}
 .bb-toast-pitch{display:inline-block;margin-top:8px;padding:4px 12px;border-radius:10px;background:rgba(14,20,17,.78);font-size:clamp(13px,1.8vw,18px);font-weight:800}
 .bb-toast-pitch:empty{display:none}
-.bb-gauge{position:absolute;left:50%;bottom:max(20px,4vh);width:min(56vw,420px);transform:translateX(-50%);padding:8px 14px 6px;border-radius:12px;background:rgba(14,20,17,.82);opacity:0;transition:opacity .15s}
-.bb-gauge.open{opacity:1}
-.bb-gauge-label{text-align:center;font-size:18px;font-weight:800;margin-bottom:5px}
-.bb-gauge-bar{position:relative;height:16px;border-radius:8px;background:rgba(255,255,255,.14)}
+.bb-report{position:absolute;right:max(18px,3vw);top:8vh;width:clamp(124px,30vh,250px);padding:8px 10px;border-radius:12px;background:rgba(14,20,17,.82);border-bottom:3px solid #D97B4F;opacity:0;transition:opacity .15s}
+.bb-report.open{opacity:1}
+.bb-report-side{font-size:11px;font-weight:700;opacity:.75;margin-bottom:3px}
+.bb-report-zone{display:block;width:100%;aspect-ratio:1;border-radius:8px;background:rgba(255,255,255,.05)}
+.bb-report-ball{fill:#D97B4F;stroke:#fff;stroke-width:.05;will-change:transform}
+.bb-report-pitch{margin:7px 0 6px;text-align:center;font-size:clamp(13px,2.2vh,17px);font-weight:800;white-space:pre}
+.bb-gauge{padding-top:5px;border-top:1px solid rgba(255,255,255,.18)}
+.bb-gauge.blank .bb-gauge-bar,.bb-gauge.blank .bb-gauge-ends{visibility:hidden}
+.bb-gauge-label{text-align:center;font-size:clamp(12px,2vh,15px);font-weight:800;margin-bottom:4px}
+.bb-gauge-bar{position:relative;height:12px;border-radius:6px;background:rgba(255,255,255,.14)}
 .bb-gauge-band{position:absolute;left:50%;top:0;height:100%;transform:translateX(-50%);border-radius:8px}
 .bb-gauge-fair{background:#F2C94C}
 .bb-gauge-good{background:#B5DD6A}
 .bb-gauge-perfect{background:#4FBF6B}
-.bb-gauge-marker{position:absolute;top:100%;transform:translateX(-50%);font-size:13px;line-height:13px;color:#fff}
-.bb-gauge-ends{display:flex;justify-content:space-between;margin-top:12px;font-size:11px;font-weight:700;opacity:.8}
+.bb-gauge-marker{position:absolute;top:100%;transform:translateX(-50%);font-size:11px;line-height:11px;color:#fff}
+.bb-gauge-ends{display:flex;justify-content:space-between;margin-top:11px;font-size:10px;font-weight:700;opacity:.8}
 @media (orientation:portrait){
   .bb-aim{right:auto;left:7vw;width:86vw;top:42%}
   .bb-pad{gap:4px;bottom:calc(clamp(96px,15vw,150px) + 30px)}
   .bb-pitch-key{width:17.5vw}
-  .bb-gauge{bottom:calc(clamp(96px,15vw,150px) + 40px);width:80vw}
+  .bb-report{top:12vh;width:clamp(124px,34vw,220px)}
 }

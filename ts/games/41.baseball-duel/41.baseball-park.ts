@@ -243,6 +243,7 @@ class BbBallparkBuilder {
   private static readonly SKIN_COLORS: readonly string[] = ["#FFE0C8", "#F6C09C", "#E2A981", "#C98A62", "#A86A48"];
   private static readonly WALL_PANELS = 16;
   private static readonly FOUL_LINE_START = 1.72;
+  private static readonly PLATE_RIM = 0.035;
   private static readonly TIER_DEPTH = 1.5;
   private static readonly TIER_RISE = 0.85;
 
@@ -336,13 +337,20 @@ class BbBallparkBuilder {
       base.castShadow = base.receiveShadow = true;
       this.group.add(base);
     });
-    const half = BbFieldGeometry.PLATE_WIDTH / 2, shape = new THREE.Shape();
-    shape.moveTo(-half, half * 2); shape.lineTo(half, half * 2); shape.lineTo(half, half); shape.lineTo(0, 0); shape.lineTo(-half, half); shape.closePath();
-    const plate = new THREE.Mesh(new THREE.ExtrudeGeometry(shape, { depth: 0.02, bevelEnabled: false }), white);
-    plate.rotation.x = -Math.PI / 2;
-    plate.position.y = 0.012;
-    plate.receiveShadow = true;
-    this.group.add(plate);
+    const half = BbFieldGeometry.PLATE_WIDTH / 2, rim = BbBallparkBuilder.PLATE_RIM;
+    const pentagon = (grow: number) => {
+      const shape = new THREE.Shape(), side = half + grow, slant = grow * Math.SQRT2;
+      shape.moveTo(-side, half * 2 + grow); shape.lineTo(side, half * 2 + grow); shape.lineTo(side, half - grow * (Math.SQRT2 - 1)); shape.lineTo(0, -slant); shape.lineTo(-side, half - grow * (Math.SQRT2 - 1)); shape.closePath();
+      return shape;
+    };
+    const dark = new THREE.MeshLambertMaterial({ color: "#1c1f1d" });
+    ([[pentagon(rim), dark, 0.014, 0.012], [pentagon(0), white, 0.03, 0.012]] as Array<[Three<"Shape">, Three<"Material">, number, number]>).forEach(([shape, material, depth, height]) => {
+      const plate = new THREE.Mesh(new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false }), material);
+      plate.rotation.x = -Math.PI / 2;
+      plate.position.y = height;
+      plate.receiveShadow = true;
+      this.group.add(plate);
+    });
   }
 
   private addChalkLines(): void {

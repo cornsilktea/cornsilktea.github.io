@@ -22,7 +22,12 @@ class BbRunnerDiamond {
         this.seen = [false, false, false, false];
         const edge = BbRunnerDiamond.EDGE, home = BbFieldGeometry.HOME, half = BbRunnerDiamond.BAG_HALF;
         const picture = BbHudParts.shape("svg", "bb-diamond", host, { viewBox: [edge.left, edge.top, edge.right - edge.left, edge.bottom - edge.top].join(" ") });
-        BbHudParts.shape("polygon", "bb-diamond-line", picture, { points: [home].concat(BbRunnerDiamond.BAGS).map((point) => point.x + "," + point.z).join(" ") });
+        const corners = [home].concat(BbRunnerDiamond.BAGS), gaps = [half * 0.6, half, half, half];
+        corners.forEach((corner, index) => {
+            const next = corners[(index + 1) % corners.length], along = next.minus(corner).unit();
+            const from = corner.plus(along.times(gaps[index])), to = next.minus(along.times(gaps[(index + 1) % corners.length]));
+            BbHudParts.shape("line", "bb-diamond-line", picture, { x1: from.x.toFixed(2), y1: from.z.toFixed(2), x2: to.x.toFixed(2), y2: to.z.toFixed(2) });
+        });
         BbHudParts.shape("rect", "bb-diamond-home", picture, { x: -half * 0.6, y: -half * 0.6, width: half * 1.2, height: half * 1.2, transform: "rotate(45)" });
         this.bags = BbRunnerDiamond.BAGS.map((bag) => BbHudParts.shape("rect", "bb-diamond-bag", picture, { x: -half, y: -half, width: half * 2, height: half * 2, transform: "translate(" + bag.x + " " + bag.z + ") rotate(45)" }));
         this.dots = BbRunnerDiamond.ROLES.map(() => BbHudParts.shape("circle", "bb-diamond-runner", picture, { r: BbRunnerDiamond.DOT_RADIUS }));
@@ -70,6 +75,41 @@ class BbCountLamps {
     }
 }
 BbCountLamps.ROWS = [["B", 3, "ball"], ["S", 2, "strike"], ["O", 2, "out"]];
+class BbBoardTicker {
+    constructor(hud) {
+        this.hud = hud;
+        this.shown = { inning: 1, half: 0, outs: 0, balls: 0, strikes: 0, score: [0, 0], pitches: 0 };
+    }
+    begin(board) {
+        this.shown = { ...board, score: [board.score[0], board.score[1]] };
+        this.hud.show(this.shown);
+    }
+    thrown(countEnds) {
+        this.shown.pitches++;
+        if (countEnds)
+            this.shown.balls = this.shown.strikes = 0;
+        this.hud.show(this.shown);
+    }
+    settle(final) {
+        if (this.sameHalf(final) && final.outs >= this.shown.outs)
+            this.begin({ ...final, pitches: this.shown.pitches });
+        else
+            this.begin({ ...this.shown, score: final.score, outs: 3 });
+    }
+    tally(kind, final) {
+        const shown = this.shown;
+        if (kind === "settle") {
+            this.settle(final);
+            return;
+        }
+        if (kind === "out")
+            shown.outs = Math.min(shown.outs + 1, 3);
+        else
+            shown.score[shown.half] = Math.min(shown.score[shown.half] + 1, final.score[shown.half]);
+        this.hud.show(shown);
+    }
+    sameHalf(final) { return final.inning === this.shown.inning && final.half === this.shown.half; }
+}
 class BbScoreHud {
     constructor(host) {
         const box = BbHudParts.box("hud-box bb-score", host);

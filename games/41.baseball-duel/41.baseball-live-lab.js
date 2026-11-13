@@ -67,6 +67,7 @@ class BbLiveLab {
         this.feed = new BbAiGameFeed(BbBallparkRegistry.MAIN.dimensions, this.options.batsLeft ? "L" : "R", this.options.throwsLeft ? "L" : "R", this.options.seed);
         this.score = new BbLiveScoreLine(this.status);
         this.hud = new BbScoreHud(document.getElementById("hudTop"));
+        this.ticker = new BbBoardTicker(this.hud);
         this.hud.players("손님", "방장");
         this.start().catch((error) => { this.status.textContent = "불러오지 못했어요: " + error.message; });
     }
@@ -135,7 +136,7 @@ class BbLiveLab {
         this.cut = true;
         if (this.segment.live) {
             this.score.pitching(this.segment.live, this.segment.title);
-            this.hud.show(this.segment.live.boardBefore);
+            this.ticker.begin(this.segment.live.boardBefore);
         }
         else
             this.score.swapping();
@@ -163,13 +164,22 @@ class BbLiveLab {
             this.score.called(segment.live);
             this.showCalled(segment.live);
         }
+        const final = segment.live ? segment.live.board : null;
         this.hud.follow(segment.script, segment.tracks, this.seconds);
-        segment.calls.forEach((call) => { if (before < call.at && this.seconds >= call.at)
-            this.score.shout(call.text); });
+        segment.calls.forEach((call) => {
+            if (before >= call.at || this.seconds < call.at)
+                return;
+            if (call.text)
+                this.score.shout(call.text);
+            if (call.tally && final)
+                this.ticker.tally(call.tally, final);
+        });
     }
     showCalled(live) {
-        const sameHalf = live.board.inning === live.boardBefore.inning && live.board.half === live.boardBefore.half;
-        this.hud.show(sameHalf ? live.board : { ...live.boardBefore, score: live.board.score, pitches: live.boardBefore.pitches + 1, outs: live.halfOver ? 3 : live.boardBefore.outs });
+        const play = live.outcome.script;
+        this.ticker.thrown(!!play && play.result !== "FOUL");
+        if (!play)
+            this.ticker.settle(live.board);
     }
     tick(frameSeconds) {
         if (!this.paused) {

@@ -51,7 +51,8 @@ class BbPlayLab {
   private readonly session: BbDuelSession;
   private readonly pad: BbPitchPad;
   private readonly swing: BbSwingButton;
-  private readonly gauge: BbTimingGauge;
+  private readonly report: BbPitchReport;
+  private readonly ticker: BbBoardTicker;
   private readonly toast: BbCallToast;
   private readonly level: BbAiTuning;
   private readonly queued: BbScene[] = [];
@@ -70,8 +71,9 @@ class BbPlayLab {
     this.hud = new BbScoreHud(document.getElementById("hudTop") as HTMLElement);
     this.hud.players("AI " + this.level.label, "나");
     this.toast = new BbCallToast(controls);
-    this.gauge = new BbTimingGauge(controls);
-    this.player = new BbScenePlayer(this.stage, this.hud, (text) => this.toast.show(text));
+    this.report = new BbPitchReport(controls);
+    this.ticker = new BbBoardTicker(this.hud);
+    this.player = new BbScenePlayer(this.stage, this.hud, (call) => this.called(call));
     this.scenes = new BbSceneFactory(() => this.stage.metrics);
     this.session = new BbDuelSession(new BbThreeInningFormat(), BbBallparkRegistry.MAIN.dimensions, sheets, new BbSeededRandom(this.options.seed));
     this.pad = new BbPitchPad(controls, (call) => this.humanThrows(call));
@@ -99,7 +101,7 @@ class BbPlayLab {
   private nextPitch(): void {
     if (this.session.state.finished) { this.finish(); return; }
     this.player.view = this.humanFields() ? "pitcher" : "batter";
-    this.hud.show(this.session.board());
+    this.ticker.begin(this.session.board());
     if (this.humanFields() && this.options.autoPitch) {
       this.swing.hide();
       this.throwPitch(this.session.aiCall(this.level), (roll) => this.session.aiSwing(roll, this.level));
@@ -107,6 +109,7 @@ class BbPlayLab {
     }
     if (this.humanFields()) {
       this.swing.hide();
+      this.report.hide();
       this.waitingForCall = true;
       this.player.play(this.idleScene());
       this.pad.open(this.session.pitcher());
@@ -134,7 +137,11 @@ class BbPlayLab {
     const pending = this.pending as BbPendingPitch, settled = this.close(pending, contactOffset), scene = this.sceneOf(settled.outcome);
     if (midFlight) this.player.replace(scene);
     else this.player.play(scene);
-    if (midFlight) this.gauge.show(settled.outcome.swing, pending.leniency);
+  }
+
+  private called(call: BbCallCue): void {
+    if (call.text) this.toast.show(call.text);
+    if (call.tally) this.ticker.tally(call.tally, this.session.board());
   }
 
   private close(pending: BbPendingPitch, contactOffset: number | null): BbSettledPitch {
@@ -156,12 +163,13 @@ class BbPlayLab {
   }
 
   private announce(pending: BbPendingPitch): void {
-    const settled = pending.settled as BbSettledPitch, after = this.session.board();
-    const sameHalf = after.inning === pending.before.inning && after.half === pending.before.half && !this.session.state.finished;
+    const settled = pending.settled as BbSettledPitch, outcome = settled.outcome, play = outcome.script;
     pending.announced = true;
-    this.hud.show(sameHalf ? after : { ...pending.before, score: after.score, pitches: pending.before.pitches + 1, outs: settled.note.halfOver ? 3 : pending.before.outs });
-    const call = settled.note.toast || (settled.outcome.script ? BbPlayCodes.LABELS[settled.outcome.script.result] : BbPlayLab.PLAIN_CALLS[settled.outcome.kind]);
-    this.toast.show(call, this.player.title);
+    this.ticker.thrown(!!play && play.result !== "FOUL");
+    this.report.show(pending.roll, outcome.swing, pending.leniency, this.player.view);
+    if (play) return;
+    this.ticker.settle(this.session.board());
+    this.toast.show(settled.note.toast || BbPlayLab.PLAIN_CALLS[outcome.kind]);
   }
 
   private finish(): void {
@@ -174,7 +182,7 @@ class BbPlayLab {
 
   private tick(frameSeconds: number): void {
     this.toast.tick(frameSeconds);
-    this.gauge.tick(frameSeconds);
+    this.report.tick(frameSeconds);
     if (this.over || this.waitingForCall) this.player.idle(frameSeconds);
     else this.advance(frameSeconds);
     this.player.frame(frameSeconds);
@@ -195,7 +203,7 @@ class BbPlayLab {
     const swap = this.queued.shift();
     if (!swap) { this.nextPitch(); return; }
     this.swing.hide();
-    this.hud.show(this.session.board());
+    this.ticker.begin(this.session.board());
     this.player.play(swap);
   }
 }

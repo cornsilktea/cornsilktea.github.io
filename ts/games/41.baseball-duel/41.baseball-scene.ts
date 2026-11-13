@@ -40,7 +40,7 @@ class BbScenePlayer {
   private clock = 0;
   private cut = true;
 
-  constructor(private readonly stage: BbStage, private readonly hud: BbScoreHud, private readonly onCall: (text: string) => void) {}
+  constructor(private readonly stage: BbStage, private readonly hud: BbScoreHud, private readonly onCall: (call: BbCallCue) => void) {}
 
   get seconds(): number { return this.clock; }
   get arriveAt(): number { return this.scene.arriveAt; }
@@ -68,7 +68,7 @@ class BbScenePlayer {
     this.clock += deltaSeconds;
     this.draw(deltaSeconds);
     scene.sparks.forEach((spark) => { if (before < spark.at && this.clock >= spark.at) this.stage.spark(spark.point); });
-    scene.calls.forEach((call) => { if (before < call.at && this.clock >= call.at) this.onCall(call.text); });
+    scene.calls.forEach((call) => { if (before < call.at && this.clock >= call.at) this.onCall(call); });
   }
 
   private draw(deltaSeconds: number): void {

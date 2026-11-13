@@ -50,7 +50,7 @@ class BbScenePlayer {
         scene.sparks.forEach((spark) => { if (before < spark.at && this.clock >= spark.at)
             this.stage.spark(spark.point); });
         scene.calls.forEach((call) => { if (before < call.at && this.clock >= call.at)
-            this.onCall(call.text); });
+            this.onCall(call); });
     }
     draw(deltaSeconds) {
         const scene = this.scene;

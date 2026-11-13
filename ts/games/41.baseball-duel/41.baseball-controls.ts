@@ -49,6 +49,12 @@ class BbZoneAimWindow {
     this.picture.addEventListener("pointercancel", () => { this.dragging = false; });
   }
 
+  nudge(sideways: number, upward: number): void {
+    if (!this.kind) return;
+    this.aim = { u: this.aim.u + sideways, v: this.aim.v + upward };
+    this.draw();
+  }
+
   get call(): BbPitchCall | null { return this.kind ? { pitch: this.kind.id, aim: { u: this.aim.u, v: this.aim.v } } : null; }
 
   begin(sheet: BbPitcherSheet): void {
@@ -94,6 +100,8 @@ class BbZoneAimWindow {
 
 class BbPitchPad {
   private static readonly THROW_CODES: readonly string[] = ["Space", "Enter", "NumpadEnter"];
+  private static readonly ARROW_STEP = 0.1;
+  private static readonly ARROWS: Readonly<Record<string, readonly [number, number]>> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] };
   private readonly row: HTMLElement;
   private readonly keys: HTMLButtonElement[];
   private readonly paths: SVGPathElement[];
@@ -169,7 +177,10 @@ class BbPitchPad {
   }
 
   private pressed(event: KeyboardEvent): void {
-    if (!this.opened || event.repeat) return;
+    if (!this.opened) return;
+    const arrow = BbPitchPad.ARROWS[event.key];
+    if (arrow) { event.preventDefault(); this.aim.nudge(arrow[0] * BbPitchPad.ARROW_STEP, arrow[1] * BbPitchPad.ARROW_STEP); return; }
+    if (event.repeat) return;
     const kind = BbPitchCatalog.ALL.find((candidate) => event.code === "Key" + candidate.hotkey);
     if (kind) { this.pick(kind); return; }
     if (BbPitchPad.THROW_CODES.indexOf(event.code) >= 0) { event.preventDefault(); this.confirm(); }
@@ -229,6 +240,11 @@ class BbFadingNote {
     this.element.classList.add("open");
   }
 
+  hide(): void {
+    this.left = 0;
+    this.element.classList.remove("open");
+  }
+
   tick(frameSeconds: number): void {
     if (this.left <= 0) return;
     this.left -= frameSeconds;
@@ -236,9 +252,9 @@ class BbFadingNote {
   }
 }
 
-class BbTimingGauge extends BbFadingNote {
-  private static readonly SECONDS = 1.2;
+class BbTimingGauge {
   private static readonly MARGIN = 0.03;
+  private readonly element: HTMLElement;
   private static readonly BAND_CLASSES: ReadonlyArray<readonly [Exclude<BbTimingBand, "perfect" | "miss" | "poor">, string]> = [["fair", "bb-gauge-fair"], ["good", "bb-gauge-good"]];
   private readonly bands: HTMLElement[];
   private readonly perfect: HTMLElement;
@@ -246,7 +262,7 @@ class BbTimingGauge extends BbFadingNote {
   private readonly label: HTMLElement;
 
   constructor(host: HTMLElement) {
-    super(BbHudParts.box("bb-gauge", host));
+    this.element = BbHudParts.box("bb-gauge", host);
     this.label = BbHudParts.box("bb-gauge-label", this.element);
     const bar = BbHudParts.box("bb-gauge-bar", this.element);
     this.bands = BbTimingGauge.BAND_CLASSES.map(([, className]) => BbHudParts.box("bb-gauge-band " + className, bar));
@@ -258,14 +274,49 @@ class BbTimingGauge extends BbFadingNote {
   }
 
   show(swing: BbSwingResult, leniency: number): void {
-    if (swing.adjusted === null) return;
+    this.element.classList.toggle("blank", swing.adjusted === null);
+    if (swing.adjusted === null) { this.label.textContent = "지켜봄"; return; }
     const extra = BbTimingModel.BAND_EXTRA, range = swing.width + extra.poor * leniency + BbTimingGauge.MARGIN;
     const widthOf = (seconds: number) => (seconds / range * 100).toFixed(1) + "%";
     BbTimingGauge.BAND_CLASSES.forEach(([band], index) => { this.bands[index].style.width = widthOf(swing.width + extra[band] * leniency); });
     this.perfect.style.width = widthOf(swing.width);
     this.marker.style.left = (50 + BbCurve.clamp(swing.adjusted / range, -1, 1) * 50).toFixed(1) + "%";
     this.label.textContent = swing.band === "perfect" ? "정타" : swing.band === "good" ? "좋아요" : swing.adjusted < 0 ? "빨라요" : "늦었어요";
-    this.reveal(BbTimingGauge.SECONDS);
+  }
+}
+
+class BbPitchReport extends BbFadingNote {
+  private static readonly SECONDS = 4;
+  private static readonly SPAN = 1.9;
+  private static readonly SIDE_OF_VIEW: Readonly<Record<BbLiveView, number>> = { pitcher: 1, batter: -1 };
+  private static readonly VIEW_NAMES: Readonly<Record<BbLiveView, string>> = { pitcher: "투수 시선", batter: "타자 시선" };
+  private readonly ball: SVGCircleElement;
+  private readonly side: HTMLElement;
+  private readonly pitch: HTMLElement;
+  private readonly gauge: BbTimingGauge;
+
+  constructor(host: HTMLElement) {
+    super(BbHudParts.box("bb-report", host));
+    const span = BbPitchReport.SPAN;
+    this.side = BbHudParts.box("bb-report-side", this.element);
+    const picture = BbHudParts.shape("svg", "bb-report-zone", this.element, { viewBox: [-span, -span, span * 2, span * 2].join(" ") });
+    BbHudParts.shape("rect", "bb-aim-strike", picture, { x: -1, y: -1, width: 2, height: 2 });
+    [-1 / 3, 1 / 3].forEach((line) => {
+      BbHudParts.shape("line", "bb-aim-grid", picture, { x1: line, y1: -1, x2: line, y2: 1 });
+      BbHudParts.shape("line", "bb-aim-grid", picture, { x1: -1, y1: line, x2: 1, y2: line });
+    });
+    this.ball = BbHudParts.shape("circle", "bb-report-ball", picture, { r: 0.2 });
+    this.pitch = BbHudParts.box("bb-report-pitch", this.element);
+    this.gauge = new BbTimingGauge(this.element);
+  }
+
+  show(roll: BbPitchRoll, swing: BbSwingResult, leniency: number, view: BbLiveView): void {
+    const edge = BbPitchReport.SPAN - 0.2;
+    this.ball.style.transform = "translate(" + BbCurve.clamp(roll.arrive.u * BbPitchReport.SIDE_OF_VIEW[view], -edge, edge).toFixed(3) + "px," + BbCurve.clamp(-roll.arrive.v, -edge, edge).toFixed(3) + "px)";
+    this.side.textContent = BbPitchReport.VIEW_NAMES[view];
+    this.pitch.textContent = BbPitchCatalog.of(roll.pitch).label + "  " + Math.round(roll.speed) + "km/h";
+    this.gauge.show(swing, leniency);
+    this.reveal(BbPitchReport.SECONDS);
   }
 }
 

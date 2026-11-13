@@ -16,7 +16,7 @@ class BbBroadcastShots {
   }
 
   static batter(): BbCameraShot {
-    return { position: BbFieldSpace.toWorld(0, -2.7, 1.0), look: BbFieldSpace.toWorld(0, 10, 0.8), fieldOfView: 30 };
+    return { position: BbFieldSpace.toWorld(0, -2.7, 1.0), look: BbFieldSpace.toWorld(0, 10, -0.45), fieldOfView: 30 };
   }
 }
 

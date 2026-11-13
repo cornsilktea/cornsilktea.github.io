@@ -41,6 +41,12 @@ class BbZoneAimWindow {
         this.picture.addEventListener("pointerup", () => { this.dragging = false; });
         this.picture.addEventListener("pointercancel", () => { this.dragging = false; });
     }
+    nudge(sideways, upward) {
+        if (!this.kind)
+            return;
+        this.aim = { u: this.aim.u + sideways, v: this.aim.v + upward };
+        this.draw();
+    }
     get call() { return this.kind ? { pitch: this.kind.id, aim: { u: this.aim.u, v: this.aim.v } } : null; }
     begin(sheet) {
         this.sheet = sheet;
@@ -147,7 +153,15 @@ class BbPitchPad {
         this.onThrow(call);
     }
     pressed(event) {
-        if (!this.opened || event.repeat)
+        if (!this.opened)
+            return;
+        const arrow = BbPitchPad.ARROWS[event.key];
+        if (arrow) {
+            event.preventDefault();
+            this.aim.nudge(arrow[0] * BbPitchPad.ARROW_STEP, arrow[1] * BbPitchPad.ARROW_STEP);
+            return;
+        }
+        if (event.repeat)
             return;
         const kind = BbPitchCatalog.ALL.find((candidate) => event.code === "Key" + candidate.hotkey);
         if (kind) {
@@ -161,6 +175,8 @@ class BbPitchPad {
     }
 }
 BbPitchPad.THROW_CODES = ["Space", "Enter", "NumpadEnter"];
+BbPitchPad.ARROW_STEP = 0.1;
+BbPitchPad.ARROWS = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] };
 class BbSwingButton {
     constructor(host, onSwing) {
         this.onSwing = onSwing;
@@ -209,6 +225,10 @@ class BbFadingNote {
         this.left = seconds;
         this.element.classList.add("open");
     }
+    hide() {
+        this.left = 0;
+        this.element.classList.remove("open");
+    }
     tick(frameSeconds) {
         if (this.left <= 0)
             return;
@@ -217,9 +237,9 @@ class BbFadingNote {
             this.element.classList.remove("open");
     }
 }
-class BbTimingGauge extends BbFadingNote {
+class BbTimingGauge {
     constructor(host) {
-        super(BbHudParts.box("bb-gauge", host));
+        this.element = BbHudParts.box("bb-gauge", host);
         this.label = BbHudParts.box("bb-gauge-label", this.element);
         const bar = BbHudParts.box("bb-gauge-bar", this.element);
         this.bands = BbTimingGauge.BAND_CLASSES.map(([, className]) => BbHudParts.box("bb-gauge-band " + className, bar));
@@ -230,20 +250,49 @@ class BbTimingGauge extends BbFadingNote {
         BbHudParts.box("", ends, "▶ 늦음");
     }
     show(swing, leniency) {
-        if (swing.adjusted === null)
+        this.element.classList.toggle("blank", swing.adjusted === null);
+        if (swing.adjusted === null) {
+            this.label.textContent = "지켜봄";
             return;
+        }
         const extra = BbTimingModel.BAND_EXTRA, range = swing.width + extra.poor * leniency + BbTimingGauge.MARGIN;
         const widthOf = (seconds) => (seconds / range * 100).toFixed(1) + "%";
         BbTimingGauge.BAND_CLASSES.forEach(([band], index) => { this.bands[index].style.width = widthOf(swing.width + extra[band] * leniency); });
         this.perfect.style.width = widthOf(swing.width);
         this.marker.style.left = (50 + BbCurve.clamp(swing.adjusted / range, -1, 1) * 50).toFixed(1) + "%";
         this.label.textContent = swing.band === "perfect" ? "정타" : swing.band === "good" ? "좋아요" : swing.adjusted < 0 ? "빨라요" : "늦었어요";
-        this.reveal(BbTimingGauge.SECONDS);
     }
 }
-BbTimingGauge.SECONDS = 1.2;
 BbTimingGauge.MARGIN = 0.03;
 BbTimingGauge.BAND_CLASSES = [["fair", "bb-gauge-fair"], ["good", "bb-gauge-good"]];
+class BbPitchReport extends BbFadingNote {
+    constructor(host) {
+        super(BbHudParts.box("bb-report", host));
+        const span = BbPitchReport.SPAN;
+        this.side = BbHudParts.box("bb-report-side", this.element);
+        const picture = BbHudParts.shape("svg", "bb-report-zone", this.element, { viewBox: [-span, -span, span * 2, span * 2].join(" ") });
+        BbHudParts.shape("rect", "bb-aim-strike", picture, { x: -1, y: -1, width: 2, height: 2 });
+        [-1 / 3, 1 / 3].forEach((line) => {
+            BbHudParts.shape("line", "bb-aim-grid", picture, { x1: line, y1: -1, x2: line, y2: 1 });
+            BbHudParts.shape("line", "bb-aim-grid", picture, { x1: -1, y1: line, x2: 1, y2: line });
+        });
+        this.ball = BbHudParts.shape("circle", "bb-report-ball", picture, { r: 0.2 });
+        this.pitch = BbHudParts.box("bb-report-pitch", this.element);
+        this.gauge = new BbTimingGauge(this.element);
+    }
+    show(roll, swing, leniency, view) {
+        const edge = BbPitchReport.SPAN - 0.2;
+        this.ball.style.transform = "translate(" + BbCurve.clamp(roll.arrive.u * BbPitchReport.SIDE_OF_VIEW[view], -edge, edge).toFixed(3) + "px," + BbCurve.clamp(-roll.arrive.v, -edge, edge).toFixed(3) + "px)";
+        this.side.textContent = BbPitchReport.VIEW_NAMES[view];
+        this.pitch.textContent = BbPitchCatalog.of(roll.pitch).label + "  " + Math.round(roll.speed) + "km/h";
+        this.gauge.show(swing, leniency);
+        this.reveal(BbPitchReport.SECONDS);
+    }
+}
+BbPitchReport.SECONDS = 4;
+BbPitchReport.SPAN = 1.9;
+BbPitchReport.SIDE_OF_VIEW = { pitcher: 1, batter: -1 };
+BbPitchReport.VIEW_NAMES = { pitcher: "투수 시선", batter: "타자 시선" };
 class BbCallToast extends BbFadingNote {
     constructor(host) {
         super(BbHudParts.box("bb-toast", host));

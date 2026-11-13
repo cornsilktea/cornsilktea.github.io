@@ -276,11 +276,11 @@ class BbBatStance {
         const shoulder = BbBodyDefaults.standingShoulderHeight(metrics), waggle = Math.sin(seconds * 3.1) * 0.05;
         const sketch = new BbPoseSketch(metrics)
             .hips(new BbVec(0, metrics.hipHeight - 0.035, 0), -0.1, 0.06)
-            .chest(-0.35, 0.1)
+            .chest(-0.45, 0.1)
             .feet(new BbVec(BbBatStance.FRONT_FOOT_X, metrics.ankleHeight, 0), new BbVec(-0.2, metrics.ankleHeight, 0));
         sketch.headFacing(1.05, 0.05);
-        const axis = new BbVec(-0.5 + waggle, 0.8, -0.05 - waggle * 0.5);
-        return sketch.holdBat(new BbVec(-0.3, shoulder, 0.25).minus(axis.unit().times(BbBatShape.GRIP_CENTER_AT)), axis);
+        const axis = new BbVec(-0.3 + waggle, 0.9, 0.16 - waggle * 0.5);
+        return sketch.holdBat(new BbVec(-0.27, shoulder - 0.05, 0.38).minus(axis.unit().times(BbBatShape.GRIP_CENTER_AT)), axis);
     }
     static loaded(metrics, liftRatio) {
         const shoulder = BbBodyDefaults.standingShoulderHeight(metrics), lift = Math.sin(liftRatio * Math.PI) * 0.07;
@@ -290,8 +290,8 @@ class BbBatStance {
             .chest(-0.45, 0.12)
             .feet(new BbVec(frontX, metrics.ankleHeight + lift, 0), new BbVec(-0.2, metrics.ankleHeight, 0));
         sketch.headFacing(1.05, 0.05);
-        const axis = new BbVec(-0.62, 0.7, -0.15);
-        return sketch.holdBat(new BbVec(-0.36, shoulder - 0.02, 0.2).minus(axis.unit().times(BbBatShape.GRIP_CENTER_AT)), axis);
+        const axis = new BbVec(-0.5, 0.8, 0.08);
+        return sketch.holdBat(new BbVec(-0.34, shoulder - 0.04, 0.34).minus(axis.unit().times(BbBatShape.GRIP_CENTER_AT)), axis);
     }
     static blend(from, to, ratio) {
         const mix = (a, b) => BbCurve.mix(a, b, ratio);
