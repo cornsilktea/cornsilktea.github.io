@@ -3,6 +3,7 @@ class BbPitchClock {
     constructor(host) {
         this.left = 0;
         this.shown = -1;
+        this.onWarn = () => undefined;
         this.element = BbHudParts.box("bb-clock", host);
     }
     start(seconds) {
@@ -24,6 +25,8 @@ class BbPitchClock {
             this.shown = whole;
             this.element.textContent = String(whole);
             this.element.classList.toggle("warn", whole <= BbPitchClock.WARN_SECONDS);
+            if (frameSeconds > 0 && whole > 0 && whole <= BbPitchClock.WARN_SECONDS)
+                this.onWarn();
         }
         if (this.left > 0)
             return false;
@@ -56,6 +59,7 @@ class BbMatchDirector {
         this.orbiting = false;
         this.halted = false;
         this.orbitAngle = 0;
+        this.atmosphere = null;
         this.cards = new BbMatchupCards(host);
         this.toast = new BbCallToast(host);
         this.report = new BbPitchReport(host);
@@ -65,6 +69,12 @@ class BbMatchDirector {
         this.scenes = new BbSceneFactory(() => this.stage.metrics);
         this.pad = new BbPitchPad(host, (call) => this.humanThrows(call));
         this.swing = new BbSwingButton(host, () => this.humanSwings());
+    }
+    attach(atmosphere) {
+        this.atmosphere = atmosphere;
+        this.player.onSound = (mark) => { if (this.running)
+            atmosphere.mark(mark); };
+        this.clock.onWarn = () => atmosphere.clockTick();
     }
     get isRunning() { return this.running; }
     get sequence() { return this.session.log.length; }
@@ -151,6 +161,8 @@ class BbMatchDirector {
         pending.started = true;
     }
     tick(frameSeconds) {
+        if (this.atmosphere && this.running)
+            this.atmosphere.tick(frameSeconds);
         this.toast.tick(frameSeconds);
         this.pad.tick(frameSeconds);
         if (!this.staged)
@@ -175,6 +187,10 @@ class BbMatchDirector {
         this.chance = new BbSeededRandom(plan.seed + 17);
         this.session = new BbDuelSession(plan.format, BbBallparkRegistry.MAIN.dimensions, plan.teams, new BbSeededRandom(plan.seed + plan.log.length * BbMatchDirector.RESUME_STRIDE));
         this.session.restore(plan.log);
+        if (plan.looks)
+            this.stage.dress(plan.looks);
+        if (this.atmosphere)
+            this.atmosphere.tension(false);
         this.hud.players(plan.names[0], plan.names[1]);
         this.queued.length = 0;
         this.pending = null;
@@ -266,6 +282,30 @@ class BbMatchDirector {
             this.toast.show(call.text);
         if (call.tally)
             this.ticker.tally(call.tally, this.session.board());
+        const moment = BbMatchDirector.momentOf(call);
+        if (moment && this.atmosphere && this.running)
+            this.atmosphere.moment(moment, this.battingNow());
+    }
+    static momentOf(call) {
+        if (call.tally === "out")
+            return "out";
+        if (call.tally === "run")
+            return "run";
+        if (call.text === "홈런!")
+            return "homer";
+        return call.text && call.tally === null ? "hit" : null;
+    }
+    battingNow() { return this.pending ? (this.pending.fielding === 0 ? 1 : 0) : this.session.battingIndex; }
+    feelCount(settled) {
+        const atmosphere = this.atmosphere;
+        if (!atmosphere || !this.running)
+            return;
+        const board = this.session.board(), runners = this.session.setting().runners, verdict = settled.note.toast || "";
+        if (verdict.indexOf("삼진") >= 0)
+            atmosphere.moment("out", this.battingNow());
+        else if (verdict.indexOf("볼넷") >= 0)
+            atmosphere.moment("hit", this.battingNow());
+        atmosphere.tension(!settled.note.halfOver && (board.strikes === 2 || !!runners[1] || !!runners[2]));
     }
     announce(pending) {
         const settled = pending.settled, outcome = settled.outcome, play = outcome.script, session = this.session;
@@ -273,8 +313,12 @@ class BbMatchDirector {
         this.ticker.thrown(!!play && play.result !== "FOUL");
         const verdict = play ? BbMatchDirector.IN_PLAY_VERDICT : settled.note.toast || BbMatchDirector.PLAIN_CALLS[outcome.kind];
         this.report.show(pending.roll, verdict, outcome.swing, pending.leniency, this.player.view);
-        if (play)
+        if (play) {
+            if (this.atmosphere)
+                this.atmosphere.tension(false);
             return;
+        }
+        this.feelCount(settled);
         this.ticker.settle(session.board());
         if (!settled.note.halfOver)
             this.showCards();
@@ -310,6 +354,8 @@ class BbMatchDirector {
             this.nextPitch();
             return;
         }
+        if (this.atmosphere && this.queued.length === 1)
+            this.atmosphere.swap();
         this.swing.hide();
         this.ticker.begin(this.session.board());
         player.play(swap);

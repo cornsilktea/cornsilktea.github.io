@@ -15,6 +15,7 @@ interface BbRoomMatch {
   sheets: [BbTeamSheet, BbTeamSheet];
   names: [string, string];
   level: BbAiLevelId;
+  looks?: [CharacterLook, CharacterLook];
 }
 
 interface BbRoomEnd {
@@ -30,7 +31,7 @@ interface BbNetEntry { p?: BbNetPitch; r?: BbNetRoll; s?: BbNetSwing }
 class BbRoomRules {
   static readonly AI_SEAT = "ai";
   static readonly RULES: RkRoomRules = { root: "baseballduel/rooms", seatCount: 2, spectatorSlot: 9, seatOrder: [0, 1], spectatorLimit: 8 };
-  static readonly VALUES: readonly string[] = ["match", "setup", "end", "vsAt", "assign"];
+  static readonly VALUES: readonly string[] = ["match", "setup", "end", "vsAt", "assign", "flip"];
   static readonly HOST_TEAM = 1;
   static readonly BLANK_SETUP: BbRoomSetup = { mode: "match", level: "normal", ai: false };
 
@@ -48,6 +49,14 @@ class BbRoomRules {
   static setupOf(value: BbRoomSetup | null): BbRoomSetup {
     if (!value || !BbAiLevel.ALL[value.level] || BbModeRules.ORDER.indexOf(value.mode) < 0) return BbRoomRules.BLANK_SETUP;
     return { mode: value.mode, level: value.level, ai: !!value.ai };
+  }
+
+  static sideLabels(flip: boolean): [string, string] {
+    return flip ? ["손님 · 말 공격", "방장 · 초 공격"] : ["손님 · 초 공격", "방장 · 말 공격"];
+  }
+
+  static seatIds(guest: string | null, host: string | null, flip: boolean): [string | null, string | null] {
+    return flip ? [host, guest] : [guest, host];
   }
 
   static teamOf(match: BbRoomMatch, id: string): 0 | 1 | null { return match.seats.s0 === id ? 0 : match.seats.s1 === id ? 1 : null; }

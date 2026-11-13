@@ -6,13 +6,13 @@ class BbSceneFactory {
     setup(hands) { return { metrics: this.metrics(), batsLeft: hands.batsLeft, throwsLeft: hands.throwsLeft }; }
     pitch(cue, fielding, hands) {
         const play = new BbPlayChoreographer(cue), script = play.build(this.setup(hands));
-        return { script, director: new BbCameraDirector(play.cameraCues), calls: play.calls, sparks: play.sparks, tracks: play.runnerTracks, mark: play.crossedAt, arriveAt: play.arriveAt, fielding, title: play.title };
+        return { script, director: new BbCameraDirector(play.cameraCues), calls: play.calls, sparks: play.sparks, sounds: play.sounds, tracks: play.runnerTracks, mark: play.crossedAt, arriveAt: play.arriveAt, fielding, title: play.title };
     }
     swap(leaving, hands) {
         const entering = leaving === 0 ? 1 : 0;
         return [[false, leaving], [true, entering]].map(([comesIn, team]) => {
             const swap = new BbSwapChoreographer(comesIn, BbSceneFactory.DUGOUT_SIDES[team]);
-            return { script: swap.build(this.setup(hands)), director: new BbCameraDirector(swap.cameraCues), calls: swap.calls, sparks: [], tracks: swap.runnerTracks, mark: null, arriveAt: swap.arriveAt, fielding: team, title: swap.title };
+            return { script: swap.build(this.setup(hands)), director: new BbCameraDirector(swap.cameraCues), calls: swap.calls, sparks: [], sounds: [], tracks: swap.runnerTracks, mark: null, arriveAt: swap.arriveAt, fielding: team, title: swap.title };
         });
     }
 }
@@ -25,6 +25,7 @@ class BbScenePlayer {
         this.view = "pitcher";
         this.clock = 0;
         this.cut = true;
+        this.onSound = () => undefined;
     }
     get seconds() { return this.clock; }
     get arriveAt() { return this.scene.arriveAt; }
@@ -44,8 +45,8 @@ class BbScenePlayer {
     }
     idle(frameSeconds) { this.draw(frameSeconds); }
     skip() { if (!this.finished)
-        this.advance(this.scene.script.duration - this.clock + 0.001); }
-    advance(deltaSeconds) {
+        this.advance(this.scene.script.duration - this.clock + 0.001, true); }
+    advance(deltaSeconds, quiet = false) {
         const before = this.clock, scene = this.scene;
         this.clock += deltaSeconds;
         this.draw(deltaSeconds);
@@ -53,6 +54,9 @@ class BbScenePlayer {
             this.stage.spark(spark.point); });
         scene.calls.forEach((call) => { if (before < call.at && this.clock >= call.at)
             this.onCall(call); });
+        if (!quiet)
+            scene.sounds.forEach((mark) => { if (before < mark.at && this.clock >= mark.at)
+                this.onSound(mark); });
     }
     draw(deltaSeconds) {
         const scene = this.scene, shown = Math.max(0, this.clock);

@@ -3,6 +3,7 @@ interface BbScene {
   director: BbCameraDirector;
   calls: readonly BbCallCue[];
   sparks: readonly BbEffectCue[];
+  sounds: readonly BbSoundMark[];
   tracks: readonly BbRunnerTrack[];
   mark: BbVec | null;
   arriveAt: number;
@@ -19,14 +20,14 @@ class BbSceneFactory {
 
   pitch(cue: BbPitchCue, fielding: 0 | 1, hands: BbStageCast): BbScene {
     const play = new BbPlayChoreographer(cue), script = play.build(this.setup(hands));
-    return { script, director: new BbCameraDirector(play.cameraCues), calls: play.calls, sparks: play.sparks, tracks: play.runnerTracks, mark: play.crossedAt, arriveAt: play.arriveAt, fielding, title: play.title };
+    return { script, director: new BbCameraDirector(play.cameraCues), calls: play.calls, sparks: play.sparks, sounds: play.sounds, tracks: play.runnerTracks, mark: play.crossedAt, arriveAt: play.arriveAt, fielding, title: play.title };
   }
 
   swap(leaving: 0 | 1, hands: BbStageCast): BbScene[] {
     const entering: 0 | 1 = leaving === 0 ? 1 : 0;
     return ([[false, leaving], [true, entering]] as Array<[boolean, 0 | 1]>).map(([comesIn, team]) => {
       const swap = new BbSwapChoreographer(comesIn, BbSceneFactory.DUGOUT_SIDES[team]);
-      return { script: swap.build(this.setup(hands)), director: new BbCameraDirector(swap.cameraCues), calls: swap.calls, sparks: [], tracks: swap.runnerTracks, mark: null, arriveAt: swap.arriveAt, fielding: team, title: swap.title };
+      return { script: swap.build(this.setup(hands)), director: new BbCameraDirector(swap.cameraCues), calls: swap.calls, sparks: [], sounds: [], tracks: swap.runnerTracks, mark: null, arriveAt: swap.arriveAt, fielding: team, title: swap.title };
     });
   }
 }
@@ -39,6 +40,8 @@ class BbScenePlayer {
   private directed!: BbDirectedShot;
   private clock = 0;
   private cut = true;
+
+  onSound: (mark: BbSoundMark) => void = () => undefined;
 
   constructor(private readonly stage: BbStage, private readonly hud: BbScoreHud, private readonly onCall: (call: BbCallCue) => void) {}
 
@@ -63,14 +66,15 @@ class BbScenePlayer {
 
   idle(frameSeconds: number): void { this.draw(frameSeconds); }
 
-  skip(): void { if (!this.finished) this.advance(this.scene.script.duration - this.clock + 0.001); }
+  skip(): void { if (!this.finished) this.advance(this.scene.script.duration - this.clock + 0.001, true); }
 
-  advance(deltaSeconds: number): void {
+  advance(deltaSeconds: number, quiet = false): void {
     const before = this.clock, scene = this.scene;
     this.clock += deltaSeconds;
     this.draw(deltaSeconds);
     scene.sparks.forEach((spark) => { if (before < spark.at && this.clock >= spark.at) this.stage.spark(spark.point); });
     scene.calls.forEach((call) => { if (before < call.at && this.clock >= call.at) this.onCall(call); });
+    if (!quiet) scene.sounds.forEach((mark) => { if (before < mark.at && this.clock >= mark.at) this.onSound(mark); });
   }
 
   private draw(deltaSeconds: number): void {

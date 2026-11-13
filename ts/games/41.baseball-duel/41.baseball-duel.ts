@@ -37,17 +37,20 @@ class BbModeRules {
 
   static humanTeam(mode: BbGameMode): 0 | 1 { return BbModeRules.HUMAN_TEAM[mode]; }
 
+  static aiLook(team: 0 | 1): CharacterLook { return CharacterLooks.clean(team === 0 ? { c: 1, p: { skin: 3, hair: 2 } } : { c: 4, p: { skin: 1, hair: 5 } }); }
+
   static plan(game: BbLocalGame): BbMatchPlan {
-    const human = BbModeRules.humanTeam(game.mode), level = BbAiLevel.ALL[game.level], rival = "AI " + level.label;
+    const human = BbModeRules.humanTeam(game.mode), level = BbAiLevel.ALL[game.level], rival = "AI " + level.label, mine = new PlayerProfile().look;
     return {
       format: new BbOneInningFormat(), teams: game.teams, names: human === 1 ? [rival, game.me] : [game.me, rival], seats: human === 1 ? ["ai", "human"] : ["human", "ai"],
-      level, seed: game.seed, halvesToPlay: game.mode === "match" ? null : 1, log: game.log, view: null, autoSwingAt: null
+      level, seed: game.seed, halvesToPlay: game.mode === "match" ? null : 1, log: game.log, view: null, autoSwingAt: null,
+      looks: human === 1 ? [BbModeRules.aiLook(0), mine] : [mine, BbModeRules.aiLook(1)]
     };
   }
 
   static showcase(seed: number): BbMatchPlan {
     const team = (): BbTeamSheet => ({ lineup: [BbAiLevel.batterSheet("R")], pitchers: [BbAiLevel.pitcherSheet("R")] });
-    return { format: new BbThreeInningFormat(), teams: [team(), team()], names: ["", ""], seats: ["ai", "ai"], level: BbAiLevel.ALL.normal, seed, halvesToPlay: null, log: [], view: "pitcher", autoSwingAt: null };
+    return { format: new BbThreeInningFormat(), teams: [team(), team()], names: ["", ""], seats: ["ai", "ai"], level: BbAiLevel.ALL.normal, seed, halvesToPlay: null, log: [], view: "pitcher", autoSwingAt: null, looks: [BbModeRules.aiLook(0), BbModeRules.aiLook(1)] };
   }
 }
 
@@ -59,6 +62,8 @@ interface BbRoomView {
   editable: boolean;
   watchers: number;
   notice: string;
+  flip: boolean;
+  faces: [string | null, string | null];
 }
 
 interface BbRoomActions {
@@ -73,6 +78,8 @@ class BbRoomCard {
   private readonly modes: HTMLButtonElement[];
   private readonly levels: HTMLButtonElement[];
   private readonly seats: HTMLElement;
+  private readonly sides: [HTMLElement, HTMLElement];
+  private readonly faces: [HTMLImageElement, HTMLImageElement];
   private readonly rival: HTMLElement;
   private readonly owner: HTMLElement;
   private readonly addAi: HTMLButtonElement;
@@ -91,12 +98,20 @@ class BbRoomCard {
     this.modes = BbModeRules.ORDER.map((mode) => BbSheetParts.button("bb-room-chip", modeRow, BbModeRules.LABELS[mode], () => change({ mode })));
     this.seats = BbHudParts.box("bb-room-seats", mount);
     const guest = BbHudParts.box("bb-room-seat", this.seats);
-    BbHudParts.box("bb-room-side", guest, "손님 · 초 공격");
+    const labels = BbRoomRules.sideLabels(false), guestSide = BbHudParts.box("bb-room-side", guest, labels[0]), face = (seat: HTMLElement) => {
+      const image = document.createElement("img");
+      image.className = "bb-room-face";
+      image.alt = "";
+      seat.appendChild(image);
+      return image;
+    };
+    const guestFace = face(guest);
     this.rival = BbHudParts.box("bb-room-name", guest);
     this.addAi = BbSheetParts.button("bb-room-chip", guest, "AI 추가", () => change({ ai: true }));
     this.dropAi = BbSheetParts.button("bb-room-chip", guest, "AI 제거", () => change({ ai: false }));
     const host = BbHudParts.box("bb-room-seat", this.seats);
-    BbHudParts.box("bb-room-side", host, "방장 · 말 공격");
+    this.sides = [guestSide, BbHudParts.box("bb-room-side", host, labels[1])];
+    this.faces = [guestFace, face(host)];
     this.owner = BbHudParts.box("bb-room-name", host);
     this.levelLabel = BbHudParts.box("bb-room-label", mount, "AI 난이도");
     this.levelRow = BbHudParts.box("bb-room-row", mount);
@@ -113,6 +128,14 @@ class BbRoomCard {
     this.modes.forEach((button, index) => { button.classList.toggle("on", BbModeRules.ORDER[index] === setup.mode); button.disabled = !view.editable; });
     this.levels.forEach((button, index) => { button.classList.toggle("on", BbRoomCard.LEVELS[index] === setup.level); button.disabled = !view.editable; });
     this.seats.hidden = !match;
+    const labels = BbRoomRules.sideLabels(view.flip);
+    this.sides[0].textContent = labels[0];
+    this.sides[1].textContent = labels[1];
+    this.faces.forEach((image, index) => {
+      const url = view.faces[index];
+      image.hidden = !url;
+      if (url && image.src !== url) image.src = url;
+    });
     this.rival.textContent = view.guest || (ai ? "🤖 AI (" + BbAiLevel.ALL[setup.level].label + ")" : "사람을 기다리는 중");
     this.owner.textContent = view.host;
     this.addAi.hidden = !view.editable || !!view.guest || ai;
@@ -196,6 +219,7 @@ class BbDuelGame {
   private static readonly SEED_SPAN = 1000000007;
   private static readonly AI_FALLBACK_MS = 120000;
   private static readonly CLIENT_VERSION = 20261113;
+  private static readonly QUALITY_KEY = "baseballduel_quality_v1";
 
   private readonly stage: BbStage;
   private readonly hud: BbScoreHud;
@@ -227,6 +251,8 @@ class BbDuelGame {
   private readonly versus: VersusCurtain;
   private readonly board: BbBoardPanel;
   private random: MkRandomFlow | null = null;
+  private readonly sound: BbSoundDirector;
+  private quality: QualityGovernorHandle | null = null;
 
   constructor(libs: ThreeLibs) {
     const controls = document.getElementById("bbControls") as HTMLElement, dialogs = document.getElementById("bbDialogs") as HTMLElement;
@@ -239,10 +265,16 @@ class BbDuelGame {
     this.corner.addEventListener("click", () => this.sheet.open());
     this.room = new BbRoomCard(document.getElementById("roomMount") as HTMLElement, { change: (setup) => this.changeSetup(setup), start: () => this.startFromRoom(), leave: () => this.leaveRoom("") });
     this.result = new BbResultCard(document.getElementById("resultMount") as HTMLElement, () => this.again(), () => this.leaveRoom(""));
+    this.sound = new BbSoundDirector(() => this.stage.listener);
+    this.director.attach(new BbAtmosphere(this.stage, this.sound));
+    const prefs = this.sound.settings;
     this.menu = new BbGameMenu(controls, [
       { label: "연출 빠르게", onFlip: (on) => this.director.quicken(on) },
-      { label: "타자 시점으로 보기(관전)", onFlip: (on) => this.director.watch(on ? "batter" : "pitcher") }
-    ], [["연출 건너뛰기", () => this.director.skipScene()], ["나가기", () => this.leaveGame()]]);
+      { label: "타자 시점으로 보기(관전)", onFlip: (on) => this.director.watch(on ? "batter" : "pitcher") },
+      { label: "효과음", on: prefs.fx, onFlip: (on) => this.sound.change({ fx: on }) },
+      { label: "응원 소리", on: prefs.crowd, onFlip: (on) => this.sound.change({ crowd: on }) }
+    ], [["연출 건너뛰기", () => this.director.skipScene()], ["나가기", () => this.leaveGame()]],
+    [{ labels: BbSoundSettings.VOLUME_LABELS, index: Math.max(0, BbSoundSettings.VOLUMES.indexOf(prefs.volume)), onPick: (index) => this.sound.change({ volume: BbSoundSettings.VOLUMES[index] }) }]);
     (document.getElementById("btnCreate") as HTMLElement).addEventListener("click", () => { this.createRoom(); });
     (document.getElementById("btnRandom") as HTMLElement).addEventListener("click", () => { this.createParty(); });
     (document.getElementById("btnJoin") as HTMLElement).addEventListener("click", () => { this.joinRoom(); });
@@ -250,7 +282,7 @@ class BbDuelGame {
     this.versus = new VersusCurtain(document.getElementById("versusCurtain") as HTMLElement, new BbVersusContent(), {
       inRoom: () => !!this.session, waiting: () => !!this.session && this.session.status === "lobby", randomMatch: () => !!this.ticket(),
       roomShownAt: () => (this.session ? Number(this.session.value<number>("vsAt")) || 0 : 0), sides: () => this.versusSides(), now: () => this.backend.now()
-    }, ["손님 · 초 공격", "방장 · 말 공격"]);
+    }, ["초 공격", "말 공격"]);
     const portal = window.PORTAL_CLASS;
     this.board = new BbBoardPanel(document.getElementById("boardMount") as HTMLElement, this.backend, portal ? portal.id : null);
     this.account.bind();
@@ -262,6 +294,12 @@ class BbDuelGame {
     this.zones.load(this.backend);
     this.board.load();
     await this.stage.load(BbDuelGame.ASSET_DIRECTORY, BbBallparkRegistry.MAIN, { batsLeft: false, throwsLeft: false });
+    const govern = window.QualityGovernor;
+    if (govern) {
+      this.quality = govern({ steps: this.stage.qualitySteps(), storageKey: BbDuelGame.QUALITY_KEY, isPlaying: () => this.director.isRunning && !this.liveOver && this.shown === null, slowSec: 0.022, slowLimit: 90 });
+      this.quality.restore();
+    }
+    this.versus.sync();
     const saved = BbLocalResume.load();
     if (saved) this.play(saved, "방금 상황을 불러왔어요");
     else {
@@ -281,6 +319,7 @@ class BbDuelGame {
       link.pump();
     }
     this.director.tick(frameSeconds);
+    if (this.quality) this.quality.update(frameSeconds);
   }
 
   private myName(): string { return PlayerProfile.storedNick() || "나"; }
@@ -348,15 +387,18 @@ class BbDuelGame {
     if (!session) return null;
     const ticket = this.ticket(), assign = session.value<Record<string, number>>("assign"), setup = BbRoomRules.setupOf(session.value<BbRoomSetup>("setup"));
     const seats = this.seatPlan.humanSeats(session.players);
-    const ids: [string | null, string | null] = ticket && assign ? [BbRoomRules.assignedTo(assign, 0), BbRoomRules.assignedTo(assign, 1)] : [seats[0], seats[BbRoomRules.HOST_TEAM]];
+    const ids: [string | null, string | null] = ticket && assign ? [BbRoomRules.assignedTo(assign, 0), BbRoomRules.assignedTo(assign, 1)] : BbRoomRules.seatIds(seats[0], seats[BbRoomRules.HOST_TEAM], this.flipped(session));
     if (!ids[0] && !ids[1]) return null;
     const names = (ticket && ticket.rivalIds) || {};
     const side = (team: 0 | 1): VersusSideData => {
       const id = ids[team], record = id ? session.players.get(id) || null : null, ai = !id && (!!ticket || setup.ai);
-      return BbVersusLineup.side(id, record ? { nick: record.nick, vs: record.vs } : null, ai ? "AI" : id ? names[id] || "" : "", team, this.myId, ai);
+      const portrait = ai ? this.stage.portrait(BbModeRules.aiLook(team), team) : record ? this.stage.portrait(BbWardrobe.lookOf(record.look, BbModeRules.aiLook(team)), team) : null;
+      return BbVersusLineup.side(id, record ? { nick: record.nick, vs: record.vs } : null, ai ? "AI" : id ? names[id] || "" : "", team, this.myId, ai, portrait);
     };
     return [side(0), side(1)];
   }
+
+  private flipped(session: RkSession<BbPlayerRecord>): boolean { return !this.ticket() && !!session.value<boolean>("flip"); }
 
   private leaveReport(randomOnly: boolean): BbStatsReport | null {
     const live = this.live, session = this.session, summary = this.director.summary();
@@ -442,11 +484,22 @@ class BbDuelGame {
 
   private drawRoom(note: string): void {
     const session = this.session;
-    if (!session) { this.room.draw({ code: "", setup: this.setup, guest: null, host: this.myName(), editable: true, watchers: 0, notice: note }); return; }
+    if (!session) {
+      const faces: [string | null, string | null] = [this.setup.ai ? this.stage.portrait(BbModeRules.aiLook(0), 0) : null, this.stage.portrait(this.profile.look, 1)];
+      this.room.draw({ code: "", setup: this.setup, guest: null, host: this.myName(), editable: true, watchers: 0, notice: note, flip: false, faces });
+      return;
+    }
     const seats = this.seatPlan.humanSeats(session.players), nameOf = (id: string | null) => { const record = id ? session.players.get(id) : null; return record ? record.nick : null; };
+    const setup = BbRoomRules.setupOf(session.value<BbRoomSetup>("setup")), flip = this.flipped(session), guestTeam: 0 | 1 = flip ? 1 : 0, hostTeam: 0 | 1 = flip ? 0 : 1;
+    const faceOf = (id: string | null, team: 0 | 1): string | null => {
+      const record = id ? session.players.get(id) : null;
+      if (record) return this.stage.portrait(BbWardrobe.lookOf(record.look, BbModeRules.aiLook(team)), team);
+      return !id && setup.ai ? this.stage.portrait(BbModeRules.aiLook(team), team) : null;
+    };
     this.room.draw({
-      code: session.code, setup: BbRoomRules.setupOf(session.value<BbRoomSetup>("setup")), guest: nameOf(seats[0]), host: nameOf(seats[BbRoomRules.HOST_TEAM]) || "방장",
-      editable: session.isHost(), watchers: this.seatPlan.spectators(session.players).length, notice: session.isSpectator() ? "관전으로 들어왔습니다" : note
+      code: session.code, setup, guest: nameOf(seats[0]), host: nameOf(seats[BbRoomRules.HOST_TEAM]) || "방장",
+      editable: session.isHost(), watchers: this.seatPlan.spectators(session.players).length, notice: session.isSpectator() ? "관전으로 들어왔습니다" : note, flip,
+      faces: [faceOf(seats[0], guestTeam), faceOf(seats[BbRoomRules.HOST_TEAM], hostTeam)]
     });
   }
 
@@ -500,9 +553,12 @@ class BbDuelGame {
     const guestId = this.guestId(session), guest = guestId ? session.players.get(guestId) || null : null, mine = session.me();
     if (!mine || (!guest && !setup.ai)) return;
     const rival: BbTeamSheet = guest ? BbProfileStore.teamOf(guest.sheet) : { lineup: [BbAiLevel.batterSheet("R")], pitchers: [BbAiLevel.pitcherSheet("R")] };
+    const flip = !randomMatch && this.flipped(session), rivalId = guest ? guestId as string : BbRoomRules.AI_SEAT, rivalName = guest ? guest.nick : "AI " + BbAiLevel.ALL[setup.level].label;
+    const ids = BbRoomRules.seatIds(rivalId, this.myId, flip) as [string, string], ownSheet = BbProfileStore.teamOf(mine.sheet);
+    const lookOf = (id: string, team: 0 | 1): CharacterLook => { const record = session.players.get(id); return BbWardrobe.lookOf(record ? record.look : null, BbModeRules.aiLook(team)); };
     const match: BbRoomMatch = {
-      id: this.backend.now(), seats: { s0: guest ? guestId as string : BbRoomRules.AI_SEAT, s1: this.myId }, sheets: [rival, BbProfileStore.teamOf(mine.sheet)],
-      names: [guest ? guest.nick : "AI " + BbAiLevel.ALL[setup.level].label, mine.nick], level: setup.level
+      id: this.backend.now(), seats: { s0: ids[0], s1: ids[1] }, sheets: flip ? [ownSheet, rival] : [rival, ownSheet],
+      names: flip ? [mine.nick, rivalName] : [rivalName, mine.nick], level: setup.level, looks: [lookOf(ids[0], 0), lookOf(ids[1], 1)]
     };
     session.ref.update({ match, status: "play", end: null, log: null });
   }
@@ -529,7 +585,8 @@ class BbDuelGame {
     this.director.begin({
       format: new BbOneInningFormat(), teams: [BbProfileStore.teamOf(match.sheets[0]), BbProfileStore.teamOf(match.sheets[1])], names: match.names,
       seats: BbRoomRules.seatsFor(match, this.myId, session.isHost()), level: BbAiLevel.ALL[match.level] || BbAiLevel.ALL.normal, seed: match.id % BbDuelGame.SEED_SPAN,
-      halvesToPlay: null, log, view: BbRoomRules.teamOf(match, this.myId) === null ? "pitcher" : null, autoSwingAt: null, scouting: this.scouting(session, match)
+      halvesToPlay: null, log, view: BbRoomRules.teamOf(match, this.myId) === null ? "pitcher" : null, autoSwingAt: null, scouting: this.scouting(session, match),
+      looks: [BbWardrobe.lookOf(match.looks ? match.looks[0] : null, BbModeRules.aiLook(0)), BbWardrobe.lookOf(match.looks ? match.looks[1] : null, BbModeRules.aiLook(1))]
     }, link);
     if (log.length) this.director.say("방금 상황을 불러왔어요");
     if (this.random) this.random.armMatch();
@@ -583,7 +640,7 @@ class BbDuelGame {
       this.liveOver = true;
       this.pause.clear();
       const mine = BbRoomRules.teamOf(live, this.myId), random = this.random, ticket = this.ticket(), session = this.session;
-      const hostLabel = this.session && this.session.isHost() ? "방으로 돌아가기" : "방장을 기다리는 중";
+      const hostLabel = this.session && this.session.isHost() ? "한 번 더 (공수 교대)" : "방장을 기다리는 중";
       this.result.show(summary, "match", mine, ticket ? "" : hostLabel, ticket ? "팀 대기실로" : "나가기");
       this.showScreen("resultScreen");
       this.showcase();
@@ -614,7 +671,9 @@ class BbDuelGame {
   private again(): void {
     const session = this.session;
     if (!session) { this.startGame(this.last.mode, this.last.level); return; }
-    if (session.isHost()) session.ref.update({ status: "lobby", match: null, end: null, log: null });
+    if (!session.isHost()) return;
+    const flip = !this.flipped(session);
+    session.ref.update({ status: "lobby", match: null, end: null, log: null, vsAt: null, flip }).then(() => { if (this.session === session) this.startFromRoom(); }).catch(() => undefined);
   }
 
   private dropSession(): void {

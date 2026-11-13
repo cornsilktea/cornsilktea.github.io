@@ -265,6 +265,7 @@ class BbGearFactory {
 class BbPlayerActor {
     constructor(libs, factory, assets, gear, outfit) {
         this.libs = libs;
+        this.outfit = outfit;
         this.shownYaw = 0;
         this.snapYaw = true;
         this.lastFrame = null;
@@ -311,6 +312,10 @@ class BbPlayerActor {
         if (this.lastFrame && this.weight > 0)
             this.poser.apply(this.lastFrame, this.weight);
         this.placeBat(frame);
+    }
+    standStill(seconds) {
+        this.animator.play("Idle_A");
+        this.animator.update(seconds);
     }
     turnToward(yaw, deltaSeconds) {
         const gap = Math.atan2(Math.sin(yaw - this.shownYaw), Math.cos(yaw - this.shownYaw)), step = BbPlayerActor.TURN_SPEED * deltaSeconds;
@@ -421,3 +426,67 @@ BbBallActor.RELEASE_BLEND_SECONDS = 0.1;
 BbBallActor.SHADOW_RADIUS = 0.062;
 BbBallActor.SHADOW_GROWTH = 0.22;
 BbBallActor.SHADOW_LIFT = 0.012;
+class BbWardrobe {
+    constructor(libs, factory, assets, gear) {
+        this.libs = libs;
+        this.factory = factory;
+        this.assets = assets;
+        this.gear = gear;
+    }
+    static sameLook(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
+    static lookOf(raw, fallback) { return raw ? CharacterLooks.clean(raw) : fallback; }
+    actor(outfit) { return new BbPlayerActor(this.libs, this.factory, this.assets, this.gear, outfit); }
+}
+class BbPortraitStudio {
+    constructor(libs, wardrobe) {
+        this.libs = libs;
+        this.wardrobe = wardrobe;
+        this.cache = new Map();
+        this.renderer = null;
+        this.scene = null;
+        this.camera = null;
+    }
+    shoot(look, kit) {
+        const key = JSON.stringify(look) + "|" + kit.cap;
+        const cached = this.cache.get(key);
+        if (cached)
+            return cached;
+        try {
+            const url = this.render(look, kit);
+            this.cache.set(key, url);
+            return url;
+        }
+        catch (error) {
+            return null;
+        }
+    }
+    render(look, kit) {
+        const THREE = this.libs.THREE;
+        if (!this.renderer || !this.scene || !this.camera) {
+            const canvas = document.createElement("canvas");
+            canvas.width = canvas.height = BbPortraitStudio.SIZE;
+            this.renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, preserveDrawingBuffer: true });
+            this.renderer.setClearColor(0x000000, 0);
+            this.renderer.setSize(BbPortraitStudio.SIZE, BbPortraitStudio.SIZE, false);
+            this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+            this.scene = new THREE.Scene();
+            this.scene.add(new THREE.HemisphereLight(0xfff6e4, 0x5a6a50, 1.4));
+            const sun = new THREE.DirectionalLight(0xffefd2, 1.3);
+            sun.position.set(-2, 4, 5);
+            this.scene.add(sun);
+            this.camera = new THREE.PerspectiveCamera(26, 1, 0.05, 50);
+        }
+        const actor = this.wardrobe.actor({ look, kit, headGear: "cap", gloveSide: null, chestProtector: false, carriesBat: false, flapOnLeft: false });
+        actor.standStill(0.4);
+        this.scene.add(actor.root);
+        actor.root.updateMatrixWorld(true);
+        const box = new THREE.Box3().setFromObject(actor.root), size = box.getSize(new THREE.Vector3()), focus = new THREE.Vector3((box.min.x + box.max.x) / 2, box.max.y - size.y * 0.24, (box.min.z + box.max.z) / 2);
+        const distance = size.y * 0.42 / Math.tan(13 * Math.PI / 180) + size.z * 0.5;
+        this.camera.position.set(focus.x + distance * 0.18, focus.y + size.y * 0.04, focus.z + distance);
+        this.camera.lookAt(focus);
+        this.renderer.render(this.scene, this.camera);
+        this.scene.remove(actor.root);
+        return this.renderer.domElement.toDataURL("image/png");
+    }
+}
+BbPortraitStudio.SIZE = 160;

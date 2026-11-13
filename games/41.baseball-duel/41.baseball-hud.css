@@ -198,6 +198,9 @@ body.menu #hudTop,body.menu #bbControls{display:none}
 .bb-room-side{font-size:12px;font-weight:800;color:#D97B4F}
 .bb-room-name{font-size:17px;font-weight:800;min-height:24px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bb-room-seat .bb-room-chip{flex:none}
+.bb-room-face{width:72px;height:72px;align-self:center;border-radius:50%;background:rgba(0,0,0,.28);object-fit:cover}
+.bb-room-face[hidden]{display:none}
+@media (max-height:520px){.bb-room-face{width:48px;height:48px}}
 #roomMount .st-btn{margin-top:10px}
 #roomMount .st-btn.primary{margin-top:14px}
 .bb-result-headline{font-family:"Black Han Sans","Nanum Gothic","Malgun Gothic",sans-serif;font-size:clamp(34px,7vw,54px);color:#fff;text-shadow:4px 5px 0 #D97B4F}

@@ -203,12 +203,22 @@ class BbSheetDialog {
 BbSheetDialog.TABS = ["투수", "타자"];
 class BbGameMenu {
     shut() { this.panel.classList.remove("open"); }
-    constructor(host, toggles, actions) {
+    constructor(host, toggles, actions, cycles = []) {
         const corner = BbHudParts.box("bb-menu", host);
         BbSheetParts.button("bb-menu-open", corner, "⋯", () => this.panel.classList.toggle("open"));
         this.panel = BbHudParts.box("bb-menu-panel", corner);
         toggles.forEach((toggle) => {
             const item = BbSheetParts.button("bb-menu-item", this.panel, toggle.label, () => toggle.onFlip(item.classList.toggle("on")));
+            if (toggle.on)
+                item.classList.add("on");
+        });
+        cycles.forEach((cycle) => {
+            let index = cycle.index;
+            const item = BbSheetParts.button("bb-menu-item", this.panel, cycle.labels[index], () => {
+                index = (index + 1) % cycle.labels.length;
+                item.textContent = cycle.labels[index];
+                cycle.onPick(index);
+            });
         });
         actions.forEach(([label, run]) => BbSheetParts.button("bb-menu-item", this.panel, label, () => { this.panel.classList.remove("open"); run(); }));
     }

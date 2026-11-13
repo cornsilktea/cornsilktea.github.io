@@ -26,11 +26,11 @@ class BbVersusContent implements VersusCurtainContent {
 }
 
 class BbVersusLineup {
-  static side(id: string | null, person: BbVersusPerson | null, fallbackNick: string, team: 0 | 1, myId: string, ai: boolean): VersusSideData {
+  static side(id: string | null, person: BbVersusPerson | null, fallbackNick: string, team: 0 | 1, myId: string, ai: boolean, portrait: string | null = null): VersusSideData {
     const color = BbVersusContent.COLORS[team];
-    if (ai) return { nick: fallbackNick || "AI", kind: "ai", me: false, portrait: null, color, payload: null };
+    if (ai) return { nick: fallbackNick || "AI", kind: "ai", me: false, portrait, color, payload: null };
     if (!id) return { nick: "상대", kind: "empty", me: false, portrait: null, color, payload: null };
     if (!person) return { nick: fallbackNick || "상대", kind: "pending", me: false, portrait: null, color, payload: null };
-    return { nick: person.nick || "학생", kind: "player", me: id === myId, portrait: null, color, payload: BbVersusCards.fromRoom(person.vs) };
+    return { nick: person.nick || "학생", kind: "player", me: id === myId, portrait, color, payload: BbVersusCards.fromRoom(person.vs) };
   }
 }

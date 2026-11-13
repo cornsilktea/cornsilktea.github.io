@@ -261,8 +261,6 @@ class BbGroundPainter {
 
 class BbBallparkBuilder {
   private static readonly SEAT_COLORS: readonly string[] = ["#2d5fa8", "#2a579b", "#31649f"];
-  private static readonly SHIRT_COLORS: readonly string[] = ["#e9e6dc", "#d9534f", "#3b6fb6", "#f0c040", "#4caf7a", "#8e6bbf", "#f08a3e", "#2f3640", "#e8a0b8", "#7fb6d9"];
-  private static readonly SKIN_COLORS: readonly string[] = ["#FFE0C8", "#F6C09C", "#E2A981", "#C98A62", "#A86A48"];
   private static readonly WALL_PANELS = 16;
   private static readonly FOUL_LINE_START = 1.72;
   private static readonly PLATE_RIM = 0;
@@ -270,6 +268,7 @@ class BbBallparkBuilder {
   private static readonly TIER_RISE = 0.85;
 
   readonly group: Three<"Group">;
+  crowdSeats: readonly number[] = [];
   private readonly outline: BbParkOutline;
   private readonly random = new BbScatter(20261112);
 
@@ -547,22 +546,7 @@ class BbBallparkBuilder {
     this.addCrowd(bodies);
   }
 
-  private addCrowd(seats: readonly number[]): void {
-    const THREE = this.libs.THREE, total = seats.length / 3, matrix = new THREE.Matrix4(), color = new THREE.Color();
-    const torsos = new THREE.InstancedMesh(new THREE.BoxGeometry(0.44, 0.52, 0.3), new THREE.MeshLambertMaterial(), total);
-    const heads = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.17, 0), new THREE.MeshLambertMaterial(), total);
-    for (let index = 0; index < total; index++) {
-      const x = seats[index * 3], y = seats[index * 3 + 1], z = -seats[index * 3 + 2], lift = this.random.between(0, 0.07);
-      matrix.makeTranslation(x, y + 0.36 + lift, z);
-      torsos.setMatrixAt(index, matrix);
-      torsos.setColorAt(index, color.set(this.random.pick(BbBallparkBuilder.SHIRT_COLORS)));
-      matrix.makeTranslation(x, y + 0.8 + lift, z);
-      heads.setMatrixAt(index, matrix);
-      heads.setColorAt(index, color.set(this.random.pick(BbBallparkBuilder.SKIN_COLORS)));
-    }
-    torsos.frustumCulled = heads.frustumCulled = false;
-    this.group.add(torsos, heads);
-  }
+  private addCrowd(seats: readonly number[]): void { this.crowdSeats = seats.slice(); }
 
   private addDugouts(): void {
     const THREE = this.libs.THREE, width = this.spec.dimensions.foulTerritoryWidth;

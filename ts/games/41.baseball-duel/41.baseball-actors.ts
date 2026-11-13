@@ -330,7 +330,7 @@ class BbPlayerActor {
   private lastFrame: BbPoseFrame | null = null;
   private weight = 0;
 
-  constructor(private readonly libs: ThreeLibs, factory: CharacterModelFactory, assets: CharacterAssets, gear: BbGearFactory, outfit: BbActorOutfit) {
+  constructor(private readonly libs: ThreeLibs, factory: CharacterModelFactory, assets: CharacterAssets, gear: BbGearFactory, readonly outfit: BbActorOutfit) {
     const THREE = libs.THREE;
     this.root = new THREE.Group();
     this.model = factory.build(BbTeamKits.dress(outfit.look, outfit.kit));
@@ -366,6 +366,11 @@ class BbPlayerActor {
     if (frame) this.lastFrame = frame;
     if (this.lastFrame && this.weight > 0) this.poser.apply(this.lastFrame, this.weight);
     this.placeBat(frame);
+  }
+
+  standStill(seconds: number): void {
+    this.animator.play("Idle_A");
+    this.animator.update(seconds);
   }
 
   private turnToward(yaw: number, deltaSeconds: number): void {
@@ -474,5 +479,67 @@ class BbBallActor {
     const texture = new libs.THREE.CanvasTexture(canvas);
     texture.colorSpace = libs.THREE.SRGBColorSpace;
     return texture;
+  }
+}
+
+class BbWardrobe {
+  constructor(private readonly libs: ThreeLibs, private readonly factory: CharacterModelFactory, private readonly assets: CharacterAssets, private readonly gear: BbGearFactory) {}
+
+  static sameLook(a: CharacterLook, b: CharacterLook): boolean { return JSON.stringify(a) === JSON.stringify(b); }
+
+  static lookOf(raw: CharacterLook | null | undefined, fallback: CharacterLook): CharacterLook { return raw ? CharacterLooks.clean(raw) : fallback; }
+
+  actor(outfit: BbActorOutfit): BbPlayerActor { return new BbPlayerActor(this.libs, this.factory, this.assets, this.gear, outfit); }
+}
+
+class BbPortraitStudio {
+  private static readonly SIZE = 160;
+  private readonly cache = new Map<string, string>();
+  private renderer: Three<"WebGLRenderer"> | null = null;
+  private scene: Three<"Scene"> | null = null;
+  private camera: Three<"PerspectiveCamera"> | null = null;
+
+  constructor(private readonly libs: ThreeLibs, private readonly wardrobe: BbWardrobe) {}
+
+  shoot(look: CharacterLook, kit: BbTeamKit): string | null {
+    const key = JSON.stringify(look) + "|" + kit.cap;
+    const cached = this.cache.get(key);
+    if (cached) return cached;
+    try {
+      const url = this.render(look, kit);
+      this.cache.set(key, url);
+      return url;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  private render(look: CharacterLook, kit: BbTeamKit): string {
+    const THREE = this.libs.THREE;
+    if (!this.renderer || !this.scene || !this.camera) {
+      const canvas = document.createElement("canvas");
+      canvas.width = canvas.height = BbPortraitStudio.SIZE;
+      this.renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, preserveDrawingBuffer: true });
+      this.renderer.setClearColor(0x000000, 0);
+      this.renderer.setSize(BbPortraitStudio.SIZE, BbPortraitStudio.SIZE, false);
+      this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+      this.scene = new THREE.Scene();
+      this.scene.add(new THREE.HemisphereLight(0xfff6e4, 0x5a6a50, 1.4));
+      const sun = new THREE.DirectionalLight(0xffefd2, 1.3);
+      sun.position.set(-2, 4, 5);
+      this.scene.add(sun);
+      this.camera = new THREE.PerspectiveCamera(26, 1, 0.05, 50);
+    }
+    const actor = this.wardrobe.actor({ look, kit, headGear: "cap", gloveSide: null, chestProtector: false, carriesBat: false, flapOnLeft: false });
+    actor.standStill(0.4);
+    this.scene.add(actor.root);
+    actor.root.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(actor.root), size = box.getSize(new THREE.Vector3()), focus = new THREE.Vector3((box.min.x + box.max.x) / 2, box.max.y - size.y * 0.24, (box.min.z + box.max.z) / 2);
+    const distance = size.y * 0.42 / Math.tan(13 * Math.PI / 180) + size.z * 0.5;
+    this.camera.position.set(focus.x + distance * 0.18, focus.y + size.y * 0.04, focus.z + distance);
+    this.camera.lookAt(focus);
+    this.renderer.render(this.scene, this.camera);
+    this.scene.remove(actor.root);
+    return this.renderer.domElement.toDataURL("image/png");
   }
 }

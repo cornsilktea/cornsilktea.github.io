@@ -20,6 +20,15 @@ interface BbEffectCue {
   point: BbVec;
 }
 
+type BbSoundKind = "release" | "mitt" | "whiff" | "crack" | "tick" | "glove" | "throw" | "slide";
+
+interface BbSoundMark {
+  at: number;
+  kind: BbSoundKind;
+  power: number;
+  point: BbVec | null;
+}
+
 interface BbRunnerTrack {
   role: BbRoleId;
   since: number;
@@ -188,6 +197,7 @@ abstract class BbPitchChoreographer extends BbDrill {
   readonly cameraCues: BbCameraCue[] = [];
   readonly calls: BbCallCue[] = [];
   readonly sparks: BbEffectCue[] = [];
+  readonly sounds: BbSoundMark[] = [];
   readonly runnerTracks: BbRunnerTrack[] = [];
   protected plateAt = 0;
   private platePoint: BbVec | null = null;
@@ -212,6 +222,8 @@ abstract class BbPitchChoreographer extends BbDrill {
   protected call(at: number, text: string, tally: BbCallTally | null): void { this.calls.push({ at: this.until(at), text, tally }); }
 
   protected shoot(at: number, kind: BbShotKind, from: BbVec, to: BbVec): void { this.cameraCues.push({ at, kind, from, to }); }
+
+  protected sound(at: number, kind: BbSoundKind, power: number, point: BbVec | null = null): void { this.sounds.push({ at, kind, power: BbCurve.clamp(power, 0, 1), point }); }
 
   protected onBase(role: BbRoleId, since: number): void {
     if (!this.runnerTracks.some((track) => track.role === role)) this.runnerTracks.push({ role, since, until: Infinity });
@@ -248,17 +260,24 @@ abstract class BbPitchChoreographer extends BbDrill {
     this.fly(flight, releaseAt, look.spinRate(roll.flightSeconds), look.spinAxis());
     this.plateAt = this.until(releaseAt + roll.flightSeconds);
     this.platePoint = plate;
+    const pace = BbCurve.span(roll.speed, 90, 160);
+    this.sound(releaseAt, "release", 0.35 + pace * 0.65, from);
     this.shoot(0, "pitch", BbFieldGeometry.RUBBER, BbFieldGeometry.HOME);
     this.pose("batter", new BbBatLoadPose(this.metrics), this.plateAt - BbPitchChoreographer.LOAD_LEAD, null, "로드");
     if (swing.kind === "contact" && swing.ball && outcome.script) {
       const swingEndsAt = this.swingAt(plate, this.plateAt, swing.band === "perfect" || swing.band === "good" ? "full" : "weak");
+      if (outcome.script.result === "FOUL") this.sound(this.plateAt, "tick", 0.6, plate);
+      else this.sound(this.plateAt, "crack", swing.band === "perfect" ? 1 : swing.band === "good" ? 0.75 : 0.35, plate);
       this.playOut(swing.ball, outcome.script, plate, swingEndsAt);
     } else {
       if (swing.kind === "miss") {
         const slip = BbCurve.clamp(swing.adjusted || 0, -BbPitchChoreographer.SWING_SLIP_LIMIT, BbPitchChoreographer.SWING_SLIP_LIMIT);
         this.swingAt(plate.plus(new BbVec(0, roll.arrive.v < 0 ? BbPitchChoreographer.MISS_GAP : -BbPitchChoreographer.MISS_GAP, 0)), this.plateAt + slip, "full");
+        this.sound(this.plateAt + slip - 0.04, "whiff", 0.8, plate);
       }
-      this.until(this.receive(flight, releaseAt) + BbPitchChoreographer.TAIL_AFTER_CATCH);
+      const caughtAt = this.receive(flight, releaseAt);
+      this.sound(caughtAt, "mitt", 0.4 + pace * 0.6, plate);
+      this.until(caughtAt + BbPitchChoreographer.TAIL_AFTER_CATCH);
     }
     this.script.duration = this.lastMoment;
   }
@@ -427,6 +446,7 @@ class BbPlayChoreographer extends BbPitchChoreographer {
     if (fumbled) this.synced(role, new BbCatchPose(this.metrics, "ground", local), at, "포구 실패");
     else {
       this.catchWith(role, inAir ? "fly" : "ground", local, at, inAir ? "뜬공 포구" : "타구 포구");
+      this.sound(at, "glove", 0.6, glove);
       this.holder = role;
       this.heldSince = at;
     }
@@ -519,6 +539,7 @@ class BbPlayChoreographer extends BbPitchChoreographer {
     const local = kind === "stretch" ? BbPlayChoreographer.STRETCH_GLOVE : BbDrill.CHEST_GLOVE, target = this.gloveWorld(receiver, arriveAt, local);
     const landedAt = this.throwTo(thrower, target, arriveAt, crowHop);
     this.catchWith(receiver, kind, local, landedAt, "송구 포구");
+    this.sound(landedAt, "glove", 0.75, target);
     this.holder = receiver;
     this.heldSince = landedAt;
     if (base !== null) this.ballReaches.set(base, landedAt);
@@ -536,6 +557,7 @@ class BbPlayChoreographer extends BbPitchChoreographer {
     this.pose(role, pose, startAt, releaseAt, "송구");
     this.hold(role, "throw", startAt);
     const from = this.handWorld(role, "throw", releaseAt);
+    this.sound(releaseAt, "throw", crowHop ? 0.8 : 0.55, from);
     this.fly(new BbThrowTrajectory(from, target, Math.max(1, target.minus(from).flat().length()) / flightSeconds), releaseAt, 14);
     this.freeAt.set(role, releaseAt + 0.3);
     return releaseAt + flightSeconds;
@@ -618,6 +640,7 @@ class BbPlayChoreographer extends BbPitchChoreographer {
     if (slides) {
       this.move(role, stops[stops.length - 1], runUntil, runUntil + slideSeconds, "slide");
       this.synced(role, new BbSlidePose(this.metrics, slideSeconds), runUntil + slideSeconds, "슬라이딩");
+      this.sound(runUntil, "slide", 0.8, stops[stops.length - 1]);
     }
     this.until(endAt);
   }

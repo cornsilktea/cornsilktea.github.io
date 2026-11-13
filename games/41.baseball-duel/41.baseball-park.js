@@ -250,6 +250,7 @@ class BbBallparkBuilder {
     constructor(libs, spec) {
         this.libs = libs;
         this.spec = spec;
+        this.crowdSeats = [];
         this.random = new BbScatter(20261112);
         this.group = new libs.THREE.Group();
         this.outline = new BbParkOutline(spec.dimensions);
@@ -522,22 +523,7 @@ class BbBallparkBuilder {
         this.group.add(new THREE.Mesh(geometry, new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide })));
         this.addCrowd(bodies);
     }
-    addCrowd(seats) {
-        const THREE = this.libs.THREE, total = seats.length / 3, matrix = new THREE.Matrix4(), color = new THREE.Color();
-        const torsos = new THREE.InstancedMesh(new THREE.BoxGeometry(0.44, 0.52, 0.3), new THREE.MeshLambertMaterial(), total);
-        const heads = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.17, 0), new THREE.MeshLambertMaterial(), total);
-        for (let index = 0; index < total; index++) {
-            const x = seats[index * 3], y = seats[index * 3 + 1], z = -seats[index * 3 + 2], lift = this.random.between(0, 0.07);
-            matrix.makeTranslation(x, y + 0.36 + lift, z);
-            torsos.setMatrixAt(index, matrix);
-            torsos.setColorAt(index, color.set(this.random.pick(BbBallparkBuilder.SHIRT_COLORS)));
-            matrix.makeTranslation(x, y + 0.8 + lift, z);
-            heads.setMatrixAt(index, matrix);
-            heads.setColorAt(index, color.set(this.random.pick(BbBallparkBuilder.SKIN_COLORS)));
-        }
-        torsos.frustumCulled = heads.frustumCulled = false;
-        this.group.add(torsos, heads);
-    }
+    addCrowd(seats) { this.crowdSeats = seats.slice(); }
     addDugouts() {
         const THREE = this.libs.THREE, width = this.spec.dimensions.foulTerritoryWidth;
         const concrete = new THREE.MeshLambertMaterial({ color: "#3b4148" }), wood = new THREE.MeshLambertMaterial({ color: "#9a6a3c" });
@@ -716,8 +702,6 @@ class BbBallparkBuilder {
     }
 }
 BbBallparkBuilder.SEAT_COLORS = ["#2d5fa8", "#2a579b", "#31649f"];
-BbBallparkBuilder.SHIRT_COLORS = ["#e9e6dc", "#d9534f", "#3b6fb6", "#f0c040", "#4caf7a", "#8e6bbf", "#f08a3e", "#2f3640", "#e8a0b8", "#7fb6d9"];
-BbBallparkBuilder.SKIN_COLORS = ["#FFE0C8", "#F6C09C", "#E2A981", "#C98A62", "#A86A48"];
 BbBallparkBuilder.WALL_PANELS = 16;
 BbBallparkBuilder.FOUL_LINE_START = 1.72;
 BbBallparkBuilder.PLATE_RIM = 0;

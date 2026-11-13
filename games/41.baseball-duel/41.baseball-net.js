@@ -15,6 +15,12 @@ class BbRoomRules {
             return BbRoomRules.BLANK_SETUP;
         return { mode: value.mode, level: value.level, ai: !!value.ai };
     }
+    static sideLabels(flip) {
+        return flip ? ["손님 · 말 공격", "방장 · 초 공격"] : ["손님 · 초 공격", "방장 · 말 공격"];
+    }
+    static seatIds(guest, host, flip) {
+        return flip ? [host, guest] : [guest, host];
+    }
     static teamOf(match, id) { return match.seats.s0 === id ? 0 : match.seats.s1 === id ? 1 : null; }
     static seatsFor(match, myId, hosting) {
         const kind = (id) => (id === myId ? "human" : id === BbRoomRules.AI_SEAT && hosting ? "ai" : "remote");
@@ -23,7 +29,7 @@ class BbRoomRules {
 }
 BbRoomRules.AI_SEAT = "ai";
 BbRoomRules.RULES = { root: "baseballduel/rooms", seatCount: 2, spectatorSlot: 9, seatOrder: [0, 1], spectatorLimit: 8 };
-BbRoomRules.VALUES = ["match", "setup", "end", "vsAt", "assign"];
+BbRoomRules.VALUES = ["match", "setup", "end", "vsAt", "assign", "flip"];
 BbRoomRules.HOST_TEAM = 1;
 BbRoomRules.BLANK_SETUP = { mode: "match", level: "normal", ai: false };
 class BbRoomLink {

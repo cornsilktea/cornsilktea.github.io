@@ -75,6 +75,9 @@ class BbStage {
   private static readonly MOVE_FOLLOW = 5.5;
   private static readonly LOOK_FOLLOW = 8;
   private static readonly LONGEST_FRAME_SECONDS = 0.05;
+  private static readonly PIXEL_RATIO_CAP = 1.5;
+  private static readonly PIXEL_RATIO_STEP = 0.25;
+  private static readonly SMALL_SHADOW = 512;
 
   private readonly renderer: Three<"WebGLRenderer">;
   private readonly scene: Three<"Scene">;
@@ -89,11 +92,15 @@ class BbStage {
   private zone!: Three<"LineLoop">;
   private stamp!: Three<"Mesh">;
   private sparks!: BbSparkBurst;
+  private crowd: BbCrowdSystem | null = null;
+  private wardrobe: BbWardrobe | null = null;
+  private studio: BbPortraitStudio | null = null;
+  private pixelRatio = Math.min(window.devicePixelRatio, BbStage.PIXEL_RATIO_CAP);
 
   constructor(private readonly libs: ThreeLibs, canvas: HTMLCanvasElement) {
     const THREE = libs.THREE;
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+    this.renderer.setPixelRatio(this.pixelRatio);
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.scene = new THREE.Scene();
@@ -118,11 +125,15 @@ class BbStage {
   async load(assetDirectory: string, park: BbBallparkSpec, cast: BbStageCast): Promise<void> {
     const assets = new CharacterAssets(this.libs, assetDirectory);
     await assets.load();
-    const factory = new CharacterModelFactory(this.libs, assets), gear = new BbGearFactory(this.libs);
-    this.scene.add(new BbBallparkBuilder(this.libs, park).build());
+    const factory = new CharacterModelFactory(this.libs, assets), gear = new BbGearFactory(this.libs), builder = new BbBallparkBuilder(this.libs, park);
+    this.scene.add(builder.build());
+    this.crowd = new BbCrowdSystem(this.libs, builder.crowdSeats);
+    this.scene.add(this.crowd.group);
     new BbParkLighting(this.libs).addTo(this.scene);
-    this.createActors(0, factory, assets, gear, cast);
-    this.createActors(1, factory, assets, gear, cast);
+    this.wardrobe = new BbWardrobe(this.libs, factory, assets, gear);
+    this.studio = new BbPortraitStudio(this.libs, this.wardrobe);
+    this.createActors(0, cast);
+    this.createActors(1, cast);
     this.field(1);
     this.ball = new BbBallActor(this.libs);
     this.zone = this.zoneFrame();
@@ -162,14 +173,9 @@ class BbStage {
 
   spark(at: BbVec): void { this.sparks.burst(at); }
 
-  private createActors(team: 0 | 1, factory: CharacterModelFactory, assets: CharacterAssets, gear: BbGearFactory, cast: BbStageCast): void {
+  private createActors(team: 0 | 1, cast: BbStageCast): void {
     const mine = new PlayerProfile().look, batterFlapOnLeft = !cast.batsLeft, fieldKit = BbStage.TEAM_KITS[team], batKit = BbStage.TEAM_KITS[1 - team];
-    const make = (role: BbRoleId, outfit: BbActorOutfit) => {
-      const actor = new BbPlayerActor(this.libs, factory, assets, gear, outfit);
-      this.scene.add(actor.root);
-      actor.root.visible = false;
-      this.casts[team].set(role, actor);
-    };
+    const make = (role: BbRoleId, outfit: BbActorOutfit) => this.place(team, role, outfit);
     BbStage.FIELDERS.forEach((role, index) => {
       const look = role === "pitcher" ? mine : CharacterLooks.clean({ c: index % 6, p: { skin: index % 5, hair: (index * 3) % 8 } });
       const gloveSide: BbSide = role === "pitcher" && cast.throwsLeft ? "right" : "left";
@@ -178,6 +184,64 @@ class BbStage {
     make("umpire", { look: CharacterLooks.clean({ c: 3, p: { skin: 2, hair: 0 } }), kit: BbTeamKits.UMPIRE, headGear: "mask", gloveSide: null, chestProtector: false, carriesBat: false, flapOnLeft: false });
     make("batter", { look: mine, kit: batKit, headGear: "helmet", gloveSide: null, chestProtector: false, carriesBat: true, flapOnLeft: batterFlapOnLeft });
     BbStage.RUNNERS.forEach((role) => make(role, { look: mine, kit: batKit, headGear: "helmet", gloveSide: null, chestProtector: false, carriesBat: false, flapOnLeft: batterFlapOnLeft }));
+  }
+
+  private place(team: 0 | 1, role: BbRoleId, outfit: BbActorOutfit): void {
+    const old = this.casts[team].get(role), actor = (this.wardrobe as BbWardrobe).actor(outfit);
+    if (old) this.scene.remove(old.root);
+    this.scene.add(actor.root);
+    actor.root.visible = false;
+    this.casts[team].set(role, actor);
+  }
+
+  dress(looks: readonly [CharacterLook, CharacterLook]): void {
+    if (!this.wardrobe) return;
+    ([0, 1] as Array<0 | 1>).forEach((team) => {
+      const other: 0 | 1 = team === 0 ? 1 : 0, pitcher = this.casts[team].get("pitcher");
+      if (pitcher && !BbWardrobe.sameLook(pitcher.outfit.look, looks[team])) this.place(team, "pitcher", { ...pitcher.outfit, look: looks[team] });
+      (["batter"] as BbRoleId[]).concat(BbStage.RUNNERS).forEach((role) => {
+        const actor = this.casts[other].get(role);
+        if (actor && !BbWardrobe.sameLook(actor.outfit.look, looks[team])) this.place(other, role, { ...actor.outfit, look: looks[team] });
+      });
+    });
+    this.field(this.fielding);
+  }
+
+  portrait(look: CharacterLook, team: 0 | 1): string | null { return this.studio ? this.studio.shoot(look, BbStage.TEAM_KITS[team]) : null; }
+
+  cheer(moment: BbCrowdMoment, batting: 0 | 1): void { if (this.crowd) this.crowd.react(moment, batting); }
+
+  tension(on: boolean): void { if (this.crowd) this.crowd.tension(on); }
+
+  get listener(): BbVec { return new BbVec(this.camera.position.x, this.camera.position.y, this.camera.position.z); }
+
+  qualitySteps(): Array<() => boolean> {
+    return [
+      () => !!this.crowd && this.crowd.slower(),
+      () => this.smallerShadow(),
+      () => this.lowerPixels(),
+      () => !!this.crowd && this.crowd.thinner()
+    ];
+  }
+
+  private smallerShadow(): boolean {
+    let changed = false;
+    this.scene.traverse((node) => {
+      const light = node as Three<"DirectionalLight">;
+      if (!light.isDirectionalLight || !light.castShadow || light.shadow.mapSize.x <= BbStage.SMALL_SHADOW) return;
+      light.shadow.mapSize.set(BbStage.SMALL_SHADOW, BbStage.SMALL_SHADOW);
+      if (light.shadow.map) { light.shadow.map.dispose(); light.shadow.map = null; }
+      changed = true;
+    });
+    return changed;
+  }
+
+  private lowerPixels(): boolean {
+    if (this.pixelRatio <= 1) return false;
+    this.pixelRatio = Math.max(1, this.pixelRatio - BbStage.PIXEL_RATIO_STEP);
+    this.renderer.setPixelRatio(this.pixelRatio);
+    this.resize();
+    return true;
   }
 
   reset(script: BbDrillScript): void {
@@ -214,7 +278,9 @@ class BbStage {
 
   run(onFrame: (frameSeconds: number) => void): void {
     this.renderer.setAnimationLoop(() => {
-      onFrame(Math.min(BbStage.LONGEST_FRAME_SECONDS, this.clock.getDelta()));
+      const frameSeconds = Math.min(BbStage.LONGEST_FRAME_SECONDS, this.clock.getDelta());
+      onFrame(frameSeconds);
+      if (this.crowd) this.crowd.update(frameSeconds, this.camera);
       this.renderer.render(this.scene, this.camera);
     });
   }
