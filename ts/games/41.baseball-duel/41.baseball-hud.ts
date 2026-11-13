@@ -87,7 +87,6 @@ class BbCountLamps {
 }
 
 class BbScoreHud {
-  private static readonly HALF_MARKS: readonly string[] = ["▲초", "▼말"];
   private readonly inning: HTMLElement;
   private readonly names: HTMLElement[];
   private readonly runs: HTMLElement[];
@@ -116,7 +115,7 @@ class BbScoreHud {
   room(code: string): void { this.roomCode.textContent = code ? "방 코드 " + code : ""; }
 
   show(board: BbBoardSnapshot): void {
-    this.inning.textContent = board.inning + "회 " + BbScoreHud.HALF_MARKS[board.half];
+    this.inning.textContent = board.inning + "회";
     this.runs.forEach((cell, team) => { cell.textContent = String(board.score[team]); });
     this.rows.forEach((row, team) => row.classList.toggle("batting", team === board.half));
     this.lamps.show(board.balls, board.strikes, board.outs);

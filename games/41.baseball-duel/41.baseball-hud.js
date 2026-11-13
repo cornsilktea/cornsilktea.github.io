@@ -87,7 +87,7 @@ class BbScoreHud {
     players(guest, host) { [guest, host].forEach((name, team) => { this.names[team].textContent = name; }); }
     room(code) { this.roomCode.textContent = code ? "방 코드 " + code : ""; }
     show(board) {
-        this.inning.textContent = board.inning + "회 " + BbScoreHud.HALF_MARKS[board.half];
+        this.inning.textContent = board.inning + "회";
         this.runs.forEach((cell, team) => { cell.textContent = String(board.score[team]); });
         this.rows.forEach((row, team) => row.classList.toggle("batting", team === board.half));
         this.lamps.show(board.balls, board.strikes, board.outs);
@@ -95,4 +95,3 @@ class BbScoreHud {
     }
     follow(script, tracks, seconds) { this.diamond.follow(script, tracks, seconds); }
 }
-BbScoreHud.HALF_MARKS = ["▲초", "▼말"];

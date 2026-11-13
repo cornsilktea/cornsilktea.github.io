@@ -1,12 +1,13 @@
-#hudTop{position:fixed;left:50%;top:8px;transform:translateX(-50%);z-index:20;pointer-events:none;font-family:"Nanum Gothic","Malgun Gothic",sans-serif}
-.bb-score.hud-box{position:relative;display:flex;align-items:center;gap:14px;padding:8px 16px;border-radius:12px;background:rgba(14,20,17,.78);border-bottom:3px solid #D97B4F;color:#fff;white-space:nowrap}
-.bb-score-inning{font-size:17px;font-weight:800;min-width:62px;text-align:center}
-.bb-score-teams{display:flex;flex-direction:column;gap:3px;min-width:132px}
-.bb-score-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding-left:8px;border-left:3px solid transparent;font-size:15px;font-weight:700;opacity:.72}
+@font-face{font-family:"Black Han Sans";src:url("../../common/fonts/BlackHanSans-Regular.ttf") format("truetype");font-display:swap}
+#hudTop{position:fixed;left:var(--bb-hud-left,8px);top:var(--bb-hud-top,8px);z-index:20;pointer-events:none;font-family:"Nanum Gothic","Malgun Gothic",sans-serif}
+.bb-score.hud-box{position:relative;display:flex;align-items:center;gap:10px;padding:6px 10px;border-radius:12px;background:rgba(14,20,17,.78);border-bottom:3px solid #D97B4F;color:#fff;white-space:nowrap}
+.bb-score-inning{font-size:17px;font-weight:800;text-align:center}
+.bb-score-teams{display:flex;flex-direction:column;gap:2px}
+.bb-score-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding-left:6px;border-left:3px solid transparent;font-size:15px;font-weight:700;opacity:.72}
 .bb-score-row.batting{border-left-color:#D97B4F;opacity:1}
-.bb-score-name{max-width:120px;overflow:hidden;text-overflow:ellipsis}
-.bb-score-runs{font-size:19px;font-weight:800;min-width:20px;text-align:right}
-.bb-diamond{width:66px;height:62px;flex:none;overflow:visible}
+.bb-score-name{max-width:96px;overflow:hidden;text-overflow:ellipsis}
+.bb-score-runs{font-size:19px;font-weight:800;text-align:right}
+.bb-diamond{width:58px;height:55px;flex:none;overflow:visible}
 .bb-diamond-line{fill:none;stroke:rgba(255,255,255,.38);stroke-width:1.3}
 .bb-diamond-home{fill:rgba(255,255,255,.55)}
 .bb-diamond-bag{fill:rgba(255,255,255,.16);stroke:rgba(255,255,255,.75);stroke-width:1.2}
@@ -19,19 +20,18 @@
 .bb-lamp-ball.on{background:#6FCF7C}
 .bb-lamp-strike.on{background:#F2C94C}
 .bb-lamp-out.on{background:#D97B4F}
-.bb-score-pitches{font-size:13px;font-weight:700;opacity:.85;min-width:52px;text-align:right}
-.bb-score .room-code-tag{position:absolute;left:50%;top:100%;transform:translateX(-50%);margin-top:5px;padding:2px 9px;border-radius:8px;background:rgba(14,20,17,.7);font-size:11px;font-weight:700}
+.bb-score-pitches{font-size:13px;font-weight:700;opacity:.85}
+.bb-score .room-code-tag{position:absolute;left:0;top:100%;margin-top:5px;padding:2px 9px;border-radius:8px;background:rgba(14,20,17,.7);font-size:11px;font-weight:700}
 .bb-score .room-code-tag:empty{display:none}
 @media (max-width:700px),(orientation:portrait){
-  .bb-score.hud-box{gap:8px;padding:6px 10px}
-  .bb-score-inning{font-size:13px;min-width:46px}
-  .bb-score-teams{min-width:84px}
+  .bb-score.hud-box{gap:7px;padding:5px 8px}
+  .bb-score-inning{font-size:13px}
   .bb-score-row{font-size:12px;gap:6px}
   .bb-score-name{max-width:70px}
   .bb-score-runs{font-size:15px}
   .bb-diamond{width:50px;height:47px}
   .bb-lamp{width:9px;height:9px}
-  .bb-score-pitches{font-size:11px;min-width:40px}
+  .bb-score-pitches{font-size:11px}
 }
 #bbControls{position:fixed;inset:0;z-index:15;pointer-events:none;font-family:"Nanum Gothic","Malgun Gothic",sans-serif;color:#fff}
 #bbControls button{pointer-events:auto;font-family:inherit;color:#fff;cursor:pointer}
@@ -60,7 +60,7 @@
 .bb-action.spent{opacity:.35}
 .bb-toast{position:absolute;left:50%;top:24%;transform:translateX(-50%);text-align:center;opacity:0;transition:opacity .15s;white-space:nowrap}
 .bb-toast.open{opacity:1}
-.bb-toast-call{font-size:clamp(28px,5vw,56px);font-weight:800;transform:skewX(-8deg);text-shadow:-3px -3px 0 #14201a,3px -3px 0 #14201a,-3px 3px 0 #14201a,3px 3px 0 #14201a,5px 6px 0 #D97B4F}
+.bb-toast-call{font-family:"Black Han Sans","Nanum Gothic","Malgun Gothic",sans-serif;font-size:clamp(30px,5.4vw,60px);font-weight:400;transform:skewX(-8deg);text-shadow:-3px -3px 0 #14201a,3px -3px 0 #14201a,-3px 3px 0 #14201a,3px 3px 0 #14201a,5px 6px 0 #D97B4F}
 .bb-toast-pitch{display:inline-block;margin-top:8px;padding:4px 12px;border-radius:10px;background:rgba(14,20,17,.78);font-size:clamp(13px,1.8vw,18px);font-weight:800}
 .bb-toast-pitch:empty{display:none}
 .bb-gauge{position:absolute;left:50%;bottom:max(20px,4vh);width:min(56vw,420px);transform:translateX(-50%);padding:8px 14px 6px;border-radius:12px;background:rgba(14,20,17,.82);opacity:0;transition:opacity .15s}
