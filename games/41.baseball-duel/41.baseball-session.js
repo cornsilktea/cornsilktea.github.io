@@ -3,6 +3,7 @@ class BbDuelSession {
     constructor(format, dimensions, teams, random) {
         this.teams = teams;
         this.random = random;
+        this.log = [];
         this.lastPitch = null;
         this.previousSpeed = null;
         this.rules = new BbMatchRules(format);
@@ -25,6 +26,15 @@ class BbDuelSession {
     aiCall(level) {
         return new BbAiPitcher(level).choose(this.state.balls, this.state.strikes, this.pitcher(), this.lastPitch, this.random);
     }
+    get lastThrown() { return this.lastPitch; }
+    rollWith(call, seed) {
+        const pitcher = this.pitcher();
+        return BbPitchRoller.roll(call.pitch, call.aim, pitcher.abilities, pitcher.hand, seed);
+    }
+    restore(entries) {
+        entries.forEach((entry) => { if (!this.state.finished)
+            this.settle(this.rollWith({ pitch: entry.pitch, aim: entry.aim }, entry.seed), entry.contactOffset); });
+    }
     roll(call) {
         const pitcher = this.pitcher();
         return BbPitchRoller.roll(call.pitch, call.aim, pitcher.abilities, pitcher.hand, this.random.seed());
@@ -39,6 +49,7 @@ class BbDuelSession {
         this.previousSpeed = note.plateAppearanceOver ? null : roll.speed;
         if (note.plateAppearanceOver)
             this.lineups[battingIndex].advance();
+        this.log.push({ pitch: roll.pitch, aim: roll.aim, seed: roll.seed, contactOffset });
         return { outcome, note };
     }
 }

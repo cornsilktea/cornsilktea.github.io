@@ -7,6 +7,7 @@ class BbDuelSession {
   private static readonly ERROR_CHANCE = 0.05;
 
   readonly state: BbGameState;
+  readonly log: BbLogEntry[] = [];
   private readonly rules: BbMatchRules;
   private readonly judge: BbPitchJudge;
   private readonly lineups: BbLineup[];
@@ -40,6 +41,17 @@ class BbDuelSession {
     return new BbAiPitcher(level).choose(this.state.balls, this.state.strikes, this.pitcher(), this.lastPitch, this.random);
   }
 
+  get lastThrown(): BbPitchId | null { return this.lastPitch; }
+
+  rollWith(call: BbPitchCall, seed: number): BbPitchRoll {
+    const pitcher = this.pitcher();
+    return BbPitchRoller.roll(call.pitch, call.aim, pitcher.abilities, pitcher.hand, seed);
+  }
+
+  restore(entries: readonly BbLogEntry[]): void {
+    entries.forEach((entry) => { if (!this.state.finished) this.settle(this.rollWith({ pitch: entry.pitch, aim: entry.aim }, entry.seed), entry.contactOffset); });
+  }
+
   roll(call: BbPitchCall): BbPitchRoll {
     const pitcher = this.pitcher();
     return BbPitchRoller.roll(call.pitch, call.aim, pitcher.abilities, pitcher.hand, this.random.seed());
@@ -56,6 +68,7 @@ class BbDuelSession {
     this.lastPitch = note.plateAppearanceOver ? null : roll.pitch;
     this.previousSpeed = note.plateAppearanceOver ? null : roll.speed;
     if (note.plateAppearanceOver) this.lineups[battingIndex].advance();
+    this.log.push({ pitch: roll.pitch, aim: roll.aim, seed: roll.seed, contactOffset });
     return { outcome, note };
   }
 }

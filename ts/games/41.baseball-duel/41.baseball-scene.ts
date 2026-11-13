@@ -47,9 +47,9 @@ class BbScenePlayer {
   get finished(): boolean { return this.clock > this.scene.script.duration; }
   get title(): string { return this.scene.title; }
 
-  play(scene: BbScene): void {
+  play(scene: BbScene, lead = 0): void {
     this.scene = scene;
-    this.clock = 0;
+    this.clock = -lead;
     this.cut = true;
     this.stage.field(scene.fielding);
     this.stage.reset(scene.script);
@@ -74,13 +74,13 @@ class BbScenePlayer {
   }
 
   private draw(deltaSeconds: number): void {
-    const scene = this.scene;
-    const state = scene.script.ballAt(this.clock);
-    this.directed = scene.director.direct(this.view, this.clock, state ? state.point : null);
+    const scene = this.scene, shown = Math.max(0, this.clock);
+    const state = scene.script.ballAt(shown);
+    this.directed = scene.director.direct(this.view, shown, state ? state.point : null);
     this.cut = this.cut || this.directed.cut;
     const pitching = this.directed.kind === "pitch", passed = this.clock >= scene.arriveAt;
-    this.stage.advance(scene.script, this.clock, deltaSeconds, this.view === "batter" && pitching ? BbStage.HIDDEN_BEHIND_PLATE : [], pitching && this.clock < scene.arriveAt + BbScenePlayer.ZONE_LINGER_SECONDS, pitching && passed ? scene.mark : null);
-    this.hud.follow(scene.script, scene.tracks, this.clock);
+    this.stage.advance(scene.script, shown, deltaSeconds, this.view === "batter" && pitching ? BbStage.HIDDEN_BEHIND_PLATE : [], pitching && this.clock < scene.arriveAt + BbScenePlayer.ZONE_LINGER_SECONDS, pitching && passed ? scene.mark : null);
+    this.hud.follow(scene.script, scene.tracks, shown);
   }
 
   frame(frameSeconds: number): void {

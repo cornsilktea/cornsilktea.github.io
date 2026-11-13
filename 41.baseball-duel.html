@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<script charset="utf-8" src="common/firebase-config.js"></script>
+<script charset="utf-8" src="common/access-guard.js" data-game="baseballduel"></script>
+<script charset="utf-8" src="common/fullscreen-keeper.js" data-watch></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>야구 1대1 대전</title>
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="정보 수업용 링크 모음">
+<meta property="og:title" content="야구 1대1 대전">
+<meta property="og:description" content="투수와 타자로 번갈아 맞붙는 3D 야구 1대1 대전">
+<meta property="og:url" content="https://cornsilktea.github.io/41.baseball-duel.html">
+<meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
+<meta name="twitter:card" content="summary">
+<link rel="stylesheet" href="common/theme.css">
+<link rel="stylesheet" href="games/41.baseball-duel/41.baseball-hud.css?v=20261113a">
+<script async src="https://cdn.jsdelivr.net/npm/es-module-shims@1.10.1/dist/es-module-shims.js"></script>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+<style>
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #16221b; font-family: "Nanum Gothic", "Malgun Gothic", sans-serif; color: #fff; -webkit-user-select: none; user-select: none; }
+  #bbView { position: fixed; left: 0; top: 0; display: block; width: 100%; height: 100%; touch-action: none; }
+  .st-screen { --st-bg: 14, 26, 20; --st-panel: rgba(14, 26, 20, .86); --st-accent: #D97B4F; --st-accent-ink: #fff; --st-title2: #D97B4F; --st-glow: rgba(217, 123, 79, .45); overflow-y: auto; z-index: 20; }
+  .st-screen input[type=text] { flex: 1; min-width: 0; min-height: 56px; margin-top: 10px; padding: 6px 12px; font: inherit; font-size: 19px; font-weight: 800; border-radius: 6px; border: 2px solid rgba(255,255,255,.3); background: rgba(255,255,255,.08); color: #fff; -webkit-user-select: text; user-select: text; }
+  .st-screen input[type=text]:focus { border-color: #D97B4F; outline: none; }
+  .bb-join-row { display: flex; gap: 10px; }
+  .bb-join-row .st-btn { width: auto; min-width: 96px; }
+  #startNote { min-height: 0; font-size: 14px; font-weight: 700; color: #F2C94C; }
+  #startNote:not(:empty) { margin-top: 10px; }
+</style>
+</head>
+<body class="menu">
+<canvas id="bbView"></canvas>
+<div id="hudTop"></div>
+<div id="bbControls" class="bb-ui"></div>
+
+<div id="startScreen" class="st-screen" hidden>
+  <div class="st-wrap">
+    <div class="st-hero"><h1 class="st-title">야구 1대1 대전</h1></div>
+    <div class="st-card">
+      <button type="button" class="st-btn primary" id="btnCreate">게임 만들기</button>
+      <button type="button" class="st-btn primary" id="btnRandom">랜덤 매칭 방 만들기</button>
+      <div class="bb-join-row"><input type="text" id="joinCode" maxlength="6" placeholder="방 코드" autocomplete="off"><button type="button" class="st-btn" id="btnJoin">입장</button></div>
+      <div id="startNote"></div>
+    </div>
+    <div class="st-card">
+      <h2>조작 방법</h2>
+      <div class="st-keys">
+        <div><kbd>Space</kbd> <kbd>Enter</kbd> 스윙 버튼 — 타자: 스윙</div>
+        <div><kbd>Q</kbd> <kbd>W</kbd> <kbd>E</kbd> <kbd>A</kbd> <kbd>S</kbd> — 투수: 구종 고르기</div>
+        <div>방향키 · 클릭 · 드래그 — 투수: 던질 위치</div>
+        <div><kbd>Space</kbd> <kbd>Enter</kbd> 던지기 버튼 — 투수: 던지기</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="roomScreen" class="st-screen" hidden>
+  <div class="st-wrap">
+    <div class="st-hero"><h1 class="st-title">야구 1대1 대전</h1></div>
+    <div class="st-card" id="roomMount"></div>
+  </div>
+</div>
+
+<div id="resultScreen" class="st-screen" hidden>
+  <div class="st-wrap">
+    <div class="st-card" id="resultMount"></div>
+  </div>
+</div>
+
+<button type="button" id="sheetCorner" class="bb-corner" hidden>선수 정보 만들기</button>
+<div id="bbDialogs" class="bb-ui"></div>
+
+<script charset="utf-8" src="common/character-kit.js?v=20261011"></script>
+<script charset="utf-8" src="games/41.baseball-duel/41.baseball-motion.js?v=20261113a"></script>
+<script charset="utf-8" src="games/41.baseball-duel/41.baseball-field.js?v=20261113a"></script>
+<script charset="utf-8" src="games/41.baseball-duel/41.baseball-pitch.js?v=20261113a"></script>
+<script charset="utf-8" src="games/41.baseball-duel/41.baseball-batting.js?v=20261113a"></script>
+<script charset="utf-8" src="games/41.baseball-duel/41.baseball-running.js?v=20261113a"></script>
+<script charset="utf-8" src="games/41.baseball-duel/41.baseball-defense.js?v=20261113a"></script>
+<script charset="utf-8" src="games/41.baseball-duel/41.baseball-play.js?v=20261113a"></script>
+<script charset="utf-8" src="games/41.baseball-duel/41.baseball-game.js?v=20261113a"></script>
+<script charset="utf-8" src="games/41.baseball-duel/41.baseball-ai.js?v=20261113a"></script>
+<script charset="utf-8" src="games/41.baseball-duel/41.baseball-drills.js?v=20261113a"></script>
+<script charset="utf-8" src="games/41.baseball-duel/41.baseball-choreo.js?v=20261113a"></script>
+<script charset="utf-8" src="games/41.baseball-duel/41.baseball-actors.js?v=20261113a"></script>
+<script charset="utf-8" src="games/41.baseball-duel/41.baseball-park.js?v=20261113a"></script>
+<script charset="utf-8" src="games/41.baseball-duel/41.baseball-stage.js?v=20261113a"></script>
+<script charset="utf-8" src="games/41.baseball-duel/41.baseball-camera.js?v=20261113a"></script>
+<script charset="utf-8" src="games/41.baseball-duel/41.baseball-hud.js?v=20261113a"></script>
+<script charset="utf-8" src="games/41.baseball-duel/41.baseball-session.js?v=20261113a"></script>
+<script charset="utf-8" src="games/41.baseball-duel/41.baseball-scene.js?v=20261113a"></script>
+<script charset="utf-8" src="games/41.baseball-duel/41.baseball-controls.js?v=20261113a"></script>
+<script charset="utf-8" src="games/41.baseball-duel/41.baseball-sheet.js?v=20261113a"></script>
+<script charset="utf-8" src="games/41.baseball-duel/41.baseball-match.js?v=20261113a"></script>
+<script charset="utf-8" src="games/41.baseball-duel/41.baseball-duel.js?v=20261113a"></script>
+<script type="module">
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
+new BbDuelGame({ THREE, GLTFLoader, SkeletonUtils });
+</script>
+</body>
+</html>
