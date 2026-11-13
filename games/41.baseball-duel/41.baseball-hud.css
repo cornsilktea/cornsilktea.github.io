@@ -225,3 +225,24 @@ body.menu #hudTop,body.menu #bbControls{display:none}
 .bb-room-chip:disabled{cursor:default;opacity:.6}
 .bb-pause{position:absolute;left:50%;top:38%;transform:translate(-50%,-50%);padding:14px 26px;border-radius:14px;background:rgba(14,20,17,.9);border-bottom:4px solid #D97B4F;font-size:clamp(18px,3vw,28px);font-weight:800;white-space:nowrap;display:none}
 .bb-pause.open{display:block}
+.bb-aim-heat{fill:transparent;stroke:none;pointer-events:none}
+.bb-aim-heat.hot{fill:rgba(200,69,58,.55)}.bb-aim-heat.cold{fill:rgba(58,111,200,.55)}.bb-aim-heat.mid{fill:rgba(255,255,255,.12)}.bb-aim-heat.few{fill:rgba(255,255,255,.04)}
+.bb-card-heat{display:none;position:absolute;top:6px;right:8px;grid-template-columns:repeat(3,10px);gap:1px;padding:1px;border:1px solid rgba(255,255,255,.6)}
+.bb-card-heat.open{display:grid}
+.bb-card-heat-cell{height:12px;background:rgba(255,255,255,.08)}
+.bb-card-heat-cell.hot{background:#C8453A}.bb-card-heat-cell.cold{background:#3A6FC8}.bb-card-heat-cell.mid{background:rgba(255,255,255,.22)}
+.bb-card-heat-cell.heat1{background:rgba(217,123,79,.3)}.bb-card-heat-cell.heat2{background:rgba(217,123,79,.5)}.bb-card-heat-cell.heat3{background:rgba(217,123,79,.75)}.bb-card-heat-cell.heat4{background:#D97B4F}
+.bb-result-streak:not(:empty){margin:0 0 8px;font-size:14px;font-weight:800;color:#F2C94C}
+.bb-result-lines .bbx{margin-bottom:10px}
+.bb-board-title{font-size:18px;font-weight:800;margin-bottom:8px}
+.bb-board-toggles{display:flex;gap:6px;flex-wrap:wrap}
+.bb-board-toggles .bb-room-chip{flex:1 1 auto;min-height:38px;font-size:14px}
+.bb-board-stats{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.bb-board-stat{min-height:32px;padding:3px 9px;border:1px solid rgba(255,255,255,.25);border-radius:999px;background:rgba(255,255,255,.06);color:#fff;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer}
+.bb-board-stat.on{border-color:#D97B4F;background:rgba(217,123,79,.35)}
+.bb-board-list{display:flex;flex-direction:column;gap:3px;margin-top:8px}
+.bb-board-row{display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:6px;background:rgba(255,255,255,.05)}
+.bb-board-rank{width:22px;font-weight:900;color:#D97B4F}
+.bb-board-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700}
+.bb-board-value{font-weight:900}
+.bb-board-note{margin-top:6px;font-size:12px;color:#A3B0A6}

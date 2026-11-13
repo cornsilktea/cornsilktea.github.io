@@ -158,6 +158,20 @@ class RoyaleCheck extends MkCheckGame {
   }
 }
 
+// 41번은 방장이 말 공격(자리 1)이고 경기 결과는 매 공 기록(log)으로 정해져, 검사는 기권 칸(end)으로 승패를 낸다(무승부는 15회까지 가야 해서 못 만든다).
+class BaseballCheck extends MkCheckGame {
+  started(room) { return !!room && room.status === "play" && !!room.match; }
+  teamOf(room, me) { return room.match ? (room.match.seats.s0 === me ? 0 : room.match.seats.s1 === me ? 1 : null) : null; }
+  fakePlayer(room, me, fakeId, nick) {
+    const slot = room.assign && room.assign[fakeId];
+    return slot === undefined ? null : Object.assign({}, room.players[me], { nick, slot, vs: null, joinedAt: Date.now() });
+  }
+  endUpdate(room, me, outcome) {
+    const mine = this.teamOf(room, me);
+    return { end: { winner: outcome === "win" ? mine : 1 - mine, match: room.match.id } };
+  }
+}
+
 class MkCheckRunner {
   constructor(game) { this.game = game; this.log = []; this.done = false; this.fakeSeq = 0; }
   static wait(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
@@ -322,6 +336,7 @@ class MkCheckCatalog {
       snowDuos: () => new RoyaleCheck("snowroyale", "btnRandomDuos", false),
       balloonSolo: () => new RoyaleCheck("waterballoon", "btnRandomSolo", true),
       balloonTeam: () => new RoyaleCheck("waterballoon", "btnRandomTeam", true),
+      baseball: () => new BaseballCheck("baseballduel", "btnRandom"),
     }[name]();
   }
 }

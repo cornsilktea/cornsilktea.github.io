@@ -91,18 +91,25 @@ class BbResultCard {
     constructor(mount, onAgain, onLeave) {
         this.headline = BbHudParts.box("bb-result-headline", mount);
         this.detail = BbHudParts.box("bb-result-detail", mount);
+        this.streak = BbHudParts.box("bb-result-streak", mount);
         this.lines = BbHudParts.box("bb-result-lines", mount);
         this.facts = BbHudParts.box("bb-result-facts", mount);
         this.againButton = BbSheetParts.button("st-btn primary", mount, "다시 하기", onAgain);
-        BbSheetParts.button("st-btn", mount, "나가기", onLeave);
+        this.leaveButton = BbSheetParts.button("st-btn", mount, "나가기", onLeave);
     }
-    show(summary, mode, viewer, againLabel) {
+    note(text) { this.streak.textContent = text; }
+    show(summary, mode, viewer, againLabel, leaveLabel = "나가기") {
         const state = summary.state, mine = viewer === null ? 1 : viewer, names = summary.plan.names;
         this.againButton.textContent = againLabel;
+        this.againButton.hidden = !againLabel;
+        this.leaveButton.textContent = leaveLabel;
+        this.streak.textContent = "";
         this.lines.textContent = "";
         this.facts.textContent = "";
-        if (mode === "match")
+        if (mode === "match") {
             this.showMatch(summary, viewer);
+            return;
+        }
         else {
             this.headline.textContent = BbModeRules.LABELS[mode] + " 끝";
             this.detail.textContent = names[mine];
@@ -124,16 +131,7 @@ class BbResultCard {
         this.headline.textContent = tied ? "무승부" : viewer === null ? names[winner] + " 승리" : winner === viewer ? "승리!" : "패배";
         this.detail.textContent = summary.forfeitedBy !== null ? names[summary.forfeitedBy] + " 기권 (자리 비움·나감)" : state.endNote || names[0] + " " + state.score[0] + " : " + state.score[1] + " " + names[1];
         this.lines.hidden = false;
-        const first = summary.plan.format.startInning, head = BbHudParts.box("bb-result-line head", this.lines);
-        BbHudParts.box("bb-result-team", head);
-        state.lineScore.forEach((unused, index) => BbHudParts.box("bb-result-cell", head, String(first + index)));
-        BbHudParts.box("bb-result-cell total", head, "R");
-        [0, 1].forEach((team) => {
-            const row = BbHudParts.box("bb-result-line", this.lines);
-            BbHudParts.box("bb-result-team", row, names[team]);
-            state.lineScore.forEach((inning) => BbHudParts.box("bb-result-cell", row, String(inning[team])));
-            BbHudParts.box("bb-result-cell total", row, String(state.score[team]));
-        });
+        this.lines.innerHTML = BbBoxTable.html(BbBoxTable.sheetOf(BbReportBuilder.fromSummary("view", summary, viewer === null ? 1 : viewer, false, false, false, 1)));
     }
     addFacts(title, facts) {
         BbHudParts.box("bb-result-title", this.facts, title);
@@ -162,6 +160,10 @@ class BbDuelGame {
         this.last = { mode: "match", level: "normal" };
         this.showcaseSeed = 4100;
         this.shown = "startScreen";
+        this.zones = new BbZoneSwitch();
+        this.account = new BbAccount(() => this.zones.on);
+        this.rates = new BbVersusRates(this.account, () => this.zones.on);
+        this.random = null;
         const controls = document.getElementById("bbControls"), dialogs = document.getElementById("bbDialogs");
         this.stage = new BbStage(libs, document.getElementById("bbView"));
         this.hud = new BbScoreHud(document.getElementById("hudTop"));
@@ -177,14 +179,23 @@ class BbDuelGame {
             { label: "타자 시점으로 보기(관전)", onFlip: (on) => this.director.watch(on ? "batter" : "pitcher") }
         ], [["연출 건너뛰기", () => this.director.skipScene()], ["나가기", () => this.leaveGame()]]);
         document.getElementById("btnCreate").addEventListener("click", () => { this.createRoom(); });
-        document.getElementById("btnRandom").addEventListener("click", () => this.notice("랜덤 매칭은 준비 중입니다"));
+        document.getElementById("btnRandom").addEventListener("click", () => { this.createParty(); });
         document.getElementById("btnJoin").addEventListener("click", () => { this.joinRoom(); });
         window.addEventListener("pagehide", () => { if (this.session)
             this.session.removeMineOnUnload(); });
+        this.versus = new VersusCurtain(document.getElementById("versusCurtain"), new BbVersusContent(), {
+            inRoom: () => !!this.session, waiting: () => !!this.session && this.session.status === "lobby", randomMatch: () => !!this.ticket(),
+            roomShownAt: () => (this.session ? Number(this.session.value("vsAt")) || 0 : 0), sides: () => this.versusSides(), now: () => this.backend.now()
+        }, ["손님 · 초 공격", "방장 · 말 공격"]);
+        const portal = window.PORTAL_CLASS;
+        this.board = new BbBoardPanel(document.getElementById("boardMount"), this.backend, portal ? portal.id : null);
+        this.account.bind();
         this.showScreen("startScreen");
         this.load().catch((error) => this.notice("불러오지 못했어요: " + error.message));
     }
     async load() {
+        this.zones.load(this.backend);
+        this.board.load();
         await this.stage.load(BbDuelGame.ASSET_DIRECTORY, BbBallparkRegistry.MAIN, { batsLeft: false, throwsLeft: false });
         const saved = BbLocalResume.load();
         if (saved)
@@ -209,7 +220,93 @@ class BbDuelGame {
     }
     myName() { return PlayerProfile.storedNick() || "나"; }
     myRecord() {
-        return { nick: this.myName(), isBot: false, joinedAt: this.backend.now(), slot: BbRoomRules.HOST_TEAM, look: this.profile.look, spectator: false, sheet: BbProfileStore.teamOf(BbProfileStore.load()) };
+        const record = { nick: this.myName(), isBot: false, joinedAt: this.backend.now(), slot: BbRoomRules.HOST_TEAM, look: this.profile.look, spectator: false, sheet: BbProfileStore.teamOf(BbProfileStore.load()) };
+        const card = this.rates.forRoom();
+        if (card)
+            record.vs = card;
+        return record;
+    }
+    ticket() { return this.random ? this.random.ticket() : null; }
+    flow() {
+        if (this.random)
+            return this.random;
+        const account = this.account;
+        this.random = RkRandomSetup.create({
+            backend: this.backend, directory: this.directory, rules: BbRoomRules.RULES, myId: this.myId,
+            options: {
+                gameRoot: "baseballduel", queue: "baseballduel", partyLimit: 1, solo: true, allowBots: false, aiFallbackMs: BbDuelGame.AI_FALLBACK_MS, clientVersion: BbDuelGame.CLIENT_VERSION,
+                matcher: new MkVersusMatcher(1, Object.assign({}, MkMatcher.TIMING, { rematchWaitMs: BbDuelGame.AI_FALLBACK_MS + 30000, busyMs: 300000 })),
+                intro: "매칭 시작을 누르면 아무 학생과 1대1 야구를 해요.",
+                stats: new AccountStatsOpener(() => account.openStats(), account.pendingGuard(() => this.leaveReport(true)))
+            },
+            assign: (plan) => BbRoomRules.assignSeats(plan),
+            port: {
+                myRecord: () => this.myRecord(),
+                enterTicketRoom: (code, hosting) => this.enterTicketRoom(code, hosting),
+                leaveRoomQuietly: () => this.dropSession(),
+                startMatch: () => this.versus.afterShown(() => this.launchMatch(true)),
+                showParty: () => { this.showScreen("partyScreen"); this.random.render(); },
+                showStart: (message) => { this.showScreen("startScreen"); if (message)
+                    this.notice(message); },
+                presentIds: () => (this.session ? RkMatchHooks.humanIds(this.session.players) : [])
+            },
+            screen: document.getElementById("partyScreen"),
+            mount: document.getElementById("partyMount")
+        });
+        return this.random;
+    }
+    async createParty() {
+        if (!this.backend.database) {
+            this.notice("서버에 연결하지 못했어요");
+            return;
+        }
+        try {
+            await this.rates.loadOnce();
+            const message = await this.flow().create();
+            if (message)
+                this.notice(message);
+        }
+        catch (error) {
+            this.notice("랜덤 매칭 방을 만들지 못했어요. (데이터베이스 규칙을 확인해 주세요)");
+        }
+    }
+    async enterTicketRoom(code, hosting) {
+        if (!hosting) {
+            const outcome = await this.directory.join(code, this.myId, this.myRecord(), false, true).catch(() => null);
+            if (!outcome || !outcome.ok)
+                return false;
+        }
+        this.enterRoom(code, hosting, "매칭됐어요! 곧 시작해요.");
+        return true;
+    }
+    inParty() { return !!this.random && this.random.inParty(); }
+    versusSides() {
+        const session = this.session;
+        if (!session)
+            return null;
+        const ticket = this.ticket(), assign = session.value("assign"), setup = BbRoomRules.setupOf(session.value("setup"));
+        const seats = this.seatPlan.humanSeats(session.players);
+        const ids = ticket && assign ? [BbRoomRules.assignedTo(assign, 0), BbRoomRules.assignedTo(assign, 1)] : [seats[0], seats[BbRoomRules.HOST_TEAM]];
+        if (!ids[0] && !ids[1])
+            return null;
+        const names = (ticket && ticket.rivalIds) || {};
+        const side = (team) => {
+            const id = ids[team], record = id ? session.players.get(id) || null : null, ai = !id && (!!ticket || setup.ai);
+            return BbVersusLineup.side(id, record ? { nick: record.nick, vs: record.vs } : null, ai ? "AI" : id ? names[id] || "" : "", team, this.myId, ai);
+        };
+        return [side(0), side(1)];
+    }
+    leaveReport(randomOnly) {
+        const live = this.live, session = this.session, summary = this.director.summary();
+        const mine = live ? BbRoomRules.teamOf(live, this.myId) : null, random = !!this.ticket();
+        if (!live || !session || !summary || mine === null || this.liveOver || (randomOnly && !random))
+            return null;
+        const progress = AccountForfeit.progressOnLeave(random, this.director.matchProgress());
+        return BbReportBuilder.fromSummary(this.matchKey(session, live), summary, mine, live.seats.s0 !== BbRoomRules.AI_SEAT && live.seats.s1 !== BbRoomRules.AI_SEAT, random, true, progress);
+    }
+    matchKey(session, match) {
+        const ticket = this.ticket();
+        return ticket ? ticket.matchId : session.code + "_" + match.id;
     }
     notice(text) {
         const note = document.getElementById("startNote");
@@ -238,7 +335,8 @@ class BbDuelGame {
             return;
         }
         try {
-            const code = await this.directory.create(this.myId, this.myRecord(), { setup: this.setup });
+            await this.rates.loadOnce();
+            const code = await this.directory.create(this.myId, this.myRecord(), { setup: this.setup }, (taken) => this.flow().codeTaken(taken));
             if (code)
                 this.enterRoom(code, true, "");
             else
@@ -259,6 +357,13 @@ class BbDuelGame {
             return;
         }
         try {
+            await this.rates.loadOnce();
+            const party = await this.flow().tryJoin(code);
+            if (party.handled) {
+                if (party.message)
+                    this.notice(party.message);
+                return;
+            }
             const outcome = await this.directory.join(code, this.myId, this.myRecord(), false);
             if (outcome.ok)
                 this.enterRoom(code, false, outcome.message);
@@ -283,6 +388,7 @@ class BbDuelGame {
         session.onHostTakeover = () => this.roomChanged("host");
         session.connect();
         this.openRoom(note);
+        this.versus.sync();
     }
     drawRoom(note) {
         const session = this.session;
@@ -302,6 +408,9 @@ class BbDuelGame {
             return;
         const match = session.value("match"), end = session.value("end");
         if (session.status === "play" && match && (!this.live || this.live.id !== match.id)) {
+            this.versus.sync();
+            if (this.random && kind === "match")
+                this.random.armMatch();
             this.startOnline(session, match);
             return;
         }
@@ -316,6 +425,12 @@ class BbDuelGame {
             this.director.reseat(BbRoomRules.seatsFor(this.live, this.myId, session.isHost()));
         if (this.shown === "roomScreen")
             this.drawRoom("");
+        const random = this.random;
+        if (random && (kind === "players" || kind === "host" || kind === "status"))
+            random.roomChanged(this.seatPlan.humanSeats(session.players).filter((id) => !!id).length, session.isHost(), session.status === "lobby");
+        if (random && kind === "match")
+            random.armMatch();
+        this.versus.sync();
     }
     changeSetup(setup) {
         const session = this.session;
@@ -345,15 +460,37 @@ class BbDuelGame {
         }
         if (!session.isHost())
             return;
-        const seats = this.seatPlan.humanSeats(session.players), guest = seats[0] ? session.players.get(seats[0]) : null, mine = session.me();
+        if (this.guestId(session))
+            this.versus.requestRoomStart((at) => { session.ref.update({ vsAt: at }); }, () => { if (this.session === session)
+                this.launchMatch(false); });
+        else
+            this.launchMatch(false);
+    }
+    guestId(session) {
+        const humans = this.seatPlan.humanSeats(session.players).filter((id) => !!id && id !== this.myId);
+        return humans[0] || null;
+    }
+    launchMatch(randomMatch) {
+        const session = this.session;
+        if (!session || !session.isHost() || session.status !== "lobby")
+            return;
+        const setup = randomMatch ? { mode: "match", level: "normal", ai: true } : BbRoomRules.setupOf(session.value("setup"));
+        const guestId = this.guestId(session), guest = guestId ? session.players.get(guestId) || null : null, mine = session.me();
         if (!mine || (!guest && !setup.ai))
             return;
         const rival = guest ? BbProfileStore.teamOf(guest.sheet) : { lineup: [BbAiLevel.batterSheet("R")], pitchers: [BbAiLevel.pitcherSheet("R")] };
         const match = {
-            id: this.backend.now(), seats: { s0: guest ? seats[0] : BbRoomRules.AI_SEAT, s1: this.myId }, sheets: [rival, BbProfileStore.teamOf(mine.sheet)],
+            id: this.backend.now(), seats: { s0: guest ? guestId : BbRoomRules.AI_SEAT, s1: this.myId }, sheets: [rival, BbProfileStore.teamOf(mine.sheet)],
             names: [guest ? guest.nick : "AI " + BbAiLevel.ALL[setup.level].label, mine.nick], level: setup.level
         };
         session.ref.update({ match, status: "play", end: null, log: null });
+    }
+    scouting(session, match) {
+        const scout = (id) => {
+            const record = id === BbRoomRules.AI_SEAT ? null : session.players.get(id), built = record ? BbScoutBuilder.of(BbVersusCards.fromRoom(record.vs)) : null;
+            return built && !this.zones.on ? { batStats: built.batStats, pitStats: built.pitStats, hitHeat: null, pitchHeat: null } : built;
+        };
+        return [scout(match.seats.s0), scout(match.seats.s1)];
     }
     async startOnline(session, match) {
         this.closeLive();
@@ -372,10 +509,12 @@ class BbDuelGame {
         this.director.begin({
             format: new BbOneInningFormat(), teams: [BbProfileStore.teamOf(match.sheets[0]), BbProfileStore.teamOf(match.sheets[1])], names: match.names,
             seats: BbRoomRules.seatsFor(match, this.myId, session.isHost()), level: BbAiLevel.ALL[match.level] || BbAiLevel.ALL.normal, seed: match.id % BbDuelGame.SEED_SPAN,
-            halvesToPlay: null, log, view: BbRoomRules.teamOf(match, this.myId) === null ? "pitcher" : null, autoSwingAt: null
+            halvesToPlay: null, log, view: BbRoomRules.teamOf(match, this.myId) === null ? "pitcher" : null, autoSwingAt: null, scouting: this.scouting(session, match)
         }, link);
         if (log.length)
             this.director.say("방금 상황을 불러왔어요");
+        if (this.random)
+            this.random.armMatch();
     }
     closeLive() {
         if (this.link)
@@ -424,9 +563,19 @@ class BbDuelGame {
         if (live && !this.liveOver) {
             this.liveOver = true;
             this.pause.clear();
-            this.result.show(summary, "match", BbRoomRules.teamOf(live, this.myId), this.session && this.session.isHost() ? "방으로 돌아가기" : "방장을 기다리는 중");
+            const mine = BbRoomRules.teamOf(live, this.myId), random = this.random, ticket = this.ticket(), session = this.session;
+            const hostLabel = this.session && this.session.isHost() ? "방으로 돌아가기" : "방장을 기다리는 중";
+            this.result.show(summary, "match", mine, ticket ? "" : hostLabel, ticket ? "팀 대기실로" : "나가기");
             this.showScreen("resultScreen");
             this.showcase();
+            if (mine !== null && session)
+                this.recordEnd(session, live, summary, mine);
+            if (random && ticket && mine !== null) {
+                const report = BbReportBuilder.fromSummary("x", summary, mine, true, true, false, 1), result = report.winner === -1 ? "draw" : report.winner === mine ? "win" : "lose";
+                const hint = () => this.result.note(random.endHint());
+                hint();
+                random.matchEnded({ result }, hint);
+            }
             return;
         }
         if (!game) {
@@ -437,6 +586,14 @@ class BbDuelGame {
         this.result.show(summary, game.mode, BbModeRules.humanTeam(game.mode), "다시 하기");
         this.showScreen("resultScreen");
         this.showcase();
+    }
+    recordEnd(session, live, summary, mine) {
+        const rival = live.seats.s0 !== BbRoomRules.AI_SEAT && live.seats.s1 !== BbRoomRules.AI_SEAT;
+        if (!rival)
+            return;
+        const report = BbReportBuilder.fromSummary(this.matchKey(session, live), summary, mine, rival, !!this.ticket(), false, 1);
+        this.account.record(report);
+        this.rates.note(report);
     }
     again() {
         const session = this.session;
@@ -452,27 +609,42 @@ class BbDuelGame {
         this.closeLive();
         this.session = null;
         this.hud.room("");
+        this.versus.cancelStart();
         if (session)
             session.leave();
+        this.versus.sync();
     }
     leaveRoom(message) {
+        if (this.inParty()) {
+            this.random.backToParty(message);
+            return;
+        }
         this.dropSession();
         this.showScreen("startScreen");
         if (message)
             this.notice(message);
     }
     leaveGame() {
-        const live = this.live, mine = live ? BbRoomRules.teamOf(live, this.myId) : null;
-        if ((!this.game && !live) || !window.confirm("경기를 그만두고 나갈까요?"))
+        const live = this.live, mine = live ? BbRoomRules.teamOf(live, this.myId) : null, random = !!this.ticket();
+        const question = random && mine !== null && !this.liveOver ? MkForfeit.QUESTION : "경기를 그만두고 나갈까요?";
+        if ((!this.game && !live) || !window.confirm(question))
             return;
-        if (live && mine !== null && !this.liveOver)
+        if (live && mine !== null && !this.liveOver) {
+            const report = this.leaveReport(false);
+            if (report && report.rival)
+                this.account.record(report);
+            if (this.random)
+                this.random.forfeitIfLate(this.director.matchProgress());
             this.claimEnd(mine === 0 ? 1 : 0);
+        }
         BbLocalResume.clear();
         this.leaveRoom("");
         this.showcase();
     }
 }
 BbDuelGame.ASSET_DIRECTORY = "assets/kaykit/";
-BbDuelGame.SCREENS = ["startScreen", "roomScreen", "resultScreen"];
+BbDuelGame.SCREENS = ["startScreen", "roomScreen", "partyScreen", "resultScreen"];
 BbDuelGame.NOTICE_SECONDS = 2.5;
 BbDuelGame.SEED_SPAN = 1000000007;
+BbDuelGame.AI_FALLBACK_MS = 120000;
+BbDuelGame.CLIENT_VERSION = 20261113;

@@ -11,6 +11,14 @@ interface BbMatchPlan {
   log: BbLogEntry[];
   view: BbLiveView | null;
   autoSwingAt: number | null;
+  scouting?: [BbTeamScout | null, BbTeamScout | null];
+}
+
+interface BbTeamScout {
+  batStats: readonly string[];
+  pitStats: readonly string[];
+  hitHeat: readonly string[] | null;
+  pitchHeat: readonly string[] | null;
 }
 
 interface BbMatchSummary {
@@ -254,10 +262,24 @@ class BbMatchDirector {
   }
 
   private show(): void {
-    const session = this.session, names = this.plan.names;
-    this.ticker.begin(session.board());
-    this.cards.show(names[session.battingIndex], session.batter(), names[session.fieldingIndex], session.pitcher(), session.board().pitches);
+    this.ticker.begin(this.session.board());
+    this.showCards();
   }
+
+  private scoutOf(team: 0 | 1): BbTeamScout | null { return this.plan.scouting ? this.plan.scouting[team] : null; }
+
+  private showCards(): void {
+    const session = this.session, names = this.plan.names, seats = this.plan.seats, batting = this.scoutOf(session.battingIndex), fielding = this.scoutOf(session.fieldingIndex);
+    const facts: BbCardFacts = {
+      batting: batting ? batting.batStats : [], pitching: fielding ? fielding.pitStats : [],
+      batterHeat: seats[session.fieldingIndex] === "human" && batting ? batting.hitHeat : null, pitcherHeat: seats[session.battingIndex] === "human" && fielding ? fielding.pitchHeat : null
+    };
+    this.cards.show(names[session.battingIndex], session.batter(), names[session.fieldingIndex], session.pitcher(), session.board().pitches, facts);
+  }
+
+  matchProgress(): number { return this.session ? new BbMatchRules(this.plan.format).progress(this.session.state) : 0; }
+
+  summary(): BbMatchSummary | null { return this.plan && this.session ? { plan: this.plan, state: this.session.state, forfeitedBy: null } : null; }
 
   private isOver(): boolean {
     const state = this.session.state, halves = this.plan.halvesToPlay;
@@ -291,7 +313,7 @@ class BbMatchDirector {
     this.swing.hide();
     this.waitingForCall = true;
     this.player.play(this.idleScene());
-    if (seat === "human") { this.pad.open(session.pitcher()); this.clock.start(BbMatchDirector.PITCH_SECONDS); }
+    if (seat === "human") { const batting = this.scoutOf(session.battingIndex); this.pad.open(session.pitcher(), batting ? batting.hitHeat : null); this.clock.start(BbMatchDirector.PITCH_SECONDS); }
     else if (seat === "ai") this.link.pitchChosen(sequence, session.aiCall(this.plan.level));
   }
 
@@ -322,14 +344,14 @@ class BbMatchDirector {
   }
 
   private announce(pending: BbPendingPitch): void {
-    const settled = pending.settled as BbSettledPitch, outcome = settled.outcome, play = outcome.script, session = this.session, names = this.plan.names;
+    const settled = pending.settled as BbSettledPitch, outcome = settled.outcome, play = outcome.script, session = this.session;
     pending.announced = true;
     this.ticker.thrown(!!play && play.result !== "FOUL");
     const verdict = play ? BbMatchDirector.IN_PLAY_VERDICT : settled.note.toast || BbMatchDirector.PLAIN_CALLS[outcome.kind];
     this.report.show(pending.roll, verdict, outcome.swing, pending.leniency, this.player.view);
     if (play) return;
     this.ticker.settle(session.board());
-    if (!settled.note.halfOver) this.cards.show(names[session.battingIndex], session.batter(), names[session.fieldingIndex], session.pitcher(), session.board().pitches);
+    if (!settled.note.halfOver) this.showCards();
     this.toast.show(verdict);
   }
 

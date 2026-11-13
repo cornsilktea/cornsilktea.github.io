@@ -100,9 +100,13 @@ class BbPlayerCard {
   private readonly fills: HTMLElement[];
   private readonly points: HTMLElement[];
   private readonly values: HTMLElement[];
+  private readonly heatGrid: HTMLElement;
+  private readonly heatCells: HTMLElement[];
 
   constructor(host: HTMLElement, side: BbCardSide, role: string, abilityLabels: readonly string[], statLabels: readonly string[]) {
     const card = BbHudParts.box("bb-card bb-card-" + side, host), head = BbHudParts.box("bb-card-head", card);
+    this.heatGrid = BbHudParts.box("bb-card-heat", card);
+    this.heatCells = Array.from({ length: BbZoneGrid.CELLS }, () => BbHudParts.box("bb-card-heat-cell", this.heatGrid));
     BbHudParts.box("bb-card-role", head, role);
     this.name = BbHudParts.box("bb-card-name", head);
     const abilities = BbHudParts.box("bb-card-abilities", card);
@@ -130,6 +134,18 @@ class BbPlayerCard {
     });
     this.values.forEach((cell, index) => { cell.textContent = stats[index] || BbPlayerCard.NO_RECORD; });
   }
+
+  heat(tones: readonly string[] | null): void {
+    this.heatGrid.classList.toggle("open", !!tones);
+    this.heatCells.forEach((cell, index) => { cell.className = "bb-card-heat-cell" + (tones ? " " + tones[index] : ""); });
+  }
+}
+
+interface BbCardFacts {
+  batting: readonly string[];
+  pitching: readonly string[];
+  batterHeat: readonly string[] | null;
+  pitcherHeat: readonly string[] | null;
 }
 
 class BbMatchupCards {
@@ -141,9 +157,11 @@ class BbMatchupCards {
     this.pitcher = new BbPlayerCard(host, "right", "투수", ["제구", "구위", "변화"], ["평균자책점", "WHIP", "피OPS", "투구수"]);
   }
 
-  show(batterName: string, batter: BbBatterSheet, pitcherName: string, pitcher: BbPitcherSheet, pitches: number): void {
-    this.batter.show(batterName, [batter.abilities.contact, batter.abilities.power, batter.abilities.speed]);
-    this.pitcher.show(pitcherName, [pitcher.abilities.control, pitcher.abilities.power, pitcher.abilities.breaking], ["", "", "", String(pitches)]);
+  show(batterName: string, batter: BbBatterSheet, pitcherName: string, pitcher: BbPitcherSheet, pitches: number, facts: BbCardFacts | null = null): void {
+    this.batter.show(batterName, [batter.abilities.contact, batter.abilities.power, batter.abilities.speed], facts ? facts.batting : []);
+    this.pitcher.show(pitcherName, [pitcher.abilities.control, pitcher.abilities.power, pitcher.abilities.breaking], (facts ? facts.pitching.slice(0, 3) : ["", "", ""]).concat([String(pitches)]));
+    this.batter.heat(facts ? facts.batterHeat : null);
+    this.pitcher.heat(facts ? facts.pitcherHeat : null);
   }
 }
 

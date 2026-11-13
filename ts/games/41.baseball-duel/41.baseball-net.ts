@@ -1,5 +1,6 @@
 interface BbPlayerRecord extends RkPlayerRecord {
   sheet: BbTeamSheet;
+  vs?: BbVersusCard;
 }
 
 interface BbRoomSetup {
@@ -29,9 +30,20 @@ interface BbNetEntry { p?: BbNetPitch; r?: BbNetRoll; s?: BbNetSwing }
 class BbRoomRules {
   static readonly AI_SEAT = "ai";
   static readonly RULES: RkRoomRules = { root: "baseballduel/rooms", seatCount: 2, spectatorSlot: 9, seatOrder: [0, 1], spectatorLimit: 8 };
-  static readonly VALUES: readonly string[] = ["match", "setup", "end"];
+  static readonly VALUES: readonly string[] = ["match", "setup", "end", "vsAt", "assign"];
   static readonly HOST_TEAM = 1;
   static readonly BLANK_SETUP: BbRoomSetup = { mode: "match", level: "normal", ai: false };
+
+  static assignSeats(plan: MkMatchPlan): Record<string, number> {
+    const assign: Record<string, number> = {};
+    plan.groups.forEach((group) => MkSeatAssign.peopleOf(group).slice(0, 1).forEach((id) => { assign[id] = group.code === plan.binder ? BbRoomRules.HOST_TEAM : 0; }));
+    return assign;
+  }
+
+  static assignedTo(assign: Record<string, number> | null, team: 0 | 1): string | null {
+    if (!assign) return null;
+    return Object.keys(assign).find((id) => Number(assign[id]) === team) || null;
+  }
 
   static setupOf(value: BbRoomSetup | null): BbRoomSetup {
     if (!value || !BbAiLevel.ALL[value.level] || BbModeRules.ORDER.indexOf(value.mode) < 0) return BbRoomRules.BLANK_SETUP;

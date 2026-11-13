@@ -1,5 +1,15 @@
 "use strict";
 class BbRoomRules {
+    static assignSeats(plan) {
+        const assign = {};
+        plan.groups.forEach((group) => MkSeatAssign.peopleOf(group).slice(0, 1).forEach((id) => { assign[id] = group.code === plan.binder ? BbRoomRules.HOST_TEAM : 0; }));
+        return assign;
+    }
+    static assignedTo(assign, team) {
+        if (!assign)
+            return null;
+        return Object.keys(assign).find((id) => Number(assign[id]) === team) || null;
+    }
     static setupOf(value) {
         if (!value || !BbAiLevel.ALL[value.level] || BbModeRules.ORDER.indexOf(value.mode) < 0)
             return BbRoomRules.BLANK_SETUP;
@@ -13,7 +23,7 @@ class BbRoomRules {
 }
 BbRoomRules.AI_SEAT = "ai";
 BbRoomRules.RULES = { root: "baseballduel/rooms", seatCount: 2, spectatorSlot: 9, seatOrder: [0, 1], spectatorLimit: 8 };
-BbRoomRules.VALUES = ["match", "setup", "end"];
+BbRoomRules.VALUES = ["match", "setup", "end", "vsAt", "assign"];
 BbRoomRules.HOST_TEAM = 1;
 BbRoomRules.BLANK_SETUP = { mode: "match", level: "normal", ai: false };
 class BbRoomLink {

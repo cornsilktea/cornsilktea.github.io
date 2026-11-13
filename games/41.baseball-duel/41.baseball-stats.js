@@ -324,25 +324,43 @@ class BbReportBuilder {
 }
 class BbVersusCards {
     static fromStats(node, withZones) {
-        if (!node)
+        if (!node || !node.g)
             return null;
         const card = JSON.parse(JSON.stringify(node.rm));
-        if (withZones && node.g > 0) {
+        card.ob = Object.assign({}, node.bat);
+        card.op = Object.assign({}, node.pit);
+        if (withZones) {
             card.zb = node.zb.map((cell) => Object.assign({}, cell));
             card.zp = node.zp.slice();
-            card.bat = card.g ? card.bat : Object.assign({}, node.bat);
         }
-        return card.g > 0 || card.zb ? card : null;
+        return card;
     }
     static fromRoom(raw) {
         if (!raw || typeof raw !== "object")
             return null;
         const source = raw, card = BbStatsMath.tally(source);
+        if (source.ob)
+            card.ob = BbStatsMath.counts(source.ob, BbStatsKeys.BAT, BbBoxScoreBuilder.emptyBat());
+        if (source.op)
+            card.op = BbStatsMath.counts(source.op, BbStatsKeys.PIT, BbBoxScoreBuilder.emptyPit());
         if (source.zb)
             card.zb = AccountShape.list(source.zb).slice(0, BbZoneGrid.SLOTS).map((cell) => BbStatsMath.counts(cell, ["n", "ab", "h", "tb"], { n: 0, ab: 0, h: 0, tb: 0 }));
         if (source.zp)
             card.zp = AccountShape.list(source.zp).slice(0, BbZoneGrid.SLOTS).map(AccountNumbers.count);
-        return card.g > 0 || card.zb ? card : null;
+        return card.ob ? card : null;
+    }
+}
+class BbScoutBuilder {
+    static of(card) {
+        if (!card || !card.ob || !card.op)
+            return null;
+        const f = BbBaseballFormulas, bat = card.ob, pit = card.op;
+        return {
+            batStats: [f.rateText(f.average(bat)), f.rateText(f.onBase(bat)), f.rateText(f.slugging(bat)), String(bat.hr)],
+            pitStats: [f.meanText(f.earnedRunAverage(pit)), f.meanText(f.whip(pit)), f.rateText(f.ops(pit))],
+            hitHeat: card.zb ? BbZoneMap.hittingCells(card.zb, bat).map((cell) => cell.tone) : null,
+            pitchHeat: card.zp ? BbZoneMap.pitchingCells(card.zp).map((cell) => cell.tone) : null
+        };
     }
 }
 class BbAccount extends AccountGameAccount {

@@ -26,16 +26,18 @@ class BbZoneAimWindow {
   private readonly reach: SVGEllipseElement;
   private readonly ball: SVGCircleElement;
   private readonly info: HTMLElement;
+  private readonly heatCells: SVGRectElement[];
   private sheet: BbPitcherSheet | null = null;
   private kind: BbPitchKind | null = null;
   private aim: BbZonePoint = { u: 0, v: 0 };
   private dragging = false;
 
   constructor(host: HTMLElement) {
-    const span = BbZoneAimWindow.SPAN;
+    const span = BbZoneAimWindow.SPAN, third = 2 / 3;
     this.frame = BbHudParts.box("bb-aim", host);
     this.picture = BbHudParts.shape("svg", "bb-aim-zone", this.frame, { viewBox: [-span, -span, span * 2, span * 2].join(" ") });
     this.allowed = BbHudParts.shape("rect", "bb-aim-allowed", this.picture);
+    this.heatCells = Array.from({ length: BbZoneGrid.CELLS }, (unused, index) => BbHudParts.shape("rect", "bb-aim-heat", this.picture, { x: -1 + (index % 3) * third, y: -1 + Math.floor(index / 3) * third, width: third, height: third }));
     BbHudParts.shape("rect", "bb-aim-strike", this.picture, { x: -1, y: -1, width: 2, height: 2 });
     [-1 / 3, 1 / 3].forEach((line) => {
       BbHudParts.shape("line", "bb-aim-grid", this.picture, { x1: line, y1: -1, x2: line, y2: 1 });
@@ -57,6 +59,10 @@ class BbZoneAimWindow {
   }
 
   get call(): BbPitchCall | null { return this.kind ? { pitch: this.kind.id, aim: { u: this.aim.u, v: this.aim.v } } : null; }
+
+  heat(tones: readonly string[] | null): void {
+    this.heatCells.forEach((cell, index) => cell.setAttribute("class", "bb-aim-heat" + (tones ? " " + tones[index] : "")));
+  }
 
   begin(sheet: BbPitcherSheet): void {
     this.sheet = sheet;
@@ -151,10 +157,11 @@ class BbPitchPad {
     this.aim.nudge(sideways * reach, upward * reach);
   }
 
-  open(sheet: BbPitcherSheet): void {
+  open(sheet: BbPitcherSheet, heat: readonly string[] | null = null): void {
     this.opened = true;
     this.usable = sheet.pitches;
     this.aim.begin(sheet);
+    this.aim.heat(heat);
     BbPitchCatalog.ALL.forEach((kind, index) => {
       const end = BbPitchIcon.end();
       this.keys[index].disabled = sheet.pitches.indexOf(kind.id) < 0;

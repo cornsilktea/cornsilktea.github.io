@@ -518,6 +518,7 @@
         <button id="recToggle" type="button" aria-expanded="false">펼치기</button>
         <button id="crecToggle" type="button" aria-expanded="false">펼치기</button>
         <button id="rankToggle" type="button" aria-expanded="false">펼치기</button>
+        <button id="bbTeachToggle" type="button" aria-expanded="false">펼치기</button>
         <button id="patchNoteToggle" type="button" aria-expanded="false">펼치기</button>
         <button id="recordsToggle" type="button" aria-expanded="false">펼치기</button>
         <button id="forestHubToggle" type="button" aria-expanded="false">펼치기</button>
@@ -537,7 +538,12 @@
           <button type="button" data-sub="rec" aria-pressed="false">세계 신기록 관리</button>
           <button type="button" data-sub="crec" aria-pressed="false"><span id="crecTitle">학급 신기록 관리</span></button>
           <button type="button" data-sub="rank" aria-pressed="false">반 별 통계</button>
+          <button type="button" data-sub="bbTeach" aria-pressed="false">야구(41) 포인트별·핫콜드존</button>
         </div>
+
+        <!-- 41번 야구(2026-11-14): 핫콜드존 보이기 스위치(baseballduel/settings/zones, 기본 꺼짐)와 능력치 배분별 성적(교사 전용).
+             포인트별 성적은 누를 때만 랭킹 요약(baseballduel/board)으로 학생 목록을 얻고 학생마다 통계를 한 번씩 읽는다. 동작은 ts/games/41.baseball-duel/41.baseball-teacher.ts -->
+        <div id="bbTeachBody" hidden></div>
 
         <!-- 세계 신기록 관리: records/<게임>/<항목> 을 읽어 보여 주고, 선생님 계정으로 고치거나 지웁니다.
              (학생은 규칙상 더 높은 점수만 쓸 수 있고, 선생님 UID 는 규칙에서 예외) -->
@@ -781,6 +787,17 @@
 <script charset="utf-8" src="games/31.zombie-outbreak/31.zombie-outbreak-stats.js?v=20261104a"></script>
 <script charset="utf-8" src="games/38.snow-royale/38.snow-account.js?v=20261028c"></script>
 <script charset="utf-8" src="games/39.water-balloon/39.balloon-account.js?v=20261028c"></script>
+<script charset="utf-8" src="games/41.baseball-duel/41.baseball-motion.js?v=20261114a"></script>
+<script charset="utf-8" src="games/41.baseball-duel/41.baseball-field.js?v=20261114a"></script>
+<script charset="utf-8" src="games/41.baseball-duel/41.baseball-pitch.js?v=20261114a"></script>
+<script charset="utf-8" src="games/41.baseball-duel/41.baseball-batting.js?v=20261114a"></script>
+<script charset="utf-8" src="games/41.baseball-duel/41.baseball-running.js?v=20261114a"></script>
+<script charset="utf-8" src="games/41.baseball-duel/41.baseball-defense.js?v=20261114a"></script>
+<script charset="utf-8" src="games/41.baseball-duel/41.baseball-play.js?v=20261114a"></script>
+<script charset="utf-8" src="games/41.baseball-duel/41.baseball-game.js?v=20261114a"></script>
+<script charset="utf-8" src="games/41.baseball-duel/41.baseball-stats.js?v=20261114a"></script>
+<script charset="utf-8" src="games/41.baseball-duel/41.baseball-board.js?v=20261114a"></script>
+<script charset="utf-8" src="games/41.baseball-duel/41.baseball-teacher.js?v=20261114a"></script>
 <script charset="utf-8" src="common/account-stats-repair.js?v=20261106a"></script>
 <script>
 /* 밝기 전환 버튼: <html data-theme> 를 바꾸고 localStorage('portal_theme')에 남긴다(index.html 과 같은 키).
@@ -1354,7 +1371,9 @@ class ClassRankPanel {
     new RankGame("snowroyale", "눈싸움(38)", { label: "처치 합계" }, "온라인 방(랜덤 매칭 포함) 중 AI 없는 판만 셉니다. 승 = 1위.",
       () => ({ profile: new SnAccountProfile(), view: new SnAccountView() })),
     new RankGame("waterballoon", "물풍선(39)", { label: "처치 합계" }, "온라인 방(랜덤 매칭 포함) 중 AI 없는 판만 셉니다. 승 = 1위.",
-      () => ({ profile: new WbAccountProfile(), view: new WbAccountView() }))
+      () => ({ profile: new WbAccountProfile(), view: new WbAccountView() })),
+    new RankGame("baseballduel", "야구(41)", { label: "홈런" }, "사람과 한 경기(일반 방·랜덤 매칭)만 셉니다. AI 대전·연습은 빠집니다. 무승부는 승/패에 넣지 않습니다.",
+      () => ({ profile: new BbStatsProfile(), view: new BbStatsView(() => true) }))
   ];
 
   constructor() {
@@ -2981,6 +3000,7 @@ class AdminRestIo {
   async keys(path) { const r = await fetch(await authedUrl(path) + "&shallow=true", { cache: "no-store" }); if (!r.ok) throw new Error(String(r.status)); return Object.keys((await r.json()) || {}); }
   async patch(values) { const r = await fetch(await authedUrl(""), { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(values) }); if (!r.ok) throw new Error(String(r.status)); }
 }
+new BbTeacherPanel(new AdminRestIo(), $("bbTeachBody"), $("bbTeachToggle")).bind();
 const teamFormPanel = new TeamFormationPanel(new AdminRestIo(), { cls: "teamFormClass", load: "teamFormLoad", msg: "teamFormMsg", board: "teamFormBoard", tray: "teamFormTray" },
   D.ALL_CLASSES.filter((c) => /^[1-3]-[1-5]$/.test(c.id)), () => current);
 teamFormPanel.bind();
@@ -3176,7 +3196,7 @@ $("charMvpToggle").addEventListener("click", () => {
    실제 펼치기·처음 읽기는 각 도구의 숨은 펼치기 버튼(<키>Toggle)이 하고 여기서는 눌러 줄 뿐이다. 묶음 탭 자체를 닫으면 열려 있던 도구도 함께 접는다.
    키 g 의 묶음은 #gBody(덮개)·#gToggle(숨은 펼치기 버튼)·#gSubs(도구 버튼 줄, 버튼의 data-sub 가 도구 키)를 쓴다. */
 class ToolGroup {
-  static GROUPS = { arena: ["teamForm", "lag", "charMvp"], records: ["rec", "crec", "rank"], forestHub: ["forest", "forestAdmin"] };
+  static GROUPS = { arena: ["teamForm", "lag", "charMvp"], records: ["rec", "crec", "rank", "bbTeach"], forestHub: ["forest", "forestAdmin"] };
 
   static bindAll() { Object.keys(ToolGroup.GROUPS).forEach((key) => new ToolGroup(key, ToolGroup.GROUPS[key]).bind()); }
 

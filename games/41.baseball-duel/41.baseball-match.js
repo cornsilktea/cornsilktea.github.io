@@ -183,10 +183,20 @@ class BbMatchDirector {
         this.stop();
     }
     show() {
-        const session = this.session, names = this.plan.names;
-        this.ticker.begin(session.board());
-        this.cards.show(names[session.battingIndex], session.batter(), names[session.fieldingIndex], session.pitcher(), session.board().pitches);
+        this.ticker.begin(this.session.board());
+        this.showCards();
     }
+    scoutOf(team) { return this.plan.scouting ? this.plan.scouting[team] : null; }
+    showCards() {
+        const session = this.session, names = this.plan.names, seats = this.plan.seats, batting = this.scoutOf(session.battingIndex), fielding = this.scoutOf(session.fieldingIndex);
+        const facts = {
+            batting: batting ? batting.batStats : [], pitching: fielding ? fielding.pitStats : [],
+            batterHeat: seats[session.fieldingIndex] === "human" && batting ? batting.hitHeat : null, pitcherHeat: seats[session.battingIndex] === "human" && fielding ? fielding.pitchHeat : null
+        };
+        this.cards.show(names[session.battingIndex], session.batter(), names[session.fieldingIndex], session.pitcher(), session.board().pitches, facts);
+    }
+    matchProgress() { return this.session ? new BbMatchRules(this.plan.format).progress(this.session.state) : 0; }
+    summary() { return this.plan && this.session ? { plan: this.plan, state: this.session.state, forfeitedBy: null } : null; }
     isOver() {
         const state = this.session.state, halves = this.plan.halvesToPlay;
         return state.finished || (halves !== null && state.halvesDone >= halves);
@@ -219,7 +229,8 @@ class BbMatchDirector {
         this.waitingForCall = true;
         this.player.play(this.idleScene());
         if (seat === "human") {
-            this.pad.open(session.pitcher());
+            const batting = this.scoutOf(session.battingIndex);
+            this.pad.open(session.pitcher(), batting ? batting.hitHeat : null);
             this.clock.start(BbMatchDirector.PITCH_SECONDS);
         }
         else if (seat === "ai")
@@ -257,7 +268,7 @@ class BbMatchDirector {
             this.ticker.tally(call.tally, this.session.board());
     }
     announce(pending) {
-        const settled = pending.settled, outcome = settled.outcome, play = outcome.script, session = this.session, names = this.plan.names;
+        const settled = pending.settled, outcome = settled.outcome, play = outcome.script, session = this.session;
         pending.announced = true;
         this.ticker.thrown(!!play && play.result !== "FOUL");
         const verdict = play ? BbMatchDirector.IN_PLAY_VERDICT : settled.note.toast || BbMatchDirector.PLAIN_CALLS[outcome.kind];
@@ -266,7 +277,7 @@ class BbMatchDirector {
             return;
         this.ticker.settle(session.board());
         if (!settled.note.halfOver)
-            this.cards.show(names[session.battingIndex], session.batter(), names[session.fieldingIndex], session.pitcher(), session.board().pitches);
+            this.showCards();
         this.toast.show(verdict);
     }
     forfeit(team) { if (this.running)

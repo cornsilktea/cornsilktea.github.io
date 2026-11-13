@@ -15,7 +15,7 @@
 <meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
 <meta name="twitter:card" content="summary">
 <link rel="stylesheet" href="common/theme.css">
-<link rel="stylesheet" href="games/41.baseball-duel/41.baseball-hud.css?v=20261113c">
+<link rel="stylesheet" href="games/41.baseball-duel/41.baseball-hud.css?v=20261113d">
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 <script async src="https://cdn.jsdelivr.net/npm/es-module-shims@1.10.1/dist/es-module-shims.js"></script>
@@ -52,7 +52,9 @@
       <button type="button" class="st-btn primary" id="btnRandom">랜덤 매칭 방 만들기</button>
       <div class="bb-join-row"><input type="text" id="joinCode" maxlength="6" placeholder="방 코드" autocomplete="off"><button type="button" class="st-btn" id="btnJoin">입장</button></div>
       <div id="startNote"></div>
+      <button type="button" class="st-btn" data-account-open="stats">📊 내 통계 · 최근 20매치</button>
     </div>
+    <div class="st-card" id="boardMount"></div>
     <div class="st-card">
       <h2>조작 방법</h2>
       <div class="st-keys">
@@ -72,6 +74,13 @@
   </div>
 </div>
 
+<div id="partyScreen" class="st-screen" hidden>
+  <div class="st-wrap">
+    <div class="st-hero"><h1 class="st-title">야구 1대1 대전</h1></div>
+    <div class="st-card" id="partyMount"></div>
+  </div>
+</div>
+
 <div id="resultScreen" class="st-screen" hidden>
   <div class="st-wrap">
     <div class="st-card" id="resultMount"></div>
@@ -80,33 +89,40 @@
 
 <button type="button" id="sheetCorner" class="bb-corner" hidden>선수 정보 만들기</button>
 <div id="bbDialogs" class="bb-ui"></div>
+<div id="versusCurtain" hidden></div>
 
 <script charset="utf-8" src="common/character-kit.js?v=20261011"></script>
+<script charset="utf-8" src="common/match-kit.js?v=20261113d"></script>
+<script charset="utf-8" src="common/account-match-kit.js?v=20261113d"></script>
+<script charset="utf-8" src="common/versus-curtain.js?v=20261113d"></script>
 <script charset="utf-8" src="common/room-drop-recovery.js?v=20261106c"></script>
 <script charset="utf-8" src="common/room-kit.js?v=20261111b"></script>
-<script charset="utf-8" src="games/41.baseball-duel/41.baseball-motion.js?v=20261113c"></script>
-<script charset="utf-8" src="games/41.baseball-duel/41.baseball-field.js?v=20261113c"></script>
-<script charset="utf-8" src="games/41.baseball-duel/41.baseball-pitch.js?v=20261113c"></script>
-<script charset="utf-8" src="games/41.baseball-duel/41.baseball-batting.js?v=20261113c"></script>
-<script charset="utf-8" src="games/41.baseball-duel/41.baseball-running.js?v=20261113c"></script>
-<script charset="utf-8" src="games/41.baseball-duel/41.baseball-defense.js?v=20261113c"></script>
-<script charset="utf-8" src="games/41.baseball-duel/41.baseball-play.js?v=20261113c"></script>
-<script charset="utf-8" src="games/41.baseball-duel/41.baseball-game.js?v=20261113c"></script>
-<script charset="utf-8" src="games/41.baseball-duel/41.baseball-ai.js?v=20261113c"></script>
-<script charset="utf-8" src="games/41.baseball-duel/41.baseball-drills.js?v=20261113c"></script>
-<script charset="utf-8" src="games/41.baseball-duel/41.baseball-choreo.js?v=20261113c"></script>
-<script charset="utf-8" src="games/41.baseball-duel/41.baseball-actors.js?v=20261113c"></script>
-<script charset="utf-8" src="games/41.baseball-duel/41.baseball-park.js?v=20261113c"></script>
-<script charset="utf-8" src="games/41.baseball-duel/41.baseball-stage.js?v=20261113c"></script>
-<script charset="utf-8" src="games/41.baseball-duel/41.baseball-camera.js?v=20261113c"></script>
-<script charset="utf-8" src="games/41.baseball-duel/41.baseball-hud.js?v=20261113c"></script>
-<script charset="utf-8" src="games/41.baseball-duel/41.baseball-session.js?v=20261113c"></script>
-<script charset="utf-8" src="games/41.baseball-duel/41.baseball-scene.js?v=20261113c"></script>
-<script charset="utf-8" src="games/41.baseball-duel/41.baseball-controls.js?v=20261113c"></script>
-<script charset="utf-8" src="games/41.baseball-duel/41.baseball-sheet.js?v=20261113c"></script>
-<script charset="utf-8" src="games/41.baseball-duel/41.baseball-match.js?v=20261113c"></script>
-<script charset="utf-8" src="games/41.baseball-duel/41.baseball-net.js?v=20261113c"></script>
-<script charset="utf-8" src="games/41.baseball-duel/41.baseball-duel.js?v=20261113c"></script>
+<script charset="utf-8" src="games/41.baseball-duel/41.baseball-motion.js?v=20261113d"></script>
+<script charset="utf-8" src="games/41.baseball-duel/41.baseball-field.js?v=20261113d"></script>
+<script charset="utf-8" src="games/41.baseball-duel/41.baseball-pitch.js?v=20261113d"></script>
+<script charset="utf-8" src="games/41.baseball-duel/41.baseball-batting.js?v=20261113d"></script>
+<script charset="utf-8" src="games/41.baseball-duel/41.baseball-running.js?v=20261113d"></script>
+<script charset="utf-8" src="games/41.baseball-duel/41.baseball-defense.js?v=20261113d"></script>
+<script charset="utf-8" src="games/41.baseball-duel/41.baseball-play.js?v=20261113d"></script>
+<script charset="utf-8" src="games/41.baseball-duel/41.baseball-game.js?v=20261113d"></script>
+<script charset="utf-8" src="games/41.baseball-duel/41.baseball-ai.js?v=20261113d"></script>
+<script charset="utf-8" src="games/41.baseball-duel/41.baseball-drills.js?v=20261113d"></script>
+<script charset="utf-8" src="games/41.baseball-duel/41.baseball-choreo.js?v=20261113d"></script>
+<script charset="utf-8" src="games/41.baseball-duel/41.baseball-actors.js?v=20261113d"></script>
+<script charset="utf-8" src="games/41.baseball-duel/41.baseball-park.js?v=20261113d"></script>
+<script charset="utf-8" src="games/41.baseball-duel/41.baseball-stage.js?v=20261113d"></script>
+<script charset="utf-8" src="games/41.baseball-duel/41.baseball-camera.js?v=20261113d"></script>
+<script charset="utf-8" src="games/41.baseball-duel/41.baseball-hud.js?v=20261113d"></script>
+<script charset="utf-8" src="games/41.baseball-duel/41.baseball-session.js?v=20261113d"></script>
+<script charset="utf-8" src="games/41.baseball-duel/41.baseball-scene.js?v=20261113d"></script>
+<script charset="utf-8" src="games/41.baseball-duel/41.baseball-controls.js?v=20261113d"></script>
+<script charset="utf-8" src="games/41.baseball-duel/41.baseball-sheet.js?v=20261113d"></script>
+<script charset="utf-8" src="games/41.baseball-duel/41.baseball-match.js?v=20261113d"></script>
+<script charset="utf-8" src="games/41.baseball-duel/41.baseball-stats.js?v=20261113d"></script>
+<script charset="utf-8" src="games/41.baseball-duel/41.baseball-versus.js?v=20261113d"></script>
+<script charset="utf-8" src="games/41.baseball-duel/41.baseball-board.js?v=20261113d"></script>
+<script charset="utf-8" src="games/41.baseball-duel/41.baseball-net.js?v=20261113d"></script>
+<script charset="utf-8" src="games/41.baseball-duel/41.baseball-duel.js?v=20261113d"></script>
 <script type="module">
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
