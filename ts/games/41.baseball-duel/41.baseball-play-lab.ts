@@ -53,6 +53,8 @@ class BbPlayLab {
   private readonly swing: BbSwingButton;
   private readonly report: BbPitchReport;
   private readonly ticker: BbBoardTicker;
+  private readonly cards: BbMatchupCards;
+  private readonly names: readonly string[];
   private readonly toast: BbCallToast;
   private readonly level: BbAiTuning;
   private readonly queued: BbScene[] = [];
@@ -69,7 +71,9 @@ class BbPlayLab {
     this.level = BbAiLevel.ALL[this.options.level];
     this.stage = new BbStage(libs, document.getElementById("labView") as HTMLCanvasElement);
     this.hud = new BbScoreHud(document.getElementById("hudTop") as HTMLElement);
-    this.hud.players("AI " + this.level.label, "나");
+    this.names = ["AI " + this.level.label, "나"];
+    this.hud.players(this.names[0], this.names[1]);
+    this.cards = new BbMatchupCards(controls);
     this.toast = new BbCallToast(controls);
     this.report = new BbPitchReport(controls);
     this.ticker = new BbBoardTicker(this.hud);
@@ -102,6 +106,7 @@ class BbPlayLab {
     if (this.session.state.finished) { this.finish(); return; }
     this.player.view = this.humanFields() ? "pitcher" : "batter";
     this.ticker.begin(this.session.board());
+    this.cards.show(this.names[this.session.battingIndex], this.session.batter(), this.names[this.session.fieldingIndex], this.session.pitcher());
     if (this.humanFields() && this.options.autoPitch) {
       this.swing.hide();
       this.throwPitch(this.session.aiCall(this.level), (roll) => this.session.aiSwing(roll, this.level));

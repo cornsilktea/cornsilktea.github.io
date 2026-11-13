@@ -61,7 +61,31 @@
 .bb-toast-call{font-family:"Black Han Sans","Nanum Gothic","Malgun Gothic",sans-serif;font-size:clamp(30px,5.4vw,60px);font-weight:400;transform:skewX(-8deg);text-shadow:-3px -3px 0 #14201a,3px -3px 0 #14201a,-3px 3px 0 #14201a,3px 3px 0 #14201a,5px 6px 0 #D97B4F}
 .bb-toast-pitch{display:inline-block;margin-top:8px;padding:4px 12px;border-radius:10px;background:rgba(14,20,17,.78);font-size:clamp(13px,1.8vw,18px);font-weight:800}
 .bb-toast-pitch:empty{display:none}
-.bb-report{position:absolute;right:max(18px,3vw);top:8vh;width:clamp(124px,30vh,250px);padding:8px 10px;border-radius:12px;background:rgba(14,20,17,.82);border-bottom:3px solid #D97B4F;opacity:0;transition:opacity .15s}
+.bb-card{position:absolute;width:clamp(150px,19vw,240px);padding:7px 10px 6px;border-radius:12px;background:rgba(14,20,17,.78);border-bottom:3px solid #D97B4F}
+.bb-card-left{left:8px;top:104px}
+.bb-card-right{right:max(18px,3vw);top:8px}
+.bb-card-head{display:flex;align-items:center;gap:7px;margin-bottom:5px}
+.bb-card-role{padding:2px 7px;border-radius:7px;background:#D97B4F;font-size:11px;font-weight:800}
+.bb-card-name{font-size:15px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bb-card-ability{display:flex;align-items:center;gap:6px;margin-top:3px;font-size:11px;font-weight:700}
+.bb-card-label{width:26px;opacity:.85}
+.bb-card-bar{flex:1;height:6px;border-radius:3px;background:rgba(255,255,255,.16);overflow:hidden}
+.bb-card-fill{height:100%;background:#D97B4F;transform-origin:left center;transform:scaleX(0)}
+.bb-card-point{width:10px;text-align:right}
+.bb-card-stats{display:flex;justify-content:space-between;gap:4px;margin-top:6px;padding-top:5px;border-top:1px solid rgba(255,255,255,.18)}
+.bb-card-stat{text-align:center;min-width:0}
+.bb-card-stat-label{font-size:9px;font-weight:700;opacity:.7;white-space:nowrap}
+.bb-card-stat-value{font-size:13px;font-weight:800}
+@media (max-height:520px),(orientation:portrait){
+  .bb-card{width:clamp(120px,24vw,180px);padding:5px 8px 4px}
+  .bb-card-left{top:82px}
+  .bb-card-head{margin-bottom:2px}
+  .bb-card-name{font-size:13px}
+  .bb-card-abilities{display:none}
+  .bb-card-stats{margin-top:2px;padding-top:3px}
+  .bb-card-stat-value{font-size:11px}
+}
+.bb-report{position:absolute;right:max(18px,3vw);top:142px;width:clamp(124px,30vh,250px);padding:8px 10px;border-radius:12px;background:rgba(14,20,17,.82);border-bottom:3px solid #D97B4F;opacity:0;transition:opacity .15s}
 .bb-report.open{opacity:1}
 .bb-report-side{font-size:11px;font-weight:700;opacity:.75;margin-bottom:3px}
 .bb-report-zone{display:block;width:100%;aspect-ratio:1;border-radius:8px;background:rgba(255,255,255,.05)}
@@ -81,5 +105,9 @@
   .bb-aim{right:auto;left:7vw;width:86vw;top:42%}
   .bb-pad{gap:4px;bottom:calc(clamp(96px,15vw,150px) + 30px)}
   .bb-pitch-key{width:17.5vw}
-  .bb-report{top:12vh;width:clamp(124px,34vw,220px)}
+  .bb-report{top:74px;width:clamp(124px,34vw,220px)}
+}
+@media (max-height:520px){
+  .bb-aim{top:calc(50% + 16px);width:min(46vh,440px);right:calc(3vw + 112px)}
+  .bb-report{top:70px;width:clamp(110px,27vh,150px)}
 }

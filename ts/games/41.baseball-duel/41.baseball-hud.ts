@@ -91,6 +91,62 @@ class BbCountLamps {
   }
 }
 
+type BbCardSide = "left" | "right";
+
+class BbPlayerCard {
+  private static readonly MOST_POINTS = 7;
+  private static readonly NO_RECORD = "-";
+  private readonly name: HTMLElement;
+  private readonly fills: HTMLElement[];
+  private readonly points: HTMLElement[];
+  private readonly values: HTMLElement[];
+
+  constructor(host: HTMLElement, side: BbCardSide, role: string, abilityLabels: readonly string[], statLabels: readonly string[]) {
+    const card = BbHudParts.box("bb-card bb-card-" + side, host), head = BbHudParts.box("bb-card-head", card);
+    BbHudParts.box("bb-card-role", head, role);
+    this.name = BbHudParts.box("bb-card-name", head);
+    const abilities = BbHudParts.box("bb-card-abilities", card);
+    this.fills = [];
+    this.points = [];
+    abilityLabels.forEach((label) => {
+      const row = BbHudParts.box("bb-card-ability", abilities);
+      BbHudParts.box("bb-card-label", row, label);
+      this.fills.push(BbHudParts.box("bb-card-fill", BbHudParts.box("bb-card-bar", row)));
+      this.points.push(BbHudParts.box("bb-card-point", row));
+    });
+    const stats = BbHudParts.box("bb-card-stats", card);
+    this.values = statLabels.map((label) => {
+      const cell = BbHudParts.box("bb-card-stat", stats);
+      BbHudParts.box("bb-card-stat-label", cell, label);
+      return BbHudParts.box("bb-card-stat-value", cell, BbPlayerCard.NO_RECORD);
+    });
+  }
+
+  show(name: string, points: readonly number[], stats: readonly string[] = []): void {
+    this.name.textContent = name;
+    points.forEach((value, index) => {
+      this.fills[index].style.transform = "scaleX(" + BbCurve.clamp(value / BbPlayerCard.MOST_POINTS, 0, 1).toFixed(3) + ")";
+      this.points[index].textContent = String(value);
+    });
+    this.values.forEach((cell, index) => { cell.textContent = stats[index] || BbPlayerCard.NO_RECORD; });
+  }
+}
+
+class BbMatchupCards {
+  private readonly batter: BbPlayerCard;
+  private readonly pitcher: BbPlayerCard;
+
+  constructor(host: HTMLElement) {
+    this.batter = new BbPlayerCard(host, "left", "타자", ["컨택", "파워", "주루"], ["타율", "출루율", "장타율", "홈런"]);
+    this.pitcher = new BbPlayerCard(host, "right", "투수", ["제구", "구위", "변화"], ["평균자책점", "WHIP", "피OPS"]);
+  }
+
+  show(batterName: string, batter: BbBatterSheet, pitcherName: string, pitcher: BbPitcherSheet): void {
+    this.batter.show(batterName, [batter.abilities.contact, batter.abilities.power, batter.abilities.speed]);
+    this.pitcher.show(pitcherName, [pitcher.abilities.control, pitcher.abilities.power, pitcher.abilities.breaking]);
+  }
+}
+
 class BbBoardTicker {
   private shown: BbBoardSnapshot = { inning: 1, half: 0, outs: 0, balls: 0, strikes: 0, score: [0, 0], pitches: 0 };
 

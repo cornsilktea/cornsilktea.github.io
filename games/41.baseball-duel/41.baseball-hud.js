@@ -75,6 +75,48 @@ class BbCountLamps {
     }
 }
 BbCountLamps.ROWS = [["B", 3, "ball"], ["S", 2, "strike"], ["O", 2, "out"]];
+class BbPlayerCard {
+    constructor(host, side, role, abilityLabels, statLabels) {
+        const card = BbHudParts.box("bb-card bb-card-" + side, host), head = BbHudParts.box("bb-card-head", card);
+        BbHudParts.box("bb-card-role", head, role);
+        this.name = BbHudParts.box("bb-card-name", head);
+        const abilities = BbHudParts.box("bb-card-abilities", card);
+        this.fills = [];
+        this.points = [];
+        abilityLabels.forEach((label) => {
+            const row = BbHudParts.box("bb-card-ability", abilities);
+            BbHudParts.box("bb-card-label", row, label);
+            this.fills.push(BbHudParts.box("bb-card-fill", BbHudParts.box("bb-card-bar", row)));
+            this.points.push(BbHudParts.box("bb-card-point", row));
+        });
+        const stats = BbHudParts.box("bb-card-stats", card);
+        this.values = statLabels.map((label) => {
+            const cell = BbHudParts.box("bb-card-stat", stats);
+            BbHudParts.box("bb-card-stat-label", cell, label);
+            return BbHudParts.box("bb-card-stat-value", cell, BbPlayerCard.NO_RECORD);
+        });
+    }
+    show(name, points, stats = []) {
+        this.name.textContent = name;
+        points.forEach((value, index) => {
+            this.fills[index].style.transform = "scaleX(" + BbCurve.clamp(value / BbPlayerCard.MOST_POINTS, 0, 1).toFixed(3) + ")";
+            this.points[index].textContent = String(value);
+        });
+        this.values.forEach((cell, index) => { cell.textContent = stats[index] || BbPlayerCard.NO_RECORD; });
+    }
+}
+BbPlayerCard.MOST_POINTS = 7;
+BbPlayerCard.NO_RECORD = "-";
+class BbMatchupCards {
+    constructor(host) {
+        this.batter = new BbPlayerCard(host, "left", "타자", ["컨택", "파워", "주루"], ["타율", "출루율", "장타율", "홈런"]);
+        this.pitcher = new BbPlayerCard(host, "right", "투수", ["제구", "구위", "변화"], ["평균자책점", "WHIP", "피OPS"]);
+    }
+    show(batterName, batter, pitcherName, pitcher) {
+        this.batter.show(batterName, [batter.abilities.contact, batter.abilities.power, batter.abilities.speed]);
+        this.pitcher.show(pitcherName, [pitcher.abilities.control, pitcher.abilities.power, pitcher.abilities.breaking]);
+    }
+}
 class BbBoardTicker {
     constructor(hud) {
         this.hud = hud;
