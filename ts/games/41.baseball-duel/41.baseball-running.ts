@@ -85,8 +85,12 @@ interface BbBaserunningController {
 }
 
 class BbAutoBaseRunning implements BbBaserunningController {
+  static readonly RIGHT_FIELD_DEPTH = 46;
+  static readonly FIRST_TO_THIRD_BONUS = 0.3;
+
   onHit(bases: BbBases, batter: BbRunner, abilities: BbBatterAbilities, retrieve: BbRetrieve, throws: BbThrowClock): BbAdvance[] {
     const margin = BbBatterAbilityModel.advanceMargin(abilities.speed), moves: BbAdvance[] = [];
+    const toRightField = retrieve.spot.x > 0 && BbDiamond.fromHome(retrieve.spot) >= BbAutoBaseRunning.RIGHT_FIELD_DEPTH;
     let ceiling = 4;
     for (let from = 3; from >= 0; from--) {
       const runner = from === 0 ? batter : bases[from - 1];
@@ -96,7 +100,8 @@ class BbAutoBaseRunning implements BbBaserunningController {
       for (let next = from + 1; next <= Math.min(4, ceiling); next++) {
         const runnerAt = from === 0 ? BbRunnerMotion.batterSeconds(next, abilities) : retrieve.holdSeconds + BbRunnerMotion.fromBaseSeconds(next - from, abilities);
         const ballAt = retrieve.at + throws.secondsTo(retrieve.spot, next);
-        if (next > forcedBase && ballAt - runnerAt < margin) break;
+        const needed = toRightField && from === 1 && next === 3 ? margin - BbAutoBaseRunning.FIRST_TO_THIRD_BONUS : margin;
+        if (next > forcedBase && ballAt - runnerAt < needed) break;
         to = next; arriveAt = runnerAt;
       }
       moves.push({ runner, from, to, arriveAt, forced: forcedBase > from, out: false });

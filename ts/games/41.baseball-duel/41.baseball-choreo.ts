@@ -59,7 +59,7 @@ class BbBasePath {
   private static readonly LEAD_METERS = 2.6;
   private static readonly INFIELD_HEART = BbFieldSpace.toWorld(0, 19.4);
   static readonly GUARD_METERS = 0.95;
-  static readonly TOUCH_METERS = 0.7;
+  static readonly TOUCH_METERS = 0.45;
 
   static point(base: number): BbVec { return BbBasePath.POINTS[base]; }
 
@@ -93,6 +93,13 @@ class BbRunningLane {
     let length = 0, previous = stops[0];
     this.waypoints.forEach((point) => { length += point.distanceTo(previous); previous = point; });
     this.length = length;
+  }
+
+  lengthThrough(legs: number): number {
+    const count = Math.min(this.waypoints.length, legs * (this.stops.length === 2 ? 1 : BbRunningLane.STEPS_PER_LEG));
+    let length = 0, previous = this.stops[0];
+    for (let index = 0; index < count; index++) { length += this.waypoints[index].distanceTo(previous); previous = this.waypoints[index]; }
+    return length;
   }
 
   private static hermite(from: BbVec, to: BbVec, leave: BbVec, enter: BbVec, ratio: number): BbVec {
@@ -256,6 +263,10 @@ class BbPlayChoreographer extends BbPitchChoreographer {
   private static readonly THROUGH_SECONDS = 1.3;
   private static readonly THROUGH_SIDE_DEGREES = 15;
   private static readonly SAFE_AFTER = 0.35;
+  private static readonly ROUNDING_SHARE = 0.22;
+  private static readonly ROUNDING_WIDE = new BbVec(0.9, 0, 0);
+  private static readonly ROUNDING_BACK_SECONDS = 1.4;
+  private static readonly FIRST_TOUCH = new BbVec(0.32, 0, 0.12);
   private static readonly COVER_SPEED = 6.5;
   private static readonly BACKUP_BEHIND = 8;
   private static readonly OVERRUN = BbFieldSpace.toWorld(22.9, 23.2);
@@ -438,7 +449,7 @@ class BbPlayChoreographer extends BbPitchChoreographer {
   }
 
   private passTo(thrower: BbRoleId, receiver: BbRoleId, standAt: BbVec, comingFrom: BbVec, arriveAt: number, kind: BbCatchKind, crowHop: boolean, base: number | null): void {
-    const stand = base !== null ? BbBasePath.guardSpot(base) : standAt.lerp(comingFrom, Math.min(0.3, 0.35 / Math.max(1, standAt.distanceTo(comingFrom))));
+    const stand = base !== null ? BbBasePath.guardSpot(base, BbBasePath.TOUCH_METERS) : standAt.lerp(comingFrom, Math.min(0.3, 0.35 / Math.max(1, standAt.distanceTo(comingFrom))));
     this.busy.add(receiver);
     const leaveAt = Math.max(this.contactAt + 0.2, this.freeAt.get(receiver) || 0), reach = this.spotOf(receiver, leaveAt).distanceTo(stand);
     const covering = base === 1 && receiver === "pitcher";
@@ -499,7 +510,8 @@ class BbPlayChoreographer extends BbPitchChoreographer {
       moved.add(role);
       this.onBase(role, swingEndsAt - 0.15);
       if (out || to >= 4) this.offBase(role, endAt);
-      this.runBases(role, from, to, role === "batter" ? swingEndsAt - 0.15 : this.contactAt + event.t + BbRunnerMotion.REACTION, endAt, contested, event.kind === "tagUp" || role === "batter");
+      if (role === "batter" && to === 1 && !out && BbPlayCodes.isHit(script.result) && BbFielderPositions.isOutfield(script.fielder as BbPosition)) { this.roundFirst(swingEndsAt - 0.15, endAt); return; }
+      this.runBases(role, from, to, role === "batter" ? swingEndsAt - 0.15 : this.contactAt + event.t + BbRunnerMotion.REACTION, endAt, contested, event.kind === "tagUp" || role === "batter" || this.cue.setting.outs >= 2);
       if (to === 1 && role === "batter") this.move(role, BbPlayChoreographer.OVERRUN, endAt, endAt + 1.1, "slide");
       if (to >= 4) this.move(role, BbBasePath.dugoutDoor(-1, 0).lerp(BbFieldGeometry.HOME, 0.6), endAt + 0.4, endAt + 2.2, "walk");
     });
@@ -516,9 +528,18 @@ class BbPlayChoreographer extends BbPitchChoreographer {
     });
   }
 
+  private roundFirst(leaveAt: number, touchAt: number): void {
+    const first = BbBasePath.point(1), turn = first.lerp(BbBasePath.point(2), BbPlayChoreographer.ROUNDING_SHARE).plus(BbPlayChoreographer.ROUNDING_WIDE);
+    const stops = [this.spotOf("batter", leaveAt), first, turn], lane = new BbRunningLane(stops, BbRunningLane.ROUND);
+    const startAt = Math.min(leaveAt, touchAt - 0.5), turnAt = startAt + (touchAt - startAt) * lane.length / lane.lengthThrough(1);
+    this.runAlong("batter", stops[0], lane.waypoints, lane.length, startAt, turnAt);
+    this.move("batter", first, turnAt + 0.2, turnAt + 0.2 + BbPlayChoreographer.ROUNDING_BACK_SECONDS, "walk");
+    this.until(turnAt + 0.2 + BbPlayChoreographer.ROUNDING_BACK_SECONDS);
+  }
+
   private runBases(role: BbRoleId, from: number, to: number, leaveAt: number, endAt: number, slides: boolean, leavesNow: boolean): void {
     const stops: BbVec[] = [this.spotOf(role, leaveAt)];
-    for (let base = from + 1; base <= to; base++) stops.push(BbBasePath.point(base).plus(base === 1 && to === 1 ? new BbVec(0.25, 0, 0.1) : new BbVec(0, 0, 0)));
+    for (let base = from + 1; base <= to; base++) stops.push(BbBasePath.point(base).plus(base === 1 && to === 1 ? BbPlayChoreographer.FIRST_TOUCH : new BbVec(0, 0, 0)));
     const lane = new BbRunningLane(stops, BbRunningLane.ROUND), total = lane.length;
     const startAt = leavesNow ? Math.min(leaveAt, endAt - 0.5) : Math.max(leaveAt, endAt - total / BbPlayChoreographer.HELD_RUN_SPEED - 0.4);
     const slideSeconds = slides ? BbPlayChoreographer.SLIDE_SECONDS : 0, cut = lane.cutBefore(slides ? Math.min(BbPlayChoreographer.SLIDE_METERS, total / 2) : 0);

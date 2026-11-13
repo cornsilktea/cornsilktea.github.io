@@ -128,7 +128,6 @@ class BbScoreHud {
   private readonly names: HTMLElement[];
   private readonly runs: HTMLElement[];
   private readonly rows: HTMLElement[];
-  private readonly pitchCount: HTMLElement;
   private readonly roomCode: HTMLElement;
   private readonly lamps: BbCountLamps;
   private readonly diamond: BbRunnerDiamond;
@@ -142,7 +141,6 @@ class BbScoreHud {
     this.runs = this.rows.map((row) => BbHudParts.box("bb-score-runs", row, "0"));
     this.diamond = new BbRunnerDiamond(box);
     this.lamps = new BbCountLamps(box);
-    this.pitchCount = BbHudParts.box("bb-score-pitches", box);
     this.roomCode = BbHudParts.box("room-code-tag", box);
     this.roomCode.id = "hudRoomCode";
   }
@@ -156,7 +154,6 @@ class BbScoreHud {
     this.runs.forEach((cell, team) => { cell.textContent = String(board.score[team]); });
     this.rows.forEach((row, team) => row.classList.toggle("batting", team === board.half));
     this.lamps.show(board.balls, board.strikes, board.outs);
-    this.pitchCount.textContent = "투구 " + board.pitches;
   }
 
   follow(script: BbDrillScript, tracks: readonly BbRunnerTrack[], seconds: number): void { this.diamond.follow(script, tracks, seconds); }

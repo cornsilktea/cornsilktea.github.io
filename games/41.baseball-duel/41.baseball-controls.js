@@ -89,6 +89,7 @@ BbZoneAimWindow.SPAN = 2.4;
 class BbPitchPad {
     constructor(host, onThrow) {
         this.onThrow = onThrow;
+        this.held = new Set();
         this.usable = [];
         this.opened = false;
         this.aim = new BbZoneAimWindow(host);
@@ -116,6 +117,16 @@ class BbPitchPad {
         this.throwButton.addEventListener("click", () => this.confirm());
         host.appendChild(this.throwButton);
         window.addEventListener("keydown", (event) => this.pressed(event));
+        window.addEventListener("keyup", (event) => this.held.delete(event.key));
+        window.addEventListener("blur", () => this.held.clear());
+    }
+    tick(frameSeconds) {
+        if (!this.opened || !this.held.size)
+            return;
+        const reach = BbPitchPad.ARROW_SPEED * frameSeconds;
+        let sideways = 0, upward = 0;
+        this.held.forEach((key) => { sideways += BbPitchPad.ARROWS[key][0]; upward += BbPitchPad.ARROWS[key][1]; });
+        this.aim.nudge(sideways * reach, upward * reach);
     }
     open(sheet) {
         this.opened = true;
@@ -134,6 +145,7 @@ class BbPitchPad {
     }
     close() {
         this.opened = false;
+        this.held.clear();
         this.aim.close();
         this.row.classList.remove("open");
         this.throwButton.classList.remove("open");
@@ -158,7 +170,7 @@ class BbPitchPad {
         const arrow = BbPitchPad.ARROWS[event.key];
         if (arrow) {
             event.preventDefault();
-            this.aim.nudge(arrow[0] * BbPitchPad.ARROW_STEP, arrow[1] * BbPitchPad.ARROW_STEP);
+            this.held.add(event.key);
             return;
         }
         if (event.repeat)
@@ -175,7 +187,7 @@ class BbPitchPad {
     }
 }
 BbPitchPad.THROW_CODES = ["Space", "Enter", "NumpadEnter"];
-BbPitchPad.ARROW_STEP = 0.1;
+BbPitchPad.ARROW_SPEED = 1.5;
 BbPitchPad.ARROWS = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] };
 class BbSwingButton {
     constructor(host, onSwing) {

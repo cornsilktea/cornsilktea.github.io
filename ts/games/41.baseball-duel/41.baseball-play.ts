@@ -133,6 +133,7 @@ class BbPlayResolver {
 
   private hit(situation: BbPlaySituation, ball: BbBattedBall, retrieve: BbRetrieve): BbPlayScript {
     const script = this.blank(situation, "SINGLE", ball);
+    if (situation.outs >= 2) retrieve = { ...retrieve, holdSeconds: 0 };
     const moves = this.running.onHit(situation.bases, situation.batter, situation.abilities, retrieve, this.throws);
     script.basesAfter = [null, null, null];
     script.fielder = retrieve.by as BbPosition;

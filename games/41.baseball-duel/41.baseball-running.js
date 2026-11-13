@@ -40,6 +40,7 @@ BbTagUpRule.TAG_SECONDS = 0.25;
 class BbAutoBaseRunning {
     onHit(bases, batter, abilities, retrieve, throws) {
         const margin = BbBatterAbilityModel.advanceMargin(abilities.speed), moves = [];
+        const toRightField = retrieve.spot.x > 0 && BbDiamond.fromHome(retrieve.spot) >= BbAutoBaseRunning.RIGHT_FIELD_DEPTH;
         let ceiling = 4;
         for (let from = 3; from >= 0; from--) {
             const runner = from === 0 ? batter : bases[from - 1];
@@ -50,7 +51,8 @@ class BbAutoBaseRunning {
             for (let next = from + 1; next <= Math.min(4, ceiling); next++) {
                 const runnerAt = from === 0 ? BbRunnerMotion.batterSeconds(next, abilities) : retrieve.holdSeconds + BbRunnerMotion.fromBaseSeconds(next - from, abilities);
                 const ballAt = retrieve.at + throws.secondsTo(retrieve.spot, next);
-                if (next > forcedBase && ballAt - runnerAt < margin)
+                const needed = toRightField && from === 1 && next === 3 ? margin - BbAutoBaseRunning.FIRST_TO_THIRD_BONUS : margin;
+                if (next > forcedBase && ballAt - runnerAt < needed)
                     break;
                 to = next;
                 arriveAt = runnerAt;
@@ -94,3 +96,5 @@ class BbAutoBaseRunning {
         return true;
     }
 }
+BbAutoBaseRunning.RIGHT_FIELD_DEPTH = 46;
+BbAutoBaseRunning.FIRST_TO_THIRD_BONUS = 0.3;

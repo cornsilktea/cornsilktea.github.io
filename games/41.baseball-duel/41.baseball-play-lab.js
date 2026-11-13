@@ -140,6 +140,7 @@ class BbPlayLab {
     tick(frameSeconds) {
         this.toast.tick(frameSeconds);
         this.report.tick(frameSeconds);
+        this.pad.tick(frameSeconds);
         if (this.over || this.waitingForCall)
             this.player.idle(frameSeconds);
         else

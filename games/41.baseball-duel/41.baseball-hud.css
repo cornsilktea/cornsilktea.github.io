@@ -20,7 +20,6 @@
 .bb-lamp-ball.on{background:#6FCF7C}
 .bb-lamp-strike.on{background:#F2C94C}
 .bb-lamp-out.on{background:#D97B4F}
-.bb-score-pitches{font-size:13px;font-weight:700;opacity:.85}
 .bb-score .room-code-tag{position:absolute;left:0;top:100%;margin-top:5px;padding:2px 9px;border-radius:8px;background:rgba(14,20,17,.7);font-size:11px;font-weight:700}
 .bb-score .room-code-tag:empty{display:none}
 @media (max-width:700px),(orientation:portrait){
@@ -31,7 +30,6 @@
   .bb-score-runs{font-size:15px}
   .bb-diamond{width:50px;height:47px}
   .bb-lamp{width:9px;height:9px}
-  .bb-score-pitches{font-size:11px}
 }
 #bbControls{position:fixed;inset:0;z-index:15;pointer-events:none;font-family:"Nanum Gothic","Malgun Gothic",sans-serif;color:#fff}
 #bbControls button{pointer-events:auto;font-family:inherit;color:#fff;cursor:pointer}

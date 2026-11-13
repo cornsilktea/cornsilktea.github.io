@@ -100,7 +100,7 @@ class BbZoneAimWindow {
 
 class BbPitchPad {
   private static readonly THROW_CODES: readonly string[] = ["Space", "Enter", "NumpadEnter"];
-  private static readonly ARROW_STEP = 0.1;
+  private static readonly ARROW_SPEED = 1.5;
   private static readonly ARROWS: Readonly<Record<string, readonly [number, number]>> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] };
   private readonly row: HTMLElement;
   private readonly keys: HTMLButtonElement[];
@@ -108,6 +108,7 @@ class BbPitchPad {
   private readonly dots: SVGCircleElement[];
   private readonly throwButton: HTMLButtonElement;
   private readonly aim: BbZoneAimWindow;
+  private readonly held = new Set<string>();
   private usable: readonly BbPitchId[] = [];
   private opened = false;
 
@@ -137,6 +138,16 @@ class BbPitchPad {
     this.throwButton.addEventListener("click", () => this.confirm());
     host.appendChild(this.throwButton);
     window.addEventListener("keydown", (event) => this.pressed(event));
+    window.addEventListener("keyup", (event) => this.held.delete(event.key));
+    window.addEventListener("blur", () => this.held.clear());
+  }
+
+  tick(frameSeconds: number): void {
+    if (!this.opened || !this.held.size) return;
+    const reach = BbPitchPad.ARROW_SPEED * frameSeconds;
+    let sideways = 0, upward = 0;
+    this.held.forEach((key) => { sideways += BbPitchPad.ARROWS[key][0]; upward += BbPitchPad.ARROWS[key][1]; });
+    this.aim.nudge(sideways * reach, upward * reach);
   }
 
   open(sheet: BbPitcherSheet): void {
@@ -157,6 +168,7 @@ class BbPitchPad {
 
   close(): void {
     this.opened = false;
+    this.held.clear();
     this.aim.close();
     this.row.classList.remove("open");
     this.throwButton.classList.remove("open");
@@ -179,7 +191,7 @@ class BbPitchPad {
   private pressed(event: KeyboardEvent): void {
     if (!this.opened) return;
     const arrow = BbPitchPad.ARROWS[event.key];
-    if (arrow) { event.preventDefault(); this.aim.nudge(arrow[0] * BbPitchPad.ARROW_STEP, arrow[1] * BbPitchPad.ARROW_STEP); return; }
+    if (arrow) { event.preventDefault(); this.held.add(event.key); return; }
     if (event.repeat) return;
     const kind = BbPitchCatalog.ALL.find((candidate) => event.code === "Key" + candidate.hotkey);
     if (kind) { this.pick(kind); return; }

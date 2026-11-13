@@ -120,7 +120,6 @@ class BbScoreHud {
         this.runs = this.rows.map((row) => BbHudParts.box("bb-score-runs", row, "0"));
         this.diamond = new BbRunnerDiamond(box);
         this.lamps = new BbCountLamps(box);
-        this.pitchCount = BbHudParts.box("bb-score-pitches", box);
         this.roomCode = BbHudParts.box("room-code-tag", box);
         this.roomCode.id = "hudRoomCode";
     }
@@ -131,7 +130,6 @@ class BbScoreHud {
         this.runs.forEach((cell, team) => { cell.textContent = String(board.score[team]); });
         this.rows.forEach((row, team) => row.classList.toggle("batting", team === board.half));
         this.lamps.show(board.balls, board.strikes, board.outs);
-        this.pitchCount.textContent = "투구 " + board.pitches;
     }
     follow(script, tracks, seconds) { this.diamond.follow(script, tracks, seconds); }
 }
