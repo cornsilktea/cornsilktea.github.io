@@ -1,11 +1,11 @@
 const fs = require("fs"), vm = require("vm"), path = require("path");
 const root = path.join(__dirname, "..");
-const files = ["common/match-kit.js", "common/account-match-kit.js", "common/account-stats.js", "games/24.turbo-lap/24.turbo-lap-stats.js", "games/25.fps-survival/25.fps-survival-stats.js", "games/31.zombie-outbreak/31.zombie-outbreak-stats.js", "games/31.zombie-outbreak/31.zombie-versus.js", "games/31.zombie-outbreak/31.zombie-missions.js", "games/38.snow-royale/38.snow-account.js", "games/38.snow-royale/38.snow-versus.js", "games/39.water-balloon/39.balloon-account.js", "games/39.water-balloon/39.balloon-versus.js", "games/30.team-battle/patch-notes.js", "games/30.team-battle/teambattle-stats-repair.js", "common/account-stats-repair.js"];
+const files = ["common/match-kit.js", "common/account-match-kit.js", "common/account-stats.js", "games/24.turbo-lap/24.turbo-lap-stats.js", "games/25.fps-survival/25.fps-survival-stats.js", "games/31.zombie-outbreak/31.zombie-outbreak-stats.js", "games/31.zombie-outbreak/31.zombie-versus.js", "games/31.zombie-outbreak/31.zombie-missions.js", "games/38.snow-royale/38.snow-account.js", "games/38.snow-royale/38.snow-versus.js", "games/39.water-balloon/39.balloon-account.js", "games/39.water-balloon/39.balloon-versus.js", "games/41.baseball-duel/41.baseball-motion.js", "games/41.baseball-duel/41.baseball-field.js", "games/41.baseball-duel/41.baseball-pitch.js", "games/41.baseball-duel/41.baseball-batting.js", "games/41.baseball-duel/41.baseball-running.js", "games/41.baseball-duel/41.baseball-defense.js", "games/41.baseball-duel/41.baseball-play.js", "games/41.baseball-duel/41.baseball-game.js", "games/41.baseball-duel/41.baseball-stats.js", "games/30.team-battle/patch-notes.js", "games/30.team-battle/teambattle-stats-repair.js", "common/account-stats-repair.js"];
 const names = ["AccountNumbers", "AccountRates", "AccountMatchKey", "AccountKeyLedger", "AccountForfeit", "AccountShape", "AccountRecentHeadCodec", "RecentMatchRing", "AccountLoginNotice", "RecentBlockList", "AccountGameProfile", "AccountMatchStore",
   "TeamBattleRates", "TeamBattleSkillShare", "AccountMvpJudge", "TeamBattlePlan", "TeamBattleCodec", "TeamBattleRing", "AccountStatsMath", "AccountStatsTable", "ClassStatsSummary", "TeamBattleProfile", "AccountStatsStore",
   "TurboLapPlan", "TurboLapCodec", "TurboLapStatsMath", "TurboLapProfile", "TurboLapStatsView", "FpsPlan", "FpsCodec", "FpsStatsMath", "FpsProfile", "FpsStatsView",
   "ZombiePlan", "ZombieCodec", "ZombieStatsMath", "ZombieProfile", "ZombieStatsView", "ZombieRandomTallyMath", "ZombieRoleTallyMath", "ZombieOriginRotation", "ZombieVersusCards", "ZombieVersusLineup", "ZombieMissionSites", "ZombieMissionCatalog", "ZombieMissionProgress", "SnAccountPlan", "SnAccountCodec", "SnAccountMath", "SnAccountProfile", "SnAccountView", "SnReportBuilder", "SnVersusCards",
-  "WbAccountPlan", "WbAccountCodec", "WbAccountMath", "WbAccountProfile", "WbAccountView", "WbReportBuilder", "WbRandomTallyMath", "WbVersusCards", "WbVersusLineupBuilder",
+  "WbAccountPlan", "WbAccountCodec", "WbAccountMath", "WbAccountProfile", "WbAccountView", "WbReportBuilder", "WbRandomTallyMath", "WbVersusCards", "WbVersusLineupBuilder", "BbStatsPlan", "BbStatsCodec", "BbStatsMath", "BbStatsProfile", "BbStatsView", "BbReportBuilder", "BbVersusCards", "BbBoxTable", "BbZoneMap", "BbZoneGrid", "BbMatchRules", "BbOneInningFormat", "BbStatsKeys",
   "AccountClassRank", "RandomMatchPlan", "RandomMatchCodec", "RandomMatchMath", "RandomMatchProfile", "RandomMatchView",
   "AccountOutbox", "AccountRepairPlanner", "ZombieRepairGame", "TurboLapRepairGame", "FpsRepairGame", "SnowRepairGame", "BalloonRepairGame", "AccountStatsNormalizer", "TeamBattleDuplicatePlan", "TeamBattleGameFingerprint", "TeamBattleStatsReverter", "TeamBattleRepairPlanner", "AccountPendingCodec", "AccountMatchSender", "AccountPendingGuard", "MkStreakMath", "TurboLapClock", "TurboLapOutcome", "TeamBattleScore", "PatchNoteCodec", "PatchNoteSeen", "TeamBattleRecentBackout"];
 const src = files.map((f) => fs.readFileSync(path.join(root, f), "utf8")).join("\n") + "\n;({" + names.join(",") + "})";
@@ -439,6 +439,41 @@ const wbEnd = { match: 1, ranks: [1, 1, 2, 2], outTicks: [-1, 600, 300, 450], at
   check("39번 대결 화면 줄: 나·입장하는 중·봇", lineup.units[0].color === 2 && seats[0].me && seats[0].card.kl === 6 && seats[1].waiting && seats[1].nick === "비" && lineup.units[1].seats[0].ai, lineup);
 }
 
+const baseball = new GameCase("41번", new K.BbStatsProfile(), K.BbStatsCodec, "baseballduel");
+const bbSheet = (b, p) => ({ lineup: [{ abilities: b, hand: "R" }], pitchers: [{ abilities: p, hand: "R", pitches: ["ft"], role: "starter" }] });
+const bbSummary = (score, extra) => {
+  const rules = new K.BbMatchRules(new K.BbOneInningFormat()), state = rules.start();
+  state.score = score; state.lineScore = [[score[0], score[1]]]; state.finished = true; state.winner = score[0] > score[1] ? 0 : score[1] > score[0] ? 1 : -1;
+  Object.assign(state.box[1].bat, { pa: 5, ab: 4, h: 2, d2: 1, hr: 1, bb: 1, k: 1, r: score[1], rbi: score[1] });
+  Object.assign(state.box[1].pit, { bf: 4, ab: 4, h: 1, k: 2, outs: 3, r: score[0], er: score[0], pitches: 17, strikes: 11 });
+  Object.assign(state.box[0].bat, { pa: 4, ab: 4, h: 1, k: 2, r: score[0] });
+  Object.assign(state.box[0].pit, { bf: 5, ab: 4, h: 2, d2: 1, hr: 1, bb: 1, k: 1, outs: 2, r: score[1], er: score[1], pitches: 22, strikes: 13 });
+  state.box[1].byType.ft = { n: 12, s: 8 }; state.box[1].byType.cv = { n: 5, s: 3 }; state.box[1].bestDistance = 112.4; state.box[1].bestExit = 151.6; state.box[1].bestPitch = 138.2;
+  state.box[1].batZones[4] = { n: 3, ab: 2, h: 1, tb: 4 }; state.box[1].pitZones[0] = 6; state.box[1].pitZones[9] = 4;
+  return Object.assign({ plan: { format: new K.BbOneInningFormat(), names: ["가".repeat(25), "나"], teams: [bbSheet({ contact: 3, power: 3, speed: 3 }, { control: 3, power: 3, breaking: 3 }), bbSheet({ contact: 4, power: 3, speed: 2 }, { control: 2, power: 5, breaking: 2 })] }, state, forfeitedBy: null }, extra || {});
+};
+const bbReport = (extra, score) => Object.assign(K.BbReportBuilder.fromSummary("m41", bbSummary(score || [1, 2]), 1, true, false, false, 1), extra || {});
+{
+  const win = bbReport();
+  check("41번 판정: 사람 상대 승리는 최근·누적 모두, AI 상대는 기록 없음", (() => { const p = new K.BbStatsPlan(win); return p.recordsRecent && p.countsStats && p.win && !p.tie; })() && !new K.BbStatsPlan(bbReport({ rival: false })).recordsRecent);
+  check("41번 판정: 무승부·패배·나가기", new K.BbStatsPlan(bbReport({}, [2, 2])).tie && !new K.BbStatsPlan(bbReport({}, [3, 2])).win && !new K.BbStatsPlan(bbReport({ iLeft: true, progress: 0.3 })).recordsRecent && !new K.BbStatsPlan(bbReport({ iLeft: true, progress: 0.6 })).win);
+  check("41번 보고서: 능력치 배분 열쇠·기권", win.batKey === "4-3-2" && win.pitKey === "2-5-2" && K.BbReportBuilder.fromSummary("m", bbSummary([5, 0], { forfeitedBy: 0 }), 1, true, false, false, 1).winner === 1);
+  const r = baseball.roundTrip(win, true);
+  check("41번 값 배열: 왕복(이름 20자·회별 점수·결과표 4줄·오늘의 장면)", r.back.sheet.names[0].length === 20 && r.back.sheet.score[1] === 2 && r.back.sheet.lines[1].bat[4] === 1 && r.back.sheet.lines[1].pit[0] === 3 && r.back.sheet.lines[0].pit[1] === 22 && r.back.sheet.bestDistance === 112 && r.back.sheet.bestPitch === 138 && r.back.sheet.me === 1 && r.size < 600, r.size);
+  const a = K.BbStatsMath.apply(null, win, new K.BbStatsPlan(win), "k1", 1);
+  const tieReport = bbReport({ matchId: "m2", random: true }, [2, 2]);
+  const b = K.BbStatsMath.apply(JSON.parse(JSON.stringify(a.node)), tieReport, new K.BbStatsPlan(tieReport), "k2", 2);
+  check("41번 누적: 판·승·무·득실·타격·투구·구종·최고 기록", b.node.g === 2 && b.node.w === 1 && b.node.t === 1 && b.node.l === 0 && b.node.rf === 4 && b.node.ra === 3 && b.node.bat.h === 4 && b.node.bat.hr === 2 && b.node.pit.outs === 6 && b.node.bt.ft.n === 24 && b.node.bd === 112 && b.node.bs === 138, b.node);
+  check("41번 누적: 핫콜드존·투구 위치·포인트별", b.node.zb[4].ab === 4 && b.node.zb[4].tb === 8 && b.node.zp[0] === 12 && b.node.zp[9] === 8 && b.node.ab["4-3-2"].g === 2 && b.node.ab["4-3-2"].h === 4 && b.node.ap["2-5-2"].outs === 6, [b.node.zb[4], b.node.ab]);
+  check("41번 랜덤 매칭 칸: 랜덤 매칭 판만 rm", a.node.rm.g === 0 && b.node.rm.g === 1 && b.node.rm.t === 1 && b.node.rm.rf === 2);
+  check("41번 누적: 같은 열쇠는 무시", K.BbStatsMath.apply(b.node, win, new K.BbStatsPlan(win), "k1", 3) === null);
+  check("41번 공식: 존 칸 번호(투수 시점 3×3, 밖은 9)", K.BbZoneGrid.indexOf({ u: -0.9, v: 0.9 }) === 0 && K.BbZoneGrid.indexOf({ u: 0, v: 0 }) === 4 && K.BbZoneGrid.indexOf({ u: 1, v: -1 }) === 8 && K.BbZoneGrid.indexOf({ u: 1.01, v: 0 }) === 9);
+  const card = K.BbVersusCards.fromStats(b.node, false);
+  check("41번 대결 화면 카드: rm 만, 자리 값으로 왕복, 기록 없으면 null", card.g === 1 && !card.zb && same(K.BbVersusCards.fromRoom(JSON.parse(JSON.stringify(card))), card) && K.BbVersusCards.fromStats(a.node, false) === null && K.BbVersusCards.fromRoom(null) === null && K.BbVersusCards.fromStats(a.node, true).zb.length === 10, card);
+  const view = new K.BbStatsView(() => false);
+  check("41번 통계 창 글자", view.statsHtml(b.node).indexOf("평균자책점") >= 0 && view.statsHtml(null).indexOf("승률") >= 0 && view.resultTitle(r.back) === "승리!" && view.blockBodyHtml(r.back).indexOf("2 나") > 0);
+}
+
 const randomReport = (extra) => Object.assign({ matchId: "rm1", result: "win", rank: 2, of: 6, map: "맵".repeat(25), rivals: ["가".repeat(25), "나"] }, extra || {});
 {
   const p = (extra) => new K.RandomMatchPlan(randomReport(extra));
@@ -521,6 +556,7 @@ async function pendingCase(name, key, makeStore, lossReport, winReport, context)
 }
 const pendingChecks = (async () => {
   await pendingCase("24번", "turbolap", (db) => new K.AccountMatchStore(db, pendingUser, new K.TurboLapProfile()), turboReport({ result: "lose" }), turboReport(), null);
+  await pendingCase("41번", "baseballduel", (db) => new K.AccountMatchStore(db, pendingUser, new K.BbStatsProfile()), bbReport({ iLeft: true, random: true, progress: 1 }), bbReport({ random: true }), null);
   await pendingCase("랜덤 승패(축구)", "soccer", (db) => new K.AccountMatchStore(db, pendingUser, new K.RandomMatchProfile("soccer")), randomReport({ result: "lose" }), randomReport(), null);
   const leftReport = report({ iLeft: true, progress: 1, players: players({ 0: { left: true } }) });
   await pendingCase("30번", "teambattle", (db) => new K.AccountStatsStore(db, pendingUser), leftReport, report(), judge);
@@ -622,6 +658,21 @@ const gameChecks = (async () => {
     check("38번 랜덤 매칭 칸 규칙: 판 +1 통과, 2판·순위 0·처치 100 은 거부", legal(undefined, first) && legal(first, { g: 2, w: 1, k: 5, rk: 4 }) && !legal(first, { g: 3, w: 1, k: 5, rk: 7 }) && !legal(first, { g: 2, w: 1, k: 5, rk: 1 }) && !legal(first, { g: 2, w: 1, k: 103, rk: 3 }));
   })();
   await balloon.verifyStore(K.WbReportBuilder.fromEnd("m39", wbMatch, wbEnd, "a"));
+  await baseball.verifyStore(bbReport());
+  await new GameCase("41번 랜덤 매칭", new K.BbStatsProfile(), K.BbStatsCodec, "baseballduel").verifyStore(bbReport({ random: true }));
+  {
+    const first = baseball.store({}), status = await first.store.record(bbReport(), null), w = first.writes[0] || {}, board = w["baseballduel/board/u1"];
+    check("41번 저장: 같은 PATCH 에 랭킹 요약(board)·반별 순위(x = 홈런)", status === "stats" && !!board && board.g === 1 && board.c === "none" && board.bat.h === 2 && w["gameRanks/baseballduel/none/u1"].x === 1, Object.keys(w));
+    const ruled = RuleChecker.check("baseballduel", w, undefined, undefined);
+    const tie = bbReport({ matchId: "m41b" }, [2, 2]), second = baseball.store({ "stats/baseballduel": ruled.stats, "recent/baseballduel": ruled.slots });
+    await second.store.record(tie, null);
+    const ruled2 = RuleChecker.check("baseballduel", second.writes[0], ruled.stats, ruled.slots);
+    check("41번 규칙: 무승부 둘째 판(존·포인트별 칸 포함) 통과", ruled2.errors.length === 0 && ruled2.stats.t === 1 && ruled2.stats.ab["4-3-2"].g === 2, ruled2.errors);
+    const cheat = JSON.parse(JSON.stringify(second.writes[0])); cheat["users/u1/stats/baseballduel/bat"] = Object.assign({}, cheat["users/u1/stats/baseballduel/bat"], { hr: 90 });
+    check("41번 규칙: 홈런을 한 번에 60 넘게 올리면 거부", RuleChecker.check("baseballduel", cheat, ruled.stats, ruled.slots).errors.length > 0);
+    const cheat2 = JSON.parse(JSON.stringify(second.writes[0])); cheat2["users/u1/stats/baseballduel/w"] = 2;
+    check("41번 규칙: 승+패+무가 판 수와 다르면 거부", RuleChecker.check("baseballduel", cheat2, ruled.stats, ruled.slots).errors.length > 0);
+  }
   {
     const botMatch = JSON.parse(JSON.stringify(wbMatch)); botMatch.teams[1].members[1].bot = true;
     const botRandom = K.WbReportBuilder.fromEnd("r1", botMatch, wbEnd, "a", true);

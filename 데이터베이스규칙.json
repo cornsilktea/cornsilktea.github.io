@@ -41,7 +41,51 @@
     "baseballduel": {
       ".read": true,
       "rooms": {
-        "$room": { ".write": "$room.matches(/^[0-9]{5}$/)" }
+        "$room": {
+          ".write": "$room.matches(/^[0-9]{5}$/)"
+        }
+      },
+      "parties": {
+        "$party": {
+          ".write": "$party.matches(/^[0-9]{5}$/)"
+        }
+      },
+      "board": {
+        "$uid": {
+          ".write": "auth != null && ((auth.uid === $uid && auth.token.email_verified === true && auth.token.email.endsWith('@dongma.sen.ms.kr')) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3'))",
+          ".validate": "!newData.exists() || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3') || (newData.hasChildren(['n', 'c', 'g', 'bat', 'pit']) && newData.child('g').val() === newData.parent().parent().parent().child('users').child($uid).child('stats').child('baseballduel').child('g').val())",
+          "n": {
+            ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 40"
+          },
+          "c": {
+            ".validate": "newData.isString() && newData.val().matches(/^([1-3]-[1-5]|none)$/)"
+          },
+          "g": {
+            ".validate": "newData.isNumber() && newData.val() >= 0"
+          },
+          "bat": {
+            "$k": {
+              ".validate": "newData.isNumber() && newData.val() >= 0"
+            }
+          },
+          "pit": {
+            "$k": {
+              ".validate": "newData.isNumber() && newData.val() >= 0"
+            }
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      },
+      "settings": {
+        ".write": "auth != null && (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')",
+        "zones": {
+          ".validate": "newData.isBoolean()"
+        },
+        "$other": {
+          ".validate": false
+        }
       }
     },
     "waterballoon": {
@@ -508,7 +552,389 @@
             },
             "$other": { ".validate": false }
           },
-          "$game": { ".validate": "$game.matches(/^(teambattle|turbolap|fpsbattle|zombieoutbreak|snowroyale|waterballoon|minigames|volleyball|soccer)$/)" }
+          "baseballduel": {
+            ".write": "auth != null && (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')",
+            ".validate": "(newData.hasChildren(['g', 'w', 'l', 't', 'rf', 'ra', 'bat', 'pit']) && newData.child('w').val() + newData.child('l').val() + newData.child('t').val() === newData.child('g').val()) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')",
+            "g": {
+              ".validate": "(newData.isNumber() && newData.val() === (data.exists() ? data.val() : 0) + 1) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+            },
+            "w": {
+              ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 1) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+            },
+            "l": {
+              ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 1) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+            },
+            "t": {
+              ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 1) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+            },
+            "rf": {
+              ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 99) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+            },
+            "ra": {
+              ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 99) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+            },
+            "bat": {
+              ".validate": "newData.hasChildren(['pa', 'ab', 'h', 'd2', 'd3', 'hr', 'bb', 'k', 'sf', 'rbi', 'r', 'roe'])",
+              "pa": {
+                ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 60) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+              },
+              "ab": {
+                ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 60) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+              },
+              "h": {
+                ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 60) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+              },
+              "d2": {
+                ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 60) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+              },
+              "d3": {
+                ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 60) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+              },
+              "hr": {
+                ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 60) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+              },
+              "bb": {
+                ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 60) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+              },
+              "k": {
+                ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 60) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+              },
+              "sf": {
+                ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 60) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+              },
+              "rbi": {
+                ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 99) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+              },
+              "r": {
+                ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 99) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+              },
+              "roe": {
+                ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 60) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+              },
+              "$other": {
+                ".validate": false
+              }
+            },
+            "pit": {
+              ".validate": "newData.hasChildren(['bf', 'ab', 'h', 'd2', 'd3', 'hr', 'bb', 'k', 'sf', 'outs', 'r', 'er', 'pitches', 'strikes'])",
+              "bf": {
+                ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 60) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+              },
+              "ab": {
+                ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 60) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+              },
+              "h": {
+                ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 60) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+              },
+              "d2": {
+                ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 60) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+              },
+              "d3": {
+                ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 60) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+              },
+              "hr": {
+                ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 60) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+              },
+              "bb": {
+                ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 60) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+              },
+              "k": {
+                ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 60) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+              },
+              "sf": {
+                ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 60) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+              },
+              "outs": {
+                ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 50) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+              },
+              "r": {
+                ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 99) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+              },
+              "er": {
+                ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 99) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+              },
+              "pitches": {
+                ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 300) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+              },
+              "strikes": {
+                ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 300) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+              },
+              "$other": {
+                ".validate": false
+              }
+            },
+            "bt": {
+              "$p": {
+                ".validate": "$p.matches(/^(ft|cv|sl|ch|kn)$/)",
+                "n": {
+                  ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 300) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+                },
+                "s": {
+                  ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 300) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+                },
+                "$other": {
+                  ".validate": false
+                }
+              }
+            },
+            "bd": {
+              ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= 250) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+            },
+            "be": {
+              ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= 250) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+            },
+            "bs": {
+              ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= 250) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+            },
+            "zb": {
+              "$z": {
+                ".validate": "$z.matches(/^[0-9]$/)",
+                "n": {
+                  ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 300) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+                },
+                "ab": {
+                  ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 60) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+                },
+                "h": {
+                  ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 60) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+                },
+                "tb": {
+                  ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 240) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+                },
+                "$other": {
+                  ".validate": false
+                }
+              }
+            },
+            "zp": {
+              "$z": {
+                ".validate": "$z.matches(/^[0-9]$/) && ((newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 300) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3'))"
+              }
+            },
+            "ab": {
+              "$k": {
+                ".validate": "$k.matches(/^[1-7]-[1-7]-[1-7]$/) && newData.hasChildren(['g', 'pa', 'ab', 'h', 'd2', 'd3', 'hr', 'bb', 'k', 'sf', 'rbi', 'r', 'roe'])",
+                "pa": {
+                  ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 60) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+                },
+                "ab": {
+                  ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 60) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+                },
+                "h": {
+                  ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 60) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+                },
+                "d2": {
+                  ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 60) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+                },
+                "d3": {
+                  ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 60) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+                },
+                "hr": {
+                  ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 60) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+                },
+                "bb": {
+                  ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 60) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+                },
+                "k": {
+                  ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 60) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+                },
+                "sf": {
+                  ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 60) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+                },
+                "rbi": {
+                  ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 99) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+                },
+                "r": {
+                  ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 99) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+                },
+                "roe": {
+                  ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 60) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+                },
+                "$other": {
+                  ".validate": false
+                },
+                "g": {
+                  ".validate": "(newData.isNumber() && newData.val() === (data.exists() ? data.val() : 0) + 1) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+                }
+              }
+            },
+            "ap": {
+              "$k": {
+                ".validate": "$k.matches(/^[1-7]-[1-7]-[1-7]$/) && newData.hasChildren(['g', 'bf', 'ab', 'h', 'd2', 'd3', 'hr', 'bb', 'k', 'sf', 'outs', 'r', 'er', 'pitches', 'strikes'])",
+                "bf": {
+                  ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 60) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+                },
+                "ab": {
+                  ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 60) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+                },
+                "h": {
+                  ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 60) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+                },
+                "d2": {
+                  ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 60) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+                },
+                "d3": {
+                  ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 60) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+                },
+                "hr": {
+                  ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 60) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+                },
+                "bb": {
+                  ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 60) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+                },
+                "k": {
+                  ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 60) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+                },
+                "sf": {
+                  ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 60) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+                },
+                "outs": {
+                  ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 50) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+                },
+                "r": {
+                  ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 99) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+                },
+                "er": {
+                  ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 99) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+                },
+                "pitches": {
+                  ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 300) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+                },
+                "strikes": {
+                  ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 300) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+                },
+                "$other": {
+                  ".validate": false
+                },
+                "g": {
+                  ".validate": "(newData.isNumber() && newData.val() === (data.exists() ? data.val() : 0) + 1) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+                }
+              }
+            },
+            "rm": {
+              ".validate": "(newData.hasChildren(['g', 'w', 'l', 't', 'rf', 'ra', 'bat', 'pit']) && newData.child('w').val() + newData.child('l').val() + newData.child('t').val() === newData.child('g').val()) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')",
+              "g": {
+                ".validate": "(newData.isNumber() && newData.val() === (data.exists() ? data.val() : 0) + 1) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+              },
+              "w": {
+                ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 1) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+              },
+              "l": {
+                ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 1) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+              },
+              "t": {
+                ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 1) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+              },
+              "rf": {
+                ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 99) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+              },
+              "ra": {
+                ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 99) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+              },
+              "bat": {
+                ".validate": "newData.hasChildren(['pa', 'ab', 'h', 'd2', 'd3', 'hr', 'bb', 'k', 'sf', 'rbi', 'r', 'roe'])",
+                "pa": {
+                  ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 60) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+                },
+                "ab": {
+                  ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 60) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+                },
+                "h": {
+                  ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 60) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+                },
+                "d2": {
+                  ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 60) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+                },
+                "d3": {
+                  ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 60) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+                },
+                "hr": {
+                  ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 60) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+                },
+                "bb": {
+                  ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 60) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+                },
+                "k": {
+                  ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 60) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+                },
+                "sf": {
+                  ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 60) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+                },
+                "rbi": {
+                  ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 99) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+                },
+                "r": {
+                  ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 99) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+                },
+                "roe": {
+                  ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 60) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+                },
+                "$other": {
+                  ".validate": false
+                }
+              },
+              "pit": {
+                ".validate": "newData.hasChildren(['bf', 'ab', 'h', 'd2', 'd3', 'hr', 'bb', 'k', 'sf', 'outs', 'r', 'er', 'pitches', 'strikes'])",
+                "bf": {
+                  ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 60) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+                },
+                "ab": {
+                  ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 60) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+                },
+                "h": {
+                  ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 60) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+                },
+                "d2": {
+                  ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 60) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+                },
+                "d3": {
+                  ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 60) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+                },
+                "hr": {
+                  ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 60) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+                },
+                "bb": {
+                  ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 60) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+                },
+                "k": {
+                  ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 60) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+                },
+                "sf": {
+                  ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 60) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+                },
+                "outs": {
+                  ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 50) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+                },
+                "r": {
+                  ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 99) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+                },
+                "er": {
+                  ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 99) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+                },
+                "pitches": {
+                  ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 300) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+                },
+                "strikes": {
+                  ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 300) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+                },
+                "$other": {
+                  ".validate": false
+                }
+              },
+              "$other": {
+                ".validate": false
+              }
+            },
+            "ids": {
+              "$id": {
+                ".validate": "($id.length >= 1 && $id.length <= 60 && newData.isNumber() && !data.exists()) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
+              }
+            },
+            "$other": {
+              ".validate": false
+            }
+          },
+          "$game": { ".validate": "$game.matches(/^(teambattle|turbolap|fpsbattle|zombieoutbreak|snowroyale|waterballoon|minigames|volleyball|soccer|baseballduel)$/)" }
         },
         "recent": {
          "teambattle": {
@@ -689,7 +1115,80 @@
              "$other": { ".validate": false }
            }
          },
-         "$game": { ".validate": "$game.matches(/^(teambattle|turbolap|fpsbattle|zombieoutbreak|snowroyale|waterballoon|minigames|volleyball|soccer)$/)" }
+         "baseballduel": {
+           ".write": "auth != null && (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')",
+           "$slot": {
+             ".validate": "$slot.matches(/^([0-9]|1[0-9])$/) && newData.hasChildren(['v', 'id', 'at', 'r', 't', 'rd', 'me', 'st', 'n', 's', 'b', 'p'])",
+             "v": {
+               ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 99"
+             },
+             "id": {
+               ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 60"
+             },
+             "at": {
+               ".validate": "(newData.val() === now) || ((auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3') && newData.isNumber() && newData.val() <= now)"
+             },
+             "r": {
+               ".validate": "newData.val() === 0 || newData.val() === 1"
+             },
+             "t": {
+               ".validate": "newData.val() === 0 || newData.val() === 1"
+             },
+             "rd": {
+               ".validate": "newData.val() === 0 || newData.val() === 1"
+             },
+             "me": {
+               ".validate": "newData.val() === 0 || newData.val() === 1"
+             },
+             "st": {
+               ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 15"
+             },
+             "n": {
+               "$i": {
+                 ".validate": "$i.matches(/^[01]$/) && newData.isString() && newData.val().length <= 20"
+               }
+             },
+             "s": {
+               "$i": {
+                 ".validate": "$i.matches(/^[01]$/) && newData.isNumber() && newData.val() >= 0 && newData.val() <= 999"
+               }
+             },
+             "ls": {
+               "$i": {
+                 ".validate": "$i.matches(/^([0-9]|1[0-4])$/)",
+                 "$j": {
+                   ".validate": "$j.matches(/^[01]$/) && newData.isNumber() && newData.val() >= 0 && newData.val() <= 999"
+                 }
+               }
+             },
+             "b": {
+               "$i": {
+                 ".validate": "$i.matches(/^[01]$/)",
+                 "$j": {
+                   ".validate": "$j.matches(/^[0-7]$/) && newData.isNumber() && newData.val() >= 0 && newData.val() <= 999"
+                 }
+               }
+             },
+             "p": {
+               "$i": {
+                 ".validate": "$i.matches(/^[01]$/)",
+                 "$j": {
+                   ".validate": "$j.matches(/^[0-7]$/) && newData.isNumber() && newData.val() >= 0 && newData.val() <= 999"
+                 }
+               }
+             },
+             "bd": {
+               ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 300"
+             },
+             "bs": {
+               ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 300"
+             },
+             "$other": {
+               ".validate": false
+             }
+           }
+         },
+         "$game": { ".validate": "$game.matches(/^(teambattle|turbolap|fpsbattle|zombieoutbreak|snowroyale|waterballoon|minigames|volleyball|soccer|baseballduel)$/)" }
         },
         "streak": {
           "$game": {
@@ -704,7 +1203,7 @@
         "pending": {
           "$game": {
             ".write": "auth != null && (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')",
-            ".validate": "$game.matches(/^(teambattle|turbolap|fpsbattle|zombieoutbreak|snowroyale|waterballoon|minigames|volleyball|soccer)$/) && newData.hasChildren(['id', 'rep'])",
+            ".validate": "$game.matches(/^(teambattle|turbolap|fpsbattle|zombieoutbreak|snowroyale|waterballoon|minigames|volleyball|soccer|baseballduel)$/) && newData.hasChildren(['id', 'rep'])",
             "id": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 60" },
             "rep": { ".validate": "newData.isString() && newData.val().length >= 2 && newData.val().length <= 6000" },
             "$other": { ".validate": false }
@@ -961,7 +1460,7 @@
         "$cls": {
           "$uid": {
             ".write": "auth != null && ((auth.uid === $uid && auth.token.email_verified === true && auth.token.email.endsWith('@dongma.sen.ms.kr')) || auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')",
-            ".validate": "$game.matches(/^(turbolap|fpsbattle|zombieoutbreak|snowroyale|waterballoon|minigames|volleyball|soccer)$/) && $cls.matches(/^([1-3]-[1-5]|none)$/) && newData.hasChildren(['n', 'g', 'w', 'x']) && newData.child('w').val() <= newData.child('g').val() && (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3' || (newData.child('g').val() === newData.parent().parent().parent().parent().child('users').child($uid).child('stats').child($game).child('g').val() && newData.child('w').val() === newData.parent().parent().parent().parent().child('users').child($uid).child('stats').child($game).child('w').val()))",
+            ".validate": "$game.matches(/^(turbolap|fpsbattle|zombieoutbreak|snowroyale|waterballoon|minigames|volleyball|soccer|baseballduel)$/) && $cls.matches(/^([1-3]-[1-5]|none)$/) && newData.hasChildren(['n', 'g', 'w', 'x']) && newData.child('w').val() <= newData.child('g').val() && (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3' || (newData.child('g').val() === newData.parent().parent().parent().parent().child('users').child($uid).child('stats').child($game).child('g').val() && newData.child('w').val() === newData.parent().parent().parent().parent().child('users').child($uid).child('stats').child($game).child('w').val()))",
             "n": { ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 40" },
             "g": { ".validate": "newData.isNumber() && newData.val() >= 0" },
             "w": { ".validate": "newData.isNumber() && newData.val() >= 0" },

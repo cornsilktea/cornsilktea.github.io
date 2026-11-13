@@ -90,6 +90,8 @@ class BbPitcherRoster {
 interface BbBatCounts { pa: number; ab: number; h: number; d2: number; d3: number; hr: number; bb: number; k: number; sf: number; rbi: number; r: number; roe: number; }
 interface BbPitCounts { bf: number; ab: number; h: number; d2: number; d3: number; hr: number; bb: number; k: number; sf: number; outs: number; r: number; er: number; pitches: number; strikes: number; }
 
+interface BbZoneHitting { n: number; ab: number; h: number; tb: number; }
+
 interface BbTeamBox {
   bat: BbBatCounts;
   pit: BbPitCounts;
@@ -97,13 +99,33 @@ interface BbTeamBox {
   bestDistance: number;
   bestExit: number;
   bestPitch: number;
+  batZones: BbZoneHitting[];
+  pitZones: number[];
+}
+
+class BbZoneGrid {
+  static readonly CELLS = 9;
+  static readonly OUTSIDE = 9;
+  static readonly SLOTS = 10;
+
+  static indexOf(point: BbZonePoint): number {
+    if (Math.abs(point.u) > 1 || Math.abs(point.v) > 1) return BbZoneGrid.OUTSIDE;
+    const column = Math.min(2, Math.floor((point.u + 1) * 1.5)), row = Math.min(2, Math.floor((1 - point.v) * 1.5));
+    return row * 3 + column;
+  }
+
+  static emptyHitting(): BbZoneHitting[] { return Array.from({ length: BbZoneGrid.SLOTS }, () => ({ n: 0, ab: 0, h: 0, tb: 0 })); }
+  static emptyPitching(): number[] { return Array.from({ length: BbZoneGrid.SLOTS }, () => 0); }
 }
 
 class BbBoxScoreBuilder {
   static emptyBat(): BbBatCounts { return { pa: 0, ab: 0, h: 0, d2: 0, d3: 0, hr: 0, bb: 0, k: 0, sf: 0, rbi: 0, r: 0, roe: 0 }; }
   static emptyPit(): BbPitCounts { return { bf: 0, ab: 0, h: 0, d2: 0, d3: 0, hr: 0, bb: 0, k: 0, sf: 0, outs: 0, r: 0, er: 0, pitches: 0, strikes: 0 }; }
   static emptyTeam(): BbTeamBox {
-    return { bat: BbBoxScoreBuilder.emptyBat(), pit: BbBoxScoreBuilder.emptyPit(), byType: { ft: { n: 0, s: 0 }, cv: { n: 0, s: 0 }, sl: { n: 0, s: 0 }, ch: { n: 0, s: 0 }, kn: { n: 0, s: 0 } }, bestDistance: 0, bestExit: 0, bestPitch: 0 };
+    return {
+      bat: BbBoxScoreBuilder.emptyBat(), pit: BbBoxScoreBuilder.emptyPit(), byType: { ft: { n: 0, s: 0 }, cv: { n: 0, s: 0 }, sl: { n: 0, s: 0 }, ch: { n: 0, s: 0 }, kn: { n: 0, s: 0 } },
+      bestDistance: 0, bestExit: 0, bestPitch: 0, batZones: BbZoneGrid.emptyHitting(), pitZones: BbZoneGrid.emptyPitching()
+    };
   }
 }
 
@@ -256,13 +278,20 @@ class BbMatchRules {
 
   apply(state: BbGameState, outcome: BbPitchOutcome): BbOutcomeNote {
     if (state.finished) return { toast: "", plateAppearanceOver: false, halfOver: false, runs: 0 };
-    const fielding = this.fielding(state), type = fielding.byType[outcome.roll.pitch];
+    const fielding = this.fielding(state), batting = this.batting(state), type = fielding.byType[outcome.roll.pitch], zone = BbZoneGrid.indexOf(outcome.roll.arrive);
+    const before = { ab: batting.bat.ab, h: batting.bat.h, tb: BbBaseballFormulas.totalBases(batting.bat) };
     state.pitchCount++;
     fielding.pit.pitches++;
+    fielding.pitZones[zone]++;
     type.n++;
     if (outcome.kind !== "ball") type.s++;
     fielding.bestPitch = Math.max(fielding.bestPitch, outcome.roll.speed);
-    return this.registry.handlerOf(outcome.kind).apply(state, outcome, this);
+    const note = this.registry.handlerOf(outcome.kind).apply(state, outcome, this), cell = batting.batZones[zone];
+    cell.n++;
+    cell.ab += batting.bat.ab - before.ab;
+    cell.h += batting.bat.h - before.h;
+    cell.tb += BbBaseballFormulas.totalBases(batting.bat) - before.tb;
+    return note;
   }
 
   addOuts(state: BbGameState, count: number): void {
