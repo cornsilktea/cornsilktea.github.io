@@ -5,7 +5,7 @@ class BbBatterAbilityModel {
     static topWeight(power) { return 1 + BbBatterAbilityModel.TOP_WEIGHT_STEP * (power - BbBatterAbilityModel.BASE); }
     static topSpeed(speed) { return 8 + BbBatterAbilityModel.RUN_SPEED_STEP * (speed - BbBatterAbilityModel.BASE); }
     static firstBaseSeconds(speed) { return 4.1 - BbBatterAbilityModel.FIRST_BASE_STEP * (speed - BbBatterAbilityModel.BASE); }
-    static advanceMargin(speed) { return 0.4 - BbBatterAbilityModel.MARGIN_STEP * (speed - BbBatterAbilityModel.BASE); }
+    static advanceMargin(speed) { return 0.25 - BbBatterAbilityModel.MARGIN_STEP * (speed - BbBatterAbilityModel.BASE); }
 }
 BbBatterAbilityModel.BASE = 3;
 BbBatterAbilityModel.LENIENCY_STEP = 0.1;
@@ -84,7 +84,7 @@ BbSprayModel.SCATTER = { perfect: 9, good: 16, fair: 26, poor: 38 };
 class BbLaunchModel {
     static launchDegrees(adjusted, height, band, random) {
         const deviation = band === "perfect" || band === "good" ? 13 : 17;
-        return Math.max(-15, Math.min(70, 15 + 10 * height - 0.06 * adjusted * 1000 + random.gaussian(0, deviation)));
+        return Math.max(-15, Math.min(70, 18 + 10 * height - 0.06 * adjusted * 1000 + random.gaussian(0, deviation)));
     }
 }
 class BbExitSpeedModel {
@@ -147,7 +147,7 @@ class BbBattedBallPhysics {
 BbBattedBallPhysics.REFERENCE_DEGREES = 28;
 BbBattedBallPhysics.REFERENCE_HANG = 4.8;
 BbBattedBallPhysics.LOW_ARC_POWER = 1.5;
-BbBattedBallPhysics.CARRY_SCALE = 1.2;
+BbBattedBallPhysics.CARRY_SCALE = 1.15;
 BbBattedBallPhysics.GROUND_SPEED_KEEP = 1;
 BbBattedBallPhysics.GROUND_SLOWING = 2.8;
 BbBattedBallPhysics.CARRY = [[60, 12], [90, 34], [120, 62], [130, 73], [140, 85], [150, 98], [160, 110], [170, 123], [180, 136], [190, 149]];

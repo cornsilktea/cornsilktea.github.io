@@ -21,6 +21,7 @@ BbFieldGeometry.PLATE_WIDTH = 0.43;
 BbFieldGeometry.RUBBER_DISTANCE = 18.44;
 BbFieldGeometry.MOUND_RADIUS = 2.74;
 BbFieldGeometry.MOUND_HEIGHT = 0.25;
+BbFieldGeometry.RUBBER_BEHIND_FEET = 0.22;
 BbFieldGeometry.INFIELD_DIRT_RADIUS = 28.9;
 BbFieldGeometry.HOME_DIRT_RADIUS = 3.96;
 BbFieldGeometry.BATTER_BOX_OFFSET = 0.95;

@@ -30,6 +30,7 @@ class BbFieldGeometry {
   static readonly RUBBER_DISTANCE = 18.44;
   static readonly MOUND_RADIUS = 2.74;
   static readonly MOUND_HEIGHT = 0.25;
+  static readonly RUBBER_BEHIND_FEET = 0.22;
   static readonly INFIELD_DIRT_RADIUS = 28.9;
   static readonly HOME_DIRT_RADIUS = 3.96;
   static readonly BATTER_BOX_OFFSET = 0.95;

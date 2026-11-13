@@ -55,6 +55,13 @@ class BbInfieldFlyRule {
 
 class BbPlayResolver {
   private static readonly INFIELD_REACH = 44;
+  private static readonly THROUGH_METERS = 15;
+  private static readonly THROUGH_DEPTH = 46;
+  private static readonly THROUGH_SECONDS = 1.3;
+  private static readonly THROUGH_SIDE_DEGREES = 15;
+  private static readonly THROUGH_CHASE_SPEED = 9;
+  private static readonly THROUGH_START = 0.45;
+  private static readonly LATE_THROW_WITHIN = 0.7;
   private readonly throws = new BbThrowDecision();
 
   constructor(private readonly dimensions: BbFieldDimensions, private readonly fielding: BbFieldingController, private readonly running: BbBaserunningController, private readonly errors: BbErrorPolicy) {}
@@ -71,7 +78,20 @@ class BbPlayResolver {
     if (BbInfieldFlyRule.applies(situation, ball, spots)) return this.infieldFly(situation, ball, spots);
     const caught = this.fielding.catchInAir(ball, spots, BbFielderPositions.ALL);
     if (caught) return this.flyOut(situation, ball, caught);
-    return this.hit(situation, ball, this.fielding.retrieve(ball, spots, fence, false));
+    return this.dropped(situation, ball, this.fielding.retrieve(ball, spots, fence, false), spots, random);
+  }
+
+  private dropped(situation: BbPlaySituation, ball: BbBattedBall, retrieve: BbRetrieve, spots: Map<BbPosition, BbSpot>, random: BbSeededRandom): BbPlayScript {
+    const by = retrieve.by as BbPosition;
+    if (BbFielderPositions.isOutfield(by) || BbDiamond.fromHome(retrieve.spot) > BbPlayResolver.INFIELD_REACH) return this.hit(situation, ball, retrieve);
+    return this.infieldPlay(situation, ball, { by, at: retrieve.at, spot: retrieve.spot, moved: BbDiamond.distance(spots.get(by) as BbSpot, retrieve.spot) }, spots, random);
+  }
+
+  private throughBall(ball: BbBattedBall, pick: BbGroundPick, spots: Map<BbPosition, BbSpot>): BbRetrieve {
+    const side = BbPlayResolver.THROUGH_SIDE_DEGREES, by: BbPosition = ball.spray < -side ? "LF" : ball.spray > side ? "RF" : "CF";
+    const spot = BbDiamond.polar(Math.max(BbDiamond.fromHome(pick.spot) + BbPlayResolver.THROUGH_METERS, BbPlayResolver.THROUGH_DEPTH), ball.spray);
+    const chase = BbPlayResolver.THROUGH_START + BbDiamond.distance(spots.get(by) as BbSpot, spot) / BbPlayResolver.THROUGH_CHASE_SPEED;
+    return { at: Math.max(pick.at + BbPlayResolver.THROUGH_SECONDS, chase), spot, holdSeconds: 0, by };
   }
 
   private blank(situation: BbPlaySituation, result: BbPlayCode, ball: BbBattedBall): BbPlayScript {
@@ -159,17 +179,24 @@ class BbPlayResolver {
 
   private grounder(situation: BbPlaySituation, ball: BbBattedBall, spots: Map<BbPosition, BbSpot>, random: BbSeededRandom): BbPlayScript {
     const pick = this.fielding.pickGrounder(ball, spots, BbFielderPositions.INFIELD, 3, BbPlayResolver.INFIELD_REACH);
-    if (!pick) return this.hit(situation, ball, this.fielding.retrieve(ball, spots, this.dimensions.fenceDistance(ball.spray), false));
+    if (!pick) return this.dropped(situation, ball, this.fielding.retrieve(ball, spots, this.dimensions.fenceDistance(ball.spray), false), spots, random);
+    return this.infieldPlay(situation, ball, pick, spots, random);
+  }
+
+  private infieldPlay(situation: BbPlaySituation, ball: BbBattedBall, pick: BbGroundPick, spots: Map<BbPosition, BbSpot>, random: BbSeededRandom): BbPlayScript {
     const script = this.blank(situation, "GROUND_OUT", ball), bases = situation.bases, abilities = situation.abilities;
     script.fielder = pick.by;
     script.distance = BbDiamond.fromHome(pick.spot);
     script.events = [{ t: 0, kind: "ballFlight", spot: [pick.spot.x, pick.spot.z], arriveT: pick.at }, { t: pick.at, kind: "field", who: pick.by, spot: [pick.spot.x, pick.spot.z] }];
     const shifted = this.running.onForcedShift(bases, situation.batter, abilities);
     if (this.errors.fumbles(random)) {
+      const through = this.throughBall(ball, pick, spots), moves = this.running.onHit(bases, situation.batter, abilities, through, this.throws);
+      const reached = (moves.find((move) => move.from === 0) as BbAdvance).to, next = Math.min(4, reached + 1);
       script.result = "ERROR";
-      script.batterReached = 1;
-      script.events.push({ t: pick.at, kind: "error", who: pick.by });
-      this.applyMoves(script, shifted, 0);
+      script.batterReached = reached;
+      script.events.push({ t: pick.at, kind: "error", who: pick.by }, { t: through.at, kind: "field", who: through.by, spot: [through.spot.x, through.spot.z] });
+      this.applyMoves(script, moves, 0);
+      script.events.push({ t: through.at, kind: "throw", who: through.by, base: next, arriveT: through.at + this.throws.secondsTo(through.spot, next) });
       return script;
     }
     const batterAt = BbRunnerMotion.batterSeconds(1, abilities), runnerAt = BbRunnerMotion.fromBaseSeconds(1, abilities);
@@ -214,6 +241,8 @@ class BbPlayResolver {
     }
     script.result = "SINGLE";
     script.batterReached = 1;
+    if (firstAt - batterAt <= BbPlayResolver.LATE_THROW_WITHIN) script.events.push({ t: pick.at, kind: "throw", who: pick.by, base: 1, arriveT: firstAt });
+    if (situation.outs >= 2) shifted.forEach((move) => { if (!move.forced && move.from >= 1) { move.to = move.from + 1; move.arriveAt = runnerAt; } });
     return this.closeInfieldPlay(script, situation, shifted);
   }
 

@@ -54,6 +54,7 @@ class BbMatchDirector {
         this.fast = false;
         this.idlePitches = 0;
         this.orbiting = false;
+        this.halted = false;
         this.orbitAngle = 0;
         this.cards = new BbMatchupCards(host);
         this.toast = new BbCallToast(host);
@@ -66,6 +67,21 @@ class BbMatchDirector {
         this.swing = new BbSwingButton(host, () => this.humanSwings());
     }
     get isRunning() { return this.running; }
+    get sequence() { return this.session.log.length; }
+    get awaitsPitch() { return this.running && this.waitingForCall && !this.pending; }
+    halt(on) { this.halted = on; }
+    watch(view) {
+        if (!this.plan || !this.plan.view)
+            return;
+        this.plan.view = view;
+        this.player.view = view;
+    }
+    reseat(seats) {
+        const changed = this.plan.seats[0] !== seats[0] || this.plan.seats[1] !== seats[1];
+        this.plan.seats = seats;
+        if (changed && this.running && this.waitingForCall && !this.pending)
+            this.nextPitch();
+    }
     get board() { return this.session.board(); }
     say(text, detail = "", seconds) { this.toast.show(text, detail, seconds); }
     quicken(on) { this.fast = on; }
@@ -96,17 +112,17 @@ class BbMatchDirector {
             return;
         this.player.skip();
     }
-    deliverPitch(sequence, call, seed) {
+    deliverPitch(sequence, call, seed, swingOpen = true) {
         const session = this.session;
-        if (!this.running || this.pending || sequence !== session.log.length)
+        if (!this.running || !this.waitingForCall || this.pending || sequence !== session.log.length)
             return;
         this.pad.close();
         this.clock.hide();
         this.waitingForCall = false;
-        const roll = session.rollWith(call, seed), batter = session.batter(), seat = this.plan.seats[session.battingIndex];
+        const roll = session.rollWith(call, seed), batter = session.batter(), seated = this.plan.seats[session.battingIndex], seat = seated === "human" && !swingOpen ? "remote" : seated;
         this.pending = {
             sequence, roll, setting: session.setting(), fielding: session.fieldingIndex, hands: this.hands(), pitcherHand: session.pitcher().hand, abilities: batter.abilities,
-            leniency: BbBatterAbilityModel.leniency(batter.abilities.contact), settled: null, announced: false, started: false
+            leniency: BbBatterAbilityModel.leniency(batter.abilities.contact), settled: null, announced: false, started: false, batting: seat
         };
         if (seat === "ai") {
             this.link.swingChosen(sequence, session.aiSwing(roll, this.plan.level));
@@ -139,9 +155,9 @@ class BbMatchDirector {
         this.pad.tick(frameSeconds);
         if (!this.staged)
             return;
-        if (!this.running || this.waitingForCall) {
+        if (!this.running || this.waitingForCall || this.halted) {
             this.player.idle(frameSeconds);
-            if (this.running && this.clock.tick(frameSeconds))
+            if (this.running && !this.halted && this.clock.tick(frameSeconds))
                 this.pitchForIdler();
         }
         else
@@ -210,7 +226,7 @@ class BbMatchDirector {
             this.link.pitchChosen(sequence, session.aiCall(this.plan.level));
     }
     humanThrows(call) {
-        if (!this.running || !this.waitingForCall || this.plan.seats[this.session.fieldingIndex] !== "human")
+        if (!this.running || !this.waitingForCall || this.halted || this.plan.seats[this.session.fieldingIndex] !== "human")
             return;
         this.idlePitches = 0;
         this.link.pitchChosen(this.session.log.length, call);
@@ -230,7 +246,7 @@ class BbMatchDirector {
     }
     humanSwings() {
         const pending = this.pending;
-        if (!pending || pending.settled || this.plan.seats[this.session.battingIndex] !== "human")
+        if (!pending || pending.settled || pending.batting !== "human" || this.halted)
             return;
         this.link.swingChosen(pending.sequence, this.player.seconds + BbTimingModel.SWING_DELAY - this.player.arriveAt);
     }
@@ -253,12 +269,14 @@ class BbMatchDirector {
             this.cards.show(names[session.battingIndex], session.batter(), names[session.fieldingIndex], session.pitcher(), session.board().pitches);
         this.toast.show(verdict);
     }
+    forfeit(team) { if (this.running)
+        this.finish(team); }
     finish(forfeitedBy) {
         this.stop();
         this.events.onEnd({ plan: this.plan, state: this.session.state, forfeitedBy });
     }
     advance(frameSeconds) {
-        const pending = this.pending, player = this.player, batting = this.plan.seats[this.session.battingIndex];
+        const pending = this.pending, player = this.player, batting = pending ? pending.batting : "ai";
         const eased = this.fast && (!pending || (pending.announced && !!pending.settled.outcome.script));
         let step = frameSeconds * (eased ? BbMatchDirector.FAST_PACE : 1);
         if (pending && !pending.settled && batting === "remote")

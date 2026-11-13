@@ -189,9 +189,9 @@ class BbGearFactory {
 
   constructor(private readonly libs: ThreeLibs) {
     const THREE = libs.THREE;
-    this.capDome = new THREE.SphereGeometry(0.6, 20, 10, 0, Math.PI * 2, 0, Math.PI * 0.5);
+    this.capDome = new THREE.SphereGeometry(0.57, 20, 10, 0, Math.PI * 2, 0, Math.PI * 0.5);
     this.helmetDome = new THREE.SphereGeometry(0.63, 22, 12, 0, Math.PI * 2, 0, Math.PI * 0.56);
-    this.brim = new THREE.CylinderGeometry(0.44, 0.44, 0.04, 18, 1, false, -Math.PI / 2, Math.PI);
+    this.brim = new THREE.CylinderGeometry(0.38, 0.38, 0.04, 18, 1, false, -Math.PI / 2, Math.PI);
     this.earFlap = new THREE.SphereGeometry(0.27, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.5);
     this.glovePalm = new THREE.SphereGeometry(0.17, 14, 10);
     this.gloveThumb = new THREE.SphereGeometry(0.075, 10, 8);
@@ -213,9 +213,9 @@ class BbGearFactory {
   headGear(kind: BbHeadGear, kit: BbTeamKit, flapOnLeft: boolean): Three<"Group"> {
     const THREE = this.libs.THREE, group = new THREE.Group();
     const dome = new THREE.Mesh(kind === "helmet" ? this.helmetDome : this.capDome, this.material(kit.cap, kind === "helmet" ? 0.25 : 0.85));
-    dome.position.y = kind === "helmet" ? 0.5 : 0.58;
+    dome.position.y = kind === "helmet" ? 0.5 : 0.68;
     const brim = new THREE.Mesh(this.brim, this.material(kit.capBrim, kind === "helmet" ? 0.25 : 0.85));
-    brim.position.set(0, dome.position.y + 0.02, 0.4);
+    brim.position.set(0, dome.position.y + 0.02, kind === "helmet" ? 0.46 : 0.4);
     group.add(dome, brim);
     if (kind === "helmet") {
       const flap = new THREE.Mesh(this.earFlap, this.material(kit.cap, 0.25));

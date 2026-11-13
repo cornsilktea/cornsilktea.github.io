@@ -33,6 +33,12 @@ class BbProfileStore {
     return BbProfileStore.blank();
   }
 
+  static teamOf(sheet: Partial<BbTeamSheet> | null | undefined): BbTeamSheet {
+    const blank = BbProfileStore.blank(), candidate: Partial<BbStoredProfile> = { version: 2, lineup: sheet ? sheet.lineup : undefined, pitchers: sheet ? sheet.pitchers : undefined };
+    const sound = BbProfileStore.isSound(candidate) ? candidate as BbStoredProfile : blank;
+    return { lineup: sound.lineup.slice(0, 1), pitchers: sound.pitchers.slice(0, 1) };
+  }
+
   static save(profile: BbStoredProfile): void {
     try { localStorage.setItem(BbProfileStore.KEY, JSON.stringify(profile)); } catch (error) { return; }
   }
@@ -233,6 +239,8 @@ interface BbMenuToggle {
 
 class BbGameMenu {
   private readonly panel: HTMLElement;
+
+  shut(): void { this.panel.classList.remove("open"); }
 
   constructor(host: HTMLElement, toggles: readonly BbMenuToggle[], actions: ReadonlyArray<readonly [string, () => void]>) {
     const corner = BbHudParts.box("bb-menu", host);

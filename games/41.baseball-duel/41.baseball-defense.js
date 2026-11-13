@@ -32,7 +32,7 @@ class BbFielderMotion {
         return reaction + Math.max(0, BbDiamond.distance(from, to) - dive) / speed;
     }
 }
-BbFielderMotion.INFIELD_SPEED = 5.4;
+BbFielderMotion.INFIELD_SPEED = 5.2;
 BbFielderMotion.OUTFIELD_SPEED = 7.4;
 BbFielderMotion.CATCHER_SPEED = 5.4;
 BbFielderMotion.INFIELD_REACTION = 0.28;
@@ -60,7 +60,7 @@ BbThrowDecision.OUTFIELD_SPEED = 36;
 BbThrowDecision.RELAY_BEYOND = 60;
 BbThrowDecision.RELAY_SECONDS = 0.5;
 BbThrowDecision.OUTFIELD_DEPTH = 46;
-BbThrowDecision.PIVOT_SECONDS = 0.95;
+BbThrowDecision.PIVOT_SECONDS = 1.4;
 BbThrowDecision.RANGE_SECONDS_PER_METER = 0.08;
 BbThrowDecision.RANGE_SECONDS_LIMIT = 0.8;
 class BbCoverageTable {
@@ -86,6 +86,20 @@ class BbNoErrorPolicy {
     fumbles() { return false; }
 }
 class BbAutoFielding {
+    static callerAmong(reach, order, leaderSlack) {
+        let best = null, bestSeconds = Infinity;
+        order.forEach((position, index) => {
+            const seconds = reach.get(position);
+            if (seconds === undefined)
+                return;
+            const counted = seconds - (index === 0 ? leaderSlack : 0);
+            if (counted < bestSeconds) {
+                best = position;
+                bestSeconds = counted;
+            }
+        });
+        return best;
+    }
     catchInAir(ball, spots, among) {
         const spot = BbDiamond.polar(ball.carry, ball.spray), liner = ball.flight === "line";
         const reach = new Map();
@@ -96,18 +110,8 @@ class BbAutoFielding {
         });
         if (!reach.size)
             return null;
-        let outfielder = null, infielder = null;
-        if (reach.has("CF"))
-            outfielder = "CF";
-        else
-            for (const position of ["LF", "RF"])
-                if (reach.has(position) && (!outfielder || reach.get(position) < reach.get(outfielder)))
-                    outfielder = position;
-        for (const position of BbAutoFielding.INFIELD_CALL)
-            if (reach.has(position)) {
-                infielder = position;
-                break;
-            }
+        const outfielder = BbAutoFielding.callerAmong(reach, BbAutoFielding.OUTFIELD_CALL, BbAutoFielding.CENTER_PRIORITY);
+        const infielder = BbAutoFielding.callerAmong(reach, BbAutoFielding.INFIELD_CALL, 0) || BbAutoFielding.callerAmong(reach, BbAutoFielding.BATTERY_CALL, 0);
         let by = outfielder || infielder;
         if (outfielder && infielder && (ball.flight === "pop" || reach.get(infielder) + BbAutoFielding.INFIELDER_HEAD_START <= reach.get(outfielder)))
             by = infielder;
@@ -164,10 +168,14 @@ class BbAutoFielding {
                 bySeconds = seconds;
             }
         });
-        return { at: Math.max(ballAt, bySeconds), spot, holdSeconds: ball.flight === "ground" || ball.flight === "line" ? 0 : Math.min(ball.hang, 1) * 0.6, by };
+        return { at: Math.max(ballAt, bySeconds) + BbAutoFielding.PICKUP_SECONDS, spot, holdSeconds: ball.flight === "ground" || ball.flight === "line" ? 0 : Math.min(ball.hang, 1) * 0.6, by };
     }
 }
-BbAutoFielding.INFIELD_CALL = ["SS", "2B", "3B", "1B", "P", "C"];
+BbAutoFielding.INFIELD_CALL = ["SS", "2B", "3B", "1B"];
+BbAutoFielding.BATTERY_CALL = ["C", "P"];
+BbAutoFielding.OUTFIELD_CALL = ["CF", "LF", "RF"];
+BbAutoFielding.CENTER_PRIORITY = 0.4;
 BbAutoFielding.INFIELDER_HEAD_START = 0.5;
 BbAutoFielding.ROLL_SPEED = 11;
+BbAutoFielding.PICKUP_SECONDS = 0.4;
 BbAutoFielding.INFIELD_BACKPEDAL = 3;

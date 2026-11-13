@@ -45,45 +45,45 @@ BbModeRules.LABELS = { match: "일반", batting: "타격 연습", pitching: "투
 BbModeRules.ORDER = ["match", "batting", "pitching"];
 BbModeRules.HUMAN_TEAM = { match: 1, batting: 0, pitching: 1 };
 class BbRoomCard {
-    constructor(mount, onStart, onLeave) {
-        this.mode = "match";
-        this.level = "normal";
-        this.withAi = false;
+    constructor(mount, actions) {
+        this.setup = BbRoomRules.BLANK_SETUP;
+        const change = (part) => actions.change({ ...this.setup, ...part });
+        this.code = BbHudParts.box("bb-room-code", mount);
         BbHudParts.box("bb-room-label", mount, "게임 모드");
         const modeRow = BbHudParts.box("bb-room-row", mount);
-        this.modes = BbModeRules.ORDER.map((mode) => BbSheetParts.button("bb-room-chip", modeRow, BbModeRules.LABELS[mode], () => { this.mode = mode; this.draw(); }));
+        this.modes = BbModeRules.ORDER.map((mode) => BbSheetParts.button("bb-room-chip", modeRow, BbModeRules.LABELS[mode], () => change({ mode })));
         this.seats = BbHudParts.box("bb-room-seats", mount);
-        this.guest = BbHudParts.box("bb-room-seat", this.seats);
-        BbHudParts.box("bb-room-side", this.guest, "손님 · 초 공격");
-        this.rival = BbHudParts.box("bb-room-name", this.guest);
-        this.addAi = BbSheetParts.button("bb-room-chip", this.guest, "AI 추가", () => { this.withAi = true; this.draw(); });
-        this.dropAi = BbSheetParts.button("bb-room-chip", this.guest, "AI 제거", () => { this.withAi = false; this.draw(); });
-        this.host = BbHudParts.box("bb-room-seat", this.seats);
-        BbHudParts.box("bb-room-side", this.host, "방장 · 말 공격");
-        BbHudParts.box("bb-room-name", this.host);
-        BbHudParts.box("bb-room-label", mount, "AI 난이도");
+        const guest = BbHudParts.box("bb-room-seat", this.seats);
+        BbHudParts.box("bb-room-side", guest, "손님 · 초 공격");
+        this.rival = BbHudParts.box("bb-room-name", guest);
+        this.addAi = BbSheetParts.button("bb-room-chip", guest, "AI 추가", () => change({ ai: true }));
+        this.dropAi = BbSheetParts.button("bb-room-chip", guest, "AI 제거", () => change({ ai: false }));
+        const host = BbHudParts.box("bb-room-seat", this.seats);
+        BbHudParts.box("bb-room-side", host, "방장 · 말 공격");
+        this.owner = BbHudParts.box("bb-room-name", host);
+        this.levelLabel = BbHudParts.box("bb-room-label", mount, "AI 난이도");
         this.levelRow = BbHudParts.box("bb-room-row", mount);
-        this.levels = BbRoomCard.LEVELS.map((level) => BbSheetParts.button("bb-room-chip", this.levelRow, BbAiLevel.ALL[level].label, () => { this.level = level; this.draw(); }));
-        this.start = BbSheetParts.button("st-btn primary", mount, "시작", () => onStart(this.mode, this.level));
-        BbSheetParts.button("st-btn", mount, "나가기", onLeave);
+        this.levels = BbRoomCard.LEVELS.map((level) => BbSheetParts.button("bb-room-chip", this.levelRow, BbAiLevel.ALL[level].label, () => change({ level })));
+        this.notice = BbHudParts.box("bb-room-notice", mount);
+        this.start = BbSheetParts.button("st-btn primary", mount, "시작", () => actions.start());
+        BbSheetParts.button("st-btn", mount, "나가기", () => actions.leave());
     }
-    open(me) {
-        this.host.lastElementChild.textContent = me;
-        this.withAi = false;
-        this.draw();
-    }
-    draw() {
-        const match = this.mode === "match", needsLevel = !match || this.withAi;
-        this.modes.forEach((button, index) => button.classList.toggle("on", BbModeRules.ORDER[index] === this.mode));
-        this.levels.forEach((button, index) => button.classList.toggle("on", BbRoomCard.LEVELS[index] === this.level));
+    draw(view) {
+        const setup = view.setup, match = setup.mode === "match", ai = setup.ai && !view.guest, needsLevel = !match || ai;
+        this.setup = setup;
+        this.code.textContent = view.code ? "방 코드 " + view.code + (view.watchers ? "  ·  관전 " + view.watchers + "명" : "") : "";
+        this.modes.forEach((button, index) => { button.classList.toggle("on", BbModeRules.ORDER[index] === setup.mode); button.disabled = !view.editable; });
+        this.levels.forEach((button, index) => { button.classList.toggle("on", BbRoomCard.LEVELS[index] === setup.level); button.disabled = !view.editable; });
         this.seats.hidden = !match;
-        this.rival.textContent = this.withAi ? "🤖 AI (" + BbAiLevel.ALL[this.level].label + ")" : "사람을 기다리는 중";
-        this.addAi.hidden = this.withAi;
-        this.dropAi.hidden = !this.withAi;
-        this.levelRow.hidden = !needsLevel;
-        this.levelRow.previousElementSibling.hidden = !needsLevel;
-        this.start.disabled = match && !this.withAi;
-        this.start.textContent = match ? "시작" : BbModeRules.LABELS[this.mode] + " 시작";
+        this.rival.textContent = view.guest || (ai ? "🤖 AI (" + BbAiLevel.ALL[setup.level].label + ")" : "사람을 기다리는 중");
+        this.owner.textContent = view.host;
+        this.addAi.hidden = !view.editable || !!view.guest || ai;
+        this.dropAi.hidden = !view.editable || !ai;
+        this.levelRow.hidden = this.levelLabel.hidden = !needsLevel;
+        this.notice.textContent = view.editable ? view.notice : "방장이 시작하기를 기다리는 중";
+        this.start.hidden = !view.editable;
+        this.start.disabled = match && !view.guest && !ai;
+        this.start.textContent = match ? "시작" : BbModeRules.LABELS[setup.mode] + " 시작";
     }
 }
 BbRoomCard.LEVELS = ["easy", "normal", "hard"];
@@ -93,15 +93,16 @@ class BbResultCard {
         this.detail = BbHudParts.box("bb-result-detail", mount);
         this.lines = BbHudParts.box("bb-result-lines", mount);
         this.facts = BbHudParts.box("bb-result-facts", mount);
-        BbSheetParts.button("st-btn primary", mount, "다시 하기", onAgain);
+        this.againButton = BbSheetParts.button("st-btn primary", mount, "다시 하기", onAgain);
         BbSheetParts.button("st-btn", mount, "나가기", onLeave);
     }
-    show(summary, mode) {
-        const state = summary.state, mine = BbModeRules.humanTeam(mode), names = summary.plan.names;
+    show(summary, mode, viewer, againLabel) {
+        const state = summary.state, mine = viewer === null ? 1 : viewer, names = summary.plan.names;
+        this.againButton.textContent = againLabel;
         this.lines.textContent = "";
         this.facts.textContent = "";
         if (mode === "match")
-            this.showMatch(summary, mine);
+            this.showMatch(summary, viewer);
         else {
             this.headline.textContent = BbModeRules.LABELS[mode] + " 끝";
             this.detail.textContent = names[mine];
@@ -117,11 +118,11 @@ class BbResultCard {
                 this.addFacts("구종별", thrown);
         }
     }
-    showMatch(summary, mine) {
-        const state = summary.state, names = summary.plan.names, lost = summary.forfeitedBy === mine || (summary.forfeitedBy === null && state.winner === 1 - mine);
-        const tied = summary.forfeitedBy === null && (state.winner === -1 || state.winner === null);
-        this.headline.textContent = tied ? "무승부" : lost ? "패배" : "승리!";
-        this.detail.textContent = summary.forfeitedBy !== null ? "자리 비움으로 경기가 끝났습니다" : state.endNote || names[0] + " " + state.score[0] + " : " + state.score[1] + " " + names[1];
+    showMatch(summary, viewer) {
+        const state = summary.state, names = summary.plan.names, tied = summary.forfeitedBy === null && (state.winner === -1 || state.winner === null);
+        const winner = summary.forfeitedBy !== null ? (summary.forfeitedBy === 0 ? 1 : 0) : state.winner === 0 ? 0 : 1;
+        this.headline.textContent = tied ? "무승부" : viewer === null ? names[winner] + " 승리" : winner === viewer ? "승리!" : "패배";
+        this.detail.textContent = summary.forfeitedBy !== null ? names[summary.forfeitedBy] + " 기권 (자리 비움·나감)" : state.endNote || names[0] + " " + state.score[0] + " : " + state.score[1] + " " + names[1];
         this.lines.hidden = false;
         const first = summary.plan.format.startInning, head = BbHudParts.box("bb-result-line head", this.lines);
         BbHudParts.box("bb-result-team", head);
@@ -146,21 +147,40 @@ class BbResultCard {
 }
 class BbDuelGame {
     constructor(libs) {
+        this.profile = new PlayerProfile();
+        this.backend = new RkBackend();
+        this.directory = new RkDirectory(this.backend, BbRoomRules.RULES);
+        this.seatPlan = new RkSeatPlan(BbRoomRules.RULES);
+        this.myId = RkReloadResume.identity(BbRoomRules.RULES);
+        this.session = null;
+        this.link = null;
+        this.presence = null;
+        this.live = null;
+        this.liveOver = false;
         this.game = null;
+        this.setup = BbRoomRules.BLANK_SETUP;
         this.last = { mode: "match", level: "normal" };
         this.showcaseSeed = 4100;
+        this.shown = "startScreen";
         const controls = document.getElementById("bbControls"), dialogs = document.getElementById("bbDialogs");
         this.stage = new BbStage(libs, document.getElementById("bbView"));
-        this.director = new BbMatchDirector(this.stage, new BbScoreHud(document.getElementById("hudTop")), controls, { onEnd: (summary) => this.ended(summary), onLog: (log) => this.logged(log) });
-        this.sheet = new BbSheetDialog(dialogs, () => undefined);
+        this.hud = new BbScoreHud(document.getElementById("hudTop"));
+        this.director = new BbMatchDirector(this.stage, this.hud, controls, { onEnd: (summary) => this.ended(summary), onLog: (log) => this.logged(log) });
+        this.pause = new BbPauseBanner(controls);
+        this.sheet = new BbSheetDialog(dialogs, () => this.sheetChanged());
         this.corner = document.getElementById("sheetCorner");
         this.corner.addEventListener("click", () => this.sheet.open());
-        this.room = new BbRoomCard(document.getElementById("roomMount"), (mode, level) => this.startGame(mode, level), () => this.showScreen("startScreen"));
-        this.result = new BbResultCard(document.getElementById("resultMount"), () => this.startGame(this.last.mode, this.last.level), () => this.showScreen("startScreen"));
-        new BbGameMenu(controls, [{ label: "연출 빠르게", onFlip: (on) => this.director.quicken(on) }], [["연출 건너뛰기", () => this.director.skipScene()], ["나가기", () => this.leaveGame()]]);
-        document.getElementById("btnCreate").addEventListener("click", () => { this.room.open(this.myName()); this.showScreen("roomScreen"); });
+        this.room = new BbRoomCard(document.getElementById("roomMount"), { change: (setup) => this.changeSetup(setup), start: () => this.startFromRoom(), leave: () => this.leaveRoom("") });
+        this.result = new BbResultCard(document.getElementById("resultMount"), () => this.again(), () => this.leaveRoom(""));
+        this.menu = new BbGameMenu(controls, [
+            { label: "연출 빠르게", onFlip: (on) => this.director.quicken(on) },
+            { label: "타자 시점으로 보기(관전)", onFlip: (on) => this.director.watch(on ? "batter" : "pitcher") }
+        ], [["연출 건너뛰기", () => this.director.skipScene()], ["나가기", () => this.leaveGame()]]);
+        document.getElementById("btnCreate").addEventListener("click", () => { this.createRoom(); });
         document.getElementById("btnRandom").addEventListener("click", () => this.notice("랜덤 매칭은 준비 중입니다"));
-        document.getElementById("btnJoin").addEventListener("click", () => this.notice("방 코드 입장은 준비 중입니다"));
+        document.getElementById("btnJoin").addEventListener("click", () => { this.joinRoom(); });
+        window.addEventListener("pagehide", () => { if (this.session)
+            this.session.removeMineOnUnload(); });
         this.showScreen("startScreen");
         this.load().catch((error) => this.notice("불러오지 못했어요: " + error.message));
     }
@@ -169,11 +189,28 @@ class BbDuelGame {
         const saved = BbLocalResume.load();
         if (saved)
             this.play(saved, "방금 상황을 불러왔어요");
-        else
+        else {
             this.showcase();
-        this.stage.run((frameSeconds) => this.director.tick(frameSeconds));
+            RkReloadResume.resumeInto(this.backend, BbRoomRules.RULES, (code) => this.enterRoom(code, false, ""));
+        }
+        this.stage.run((frameSeconds) => this.tick(frameSeconds));
+    }
+    tick(frameSeconds) {
+        const live = this.live, link = this.link, presence = this.presence;
+        if (live && link && presence && !this.liveOver) {
+            const missing = presence.missing(live), expired = this.pause.step(frameSeconds, !!missing);
+            this.director.halt(this.pause.paused);
+            link.hold(this.pause.paused);
+            if (expired && missing)
+                this.claimEnd(BbRoomRules.teamOf(live, missing) === 0 ? 1 : 0);
+            link.pump();
+        }
+        this.director.tick(frameSeconds);
     }
     myName() { return PlayerProfile.storedNick() || "나"; }
+    myRecord() {
+        return { nick: this.myName(), isBot: false, joinedAt: this.backend.now(), slot: BbRoomRules.HOST_TEAM, look: this.profile.look, spectator: false, sheet: BbProfileStore.teamOf(BbProfileStore.load()) };
+    }
     notice(text) {
         const note = document.getElementById("startNote");
         note.textContent = text;
@@ -181,15 +218,182 @@ class BbDuelGame {
             note.textContent = ""; }, BbDuelGame.NOTICE_SECONDS * 1000);
     }
     showScreen(shown) {
+        this.shown = shown;
         BbDuelGame.SCREENS.forEach((id) => { document.getElementById(id).hidden = id !== shown; });
         document.body.classList.toggle("menu", shown !== null);
         this.corner.hidden = shown !== "startScreen" && shown !== "roomScreen";
+        this.menu.shut();
     }
     showcase() {
         const plan = BbModeRules.showcase(this.showcaseSeed++);
         this.game = null;
+        this.director.halt(false);
         this.director.orbit(true);
         this.director.begin(plan, new BbLocalLink(this.director, plan.seed));
+    }
+    async createRoom() {
+        this.setup = BbRoomRules.BLANK_SETUP;
+        if (!this.backend.database) {
+            this.openRoom("");
+            return;
+        }
+        try {
+            const code = await this.directory.create(this.myId, this.myRecord(), { setup: this.setup });
+            if (code)
+                this.enterRoom(code, true, "");
+            else
+                this.notice("방을 만들지 못했어요. 다시 눌러 주세요.");
+        }
+        catch (error) {
+            this.openRoom("서버에 연결하지 못해 혼자 하기만 됩니다");
+        }
+    }
+    async joinRoom() {
+        const code = document.getElementById("joinCode").value.replace(/\D/g, "");
+        if (!this.backend.database) {
+            this.notice("서버에 연결하지 못했어요");
+            return;
+        }
+        if (code.length !== 5) {
+            this.notice("방 코드 5자리를 입력해 주세요.");
+            return;
+        }
+        try {
+            const outcome = await this.directory.join(code, this.myId, this.myRecord(), false);
+            if (outcome.ok)
+                this.enterRoom(code, false, outcome.message);
+            else
+                this.notice(outcome.message);
+        }
+        catch (error) {
+            this.notice("방을 불러오지 못했어요.");
+        }
+    }
+    openRoom(note) {
+        this.showScreen("roomScreen");
+        this.drawRoom(note);
+    }
+    enterRoom(code, hosting, note) {
+        const session = new RkSession(this.backend, BbRoomRules.RULES, code, this.myId, hosting, BbRoomRules.VALUES);
+        this.session = session;
+        this.hud.room(code);
+        document.getElementById("joinCode").value = code;
+        session.onChange = (kind) => this.roomChanged(kind);
+        session.onClosed = (message) => this.leaveRoom(message);
+        session.onHostTakeover = () => this.roomChanged("host");
+        session.connect();
+        this.openRoom(note);
+    }
+    drawRoom(note) {
+        const session = this.session;
+        if (!session) {
+            this.room.draw({ code: "", setup: this.setup, guest: null, host: this.myName(), editable: true, watchers: 0, notice: note });
+            return;
+        }
+        const seats = this.seatPlan.humanSeats(session.players), nameOf = (id) => { const record = id ? session.players.get(id) : null; return record ? record.nick : null; };
+        this.room.draw({
+            code: session.code, setup: BbRoomRules.setupOf(session.value("setup")), guest: nameOf(seats[0]), host: nameOf(seats[BbRoomRules.HOST_TEAM]) || "방장",
+            editable: session.isHost(), watchers: this.seatPlan.spectators(session.players).length, notice: session.isSpectator() ? "관전으로 들어왔습니다" : note
+        });
+    }
+    roomChanged(kind) {
+        const session = this.session;
+        if (!session)
+            return;
+        const match = session.value("match"), end = session.value("end");
+        if (session.status === "play" && match && (!this.live || this.live.id !== match.id)) {
+            this.startOnline(session, match);
+            return;
+        }
+        if (session.status === "lobby" && this.live) {
+            this.closeLive();
+            this.showcase();
+            this.showScreen("roomScreen");
+        }
+        if (this.live && !this.liveOver && end && end.match === this.live.id)
+            this.director.forfeit(end.winner === 0 ? 1 : 0);
+        if (this.live && !this.liveOver && kind === "host")
+            this.director.reseat(BbRoomRules.seatsFor(this.live, this.myId, session.isHost()));
+        if (this.shown === "roomScreen")
+            this.drawRoom("");
+    }
+    changeSetup(setup) {
+        const session = this.session;
+        if (!session) {
+            this.setup = setup;
+            this.drawRoom("");
+            return;
+        }
+        if (session.isHost())
+            session.writeValue("setup", setup);
+    }
+    sheetChanged() {
+        if (this.session && !this.live)
+            this.session.ref.child("players/" + this.myId + "/sheet").set(BbProfileStore.teamOf(BbProfileStore.load()));
+    }
+    startFromRoom() {
+        const session = this.session, setup = session ? BbRoomRules.setupOf(session.value("setup")) : this.setup;
+        if (setup.mode !== "match") {
+            this.dropSession();
+            this.startGame(setup.mode, setup.level);
+            return;
+        }
+        if (!session) {
+            if (setup.ai)
+                this.startGame("match", setup.level);
+            return;
+        }
+        if (!session.isHost())
+            return;
+        const seats = this.seatPlan.humanSeats(session.players), guest = seats[0] ? session.players.get(seats[0]) : null, mine = session.me();
+        if (!mine || (!guest && !setup.ai))
+            return;
+        const rival = guest ? BbProfileStore.teamOf(guest.sheet) : { lineup: [BbAiLevel.batterSheet("R")], pitchers: [BbAiLevel.pitcherSheet("R")] };
+        const match = {
+            id: this.backend.now(), seats: { s0: guest ? seats[0] : BbRoomRules.AI_SEAT, s1: this.myId }, sheets: [rival, BbProfileStore.teamOf(mine.sheet)],
+            names: [guest ? guest.nick : "AI " + BbAiLevel.ALL[setup.level].label, mine.nick], level: setup.level
+        };
+        session.ref.update({ match, status: "play", end: null, log: null });
+    }
+    async startOnline(session, match) {
+        this.closeLive();
+        this.live = match;
+        this.liveOver = false;
+        this.game = null;
+        const link = new BbRoomLink(this.director, session, this.backend), log = await link.open();
+        if (this.session !== session || this.live !== match) {
+            link.close();
+            return;
+        }
+        this.link = link;
+        this.presence = new BbPresenceWatch(session);
+        this.showScreen(null);
+        this.director.orbit(false);
+        this.director.begin({
+            format: new BbOneInningFormat(), teams: [BbProfileStore.teamOf(match.sheets[0]), BbProfileStore.teamOf(match.sheets[1])], names: match.names,
+            seats: BbRoomRules.seatsFor(match, this.myId, session.isHost()), level: BbAiLevel.ALL[match.level] || BbAiLevel.ALL.normal, seed: match.id % BbDuelGame.SEED_SPAN,
+            halvesToPlay: null, log, view: BbRoomRules.teamOf(match, this.myId) === null ? "pitcher" : null, autoSwingAt: null
+        }, link);
+        if (log.length)
+            this.director.say("방금 상황을 불러왔어요");
+    }
+    closeLive() {
+        if (this.link)
+            this.link.close();
+        if (this.presence)
+            this.presence.close();
+        this.link = null;
+        this.presence = null;
+        this.live = null;
+        this.liveOver = false;
+        this.pause.clear();
+        this.director.halt(false);
+    }
+    claimEnd(winner) {
+        const session = this.session, live = this.live;
+        if (!session || !live)
+            return;
+        session.ref.child("end").transaction((current) => (current !== null && current !== undefined ? undefined : { winner, match: live.id })).catch(() => undefined);
     }
     startGame(mode, level) {
         const profile = BbProfileStore.load(), mine = { lineup: profile.lineup, pitchers: profile.pitchers }, rival = { lineup: [BbAiLevel.batterSheet("R")], pitchers: [BbAiLevel.pitcherSheet("R")] };
@@ -201,6 +405,7 @@ class BbDuelGame {
         const plan = BbModeRules.plan(game);
         this.game = game;
         this.last = { mode: game.mode, level: game.level };
+        this.hud.room("");
         BbLocalResume.save(game);
         this.showScreen(null);
         this.director.orbit(false);
@@ -215,24 +420,59 @@ class BbDuelGame {
         BbLocalResume.save(this.game);
     }
     ended(summary) {
-        const game = this.game;
+        const game = this.game, live = this.live;
+        if (live && !this.liveOver) {
+            this.liveOver = true;
+            this.pause.clear();
+            this.result.show(summary, "match", BbRoomRules.teamOf(live, this.myId), this.session && this.session.isHost() ? "방으로 돌아가기" : "방장을 기다리는 중");
+            this.showScreen("resultScreen");
+            this.showcase();
+            return;
+        }
         if (!game) {
             this.showcase();
             return;
         }
         BbLocalResume.clear();
-        this.result.show(summary, game.mode);
+        this.result.show(summary, game.mode, BbModeRules.humanTeam(game.mode), "다시 하기");
         this.showScreen("resultScreen");
         this.showcase();
     }
-    leaveGame() {
-        if (!this.game || !window.confirm("경기를 그만두고 나갈까요?"))
+    again() {
+        const session = this.session;
+        if (!session) {
+            this.startGame(this.last.mode, this.last.level);
             return;
-        BbLocalResume.clear();
+        }
+        if (session.isHost())
+            session.ref.update({ status: "lobby", match: null, end: null, log: null });
+    }
+    dropSession() {
+        const session = this.session;
+        this.closeLive();
+        this.session = null;
+        this.hud.room("");
+        if (session)
+            session.leave();
+    }
+    leaveRoom(message) {
+        this.dropSession();
         this.showScreen("startScreen");
+        if (message)
+            this.notice(message);
+    }
+    leaveGame() {
+        const live = this.live, mine = live ? BbRoomRules.teamOf(live, this.myId) : null;
+        if ((!this.game && !live) || !window.confirm("경기를 그만두고 나갈까요?"))
+            return;
+        if (live && mine !== null && !this.liveOver)
+            this.claimEnd(mine === 0 ? 1 : 0);
+        BbLocalResume.clear();
+        this.leaveRoom("");
         this.showcase();
     }
 }
 BbDuelGame.ASSET_DIRECTORY = "assets/kaykit/";
 BbDuelGame.SCREENS = ["startScreen", "roomScreen", "resultScreen"];
 BbDuelGame.NOTICE_SECONDS = 2.5;
+BbDuelGame.SEED_SPAN = 1000000007;

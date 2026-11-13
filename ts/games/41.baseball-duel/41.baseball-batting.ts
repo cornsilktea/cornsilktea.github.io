@@ -18,7 +18,7 @@ class BbBatterAbilityModel {
   static topWeight(power: number): number { return 1 + BbBatterAbilityModel.TOP_WEIGHT_STEP * (power - BbBatterAbilityModel.BASE); }
   static topSpeed(speed: number): number { return 8 + BbBatterAbilityModel.RUN_SPEED_STEP * (speed - BbBatterAbilityModel.BASE); }
   static firstBaseSeconds(speed: number): number { return 4.1 - BbBatterAbilityModel.FIRST_BASE_STEP * (speed - BbBatterAbilityModel.BASE); }
-  static advanceMargin(speed: number): number { return 0.4 - BbBatterAbilityModel.MARGIN_STEP * (speed - BbBatterAbilityModel.BASE); }
+  static advanceMargin(speed: number): number { return 0.25 - BbBatterAbilityModel.MARGIN_STEP * (speed - BbBatterAbilityModel.BASE); }
 }
 
 class BbStrikeZoneJudge {
@@ -99,7 +99,7 @@ class BbSprayModel {
 class BbLaunchModel {
   static launchDegrees(adjusted: number, height: number, band: BbTimingBand, random: BbSeededRandom): number {
     const deviation = band === "perfect" || band === "good" ? 13 : 17;
-    return Math.max(-15, Math.min(70, 15 + 10 * height - 0.06 * adjusted * 1000 + random.gaussian(0, deviation)));
+    return Math.max(-15, Math.min(70, 18 + 10 * height - 0.06 * adjusted * 1000 + random.gaussian(0, deviation)));
   }
 }
 
@@ -129,7 +129,7 @@ class BbBattedBallPhysics {
   static readonly REFERENCE_DEGREES = 28;
   static readonly REFERENCE_HANG = 4.8;
   static readonly LOW_ARC_POWER = 1.5;
-  static readonly CARRY_SCALE = 1.2;
+  static readonly CARRY_SCALE = 1.15;
   static readonly GROUND_SPEED_KEEP = 1;
   static readonly GROUND_SLOWING = 2.8;
   static readonly CARRY: ReadonlyArray<readonly [exitSpeed: number, meters: number]> = [[60, 12], [90, 34], [120, 62], [130, 73], [140, 85], [150, 98], [160, 110], [170, 123], [180, 136], [190, 149]];

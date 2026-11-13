@@ -23,6 +23,11 @@ class BbProfileStore {
         }
         return BbProfileStore.blank();
     }
+    static teamOf(sheet) {
+        const blank = BbProfileStore.blank(), candidate = { version: 2, lineup: sheet ? sheet.lineup : undefined, pitchers: sheet ? sheet.pitchers : undefined };
+        const sound = BbProfileStore.isSound(candidate) ? candidate : blank;
+        return { lineup: sound.lineup.slice(0, 1), pitchers: sound.pitchers.slice(0, 1) };
+    }
     static save(profile) {
         try {
             localStorage.setItem(BbProfileStore.KEY, JSON.stringify(profile));
@@ -197,6 +202,7 @@ class BbSheetDialog {
 }
 BbSheetDialog.TABS = ["투수", "타자"];
 class BbGameMenu {
+    shut() { this.panel.classList.remove("open"); }
     constructor(host, toggles, actions) {
         const corner = BbHudParts.box("bb-menu", host);
         BbSheetParts.button("bb-menu-open", corner, "⋯", () => this.panel.classList.toggle("open"));

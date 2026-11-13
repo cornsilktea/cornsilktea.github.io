@@ -188,7 +188,7 @@ class BaseballUnit {
     check.ok(script.result === "DOUBLE_PLAY" && script.outsAdded === 2 && !script.basesAfter[0] && !script.basesAfter[1], "주자 1루 강한 유격수 땅볼 → 병살");
     script = this.play(0, [true, false, false], this.ball(70, -2, -22));
     check.ok(script.result !== "DOUBLE_PLAY", "느린 땅볼은 병살이 안 됨 (" + script.result + ")");
-    script = this.play(2, [true, true, true], this.ball(150, -2, -22));
+    script = this.play(2, [true, true, true], this.ball(120, -2, -22));
     check.ok(script.outsAdded === 1 && script.scored.length === 0, "2사 만루 땅볼 아웃은 득점 불인정");
     script = this.play(1, [false, false, true], this.ball(140, 32, 5));
     check.ok(script.result === "SAC_FLY" && script.scored.length === 1 && script.outsAdded === 1, "1사 3루 깊은 외야 플라이 → 희생플라이 (" + script.result + ")");

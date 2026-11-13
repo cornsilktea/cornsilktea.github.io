@@ -191,7 +191,7 @@ class BbGroundPainter {
 
   private paintWear(surface: BbFieldCanvas): void {
     const context = surface.context, offset = BbFieldGeometry.BASE_OFFSET;
-    const worn: Array<[number, number, number]> = [[offset, offset, 1.6], [0, offset * 2, 1.6], [-offset, offset, 1.6], [-0.95, 0.2, 1.1], [0.95, 0.2, 1.1], [0, -1.3, 1.2], [0, BbFieldGeometry.RUBBER_DISTANCE - 1.3, 1.1], [0, BbFieldGeometry.RUBBER_DISTANCE, 0.9]];
+    const worn: Array<[number, number, number]> = [[offset, offset, 1.6], [0, offset * 2, 1.6], [-offset, offset, 1.6], [-0.95, 0.2, 1.1], [0.95, 0.2, 1.1], [0, -1.3, 1.2], [0, BbFieldGeometry.RUBBER_DISTANCE - 1.3, 1.1], [0, BbFieldGeometry.RUBBER_DISTANCE - 0.3, 0.9]];
     worn.forEach(([x, z, radius]) => {
       const glow = context.createRadialGradient(surface.x(x), surface.y(z), 0, surface.x(x), surface.y(z), surface.size(radius));
       glow.addColorStop(0, BbGroundPainter.DIRT_WORN);
@@ -345,7 +345,7 @@ class BbBallparkBuilder {
     mound.position.set(0, 0, -BbFieldGeometry.RUBBER_DISTANCE);
     mound.receiveShadow = true;
     const rubber = new THREE.Mesh(new THREE.BoxGeometry(0.61, 0.04, 0.15), new THREE.MeshLambertMaterial({ color: "#f4f2ea" }));
-    rubber.position.set(0, height + 0.012, -BbFieldGeometry.RUBBER_DISTANCE);
+    rubber.position.set(0, height + 0.012, -BbFieldGeometry.RUBBER_DISTANCE - BbFieldGeometry.RUBBER_BEHIND_FEET);
     rubber.receiveShadow = true;
     this.group.add(mound, rubber);
   }

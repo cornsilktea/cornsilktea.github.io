@@ -27,7 +27,7 @@ class BbFielderPositions {
 }
 
 class BbFielderMotion {
-  static readonly INFIELD_SPEED = 5.4;
+  static readonly INFIELD_SPEED = 5.2;
   static readonly OUTFIELD_SPEED = 7.4;
   static readonly CATCHER_SPEED = 5.4;
   static readonly INFIELD_REACTION = 0.28;
@@ -56,7 +56,7 @@ class BbThrowDecision implements BbThrowClock {
   static readonly RELAY_BEYOND = 60;
   static readonly RELAY_SECONDS = 0.5;
   static readonly OUTFIELD_DEPTH = 46;
-  static readonly PIVOT_SECONDS = 0.95;
+  static readonly PIVOT_SECONDS = 1.4;
   static readonly RANGE_SECONDS_PER_METER = 0.08;
   static readonly RANGE_SECONDS_LIMIT = 0.8;
 
@@ -119,10 +119,25 @@ interface BbFieldingController {
 }
 
 class BbAutoFielding implements BbFieldingController {
-  private static readonly INFIELD_CALL: readonly BbPosition[] = ["SS", "2B", "3B", "1B", "P", "C"];
+  private static readonly INFIELD_CALL: readonly BbPosition[] = ["SS", "2B", "3B", "1B"];
+  private static readonly BATTERY_CALL: readonly BbPosition[] = ["C", "P"];
+  private static readonly OUTFIELD_CALL: readonly BbPosition[] = ["CF", "LF", "RF"];
+  private static readonly CENTER_PRIORITY = 0.4;
   private static readonly INFIELDER_HEAD_START = 0.5;
   private static readonly ROLL_SPEED = 11;
+  private static readonly PICKUP_SECONDS = 0.4;
   private static readonly INFIELD_BACKPEDAL = 3;
+
+  private static callerAmong(reach: Map<BbPosition, number>, order: readonly BbPosition[], leaderSlack: number): BbPosition | null {
+    let best: BbPosition | null = null, bestSeconds = Infinity;
+    order.forEach((position, index) => {
+      const seconds = reach.get(position);
+      if (seconds === undefined) return;
+      const counted = seconds - (index === 0 ? leaderSlack : 0);
+      if (counted < bestSeconds) { best = position; bestSeconds = counted; }
+    });
+    return best;
+  }
 
   catchInAir(ball: BbBattedBall, spots: Map<BbPosition, BbSpot>, among: readonly BbPosition[]): BbCatch | null {
     const spot = BbDiamond.polar(ball.carry, ball.spray), liner = ball.flight === "line";
@@ -132,10 +147,8 @@ class BbAutoFielding implements BbFieldingController {
       if (seconds <= ball.hang) reach.set(position, seconds);
     });
     if (!reach.size) return null;
-    let outfielder: BbPosition | null = null, infielder: BbPosition | null = null;
-    if (reach.has("CF")) outfielder = "CF";
-    else for (const position of ["LF", "RF"] as BbPosition[]) if (reach.has(position) && (!outfielder || (reach.get(position) as number) < (reach.get(outfielder) as number))) outfielder = position;
-    for (const position of BbAutoFielding.INFIELD_CALL) if (reach.has(position)) { infielder = position; break; }
+    const outfielder = BbAutoFielding.callerAmong(reach, BbAutoFielding.OUTFIELD_CALL, BbAutoFielding.CENTER_PRIORITY);
+    const infielder = BbAutoFielding.callerAmong(reach, BbAutoFielding.INFIELD_CALL, 0) || BbAutoFielding.callerAmong(reach, BbAutoFielding.BATTERY_CALL, 0);
     let by = outfielder || (infielder as BbPosition);
     if (outfielder && infielder && (ball.flight === "pop" || (reach.get(infielder) as number) + BbAutoFielding.INFIELDER_HEAD_START <= (reach.get(outfielder) as number))) by = infielder;
     return { by, at: ball.hang, spot };
@@ -179,6 +192,6 @@ class BbAutoFielding implements BbFieldingController {
       const seconds = BbFielderMotion.secondsTo(position, spots.get(position) as BbSpot, spot, false);
       if (seconds < bySeconds) { by = position; bySeconds = seconds; }
     });
-    return { at: Math.max(ballAt, bySeconds), spot, holdSeconds: ball.flight === "ground" || ball.flight === "line" ? 0 : Math.min(ball.hang, 1) * 0.6, by };
+    return { at: Math.max(ballAt, bySeconds) + BbAutoFielding.PICKUP_SECONDS, spot, holdSeconds: ball.flight === "ground" || ball.flight === "line" ? 0 : Math.min(ball.hang, 1) * 0.6, by };
   }
 }

@@ -289,11 +289,11 @@ class BbPlayChoreographer extends BbPitchChoreographer {
     }
     positionOf(role) { return Object.keys(BbPlayChoreographer.ROLE_OF).find((key) => this.role(key) === role); }
     ballGetsThrough(event, glove, ball, script) {
-        const fumbledAt = this.contactAt + event.t, side = BbPlayChoreographer.THROUGH_SIDE_DEGREES, home = BbFieldGeometry.HOME;
-        const chaser = ball.spray < -side ? "left" : ball.spray > side ? "right" : "center";
-        const rest = BbFieldSpace.polar(Math.max(glove.flat().length() + BbPlayChoreographer.THROUGH_METERS, BbPlayChoreographer.THROUGH_DEPTH), ball.spray);
-        const stand = rest.plus(rest.unit().times(0.4)), leaveAt = this.contactAt + 0.35, reach = this.spotOf(chaser, leaveAt).distanceTo(stand);
-        const pickAt = Math.max(fumbledAt + BbPlayChoreographer.THROUGH_SECONDS, leaveAt + reach / BbPlayChoreographer.CHASE_SPEED + 0.1);
+        const picked = script.events.find((other) => other.kind === "field" && other !== event && !!other.spot);
+        if (!picked)
+            return;
+        const fumbledAt = this.contactAt + event.t, home = BbFieldGeometry.HOME, chaser = this.role(picked.who), spot = picked.spot;
+        const rest = BbFieldSpace.toWorld(spot[0], spot[1]), stand = rest.plus(rest.unit().times(0.4)), leaveAt = this.contactAt + 0.35, pickAt = this.contactAt + picked.t;
         this.face(this.role(event.who), rest, fumbledAt + 0.3);
         this.busy.add(chaser);
         this.freeAt.set(chaser, pickAt);
@@ -304,11 +304,6 @@ class BbPlayChoreographer extends BbPitchChoreographer {
         this.catchWith(chaser, "ground", BbDrill.GROUND_GLOVE, pickAt, "빠진 공 줍기");
         this.holder = chaser;
         this.heldSince = pickAt;
-        let settledAt = 0;
-        script.events.forEach((moved) => { if (moved.kind === "runnerMove")
-            settledAt = Math.max(settledAt, moved.arriveT); });
-        const arriveT = Math.max(pickAt - this.contactAt + this.clock.secondsTo({ x: rest.x, z: -rest.z }, 2), settledAt + BbPlayChoreographer.SAFE_AFTER);
-        this.throwPlay({ t: pickAt - this.contactAt, kind: "throw", who: this.positionOf(chaser), base: 2, arriveT }, ball);
     }
     lastSeconds() {
         let last = this.contactAt;
@@ -505,6 +500,22 @@ class BbPlayChoreographer extends BbPitchChoreographer {
             if (role !== "batter" && !moved.has(role))
                 this.offBase(role, this.contactAt + call.t);
         });
+        if (this.cue.setting.outs >= 2 && outs.length && !ball.foul)
+            this.cue.setting.runners.forEach((id, index) => {
+                if (id && !moved.has(BbBasePath.RUNNER_ROLES[index]))
+                    this.dashUntil(BbBasePath.RUNNER_ROLES[index], index + 1, this.contactAt + Math.max(...outs.map((call) => call.t)));
+            });
+    }
+    dashUntil(role, from, stopAt) {
+        const leaveAt = this.contactAt + BbRunnerMotion.REACTION, speed = BbBatterAbilityModel.topSpeed(this.cue.abilities.speed);
+        const meters = speed * (stopAt - leaveAt) - speed * speed / (2 * BbRunnerMotion.ACCELERATION);
+        if (meters < 1)
+            return;
+        const stops = [this.spotOf(role, leaveAt)];
+        for (let base = from + 1; base <= 4; base++)
+            stops.push(BbBasePath.point(base));
+        const lane = new BbRunningLane(stops, BbRunningLane.ROUND), cut = lane.cutBefore(Math.max(0, lane.length - meters));
+        this.runAlong(role, stops[0], cut.run, cut.runLength, leaveAt, stopAt);
     }
     roundFirst(leaveAt, touchAt) {
         const first = BbBasePath.point(1), turn = first.lerp(BbBasePath.point(2), BbPlayChoreographer.ROUNDING_SHARE).plus(BbPlayChoreographer.ROUNDING_WIDE);
@@ -630,11 +641,6 @@ BbPlayChoreographer.TROT_SPEED = 12.8;
 BbPlayChoreographer.TROT_WATCH = 2.2;
 BbPlayChoreographer.UNASSISTED_SLACK = 0.3;
 BbPlayChoreographer.COVER_LEAD = 0.3;
-BbPlayChoreographer.THROUGH_METERS = 15;
-BbPlayChoreographer.THROUGH_DEPTH = 46;
-BbPlayChoreographer.THROUGH_SECONDS = 1.3;
-BbPlayChoreographer.THROUGH_SIDE_DEGREES = 15;
-BbPlayChoreographer.SAFE_AFTER = 0.35;
 BbPlayChoreographer.ROUNDING_SHARE = 0.22;
 BbPlayChoreographer.ROUNDING_WIDE = new BbVec(0.9, 0, 0);
 BbPlayChoreographer.ROUNDING_BACK_SECONDS = 1.4;
