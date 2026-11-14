@@ -355,7 +355,7 @@ class BbStatsView implements AccountDialogView<BbStatsNode, BbStatsEntry> {
 
   blockBodyHtml(entry: BbStatsEntry): string {
     const sheet = entry.sheet, me = sheet.me === null ? 1 : sheet.me, line = sheet.lines[me];
-    return (entry.tie ? "무승부 · " : "") + AccountHtml.esc(sheet.names[0]) + " " + sheet.score[0] + " : " + sheet.score[1] + " " + AccountHtml.esc(sheet.names[1]) + (entry.random ? " · 랜덤 매칭" : "")
+    return AccountHtml.esc(sheet.names[0]) + " " + sheet.score[0] + " : " + sheet.score[1] + " " + AccountHtml.esc(sheet.names[1]) + (entry.random ? " · 랜덤 매칭" : "")
       + "<br>타격 " + line.bat[1] + "안타 " + line.bat[4] + "홈런 · 투구 " + BbResultColumns.pitCell(0, line.pit[0]) + "이닝 " + line.pit[6] + "실점";
   }
 

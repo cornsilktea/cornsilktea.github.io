@@ -34,6 +34,8 @@ interface AccountRecentHeadEntry {
   id: string;
   at: number;
   win: boolean;
+  /* 무승부를 남기는 게임(41 야구)만 채운다. 있으면 최근 매치 칸이 승/패가 아닌 회색 "무승부" 칸이 된다(2026-11-14) */
+  tie?: boolean;
 }
 
 interface AccountMatchPlanBase {
@@ -190,10 +192,14 @@ class RecentBlockList {
     return (date.getMonth() + 1) + "월 " + date.getDate() + "일 " + two(date.getHours()) + ":" + two(date.getMinutes());
   }
 
+  static outcomeClass(entry: AccountRecentHeadEntry): "win" | "lose" | "draw" { return entry.tie ? "draw" : entry.win ? "win" : "lose"; }
+
+  static outcomeText(entry: AccountRecentHeadEntry): string { return entry.tie ? "무승부" : entry.win ? "승리" : "패배"; }
+
   static html<E extends AccountRecentHeadEntry>(entries: E[], bodyOf: (entry: E, index: number) => string, extraClass: string = ""): string {
     return entries.map((entry, index) =>
-      '<button type="button" class="rmItem ' + (entry.win ? "win" : "lose") + (extraClass ? " " + extraClass : "") + '" data-recent="' + index + '">' +
-      '<span class="rmHead"><b>' + (entry.win ? "승리" : "패배") + "</b><small>" + RecentBlockList.whenText(entry.at) + "</small></span>" +
+      '<button type="button" class="rmItem ' + RecentBlockList.outcomeClass(entry) + (extraClass ? " " + extraClass : "") + '" data-recent="' + index + '">' +
+      '<span class="rmHead"><b>' + RecentBlockList.outcomeText(entry) + "</b><small>" + RecentBlockList.whenText(entry.at) + "</small></span>" +
       bodyOf(entry, index) + "</button>"
     ).join("");
   }
@@ -707,6 +713,7 @@ class AccountStatsDialog<N, E extends AccountRecentHeadEntry> {
     ".asd-item{display:block;width:100%;text-align:left;padding:10px 12px;border-radius:8px;border:2px solid;color:#fff;}",
     ".asd-item.win{background:rgba(52,110,200,.34);border-color:#5C93E8;}",
     ".asd-item.lose{background:rgba(200,70,60,.32);border-color:#E8756A;}",
+    ".asd-item.draw{background:rgba(255,255,255,.1);border-color:rgba(238,242,238,.55);}",
     ".asd-item .asd-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:17px;}",
     ".asd-item .asd-top small{font-size:12px;color:rgba(255,255,255,.75);font-weight:400;}",
     ".asd-item .asd-body{display:block;margin-top:2px;font-size:14px;color:rgba(255,255,255,.92);}",
@@ -817,7 +824,7 @@ class AccountStatsDialog<N, E extends AccountRecentHeadEntry> {
     this.part("h2").textContent = this.titleText();
     this.setMessage(this.entries.length ? "최근 " + this.entries.length + "경기 · 최신순 · 누르면 그 경기 결과가 열려요" : this.view.emptyRecent);
     const list = RecentBlockList.html(this.entries, (entry) => '<span class="asd-body">' + this.view.blockBodyHtml(entry) + "</span>")
-      .replace(/class="rmItem (win|lose)"/g, 'class="asd-item $1"')
+      .replace(/class="rmItem (win|lose|draw)"/g, 'class="asd-item $1"')
       .replace(/<span class="rmHead">/g, '<span class="asd-top">');
     this.part(".asd-body").innerHTML = '<div class="asd-list">' + list + "</div>";
   }
@@ -827,7 +834,7 @@ class AccountStatsDialog<N, E extends AccountRecentHeadEntry> {
     if (!entry) return;
     this.part(".asd-tabs").style.display = "none";
     this.part("h2").textContent = this.view.resultTitle(entry);
-    this.setMessage((entry.win ? "내 결과: 승리" : "내 결과: 패배") + " · " + RecentBlockList.whenText(entry.at));
+    this.setMessage("내 결과: " + RecentBlockList.outcomeText(entry) + " · " + RecentBlockList.whenText(entry.at));
     this.part(".asd-body").innerHTML = this.view.resultHtml(entry) + '<button type="button" class="asd-back-btn">← 최근 매치 목록</button>';
   }
 }

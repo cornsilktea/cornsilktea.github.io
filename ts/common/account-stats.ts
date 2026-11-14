@@ -588,6 +588,7 @@ class TeamBattleRecentBlock {
     ".rmItem.tbr-item{display:grid;grid-template-columns:104px minmax(0,1.15fr) minmax(0,1fr) minmax(0,1fr);grid-template-areas:'head me score kills' 'head teams teams teams';align-items:center;gap:6px 14px;width:100%;padding:12px 14px;border-radius:10px;border:2px solid transparent;text-align:left;color:#EEF2EE;font:inherit;cursor:pointer;box-sizing:border-box;}",
     ".rmItem.tbr-item.win{background:rgba(47,111,214,.24);border-color:rgba(111,168,255,.6);}",
     ".rmItem.tbr-item.lose{background:rgba(214,69,61,.22);border-color:rgba(255,122,112,.55);}",
+    ".rmItem.tbr-item.draw{background:rgba(255,255,255,.08);border-color:rgba(238,242,238,.45);}",
     ".rmItem.tbr-item:hover{filter:brightness(1.15);}",
     ".rmItem.tbr-item .rmHead{grid-area:head;}",
     ".rmItem.tbr-item .rmHead b{display:block;font-size:28px;font-weight:800;line-height:1.15;}",
