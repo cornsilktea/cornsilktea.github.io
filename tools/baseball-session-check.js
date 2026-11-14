@@ -15,10 +15,10 @@ class SessionCheck {
     this.games = games;
     const folder = path.join(__dirname, "..", "games", "41.baseball-duel");
     const source = SessionCheck.FILES.map((name) => fs.readFileSync(path.join(folder, "41.baseball-" + name + ".js"), "utf8")).join("\n")
-      + "\n;({BbDuelSession,BbPlayChoreographer,BbBallparkRegistry,BbBodyDefaults,BbThreeInningFormat,BbAiLevel,BbSeededRandom,BbTimingModel})";
+      + "\n;({BbDuelSession,BbPlayChoreographer,BbBallparkRegistry,BbBodyDefaults,BbThreeInningFormat,BbAiLevel,BbSeededRandom,BbTimingModel,BbRosterPlan})";
     this.code = vm.runInNewContext(source, { console, Math, Map, Set, Array, Object, Number, Infinity, JSON });
     this.problems = [];
-    this.counts = { pitches: 0, swings: 0, takes: 0, finished: 0, kinds: {} };
+    this.counts = { pitches: 0, swings: 0, takes: 0, finished: 0, changes: 0, kinds: {} };
   }
 
   note(text) { if (this.problems.length < 12) this.problems.push(text); }
@@ -41,9 +41,11 @@ class SessionCheck {
 
   playGame(seed) {
     const c = this.code, level = c.BbAiLevel.ALL.normal, hands = seed % 2 ? "L" : "R";
-    const team = () => ({ lineup: [c.BbAiLevel.batterSheet(hands)], pitchers: [c.BbAiLevel.pitcherSheet(seed % 3 ? "R" : "L")] });
+    const team = () => ({ lineup: c.BbRosterPlan.BATTING_ORDER.map((position, index) => c.BbAiLevel.batterSheet(index % 2 ? hands : "R", position)), pitchers: c.BbRosterPlan.pitcherRoles().map((role) => c.BbAiLevel.pitcherSheet(seed % 3 ? "R" : "L", role)) });
     const session = new c.BbDuelSession(new c.BbThreeInningFormat(), c.BbBallparkRegistry.MAIN.dimensions, [team(), team()], new c.BbSeededRandom(seed)), press = new c.BbSeededRandom(seed * 7919 + 1);
     for (let pitch = 0; pitch < SessionCheck.LONGEST_GAME_PITCHES && !session.state.finished; pitch++) {
+      const relief = session.tiredRelief();
+      if (relief !== null && session.change(relief)) this.counts.changes++;
       const setting = session.setting(), batter = session.batter(), pitcher = session.pitcher(), roll = session.roll(session.aiCall(level)), label = "경기 " + seed + " 공 " + pitch;
       const before = JSON.stringify(session.state), preview = session.preview(roll);
       if (JSON.stringify(session.state) !== before) this.note(label + " 미리 보기 판정이 경기 상태를 바꿈");
@@ -61,12 +63,15 @@ class SessionCheck {
     }
     if (session.state.finished) this.counts.finished++;
     else this.note("경기 " + seed + " 이 끝나지 않음");
+    const again = new c.BbDuelSession(new c.BbThreeInningFormat(), c.BbBallparkRegistry.MAIN.dimensions, [team(), team()], new c.BbSeededRandom(seed + 1));
+    again.restore(session.log);
+    if (JSON.stringify(again.state) !== JSON.stringify(session.state) || [0, 1].some((side) => again.roster(side).currentIndex() !== session.roster(side).currentIndex() || again.roster(side).stamina().level() !== session.roster(side).stamina().level())) this.note("경기 " + seed + " 로그(교체 포함)를 다시 접은 결과가 다름");
   }
 
   run() {
     for (let seed = 1; seed <= this.games; seed++) this.playGame(seed);
     const counts = this.counts;
-    console.log("경기 " + this.games + "판 · 끝난 경기 " + counts.finished + " · 공 " + counts.pitches + "개 (스윙 " + counts.swings + " · 지켜보기 " + counts.takes + ")");
+    console.log("경기 " + this.games + "판 · 끝난 경기 " + counts.finished + " · 공 " + counts.pitches + "개 (스윙 " + counts.swings + " · 지켜보기 " + counts.takes + ") · 투수 교체 " + counts.changes + "번");
     console.log("결과: " + Object.keys(counts.kinds).map((kind) => kind + " " + counts.kinds[kind]).join(" · "));
     if (!this.problems.length) { console.log("모두 통과"); return; }
     this.problems.forEach((problem) => console.log("  문제  " + problem));

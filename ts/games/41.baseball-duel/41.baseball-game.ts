@@ -28,16 +28,20 @@ class BbOneInningFormat extends BbStandardFormat { readonly id = "one"; readonly
 class BbThreeInningFormat extends BbStandardFormat { readonly id = "three"; readonly startInning = 7; readonly inningsToPlay = 3; }
 class BbFullGameFormat extends BbStandardFormat { readonly id = "full"; readonly startInning = 1; readonly inningsToPlay = 9; }
 
+type BbLineupPosition = Exclude<BbPosition, "P"> | "DH";
+type BbPitcherRole = "starter" | "reliever" | "closer";
+
 interface BbBatterSheet {
   abilities: BbBatterAbilities;
   hand: BbHand;
+  position: BbLineupPosition;
 }
 
 interface BbPitcherSheet {
   abilities: BbPitcherAbilities;
   hand: BbHand;
   pitches: BbPitchId[];
-  role: "starter" | "reliever" | "closer";
+  role: BbPitcherRole;
 }
 
 interface BbTeamSheet {
@@ -45,46 +49,160 @@ interface BbTeamSheet {
   pitchers: BbPitcherSheet[];
 }
 
+interface BbRoleSlot {
+  role: BbPitcherRole;
+  count: number;
+  label: string;
+}
+
+class BbRosterPlan {
+  static readonly PITCHER_SLOTS: readonly BbRoleSlot[] = [{ role: "starter", count: 1, label: "선발" }, { role: "reliever", count: 1, label: "중간계투" }, { role: "closer", count: 1, label: "마무리" }];
+  static readonly BATTING_ORDER: readonly BbLineupPosition[] = ["DH", "C", "1B", "2B", "3B", "SS", "LF", "CF", "RF"];
+  static readonly POSITION_LABELS: Readonly<Record<BbLineupPosition, string>> = { DH: "지명타자", C: "포수", "1B": "1루수", "2B": "2루수", "3B": "3루수", SS: "유격수", LF: "좌익수", CF: "중견수", RF: "우익수" };
+  static readonly DESIGNATED: BbLineupPosition = "DH";
+  static readonly BASE_POINTS = 3;
+
+  static pitcherRoles(): BbPitcherRole[] {
+    const roles: BbPitcherRole[] = [];
+    BbRosterPlan.PITCHER_SLOTS.forEach((slot) => { for (let index = 0; index < slot.count; index++) roles.push(slot.role); });
+    return roles;
+  }
+
+  static pitcherCount(): number { return BbRosterPlan.pitcherRoles().length; }
+  static batterCount(): number { return BbRosterPlan.BATTING_ORDER.length; }
+  static roleLabel(role: BbPitcherRole): string { const slot = BbRosterPlan.PITCHER_SLOTS.find((entry) => entry.role === role); return slot ? slot.label : role; }
+  static positionLabel(position: BbLineupPosition): string { return BbRosterPlan.POSITION_LABELS[position]; }
+
+  static isFullLineup(lineup: readonly BbBatterSheet[]): boolean {
+    if (lineup.length !== BbRosterPlan.batterCount()) return false;
+    return BbRosterPlan.BATTING_ORDER.every((position) => lineup.filter((sheet) => sheet.position === position).length === 1);
+  }
+
+  static swapPosition(lineup: BbBatterSheet[], index: number, to: BbLineupPosition): void {
+    const mover = lineup[index], holder = lineup.find((sheet) => sheet.position === to);
+    if (!mover || mover.position === to) return;
+    if (holder) holder.position = mover.position;
+    mover.position = to;
+  }
+
+  static orderedPitchers(pitchers: readonly BbPitcherSheet[]): BbPitcherSheet[] {
+    const order = BbRosterPlan.PITCHER_SLOTS.map((slot) => slot.role);
+    return pitchers.map((sheet, index) => ({ sheet, index })).sort((a, b) => (order.indexOf(a.sheet.role) - order.indexOf(b.sheet.role)) || a.index - b.index).map((entry) => entry.sheet);
+  }
+
+  static points(value: number | undefined): number { return typeof value === "number" && Number.isFinite(value) ? Math.max(1, Math.min(7, Math.round(value))) : BbRosterPlan.BASE_POINTS; }
+
+  static crewOf(lineup: readonly BbBatterSheet[]): BbDefenseCrew {
+    const points = new Map<BbPosition, number>();
+    lineup.forEach((sheet) => { const position = sheet.position; if (position && position !== "DH") points.set(position, BbRosterPlan.points(sheet.abilities.defense)); });
+    return new BbDefenseCrew(points);
+  }
+}
+
 class BbLineup {
   private turn = 0;
   constructor(private readonly slots: readonly BbBatterSheet[]) {}
   current(): BbBatterSheet { return this.slots[this.turn % this.slots.length]; }
+  currentIndex(): number { return this.turn % this.slots.length; }
   advance(): void { this.turn++; }
 }
 
+class BbStaminaModel {
+  static readonly FULL = 100;
+  static readonly TIRED_BELOW = 50;
+  static readonly WORN_BELOW = 30;
+  static readonly PITCH_COST: readonly number[] = [0, 4, 3.5, 3, 2.5, 2, 1.5, 1];
+  static readonly HIT_COST: readonly number[] = [0, 2, 1.8, 1.7, 1.5, 1.3, 1.2, 1];
+  static readonly HOME_RUN_COST: readonly number[] = [0, 4, 3.7, 3.3, 3, 2.7, 2.3, 2];
+  static readonly TIRED = new BbPitchCondition(0.9, 1);
+  static readonly WORN = new BbPitchCondition(0.9, 1.3);
+
+  static costOf(stamina: number, outcome: BbPitchOutcome): number {
+    const points = BbRosterPlan.points(stamina), code = outcome.script ? outcome.script.result : null;
+    let cost = BbStaminaModel.PITCH_COST[points];
+    if (outcome.kind === "inPlay" && code === "HOME_RUN") cost += BbStaminaModel.HOME_RUN_COST[points];
+    else if (outcome.kind === "inPlay" && code && BbPlayCodes.isHit(code)) cost += BbStaminaModel.HIT_COST[points];
+    return cost;
+  }
+
+  static condition(level: number): BbPitchCondition {
+    if (level < BbStaminaModel.WORN_BELOW) return BbStaminaModel.WORN;
+    if (level < BbStaminaModel.TIRED_BELOW) return BbStaminaModel.TIRED;
+    return BbPitchCondition.FRESH;
+  }
+}
+
 interface BbPitcherStamina {
-  afterPitch(): void;
+  spend(outcome: BbPitchOutcome): void;
+  level(): number;
+  condition(): BbPitchCondition;
   isSpent(): boolean;
 }
 
 class BbNoStamina implements BbPitcherStamina {
-  afterPitch(): void { return; }
+  spend(): void { return; }
+  level(): number { return BbStaminaModel.FULL; }
+  condition(): BbPitchCondition { return BbPitchCondition.FRESH; }
   isSpent(): boolean { return false; }
 }
 
-interface BbSubstitutionPolicy {
-  nextPitcher(roster: BbPitcherRoster, stamina: BbPitcherStamina): BbPitcherSheet | null;
-}
-
-class BbNoSubstitution implements BbSubstitutionPolicy {
-  nextPitcher(): BbPitcherSheet | null { return null; }
+class BbStaminaMeter implements BbPitcherStamina {
+  private value = BbStaminaModel.FULL;
+  constructor(private readonly stamina: number) {}
+  spend(outcome: BbPitchOutcome): void { this.value = Math.max(0, this.value - BbStaminaModel.costOf(this.stamina, outcome)); }
+  level(): number { return this.value; }
+  condition(): BbPitchCondition { return BbStaminaModel.condition(this.value); }
+  isSpent(): boolean { return this.value < BbStaminaModel.WORN_BELOW; }
 }
 
 class BbPitcherRoster {
-  readonly starter: BbPitcherSheet;
-  readonly relievers: BbPitcherSheet[];
-  readonly closer: BbPitcherSheet | null;
-  private onMound: BbPitcherSheet;
+  readonly pitchers: readonly BbPitcherSheet[];
+  private readonly meters: BbPitcherStamina[];
+  private readonly retired = new Set<number>();
+  private mound = 0;
+  private thrown = 0;
 
-  constructor(pitchers: readonly BbPitcherSheet[]) {
-    this.starter = pitchers.find((pitcher) => pitcher.role === "starter") || pitchers[0];
-    this.relievers = pitchers.filter((pitcher) => pitcher.role === "reliever");
-    this.closer = pitchers.find((pitcher) => pitcher.role === "closer") || null;
-    this.onMound = this.starter;
+  constructor(pitchers: readonly BbPitcherSheet[], meterOf: (sheet: BbPitcherSheet) => BbPitcherStamina = (sheet) => new BbStaminaMeter(sheet.abilities.stamina)) {
+    this.pitchers = BbRosterPlan.orderedPitchers(pitchers);
+    this.meters = this.pitchers.map(meterOf);
   }
 
-  current(): BbPitcherSheet { return this.onMound; }
-  change(to: BbPitcherSheet): void { this.onMound = to; }
+  current(): BbPitcherSheet { return this.pitchers[this.mound]; }
+  currentIndex(): number { return this.mound; }
+  pitchesThisOuting(): number { return this.thrown; }
+  stamina(index = this.mound): BbPitcherStamina { return this.meters[index]; }
+  isAvailable(index: number): boolean { return Number.isInteger(index) && index >= 0 && index < this.pitchers.length && index !== this.mound && !this.retired.has(index); }
+  available(): number[] { return this.pitchers.map((sheet, index) => index).filter((index) => this.isAvailable(index)); }
+
+  recommended(): number | null {
+    const left = this.available();
+    return left.length ? left[0] : null;
+  }
+
+  change(index: number): boolean {
+    if (!this.isAvailable(index)) return false;
+    this.retired.add(this.mound);
+    this.mound = index;
+    this.thrown = 0;
+    return true;
+  }
+
+  afterPitch(outcome: BbPitchOutcome): void {
+    this.thrown++;
+    this.meters[this.mound].spend(outcome);
+  }
+}
+
+interface BbSubstitutionPolicy {
+  nextPitcher(roster: BbPitcherRoster): number | null;
+}
+
+class BbNoSubstitution implements BbSubstitutionPolicy {
+  nextPitcher(): number | null { return null; }
+}
+
+class BbTiredSubstitution implements BbSubstitutionPolicy {
+  nextPitcher(roster: BbPitcherRoster): number | null { return roster.stamina().isSpent() ? roster.recommended() : null; }
 }
 
 interface BbBatCounts { pa: number; ab: number; h: number; d2: number; d3: number; hr: number; bb: number; k: number; sf: number; rbi: number; r: number; roe: number; }
@@ -157,6 +275,7 @@ interface BbPitchOutcome {
   roll: BbPitchRoll;
   swing: BbSwingResult;
   script: BbPlayScript | null;
+  runnerSpeed?: number;
 }
 
 interface BbOutcomeNote {
@@ -174,7 +293,7 @@ class BbBallHandler implements BbOutcomeHandler {
   apply(state: BbGameState, outcome: BbPitchOutcome, rules: BbMatchRules): BbOutcomeNote {
     state.balls++;
     if (state.balls < 4) return { toast: "볼", plateAppearanceOver: false, halfOver: false, runs: 0 };
-    const batting = rules.batting(state), fielding = rules.fielding(state), batter = rules.newRunner(state, true);
+    const batting = rules.batting(state), fielding = rules.fielding(state), batter = rules.newRunner(state, true, outcome.runnerSpeed);
     batting.bat.pa++; batting.bat.bb++; fielding.pit.bf++; fielding.pit.bb++;
     let scored: BbRunner | null = null;
     if (state.bases[0] && state.bases[1] && state.bases[2]) scored = state.bases[2];
@@ -271,9 +390,11 @@ class BbMatchRules {
     return Math.min(1, (state.halvesDone + Math.min(state.outs, 3) / 3) / (this.format.inningsToPlay * 2));
   }
 
-  newRunner(state: BbGameState, earned: boolean): BbRunner {
+  newRunner(state: BbGameState, earned: boolean, speed?: number): BbRunner {
     state.runnerSerial++;
-    return { id: "r" + state.runnerSerial, earned: earned && !state.tainted };
+    const runner: BbRunner = { id: "r" + state.runnerSerial, earned: earned && !state.tainted };
+    if (speed !== undefined) runner.speed = speed;
+    return runner;
   }
 
   apply(state: BbGameState, outcome: BbPitchOutcome): BbOutcomeNote {
@@ -359,23 +480,24 @@ class BbMatchRules {
 }
 
 class BbPitchJudge {
-  private readonly resolver: BbPlayResolver;
+  private readonly resolvers: readonly [BbPlayResolver, BbPlayResolver];
 
-  constructor(dimensions: BbFieldDimensions, errors: BbErrorPolicy, private readonly rules: BbMatchRules) {
-    this.resolver = new BbPlayResolver(dimensions, new BbAutoFielding(), new BbAutoBaseRunning(), errors);
+  constructor(dimensions: BbFieldDimensions, errors: BbErrorPolicy, private readonly rules: BbMatchRules, private readonly crews: readonly [BbDefenseCrew, BbDefenseCrew] = [BbDefenseCrew.STANDARD, BbDefenseCrew.STANDARD]) {
+    const resolverFor = (crew: BbDefenseCrew) => new BbPlayResolver(dimensions, new BbAutoFielding(crew), new BbAutoBaseRunning(), errors, crew);
+    this.resolvers = [resolverFor(crews[0]), resolverFor(crews[1])];
   }
 
   judge(state: BbGameState, roll: BbPitchRoll, contactOffset: number | null, batter: BbBatterSheet): BbPitchOutcome {
-    const random = new BbSeededRandom(roll.seed ^ 0x5bd1e995);
-    const swing = BbBatterActionSet.of("swing").resolve({ roll, batterHand: batter.hand, abilities: batter.abilities, contactOffset, random });
-    if (swing.kind === "take") return { kind: BbStrikeZoneJudge.isStrike(roll.arrive) ? "calledStrike" : "ball", roll, swing, script: null };
-    if (swing.kind === "miss") return { kind: "swingMiss", roll, swing, script: null };
-    const runner: BbRunner = { id: "r" + (state.runnerSerial + 1), earned: !state.tainted };
-    const script = this.resolver.resolve({ outs: state.outs, bases: state.bases, batter: runner, abilities: batter.abilities }, swing.ball as BbBattedBall, random);
-    if (script.result === "FOUL") return { kind: "foul", roll, swing, script };
+    const random = new BbSeededRandom(roll.seed ^ 0x5bd1e995), fielding = this.rules.fieldingIndex(state), runnerSpeed = batter.abilities.speed;
+    const swing = BbBatterActionSet.of("swing").resolve({ roll, batterHand: batter.hand, abilities: batter.abilities, contactOffset, random, catcherDefense: this.crews[fielding].pointsOf("C") });
+    if (swing.kind === "take") return { kind: BbStrikeZoneJudge.isStrike(roll.arrive) ? "calledStrike" : "ball", roll, swing, script: null, runnerSpeed };
+    if (swing.kind === "miss") return { kind: "swingMiss", roll, swing, script: null, runnerSpeed };
+    const runner: BbRunner = { id: "r" + (state.runnerSerial + 1), earned: !state.tainted, speed: runnerSpeed };
+    const script = this.resolvers[fielding].resolve({ outs: state.outs, bases: state.bases, batter: runner, abilities: batter.abilities }, swing.ball as BbBattedBall, random);
+    if (script.result === "FOUL") return { kind: "foul", roll, swing, script, runnerSpeed };
     if (script.result === "ERROR") runner.earned = false;
     state.runnerSerial++;
-    return { kind: "inPlay", roll, swing, script };
+    return { kind: "inPlay", roll, swing, script, runnerSpeed };
   }
 }
 
@@ -386,21 +508,83 @@ interface BbLogEntry {
   contactOffset: number | null;
 }
 
+interface BbPitcherChangeEntry {
+  change: number;
+}
+
+type BbLogEvent = BbLogEntry | BbPitcherChangeEntry;
+
+class BbLogEvents {
+  static isChange(event: BbLogEvent): event is BbPitcherChangeEntry { return typeof (event as BbPitcherChangeEntry).change === "number"; }
+}
+
+interface BbSettledPitch {
+  outcome: BbPitchOutcome;
+  note: BbOutcomeNote;
+}
+
+interface BbAimedPitch {
+  pitch: BbPitchId;
+  aim: BbZonePoint;
+}
+
+class BbMatchEngine {
+  readonly rules: BbMatchRules;
+  readonly state: BbGameState;
+  readonly rosters: readonly [BbPitcherRoster, BbPitcherRoster];
+  private readonly judge: BbPitchJudge;
+  private readonly lineups: readonly [BbLineup, BbLineup];
+
+  constructor(format: BbMatchFormat, dimensions: BbFieldDimensions, errors: BbErrorPolicy, readonly teams: readonly [BbTeamSheet, BbTeamSheet]) {
+    this.rules = new BbMatchRules(format);
+    this.judge = new BbPitchJudge(dimensions, errors, this.rules, [BbRosterPlan.crewOf(teams[0].lineup), BbRosterPlan.crewOf(teams[1].lineup)]);
+    this.state = this.rules.start();
+    this.lineups = [new BbLineup(teams[0].lineup), new BbLineup(teams[1].lineup)];
+    this.rosters = [new BbPitcherRoster(teams[0].pitchers), new BbPitcherRoster(teams[1].pitchers)];
+  }
+
+  get battingIndex(): 0 | 1 { return this.rules.battingIndex(this.state); }
+  get fieldingIndex(): 0 | 1 { return this.rules.fieldingIndex(this.state); }
+
+  roster(team: 0 | 1 = this.fieldingIndex): BbPitcherRoster { return this.rosters[team]; }
+  lineup(team: 0 | 1 = this.battingIndex): BbLineup { return this.lineups[team]; }
+  pitcher(): BbPitcherSheet { return this.roster().current(); }
+  batter(): BbBatterSheet { return this.lineup().current(); }
+  condition(): BbPitchCondition { return this.roster().stamina().condition(); }
+
+  roll(call: BbAimedPitch, seed: number): BbPitchRoll {
+    const pitcher = this.pitcher();
+    return BbPitchRoller.roll(call.pitch, call.aim, pitcher.abilities, pitcher.hand, seed, this.condition());
+  }
+
+  preview(roll: BbPitchRoll): BbPitchOutcome { return this.judge.judge(this.state, roll, null, this.batter()); }
+
+  settle(roll: BbPitchRoll, contactOffset: number | null): BbSettledPitch {
+    const roster = this.roster(), lineup = this.lineup(), outcome = this.judge.judge(this.state, roll, contactOffset, lineup.current()), note = this.rules.apply(this.state, outcome);
+    roster.afterPitch(outcome);
+    if (note.plateAppearanceOver) lineup.advance();
+    return { outcome, note };
+  }
+
+  change(index: number): boolean { return !this.state.finished && this.roster().change(index); }
+
+  replay(event: BbLogEvent): void {
+    if (this.state.finished) return;
+    if (BbLogEvents.isChange(event)) { this.change(event.change); return; }
+    this.settle(this.roll(event, event.seed), event.contactOffset);
+  }
+}
+
 class BbGameLogFold {
   constructor(private readonly format: BbMatchFormat, private readonly dimensions: BbFieldDimensions, private readonly errors: BbErrorPolicy, private readonly teams: readonly [BbTeamSheet, BbTeamSheet]) {}
 
-  fold(entries: readonly BbLogEntry[]): BbGameState {
-    const rules = new BbMatchRules(this.format), judge = new BbPitchJudge(this.dimensions, this.errors, rules), state = rules.start();
-    const lineups = [new BbLineup(this.teams[0].lineup), new BbLineup(this.teams[1].lineup)], rosters = [new BbPitcherRoster(this.teams[0].pitchers), new BbPitcherRoster(this.teams[1].pitchers)];
-    for (const entry of entries) {
-      if (state.finished) break;
-      const pitcher = rosters[rules.fieldingIndex(state)].current(), lineup = lineups[rules.battingIndex(state)];
-      const roll = BbPitchRoller.roll(entry.pitch, entry.aim, pitcher.abilities, pitcher.hand, entry.seed);
-      const note = rules.apply(state, judge.judge(state, roll, entry.contactOffset, lineup.current()));
-      if (note.plateAppearanceOver) lineup.advance();
-    }
-    return state;
+  engine(entries: readonly BbLogEvent[]): BbMatchEngine {
+    const engine = new BbMatchEngine(this.format, this.dimensions, this.errors, this.teams);
+    entries.forEach((entry) => engine.replay(entry));
+    return engine;
   }
+
+  fold(entries: readonly BbLogEvent[]): BbGameState { return this.engine(entries).state; }
 }
 
 class BbBaseballFormulas {

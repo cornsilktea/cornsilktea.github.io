@@ -1,8 +1,9 @@
-// 41번 야구 밸런스 시뮬레이션 (사양서 17.2절).
-// 사용: node tools/baseball-sim.js [--games 10000] [--seed 41] [--abilities] [--cross] [--write]
-//   기본: 보통 AI(3/3/3) 대 보통 AI 로 9회 1이닝 경기를 돌려 타격·투구 분포를 12.3절 목표와 비교한다.
-//   --abilities: 타자 28가지 배분 × 표준 투수, 투수 28가지 배분 × 표준 타자의 기대 득점 편차(목표 ±8%).
-//   --cross: 28 × 28 전체 교차(오래 걸림).  --write: docs/41.baseball-duel/41.baseball-sim-report.md 로 저장.
+// 41번 야구 밸런스 시뮬레이션 (사양서 17.2절, 선수단 프롬프트 5절).
+// 사용: node tools/baseball-sim.js [--games 10000] [--seed 41] [--abilities] [--screen 1000] [--refine 8000] [--write]
+//   기본: 보통 AI 선수단(타자 9명·투수 3명, 모두 3/3/3/3) 대 같은 선수단으로 9회 1이닝 경기를 돌려 목표와 비교하고,
+//         중요 수비 포지션 투자, 체력별 교체 시점(1·3·9이닝), 포수 수비별 장타를 표로 낸다.
+//   --abilities: 타자 149가지·투수 149가지 배분의 공정성(먼저 --screen 판씩 훑고, 위·아래 끝 배분을 --refine 판씩 다시).
+//   --write: docs/41.baseball-duel/41.baseball-sim-report.md 로 저장.
 const fs = require("fs"), path = require("path");
 const BaseballCode = require("./baseball-load.js");
 
@@ -11,7 +12,7 @@ class Tally {
     this.code = code;
     this.bat = code.BbBoxScoreBuilder.emptyBat();
     this.pit = code.BbBoxScoreBuilder.emptyPit();
-    this.halves = 0; this.runs = 0; this.pitches = 0; this.games = 0; this.extra = 0; this.ties = 0;
+    this.halves = 0; this.runs = 0; this.pitches = 0; this.games = 0; this.extra = 0; this.ties = 0; this.changes = 0;
     this.results = {}; this.flights = { ground: 0, line: 0, fly: 0, pop: 0 };
     this.bands = {}; this.types = {}; this.homeRunSpray = { pull: 0, center: 0, opposite: 0 };
     this.swings = 0; this.misses = 0; this.fouls = 0; this.takes = 0; this.zonePitches = 0;
@@ -54,42 +55,82 @@ class Tally {
   }
 }
 
+class SideTally {
+  constructor(code) {
+    this.code = code;
+    this.games = 0; this.wins = 0; this.ties = 0; this.runsFor = 0; this.runsAgainst = 0; this.changes = 0;
+    this.against = code.BbBoxScoreBuilder.emptyPit();
+    this.outings = []; this.current = null;
+  }
+
+  add(counts, into) { for (const key of Object.keys(counts)) into[key] += counts[key]; }
+
+  game(state, side) {
+    this.games++;
+    if (state.winner === side) this.wins++;
+    if (state.winner === -1) this.ties++;
+    this.runsFor += state.score[side];
+    this.runsAgainst += state.score[1 - side];
+    this.add(state.box[side].pit, this.against);
+    this.closeOuting();
+  }
+
+  watch(engine, side) {
+    if (engine.fieldingIndex !== side) return;
+    const roster = engine.roster(side), index = roster.currentIndex(), level = roster.stamina().level(), thrown = roster.pitchesThisOuting();
+    if (!this.current || this.current.index !== index) { this.closeOuting(); this.current = { index, tired: null, worn: null, pitches: 0 }; }
+    this.current.pitches = thrown;
+    if (this.current.tired === null && level < 50) this.current.tired = thrown;
+    if (this.current.worn === null && level < 30) this.current.worn = thrown;
+  }
+
+  closeOuting() { if (this.current) this.outings.push(this.current); this.current = null; }
+}
+
 class BaseballSim {
+  static FORMATS = { one: "BbOneInningFormat", three: "BbThreeInningFormat", full: "BbFullGameFormat" };
+
   constructor(seed) {
     this.code = BaseballCode.load();
     this.seed = seed;
     this.dimensions = new this.code.BbMainBallpark();
     this.errors = new this.code.BbInfieldGroundBallErrorPolicy(0.05);
+    this.level = this.code.BbAiLevel.ALL.normal;
   }
 
-  team(batterPoints, pitcherPoints) {
-    const code = this.code, breaking = pitcherPoints[2];
+  format(id) { return new this.code[BaseballSim.FORMATS[id]](); }
+
+  team(batterPoints = [3, 3, 3, 3], pitcherPoints = [3, 3, 3, 3], byPosition = {}) {
+    const code = this.code, plan = code.BbRosterPlan, breaking = pitcherPoints[2];
+    const batter = (points, position) => ({ abilities: { contact: points[0], power: points[1], speed: points[2], defense: points[3] }, hand: "R", position });
     return {
-      lineup: [{ abilities: { contact: batterPoints[0], power: batterPoints[1], speed: batterPoints[2] }, hand: "R" }],
-      pitchers: [{ abilities: { control: pitcherPoints[0], power: pitcherPoints[1], breaking }, hand: "R", pitches: new code.BbPitchSelection(breaking).usable(), role: "starter" }]
+      lineup: plan.BATTING_ORDER.map((position) => batter(byPosition[position] || batterPoints, position)),
+      pitchers: plan.pitcherRoles().map((role) => ({ abilities: { control: pitcherPoints[0], power: pitcherPoints[1], breaking, stamina: pitcherPoints[3] }, hand: "R", pitches: new code.BbPitchSelection(breaking).usable(), role }))
     };
   }
 
-  run(games, away, home, level = "normal") {
-    const code = this.code, tuning = code.BbAiLevel.ALL[level], tally = new Tally(code), random = new code.BbSeededRandom(this.seed);
+  runner(formatId, teams) {
+    const code = this.code, level = this.level;
+    return new code.BbAiMatchRunner(this.format(formatId), this.dimensions, this.errors, teams, [level, level], [level, level]);
+  }
+
+  run(games, away, home, formatId = "one", salt = 0) {
+    const tally = new Tally(this.code), random = new this.code.BbSeededRandom(this.seed + salt);
     for (let game = 0; game < games; game++) {
-      const runner = new code.BbAiMatchRunner(new code.BbOneInningFormat(), this.dimensions, this.errors, [away, home], [tuning, tuning], [tuning, tuning]);
-      tally.game(runner.play(new code.BbSeededRandom(random.seed()), (state, outcome) => tally.pitch(outcome)));
+      const state = this.runner(formatId, [away, home]).play(new this.code.BbSeededRandom(random.seed()), (s, outcome) => tally.pitch(outcome), undefined, () => tally.changes++);
+      tally.game(state);
     }
     return tally;
   }
 
-  halfInningRuns(halves, batterPoints, pitcherPoints) {
-    const code = this.code, tuning = code.BbAiLevel.ALL.normal, random = new code.BbSeededRandom(this.seed + 7);
-    const away = this.team(batterPoints, [3, 3, 3]), home = this.team([3, 3, 3], pitcherPoints), bat = code.BbBoxScoreBuilder.emptyBat();
-    let runs = 0;
-    for (let half = 0; half < halves; half++) {
-      const runner = new code.BbAiMatchRunner(new code.BbOneInningFormat(), this.dimensions, this.errors, [away, home], [tuning, tuning], [tuning, tuning]);
-      const state = runner.play(new code.BbSeededRandom(random.seed()), undefined, 1);
-      runs += state.score[0];
-      for (const key of Object.keys(bat)) bat[key] += state.box[0].bat[key];
+  side(games, mine, rival, formatId = "one", salt = 0) {
+    const code = this.code, tally = new SideTally(code), random = new code.BbSeededRandom(this.seed + 1000 + salt);
+    for (let game = 0; game < games; game++) {
+      const side = game % 2, teams = side ? [rival, mine] : [mine, rival];
+      const state = this.runner(formatId, teams).play(new code.BbSeededRandom(random.seed()), (s, outcome, note, batting, engine) => tally.watch(engine, side), undefined, (engine, team) => { if (team === side) tally.changes++; });
+      tally.game(state, side);
     }
-    return { runs: runs / halves, bat };
+    return tally;
   }
 }
 
@@ -98,20 +139,26 @@ class SimReport {
   line(text = "") { this.lines.push(text); }
   rate(value) { return this.code.BbBaseballFormulas.rateText(value); }
   percent(value) { return (value * 100).toFixed(1) + "%"; }
+  signed(value) { return (value >= 0 ? "+" : "") + (value * 100).toFixed(1) + "%"; }
+  extraBases(counts) { return (counts.d2 + counts.d3 + counts.hr) / (counts.pa || counts.bf); }
+  mean(values) { return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null; }
 
-  basic(tally, games) {
+  basic(tally, games, seed) {
     const f = this.code.BbBaseballFormulas, bat = tally.bat, pa = bat.pa;
     const inPlay = tally.flights.ground + tally.flights.line + tally.flights.fly + tally.flights.pop;
     this.line("# 41번 야구 시뮬레이션 보고서");
     this.line();
-    this.line("보통 AI(타자 3/3/3) 대 보통 AI(투수 3/3/3), 9회 1이닝 경기 " + games + "판 · 하프 이닝 " + tally.halves + "개 · 타석 " + pa + "개.");
+    this.line("보통 AI 선수단(타자 9명 3/3/3/3 · 투수 선발·중간·마무리 3/3/3/3, 체력 30 미만 자동 교체) 대 같은 선수단, 9회 1이닝 경기 " + games + "판(시드 " + seed + ") · 하프 이닝 " + tally.halves + "개 · 타석 " + pa + "개.");
     this.line();
-    this.line("## 1. 목표 대비 (사양서 12.3절)");
+    this.line("## 1. 목표 대비 (선생님 결정 2026-11-14: 최소선, 타율만 .500 상한)");
     this.line();
     this.line("| 지표 | 결과 | 목표 | 판정 |");
     this.line("|---|---|---|---|");
-    const rows = [["타율", f.average(bat), 0.4, 0.03], ["출루율", f.onBase(bat), 0.45, 0.03], ["장타율", f.slugging(bat), 0.78, 0.05], ["타석당 홈런", bat.hr / pa, 0.1, 0.02]];
-    for (const [name, value, goal, slack] of rows) this.line("| " + name + " | " + (name === "타석당 홈런" ? this.percent(value) : this.rate(value)) + " | " + (name === "타석당 홈런" ? this.percent(goal) : this.rate(goal)) + " ± " + (name === "타석당 홈런" ? "2.0%p" : this.rate(slack)) + " | " + (Math.abs(value - goal) <= slack ? "맞음" : "벗어남") + " |");
+    const average = f.average(bat), onBase = f.onBase(bat), slugging = f.slugging(bat);
+    this.line("| 타율 | " + this.rate(average) + " | .400 이상 .500 이하 | " + (average >= 0.4 && average <= 0.5 ? "맞음" : "벗어남") + " |");
+    this.line("| 출루율 | " + this.rate(onBase) + " | .450 이상 | " + (onBase >= 0.45 ? "맞음" : "벗어남") + " |");
+    this.line("| 장타율 | " + this.rate(slugging) + " | .700 이상 | " + (slugging >= 0.7 ? "맞음" : "벗어남") + " |");
+    this.line("| 타석당 홈런 | " + this.percent(bat.hr / pa) + " | 상한 없음 | - |");
     this.line();
     this.line("## 2. 그 밖의 값");
     this.line();
@@ -124,6 +171,8 @@ class SimReport {
     this.line("| 하프 이닝 평균 투구 수 | " + (tally.pitches / tally.halves).toFixed(1) + " |");
     this.line("| 타석당 투구 수 | " + (tally.pitches / pa).toFixed(2) + " |");
     this.line("| 한 판 평균 합계 득점 | " + (tally.runs / tally.games).toFixed(2) + " |");
+    this.line("| 한 판 평균 투구 수(두 팀 합) | " + (tally.pitches / tally.games).toFixed(1) + " |");
+    this.line("| 한 판 평균 투수 교체(두 팀 합) | " + (tally.changes / tally.games).toFixed(2) + " |");
     this.line("| 연장으로 간 판 | " + this.percent(tally.extra / tally.games) + " (무승부 " + this.percent(tally.ties / tally.games) + ") |");
     this.line("| 땅볼 : 라인드라이브 : 뜬공 : 내야 뜬공 | " + ["ground", "line", "fly", "pop"].map((kind) => this.percent(tally.flights[kind] / inPlay)).join(" : ") + " |");
     this.line("| 스윙률 / 헛스윙률(스윙 중) / 파울률(스윙 중) | " + this.percent(tally.swings / tally.pitches) + " / " + this.percent(tally.misses / tally.swings) + " / " + this.percent(tally.fouls / tally.swings) + " |");
@@ -166,16 +215,65 @@ class SimReport {
     this.line();
   }
 
-  abilities(title, rows, average) {
+  defenseRow(label, tally, base) {
+    const f = this.code.BbBaseballFormulas, against = tally.against, perInning = against.r / (against.outs / 3), perGame = tally.runsAgainst / tally.games;
+    const gap = base ? perInning / (base.against.r / (base.against.outs / 3)) - 1 : 0;
+    this.line("| " + label + " | " + perGame.toFixed(2) + " | " + perInning.toFixed(3) + " | " + (base ? this.signed(gap) : "기준") + " | " + this.rate(f.average(against)) + " | " + this.percent(this.extraBases(against)) + " | " + this.rate(f.slugging(against)) + " |");
+  }
+
+  keyDefense(rows, games) {
+    this.line("## 7. 중요 수비 포지션(포수·유격수·중견수)에 수비를 몰아준 효과");
+    this.line();
+    this.line("그 팀이 수비할 때의 실점만 본다(공격력이 줄어든 것은 9절 공정성에서 본다). 9회 1이닝, 각 " + games + "판(선공·후공 반씩). 나머지 6명은 3/3/3/3.");
+    this.line();
+    this.line("| 수비 배치 | 경기당 실점 | 이닝당 실점 | 기준 대비 | 피안타율 | 장타 허용(타석당 2루타 이상) | 피장타율 |");
+    this.line("|---|---|---|---|---|---|---|");
+    rows.forEach((row) => this.defenseRow(row.label, row.tally, row.base ? null : rows[0].tally));
+    this.line();
+  }
+
+  stamina(tables) {
+    this.line("## 8. 체력 — 체력 스탯별 교체 시점 (투수 3명 모두 그 체력, 나머지 능력치 3/3/3 고정, 상대는 기준 선수단)");
+    this.line();
+    this.line("구속 10% 감소(체력 50 미만)·흩어짐 30% 증가(30 미만)는 선생님이 정한 값. 깎이는 양: 1구당 " + this.code.BbStaminaModel.PITCH_COST.slice(1).join("/") + ", 안타 +" + this.code.BbStaminaModel.HIT_COST.slice(1).join("/") + ", 홈런 +" + this.code.BbStaminaModel.HOME_RUN_COST.slice(1).join("/") + " (체력 1→7).");
+    this.line();
+    for (const table of tables) {
+      this.line("### " + table.title + " (" + table.games + "판)");
+      this.line();
+      this.line("| 체력 | 선발이 50 아래로(몇 구째) | 선발이 30 아래로(몇 구째) | 30 아래까지 간 선발 | 경기당 교체 | 경기당 실점 | 체력 3 대비 |");
+      this.line("|---|---|---|---|---|---|---|");
+      const base = table.rows.find((row) => row.stamina === 3).tally;
+      for (const row of table.rows) {
+        const starts = row.tally.outings.filter((outing) => outing.index === 0), tired = this.mean(starts.filter((o) => o.tired !== null).map((o) => o.tired)), worn = this.mean(starts.filter((o) => o.worn !== null).map((o) => o.worn));
+        const perGame = row.tally.runsAgainst / row.tally.games, gap = perGame / (base.runsAgainst / base.games) - 1;
+        this.line("| " + row.stamina + " | " + (tired === null ? "-" : tired.toFixed(1)) + " | " + (worn === null ? "-" : worn.toFixed(1)) + " | " + this.percent(starts.filter((o) => o.worn !== null).length / Math.max(1, starts.length)) + " | " + (row.tally.changes / row.tally.games).toFixed(2) + " | " + perGame.toFixed(2) + " | " + (row.stamina === 3 ? "기준" : this.signed(gap)) + " |");
+      }
+      this.line();
+    }
+  }
+
+  catcher(rows, games) {
+    const f = this.code.BbBaseballFormulas, base = rows.find((row) => row.points === 3).tally.against;
+    this.line("## 9. 포수 수비별 상대 장타 (포수만 바꾸고 나머지는 3/3/3/3, 각 " + games + "판)");
+    this.line();
+    this.line("| 포수 수비 | 장타 배율(코드) | 피장타율 | 장타 허용(타석당 2루타 이상) | 기준 대비 | 선생님 예시 |");
+    this.line("|---|---|---|---|---|---|");
+    const example = { 1: "+10%", 2: "+5%", 3: "0%", 4: "−3%", 5: "−6%", 6: "(−9%)", 7: "(−12%)" };
+    for (const row of rows) {
+      const against = row.tally.against, gap = this.extraBases(against) / this.extraBases(base) - 1;
+      this.line("| " + row.points + " | ×" + this.code.BbCatcherFraming.topWeight(row.points).toFixed(2) + " | " + this.rate(f.slugging(against)) + " | " + this.percent(this.extraBases(against)) + " | " + (row.points === 3 ? "기준" : this.signed(gap)) + " | " + example[row.points] + " |");
+    }
+    this.line();
+  }
+
+  fairness(title, rows, note) {
     this.line("## " + title);
     this.line();
-    this.line("| 배분 | 하프 이닝 기대 득점 | 평균 대비 | OPS | 홈런율 | 삼진률 | 판정(±8%) |");
-    this.line("|---|---|---|---|---|---|---|");
-    const f = this.code.BbBaseballFormulas;
-    for (const row of rows) {
-      const gap = row.runs / average - 1;
-      this.line("| " + row.points.join("/") + " | " + row.runs.toFixed(3) + " | " + (gap >= 0 ? "+" : "") + (gap * 100).toFixed(1) + "% | " + this.rate(f.ops(row.bat)) + " | " + this.percent(row.bat.hr / row.bat.pa) + " | " + this.percent(row.bat.k / row.bat.pa) + " | " + (Math.abs(gap) <= 0.08 ? "안" : "밖") + " |");
-    }
+    this.line(note);
+    this.line();
+    this.line("| 배분 | 판 수 | 승률 | 경기당 득점 − 실점 | 기준(3/3/3/3) 득점 대비 | 판정(±8%) |");
+    this.line("|---|---|---|---|---|---|");
+    for (const row of rows) this.line("| " + row.points.join("/") + " | " + row.games + " | " + this.percent(row.winRate) + " | " + (row.net >= 0 ? "+" : "") + row.net.toFixed(2) + " | " + this.signed(row.gap) + " | " + (Math.abs(row.gap) <= 0.08 ? "안" : "밖") + " |");
     this.line();
   }
 }
@@ -187,19 +285,65 @@ class SimCommand {
     this.seed = value("--seed", 41);
     this.withAbilities = argv.includes("--abilities");
     this.write = argv.includes("--write");
-    this.halves = value("--halves", 4000);
+    this.screen = value("--screen", 1000);
+    this.refine = value("--refine", 8000);
+    this.sideGames = value("--side", 6000);
+    this.quick = argv.includes("--quick");
+  }
+
+  keyDefense(sim) {
+    const plan = (points) => ({ C: points, SS: points, CF: points });
+    const rows = [
+      { label: "기준(전원 3/3/3/3)", tally: sim.side(this.sideGames, sim.team(), sim.team(), "one", 1), base: true },
+      { label: "포수·유격수·중견수 수비 5 (3/2/2/5)", tally: sim.side(this.sideGames, sim.team([3, 3, 3, 3], [3, 3, 3, 3], plan([3, 2, 2, 5])), sim.team(), "one", 1) },
+      { label: "포수·유격수·중견수 수비 6 (2/2/2/6)", tally: sim.side(this.sideGames, sim.team([3, 3, 3, 3], [3, 3, 3, 3], plan([2, 2, 2, 6])), sim.team(), "one", 1) },
+      { label: "포수·유격수·중견수 수비 7 (2/2/1/7)", tally: sim.side(this.sideGames, sim.team([3, 3, 3, 3], [3, 3, 3, 3], plan([2, 2, 1, 7])), sim.team(), "one", 1) },
+      { label: "9명 모두 수비 7 (2/2/1/7)", tally: sim.side(this.sideGames, sim.team([2, 2, 1, 7]), sim.team(), "one", 1) },
+      { label: "9명 모두 수비 1 (4/4/3/1)", tally: sim.side(this.sideGames, sim.team([4, 4, 3, 1]), sim.team(), "one", 1) }
+    ];
+    return rows;
+  }
+
+  staminaTables(sim) {
+    const formats = [["one", "9회 1이닝(본 게임)", this.sideGames], ["three", "3이닝", Math.round(this.sideGames / 3)], ["full", "9이닝", Math.round(this.sideGames / 8)]];
+    return formats.map(([id, title, games]) => ({ title, games, rows: [1, 2, 3, 4, 5, 6, 7].map((stamina) => ({ stamina, tally: sim.side(games, sim.team([3, 3, 3, 3], [3, 3, 3, stamina]), sim.team(), id, 2) })) }));
+  }
+
+  catcherRows(sim) {
+    return [1, 2, 3, 4, 5, 6, 7].map((points) => ({ points, tally: sim.side(this.sideGames * 2, sim.team([3, 3, 3, 3], [3, 3, 3, 3], { C: [3, 3, 3, points] }), sim.team(), "one", 3) }));
+  }
+
+  fairnessRows(sim, asBatter) {
+    const splits = sim.code.BbAbilityAllocator.everySplit(sim.code.BbAbilityAllocator.BATTER), standard = sim.team();
+    const measure = (points, games) => {
+      const mine = asBatter ? sim.team(points) : sim.team([3, 3, 3, 3], points), tally = sim.side(games, mine, standard, "one", 4);
+      const base = 0;
+      return { points, games, winRate: (tally.wins + tally.ties / 2) / tally.games, net: (tally.runsFor - tally.runsAgainst) / tally.games, runsFor: tally.runsFor / tally.games, base };
+    };
+    const screened = splits.map((points) => measure(points, this.screen));
+    screened.sort((a, b) => b.net - a.net);
+    const edges = new Set([...screened.slice(0, 10), ...screened.slice(-10)].map((row) => row.points.join("/")));
+    const showcase = ["3/3/3/3", "7/1/1/3", "1/7/1/3", "1/1/7/3", "3/1/1/7", "1/1/3/7", "7/3/1/1", "1/7/3/1", "4/4/3/1", "4/4/1/3", "5/5/1/1", "2/2/1/7"];
+    showcase.forEach((key) => edges.add(key));
+    const refined = splits.filter((points) => edges.has(points.join("/"))).map((points) => measure(points, this.refine));
+    const standardRow = refined.find((row) => row.points.join("/") === "3/3/3/3"), scale = standardRow.runsFor;
+    refined.forEach((row) => { row.gap = row.net / scale; });
+    refined.sort((a, b) => b.net - a.net);
+    return { refined, screenedCount: screened.length, best: screened.slice(0, 5).map((row) => row.points.join("/")) };
   }
 
   run() {
-    const sim = new BaseballSim(this.seed), report = new SimReport(sim.code), standard = sim.team([3, 3, 3], [3, 3, 3]);
-    report.basic(sim.run(this.games, standard, standard), this.games);
+    const sim = new BaseballSim(this.seed), report = new SimReport(sim.code), standard = sim.team();
+    report.basic(sim.run(this.games, standard, standard), this.games, this.seed);
+    if (!this.quick) {
+      report.keyDefense(this.keyDefense(sim), this.sideGames);
+      report.stamina(this.staminaTables(sim));
+      report.catcher(this.catcherRows(sim), this.sideGames * 2);
+    }
     if (this.withAbilities) {
-      const splits = sim.code.BbAbilityAllocator.everySplit(sim.code.BbAbilityAllocator.BATTER);
-      for (const [title, asBatter] of [["7. 타자 배분 28가지 (컨택/파워/주루) × 표준 투수", true], ["8. 투수 배분 28가지 (제구/구위/변화) × 표준 타자 — 득점이 낮을수록 투수에게 유리", false]]) {
-        const rows = splits.map((points) => ({ points, ...sim.halfInningRuns(this.halves, asBatter ? points : [3, 3, 3], asBatter ? [3, 3, 3] : points) }));
-        const average = rows.reduce((sum, row) => sum + row.runs, 0) / rows.length;
-        rows.sort((a, b) => b.runs - a.runs);
-        report.abilities(title, rows, average);
+      for (const [title, asBatter] of [["10. 타자 배분 149가지 (컨택/파워/주루/수비) — 9명 모두 그 배분 대 기준 선수단", true], ["11. 투수 배분 149가지 (제구/구위/변화/체력) — 투수 3명 모두 그 배분 대 기준 선수단", false]]) {
+        const result = this.fairnessRows(sim, asBatter);
+        report.fairness(title, result.refined, "149가지를 " + this.screen + "판씩 훑은 뒤 위·아래 끝 10가지씩과 대표 배분을 " + this.refine + "판씩 다시 돌린 표(9회 1이닝, 선공·후공 반씩). 공격과 수비(또는 투구)를 함께 보는 값은 경기당 득점 − 실점이다. 훑기에서 가장 좋았던 5가지: " + result.best.join(", ") + ".");
       }
     }
     const text = report.lines.join("\n");

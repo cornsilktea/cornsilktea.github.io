@@ -1,12 +1,8 @@
 "use strict";
 class BbProfileStore {
     static blank() {
-        const even = BbAbilityAllocator.PITCHER.total / BbAbilityAllocator.PITCHER.items.length;
-        return {
-            version: 2, ballpark: "main",
-            lineup: [{ abilities: { contact: even, power: even, speed: even }, hand: "R" }],
-            pitchers: [{ abilities: { control: even, power: even, breaking: even }, hand: "R", pitches: new BbPitchSelection(even).usable(), role: "starter" }]
-        };
+        const team = BbAiLevel.team("R");
+        return { version: 3, ballpark: "main", lineup: team.lineup, pitchers: team.pitchers };
     }
     static pointsOf(plan, abilities) {
         const values = abilities;
@@ -17,16 +13,30 @@ class BbProfileStore {
             const raw = localStorage.getItem(BbProfileStore.KEY), parsed = raw ? JSON.parse(raw) : null;
             if (parsed && BbProfileStore.isSound(parsed))
                 return parsed;
+            const legacy = localStorage.getItem(BbProfileStore.LEGACY_KEY), migrated = legacy ? BbProfileStore.migrate(JSON.parse(legacy)) : null;
+            if (migrated && BbProfileStore.isSound(migrated))
+                return migrated;
         }
         catch (error) {
             return BbProfileStore.blank();
         }
         return BbProfileStore.blank();
     }
+    static migrate(old) {
+        if (!old || old.version !== 2 || !Array.isArray(old.lineup) || !Array.isArray(old.pitchers) || !old.lineup[0] || !old.pitchers[0])
+            return null;
+        const batter = old.lineup[0], pitcher = old.pitchers[0], rest = (values) => Math.max(1, Math.min(7, 12 - values.reduce((sum, value) => sum + value, 0)));
+        const bat = [batter.abilities.contact, batter.abilities.power, batter.abilities.speed], pit = [pitcher.abilities.control, pitcher.abilities.power, pitcher.abilities.breaking];
+        return {
+            version: 3, ballpark: "main",
+            lineup: BbRosterPlan.BATTING_ORDER.map((position) => ({ abilities: { contact: bat[0], power: bat[1], speed: bat[2], defense: rest(bat) }, hand: batter.hand, position })),
+            pitchers: BbRosterPlan.pitcherRoles().map((role) => ({ abilities: { control: pit[0], power: pit[1], breaking: pit[2], stamina: rest(pit) }, hand: pitcher.hand, pitches: pitcher.pitches.slice(), role }))
+        };
+    }
     static teamOf(sheet) {
-        const blank = BbProfileStore.blank(), candidate = { version: 2, lineup: sheet ? sheet.lineup : undefined, pitchers: sheet ? sheet.pitchers : undefined };
+        const blank = BbProfileStore.blank(), candidate = { version: 3, lineup: sheet ? sheet.lineup : undefined, pitchers: sheet ? sheet.pitchers : undefined };
         const sound = BbProfileStore.isSound(candidate) ? candidate : blank;
-        return { lineup: sound.lineup.slice(0, 1), pitchers: sound.pitchers.slice(0, 1) };
+        return { lineup: sound.lineup, pitchers: sound.pitchers };
     }
     static save(profile) {
         try {
@@ -37,8 +47,10 @@ class BbProfileStore {
         }
     }
     static isSound(profile) {
-        const lineup = profile.lineup, pitchers = profile.pitchers;
-        if (profile.version !== 2 || !Array.isArray(lineup) || !Array.isArray(pitchers) || !lineup.length || !pitchers.length)
+        const lineup = profile.lineup, pitchers = profile.pitchers, roles = BbRosterPlan.pitcherRoles();
+        if (profile.version !== 3 || !Array.isArray(lineup) || !Array.isArray(pitchers) || !BbRosterPlan.isFullLineup(lineup) || pitchers.length !== roles.length)
+            return false;
+        if (!pitchers.every((sheet, index) => !!sheet && sheet.role === roles[index]))
             return false;
         const handed = (sheet) => !!sheet && !!sheet.abilities && BbProfileStore.HANDS.indexOf(sheet.hand) >= 0;
         if (!lineup.every((sheet) => handed(sheet) && BbAbilityAllocator.isValid(BbAbilityAllocator.BATTER, BbProfileStore.pointsOf(BbAbilityAllocator.BATTER, sheet.abilities))))
@@ -51,7 +63,8 @@ class BbProfileStore {
         });
     }
 }
-BbProfileStore.KEY = "baseballduel_profile_v2";
+BbProfileStore.KEY = "baseballduel_profile_v3";
+BbProfileStore.LEGACY_KEY = "baseballduel_profile_v2";
 BbProfileStore.HANDS = ["R", "L"];
 class BbSheetParts {
     static button(className, parent, text, onPress) {
@@ -163,11 +176,11 @@ class BbSheetDialog {
         this.tabs = BbSheetDialog.TABS.map((label, index) => BbSheetParts.button("bb-sheet-tab", tabRow, label, () => this.turnTo(index)));
         this.panes = BbSheetDialog.TABS.map(() => BbHudParts.box("bb-sheet-pane", sheet));
         const [pitching, batting] = this.panes;
-        this.pitcherHand = new BbHandToggle(pitching, ["우투", "좌투"], (hand) => { this.pitcher().hand = hand; this.keep(); });
+        this.pitcherHand = new BbHandToggle(pitching, ["우투", "좌투"], (hand) => { this.profile.pitchers.forEach((sheet) => { sheet.hand = hand; }); this.keep(); });
         this.pitcherPoints = new BbAbilityPane(pitching, BbAbilityAllocator.PITCHER, (points) => this.pitcherChanged(points));
-        this.chips = new BbPitchChips(pitching, (pitches) => { this.pitcher().pitches = pitches; this.keep(); });
-        this.batterHand = new BbHandToggle(batting, ["우타", "좌타"], (hand) => { this.batter().hand = hand; this.keep(); });
-        this.batterPoints = new BbAbilityPane(batting, BbAbilityAllocator.BATTER, (points) => { this.batter().abilities = { contact: points[0], power: points[1], speed: points[2] }; this.keep(); });
+        this.chips = new BbPitchChips(pitching, (pitches) => { this.profile.pitchers.forEach((sheet) => { sheet.pitches = pitches.slice(); }); this.keep(); });
+        this.batterHand = new BbHandToggle(batting, ["우타", "좌타"], (hand) => { this.profile.lineup.forEach((sheet) => { sheet.hand = hand; }); this.keep(); });
+        this.batterPoints = new BbAbilityPane(batting, BbAbilityAllocator.BATTER, (points) => { this.profile.lineup.forEach((sheet) => { sheet.abilities = { contact: points[0], power: points[1], speed: points[2], defense: points[3] }; }); this.keep(); });
         this.screen.addEventListener("pointerdown", (event) => { if (event.target === this.screen)
             this.close(); });
     }
@@ -190,9 +203,8 @@ class BbSheetDialog {
     batter() { return this.profile.lineup[0]; }
     keep() { BbProfileStore.save(this.profile); }
     pitcherChanged(points) {
-        const pitcher = this.pitcher();
-        pitcher.abilities = { control: points[0], power: points[1], breaking: points[2] };
-        pitcher.pitches = this.chips.reshape(points[2]);
+        const pitches = this.chips.reshape(points[2]);
+        this.profile.pitchers.forEach((sheet) => { sheet.abilities = { control: points[0], power: points[1], breaking: points[2], stamina: points[3] }; sheet.pitches = pitches.slice(); });
         this.keep();
     }
     turnTo(shown) {

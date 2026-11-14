@@ -62,7 +62,7 @@ class BbPlayLab {
       format: new BbThreeInningFormat(), names: ["AI " + this.level.label, "나"], seats: ["ai", options.autoPitch ? "ai" : "human"], level: this.level, seed: options.seed,
       halvesToPlay: null, log: [], view: null, autoSwingAt: options.autoSwingAt,
       teams: [
-        { lineup: [BbAiLevel.batterSheet("R")], pitchers: [BbAiLevel.pitcherSheet("R")] },
+        BbAiLevel.team("R"),
         { lineup: [{ ...batter, hand: options.batsLeft ? "L" : batter.hand }], pitchers: [{ ...pitcher, hand: options.throwsLeft ? "L" : pitcher.hand }] }
       ]
     };

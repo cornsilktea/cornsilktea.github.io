@@ -36,30 +36,134 @@ class BbFullGameFormat extends BbStandardFormat {
         this.inningsToPlay = 9;
     }
 }
+class BbRosterPlan {
+    static pitcherRoles() {
+        const roles = [];
+        BbRosterPlan.PITCHER_SLOTS.forEach((slot) => { for (let index = 0; index < slot.count; index++)
+            roles.push(slot.role); });
+        return roles;
+    }
+    static pitcherCount() { return BbRosterPlan.pitcherRoles().length; }
+    static batterCount() { return BbRosterPlan.BATTING_ORDER.length; }
+    static roleLabel(role) { const slot = BbRosterPlan.PITCHER_SLOTS.find((entry) => entry.role === role); return slot ? slot.label : role; }
+    static positionLabel(position) { return BbRosterPlan.POSITION_LABELS[position]; }
+    static isFullLineup(lineup) {
+        if (lineup.length !== BbRosterPlan.batterCount())
+            return false;
+        return BbRosterPlan.BATTING_ORDER.every((position) => lineup.filter((sheet) => sheet.position === position).length === 1);
+    }
+    static swapPosition(lineup, index, to) {
+        const mover = lineup[index], holder = lineup.find((sheet) => sheet.position === to);
+        if (!mover || mover.position === to)
+            return;
+        if (holder)
+            holder.position = mover.position;
+        mover.position = to;
+    }
+    static orderedPitchers(pitchers) {
+        const order = BbRosterPlan.PITCHER_SLOTS.map((slot) => slot.role);
+        return pitchers.map((sheet, index) => ({ sheet, index })).sort((a, b) => (order.indexOf(a.sheet.role) - order.indexOf(b.sheet.role)) || a.index - b.index).map((entry) => entry.sheet);
+    }
+    static points(value) { return typeof value === "number" && Number.isFinite(value) ? Math.max(1, Math.min(7, Math.round(value))) : BbRosterPlan.BASE_POINTS; }
+    static crewOf(lineup) {
+        const points = new Map();
+        lineup.forEach((sheet) => { const position = sheet.position; if (position && position !== "DH")
+            points.set(position, BbRosterPlan.points(sheet.abilities.defense)); });
+        return new BbDefenseCrew(points);
+    }
+}
+BbRosterPlan.PITCHER_SLOTS = [{ role: "starter", count: 1, label: "선발" }, { role: "reliever", count: 1, label: "중간계투" }, { role: "closer", count: 1, label: "마무리" }];
+BbRosterPlan.BATTING_ORDER = ["DH", "C", "1B", "2B", "3B", "SS", "LF", "CF", "RF"];
+BbRosterPlan.POSITION_LABELS = { DH: "지명타자", C: "포수", "1B": "1루수", "2B": "2루수", "3B": "3루수", SS: "유격수", LF: "좌익수", CF: "중견수", RF: "우익수" };
+BbRosterPlan.DESIGNATED = "DH";
+BbRosterPlan.BASE_POINTS = 3;
 class BbLineup {
     constructor(slots) {
         this.slots = slots;
         this.turn = 0;
     }
     current() { return this.slots[this.turn % this.slots.length]; }
+    currentIndex() { return this.turn % this.slots.length; }
     advance() { this.turn++; }
 }
+class BbStaminaModel {
+    static costOf(stamina, outcome) {
+        const points = BbRosterPlan.points(stamina), code = outcome.script ? outcome.script.result : null;
+        let cost = BbStaminaModel.PITCH_COST[points];
+        if (outcome.kind === "inPlay" && code === "HOME_RUN")
+            cost += BbStaminaModel.HOME_RUN_COST[points];
+        else if (outcome.kind === "inPlay" && code && BbPlayCodes.isHit(code))
+            cost += BbStaminaModel.HIT_COST[points];
+        return cost;
+    }
+    static condition(level) {
+        if (level < BbStaminaModel.WORN_BELOW)
+            return BbStaminaModel.WORN;
+        if (level < BbStaminaModel.TIRED_BELOW)
+            return BbStaminaModel.TIRED;
+        return BbPitchCondition.FRESH;
+    }
+}
+BbStaminaModel.FULL = 100;
+BbStaminaModel.TIRED_BELOW = 50;
+BbStaminaModel.WORN_BELOW = 30;
+BbStaminaModel.PITCH_COST = [0, 4, 3.5, 3, 2.5, 2, 1.5, 1];
+BbStaminaModel.HIT_COST = [0, 2, 1.8, 1.7, 1.5, 1.3, 1.2, 1];
+BbStaminaModel.HOME_RUN_COST = [0, 4, 3.7, 3.3, 3, 2.7, 2.3, 2];
+BbStaminaModel.TIRED = new BbPitchCondition(0.9, 1);
+BbStaminaModel.WORN = new BbPitchCondition(0.9, 1.3);
 class BbNoStamina {
-    afterPitch() { return; }
+    spend() { return; }
+    level() { return BbStaminaModel.FULL; }
+    condition() { return BbPitchCondition.FRESH; }
     isSpent() { return false; }
+}
+class BbStaminaMeter {
+    constructor(stamina) {
+        this.stamina = stamina;
+        this.value = BbStaminaModel.FULL;
+    }
+    spend(outcome) { this.value = Math.max(0, this.value - BbStaminaModel.costOf(this.stamina, outcome)); }
+    level() { return this.value; }
+    condition() { return BbStaminaModel.condition(this.value); }
+    isSpent() { return this.value < BbStaminaModel.WORN_BELOW; }
+}
+class BbPitcherRoster {
+    constructor(pitchers, meterOf = (sheet) => new BbStaminaMeter(sheet.abilities.stamina)) {
+        this.retired = new Set();
+        this.mound = 0;
+        this.thrown = 0;
+        this.pitchers = BbRosterPlan.orderedPitchers(pitchers);
+        this.meters = this.pitchers.map(meterOf);
+    }
+    current() { return this.pitchers[this.mound]; }
+    currentIndex() { return this.mound; }
+    pitchesThisOuting() { return this.thrown; }
+    stamina(index = this.mound) { return this.meters[index]; }
+    isAvailable(index) { return Number.isInteger(index) && index >= 0 && index < this.pitchers.length && index !== this.mound && !this.retired.has(index); }
+    available() { return this.pitchers.map((sheet, index) => index).filter((index) => this.isAvailable(index)); }
+    recommended() {
+        const left = this.available();
+        return left.length ? left[0] : null;
+    }
+    change(index) {
+        if (!this.isAvailable(index))
+            return false;
+        this.retired.add(this.mound);
+        this.mound = index;
+        this.thrown = 0;
+        return true;
+    }
+    afterPitch(outcome) {
+        this.thrown++;
+        this.meters[this.mound].spend(outcome);
+    }
 }
 class BbNoSubstitution {
     nextPitcher() { return null; }
 }
-class BbPitcherRoster {
-    constructor(pitchers) {
-        this.starter = pitchers.find((pitcher) => pitcher.role === "starter") || pitchers[0];
-        this.relievers = pitchers.filter((pitcher) => pitcher.role === "reliever");
-        this.closer = pitchers.find((pitcher) => pitcher.role === "closer") || null;
-        this.onMound = this.starter;
-    }
-    current() { return this.onMound; }
-    change(to) { this.onMound = to; }
+class BbTiredSubstitution {
+    nextPitcher(roster) { return roster.stamina().isSpent() ? roster.recommended() : null; }
 }
 class BbZoneGrid {
     static indexOf(point) {
@@ -89,7 +193,7 @@ class BbBallHandler {
         state.balls++;
         if (state.balls < 4)
             return { toast: "볼", plateAppearanceOver: false, halfOver: false, runs: 0 };
-        const batting = rules.batting(state), fielding = rules.fielding(state), batter = rules.newRunner(state, true);
+        const batting = rules.batting(state), fielding = rules.fielding(state), batter = rules.newRunner(state, true, outcome.runnerSpeed);
         batting.bat.pa++;
         batting.bat.bb++;
         fielding.pit.bf++;
@@ -215,9 +319,12 @@ class BbMatchRules {
     progress(state) {
         return Math.min(1, (state.halvesDone + Math.min(state.outs, 3) / 3) / (this.format.inningsToPlay * 2));
     }
-    newRunner(state, earned) {
+    newRunner(state, earned, speed) {
         state.runnerSerial++;
-        return { id: "r" + state.runnerSerial, earned: earned && !state.tainted };
+        const runner = { id: "r" + state.runnerSerial, earned: earned && !state.tainted };
+        if (speed !== undefined)
+            runner.speed = speed;
+        return runner;
     }
     apply(state, outcome) {
         if (state.finished)
@@ -309,25 +416,69 @@ class BbMatchRules {
     }
 }
 class BbPitchJudge {
-    constructor(dimensions, errors, rules) {
+    constructor(dimensions, errors, rules, crews = [BbDefenseCrew.STANDARD, BbDefenseCrew.STANDARD]) {
         this.rules = rules;
-        this.resolver = new BbPlayResolver(dimensions, new BbAutoFielding(), new BbAutoBaseRunning(), errors);
+        this.crews = crews;
+        const resolverFor = (crew) => new BbPlayResolver(dimensions, new BbAutoFielding(crew), new BbAutoBaseRunning(), errors, crew);
+        this.resolvers = [resolverFor(crews[0]), resolverFor(crews[1])];
     }
     judge(state, roll, contactOffset, batter) {
-        const random = new BbSeededRandom(roll.seed ^ 0x5bd1e995);
-        const swing = BbBatterActionSet.of("swing").resolve({ roll, batterHand: batter.hand, abilities: batter.abilities, contactOffset, random });
+        const random = new BbSeededRandom(roll.seed ^ 0x5bd1e995), fielding = this.rules.fieldingIndex(state), runnerSpeed = batter.abilities.speed;
+        const swing = BbBatterActionSet.of("swing").resolve({ roll, batterHand: batter.hand, abilities: batter.abilities, contactOffset, random, catcherDefense: this.crews[fielding].pointsOf("C") });
         if (swing.kind === "take")
-            return { kind: BbStrikeZoneJudge.isStrike(roll.arrive) ? "calledStrike" : "ball", roll, swing, script: null };
+            return { kind: BbStrikeZoneJudge.isStrike(roll.arrive) ? "calledStrike" : "ball", roll, swing, script: null, runnerSpeed };
         if (swing.kind === "miss")
-            return { kind: "swingMiss", roll, swing, script: null };
-        const runner = { id: "r" + (state.runnerSerial + 1), earned: !state.tainted };
-        const script = this.resolver.resolve({ outs: state.outs, bases: state.bases, batter: runner, abilities: batter.abilities }, swing.ball, random);
+            return { kind: "swingMiss", roll, swing, script: null, runnerSpeed };
+        const runner = { id: "r" + (state.runnerSerial + 1), earned: !state.tainted, speed: runnerSpeed };
+        const script = this.resolvers[fielding].resolve({ outs: state.outs, bases: state.bases, batter: runner, abilities: batter.abilities }, swing.ball, random);
         if (script.result === "FOUL")
-            return { kind: "foul", roll, swing, script };
+            return { kind: "foul", roll, swing, script, runnerSpeed };
         if (script.result === "ERROR")
             runner.earned = false;
         state.runnerSerial++;
-        return { kind: "inPlay", roll, swing, script };
+        return { kind: "inPlay", roll, swing, script, runnerSpeed };
+    }
+}
+class BbLogEvents {
+    static isChange(event) { return typeof event.change === "number"; }
+}
+class BbMatchEngine {
+    constructor(format, dimensions, errors, teams) {
+        this.teams = teams;
+        this.rules = new BbMatchRules(format);
+        this.judge = new BbPitchJudge(dimensions, errors, this.rules, [BbRosterPlan.crewOf(teams[0].lineup), BbRosterPlan.crewOf(teams[1].lineup)]);
+        this.state = this.rules.start();
+        this.lineups = [new BbLineup(teams[0].lineup), new BbLineup(teams[1].lineup)];
+        this.rosters = [new BbPitcherRoster(teams[0].pitchers), new BbPitcherRoster(teams[1].pitchers)];
+    }
+    get battingIndex() { return this.rules.battingIndex(this.state); }
+    get fieldingIndex() { return this.rules.fieldingIndex(this.state); }
+    roster(team = this.fieldingIndex) { return this.rosters[team]; }
+    lineup(team = this.battingIndex) { return this.lineups[team]; }
+    pitcher() { return this.roster().current(); }
+    batter() { return this.lineup().current(); }
+    condition() { return this.roster().stamina().condition(); }
+    roll(call, seed) {
+        const pitcher = this.pitcher();
+        return BbPitchRoller.roll(call.pitch, call.aim, pitcher.abilities, pitcher.hand, seed, this.condition());
+    }
+    preview(roll) { return this.judge.judge(this.state, roll, null, this.batter()); }
+    settle(roll, contactOffset) {
+        const roster = this.roster(), lineup = this.lineup(), outcome = this.judge.judge(this.state, roll, contactOffset, lineup.current()), note = this.rules.apply(this.state, outcome);
+        roster.afterPitch(outcome);
+        if (note.plateAppearanceOver)
+            lineup.advance();
+        return { outcome, note };
+    }
+    change(index) { return !this.state.finished && this.roster().change(index); }
+    replay(event) {
+        if (this.state.finished)
+            return;
+        if (BbLogEvents.isChange(event)) {
+            this.change(event.change);
+            return;
+        }
+        this.settle(this.roll(event, event.seed), event.contactOffset);
     }
 }
 class BbGameLogFold {
@@ -337,20 +488,12 @@ class BbGameLogFold {
         this.errors = errors;
         this.teams = teams;
     }
-    fold(entries) {
-        const rules = new BbMatchRules(this.format), judge = new BbPitchJudge(this.dimensions, this.errors, rules), state = rules.start();
-        const lineups = [new BbLineup(this.teams[0].lineup), new BbLineup(this.teams[1].lineup)], rosters = [new BbPitcherRoster(this.teams[0].pitchers), new BbPitcherRoster(this.teams[1].pitchers)];
-        for (const entry of entries) {
-            if (state.finished)
-                break;
-            const pitcher = rosters[rules.fieldingIndex(state)].current(), lineup = lineups[rules.battingIndex(state)];
-            const roll = BbPitchRoller.roll(entry.pitch, entry.aim, pitcher.abilities, pitcher.hand, entry.seed);
-            const note = rules.apply(state, judge.judge(state, roll, entry.contactOffset, lineup.current()));
-            if (note.plateAppearanceOver)
-                lineup.advance();
-        }
-        return state;
+    engine(entries) {
+        const engine = new BbMatchEngine(this.format, this.dimensions, this.errors, this.teams);
+        entries.forEach((entry) => engine.replay(entry));
+        return engine;
     }
+    fold(entries) { return this.engine(entries).state; }
 }
 class BbBaseballFormulas {
     static totalBases(counts) { return counts.h + counts.d2 + 2 * counts.d3 + 3 * counts.hr; }

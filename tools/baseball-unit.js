@@ -91,12 +91,12 @@ class BaseballUnit {
     const c = this.code, check = this.check;
     check.section("4. 능력치·구종 칩");
     const splits = c.BbAbilityAllocator.everySplit(c.BbAbilityAllocator.BATTER);
-    check.ok(splits.length === 28, "배분 28가지 (실제 " + splits.length + ")");
-    check.ok(splits.every((split) => split.reduce((a, b) => a + b, 0) === 9 && split.every((value) => value >= 1 && value <= 7)), "합 9, 각 1~7");
+    check.ok(splits.length === 149, "배분 149가지 (실제 " + splits.length + ")");
+    check.ok(splits.every((split) => split.length === 4 && split.reduce((a, b) => a + b, 0) === 12 && split.every((value) => value >= 1 && value <= 7)), "4종, 합 12, 각 1~7");
     const allocator = new c.BbAbilityAllocator(c.BbAbilityAllocator.PITCHER);
-    check.ok(allocator.points.join() === "3,3,3" && allocator.spare() === 0, "3/3/3 시작, 여분 0");
+    check.ok(allocator.points.join() === "3,3,3,3" && allocator.spare() === 0, "3/3/3/3 시작, 여분 0");
     check.ok(!allocator.raise(0), "여분 없으면 못 올림");
-    check.ok(allocator.lower(1) && allocator.raise(0) && allocator.points.join() === "4,2,3", "내린 뒤 올리기");
+    check.ok(allocator.lower(1) && allocator.raise(0) && allocator.points.join() === "4,2,3,3", "내린 뒤 올리기");
     allocator.lower(1);
     check.ok(!allocator.lower(1), "1 밑으로 못 내림");
     check.ok([1, 2, 3, 4, 5, 6, 7].map((value) => c.BbPitchSelection.slotsFor(value)).join() === "1,1,2,2,3,3,4", "변화 포인트별 구종 수");
@@ -290,7 +290,102 @@ class BaseballUnit {
     check.ok(result.result === "HOME_RUN" && this.play(0, [false, false, false], this.ball(140, 28, 0)).result !== "HOME_RUN", "구장 치수만 바꾸면 같은 타구가 홈런이 됨");
   }
 
+  roster() {
+    const c = this.code, check = this.check, plan = c.BbRosterPlan;
+    check.section("11. 선수단·포지션");
+    check.ok(plan.pitcherRoles().join() === "starter,reliever,closer" && plan.pitcherCount() === 3, "투수 3명: 선발·중간·마무리");
+    check.ok(plan.BATTING_ORDER.join() === "DH,C,1B,2B,3B,SS,LF,CF,RF", "기본 타순 1번 지명타자 ~ 9번 우익수");
+    const team = c.BbAiLevel.team("R");
+    check.ok(team.lineup.length === 9 && team.pitchers.length === 3 && plan.isFullLineup(team.lineup), "AI 선수단 9명·3명, 포지션 9칸이 한 번씩");
+    plan.swapPosition(team.lineup, 0, "SS");
+    check.ok(team.lineup[0].position === "SS" && team.lineup[5].position === "DH" && plan.isFullLineup(team.lineup), "1번 지명타자 → 유격수: 원래 유격수(6번)가 지명타자");
+    plan.swapPosition(team.lineup, 0, "2B");
+    check.ok(team.lineup[0].position === "2B" && team.lineup[3].position === "SS" && plan.isFullLineup(team.lineup), "다시 2루수로: 원래 2루수(4번)가 유격수");
+    team.lineup[1].position = "C"; team.lineup[2].position = "C";
+    check.ok(!plan.isFullLineup(team.lineup), "같은 포지션 둘이면 잘못된 타순");
+    const ordered = plan.orderedPitchers([{ role: "closer", tag: "c" }, { role: "starter", tag: "s" }, { role: "reliever", tag: "r" }]);
+    check.ok(ordered.map((sheet) => sheet.tag).join() === "s,r,c", "투수는 역할 순서(선발→중간→마무리)로 정렬");
+  }
+
+  stamina() {
+    const c = this.code, check = this.check, model = c.BbStaminaModel;
+    check.section("12. 체력");
+    const plain = this.outcome("ball"), single = this.outcome("inPlay", this.script("SINGLE", 0, [null, null, null], [])), homer = this.outcome("inPlay", this.script("HOME_RUN", 0, [null, null, null], []));
+    check.near(model.costOf(1, plain), 4, 1e-9, "체력 1: 1구당 4");
+    check.near(model.costOf(1, single), 6, 1e-9, "체력 1: 안타 +2");
+    check.near(model.costOf(1, homer), 8, 1e-9, "체력 1: 홈런 +4");
+    check.near(model.costOf(7, plain), 1, 1e-9, "체력 7: 1구당 1");
+    check.near(model.costOf(7, single), 2, 1e-9, "체력 7: 안타 +1");
+    check.near(model.costOf(7, homer), 3, 1e-9, "체력 7: 홈런 +2");
+    check.ok([1, 2, 3, 4, 5, 6, 7].every((s, i, all) => i === 0 || model.costOf(s, plain) < model.costOf(all[i - 1], plain)), "체력 스탯이 높을수록 덜 깎임");
+    check.ok(model.condition(50) === c.BbPitchCondition.FRESH && model.condition(49.9).speedScale === 0.9 && model.condition(49.9).spreadScale === 1, "50 미만: 구속 10% 감소");
+    check.ok(model.condition(29.9).speedScale === 0.9 && model.condition(29.9).spreadScale === 1.3, "30 미만: 구속 10% 감소 + 흩어짐 30% 증가");
+    const abilities = { control: 3, power: 3, breaking: 3, stamina: 3 }, kind = c.BbPitchCatalog.of("cv");
+    const fresh = c.BbPitchRoller.roll("ft", { u: 0, v: 0 }, abilities, "R", 77), worn = c.BbPitchRoller.roll("ft", { u: 0, v: 0 }, abilities, "R", 77, model.WORN);
+    check.near(worn.speed / fresh.speed, 0.9, 1e-9, "지친 투수의 구속 비율");
+    check.near(kind.longDeviation(abilities, model.WORN) / kind.longDeviation(abilities), 1.3, 1e-9, "지친 투수의 흩어짐 비율(긴 축)");
+    check.near(kind.shortDeviation(abilities, model.WORN) / kind.shortDeviation(abilities), 1.3, 1e-9, "지친 투수의 흩어짐 비율(짧은 축)");
+    const meter = new c.BbStaminaMeter(3);
+    for (let pitch = 0; pitch < 17; pitch++) meter.spend(plain);
+    check.ok(meter.level() === 49 && meter.condition().speedScale === 0.9 && !meter.isSpent(), "체력 3: 17구 뒤 49 (구속 감소 시작)");
+    for (let pitch = 0; pitch < 7; pitch++) meter.spend(plain);
+    check.ok(meter.isSpent() && meter.level() === 28, "체력 3: 24구 뒤 28 (교체 추천)");
+  }
+
+  substitution() {
+    const c = this.code, check = this.check;
+    check.section("13. 투수 교체·로그 접기");
+    const team = c.BbAiLevel.team("R"), roster = new c.BbPitcherRoster(team.pitchers), plain = this.outcome("ball");
+    check.ok(roster.currentIndex() === 0 && roster.current().role === "starter" && roster.recommended() === 1, "선발로 시작, 추천은 중간계투");
+    roster.afterPitch(plain); roster.afterPitch(plain);
+    check.ok(roster.pitchesThisOuting() === 2 && roster.stamina().level() === 94, "투구수·체력이 그 투수에게 쌓임");
+    check.ok(!roster.change(0) && roster.change(1) && roster.pitchesThisOuting() === 0 && roster.stamina().level() === 100, "교체하면 투구수 0, 새 투수 체력 100");
+    check.ok(!roster.change(0) && roster.recommended() === 2 && roster.available().join() === "2", "내려간 투수는 다시 못 나옴, 다음 추천은 마무리");
+    check.ok(roster.change(2) && roster.recommended() === null && !roster.change(1), "마지막 투수 뒤에는 추천 없음");
+    const policy = new c.BbTiredSubstitution(), fresh = new c.BbPitcherRoster(team.pitchers);
+    check.ok(policy.nextPitcher(fresh) === null, "체력 30 이상이면 자동 교체 없음");
+    for (let pitch = 0; pitch < 24; pitch++) fresh.afterPitch(plain);
+    check.ok(policy.nextPitcher(fresh) === 1, "체력 30 미만이면 다음 투수 추천");
+    const teams = [c.BbAiLevel.team("R"), c.BbAiLevel.team("L")], random = new c.BbSeededRandom(4141), entries = [];
+    for (let index = 0; index < 300; index++) {
+      if (index === 9 || index === 40) entries.push({ change: index === 9 ? 1 : 2 });
+      entries.push({ pitch: random.pick(["ft", "cv", "sl"]), aim: { u: random.between(-1.2, 1.2), v: random.between(-1.2, 1.2) }, seed: random.seed(), contactOffset: random.chance(0.5) ? random.gaussian(0, 0.06) : null });
+    }
+    const fold = () => new c.BbGameLogFold(new c.BbThreeInningFormat(), this.park, new c.BbInfieldGroundBallErrorPolicy(0.05), teams);
+    const one = fold().engine(entries), two = fold().engine(entries);
+    const snapshot = (engine) => JSON.stringify([engine.state, [0, 1].map((team) => [engine.roster(team).currentIndex(), engine.roster(team).stamina(0).level(), engine.roster(team).pitchesThisOuting()])]);
+    check.ok(snapshot(one) === snapshot(two), "교체가 든 로그를 다시 접어도 같은 상태·체력");
+    const before = fold().engine(entries.slice(0, 9)), changed = fold().engine(entries.slice(0, 10)), team9 = before.fieldingIndex;
+    check.ok(before.roster(team9).currentIndex() === 0 && changed.roster(team9).currentIndex() === 1 && changed.roster(team9).pitchesThisOuting() === 0, "교체 사건을 접으면 그 순간 수비 팀 투수가 바뀜");
+    const plainEntries = entries.filter((entry) => typeof entry.change !== "number");
+    check.ok(snapshot(fold().engine(plainEntries)) !== snapshot(one), "교체가 있고 없음에 따라 결과가 달라짐");
+    const session = new c.BbMatchEngine(new c.BbThreeInningFormat(), this.park, new c.BbInfieldGroundBallErrorPolicy(0.05), teams);
+    entries.forEach((entry) => session.replay(entry));
+    check.ok(snapshot(session) === snapshot(one), "한 사건씩 넣어도 같은 결과(새로고침·관전 복원)");
+  }
+
+  defenseCrew() {
+    const c = this.code, check = this.check, plan = c.BbRosterPlan;
+    check.section("14. 수비 스탯·포수·주자 속도");
+    const team = c.BbAiLevel.team("R");
+    team.lineup[5].abilities.defense = 7; team.lineup[0].abilities.defense = 7; team.lineup[1].abilities.defense = 1;
+    const crew = plan.crewOf(team.lineup), base = c.BbFielderSkill.BASE;
+    check.ok(crew.pointsOf("SS") === 7 && crew.pointsOf("C") === 1 && crew.pointsOf("P") === 3 && crew.pointsOf("DH") === 3, "유격수 7·포수 1·투수 기준 3, 지명타자는 수비 안 함");
+    const from = { x: -10, z: 38 }, to = { x: -16, z: 30 };
+    check.ok(c.BbFielderMotion.secondsTo("SS", from, to, false, crew.skillOf("SS")) < c.BbFielderMotion.secondsTo("SS", from, to, false, base), "수비 7 유격수가 더 빨리 닿음");
+    check.ok(crew.arm("SS").secondsTo(from, 1) < new c.BbThrowDecision().secondsTo(from, 1), "수비 7 유격수의 송구가 더 빠름");
+    check.ok(new c.BbFielderSkill(3).moveScale === 1 && new c.BbFielderSkill(3).throwScale === 1 && new c.BbFielderSkill(3).rangeBonus === 0, "수비 3은 지금 값 그대로");
+    check.ok(c.BbCatcherFraming.topWeight(1) > c.BbCatcherFraming.topWeight(2) && c.BbCatcherFraming.topWeight(2) > 1 && c.BbCatcherFraming.topWeight(3) === 1 && c.BbCatcherFraming.topWeight(5) < c.BbCatcherFraming.topWeight(4) && c.BbCatcherFraming.topWeight(4) < 1, "포수 수비: 3 기준, 낮으면 장타 늘고 높으면 줄어듦");
+    const legs = (speed) => new c.BbAutoBaseRunning().onForcedShift([{ id: "a", earned: true, speed }, null, null], null, this.batter())[0].arriveAt;
+    check.ok(legs(7) < legs(3) && legs(3) < legs(1), "1루 주자는 자기 주루 스탯으로 달림(타자 스탯이 아님)");
+    check.ok(new c.BbAutoBaseRunning().onForcedShift([this.runner("a"), null, null], null, this.batter())[0].arriveAt === legs(3), "속도 없는 옛 주자는 타자 스탯으로");
+  }
+
   run() {
+    this.roster();
+    this.stamina();
+    this.substitution();
+    this.defenseCrew();
     this.samplerStaysInRange();
     this.aimLimiterKeepsBallOffBatter();
     this.strikeZoneIsExact();

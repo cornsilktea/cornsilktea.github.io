@@ -24,13 +24,14 @@ class BbInfieldFlyRule {
 BbInfieldFlyRule.DEEPEST = 45;
 BbInfieldFlyRule.EASY_SECONDS = 0.3;
 class BbPlayResolver {
-    constructor(dimensions, fielding, running, errors) {
+    constructor(dimensions, fielding, running, errors, crew = BbDefenseCrew.STANDARD) {
         this.dimensions = dimensions;
         this.fielding = fielding;
         this.running = running;
         this.errors = errors;
-        this.throws = new BbThrowDecision();
+        this.crew = crew;
     }
+    throwsBy(position) { return this.crew.arm(position); }
     resolve(situation, ball, random) {
         const spots = BbFielderPositions.standard(situation.bases, situation.outs);
         if (ball.foul)
@@ -116,7 +117,7 @@ class BbPlayResolver {
         script.events.push({ t: caught.at, kind: "catch", who: caught.by, spot: [caught.spot.x, caught.spot.z] }, { t: caught.at, kind: "callOut", who: situation.batter.id, base: 0 });
         if (situation.outs + 1 >= 3)
             return script;
-        const moves = this.running.onFlyOut(situation.bases, situation.abilities, caught.at, caught.spot, this.throws);
+        const moves = this.running.onFlyOut(situation.bases, situation.abilities, caught.at, caught.spot, this.throwsBy(caught.by));
         this.applyMoves(script, moves, caught.at);
         if (script.scored.length && BbFielderPositions.isOutfield(caught.by))
             script.result = "SAC_FLY";
@@ -126,7 +127,7 @@ class BbPlayResolver {
         const script = this.blank(situation, "SINGLE", ball);
         if (situation.outs >= 2)
             retrieve = { ...retrieve, holdSeconds: 0 };
-        const moves = this.running.onHit(situation.bases, situation.batter, situation.abilities, retrieve, this.throws);
+        const moves = this.running.onHit(situation.bases, situation.batter, situation.abilities, retrieve, this.throwsBy(retrieve.by));
         script.basesAfter = [null, null, null];
         script.fielder = retrieve.by;
         script.events.push({ t: retrieve.at, kind: "field", who: retrieve.by, spot: [retrieve.spot.x, retrieve.spot.z] });
@@ -134,7 +135,7 @@ class BbPlayResolver {
         const reached = moves.find((move) => move.from === 0).to;
         script.batterReached = reached;
         script.result = reached >= 4 ? "HOME_RUN" : reached === 3 ? "TRIPLE" : reached === 2 ? "DOUBLE" : "SINGLE";
-        script.events.push({ t: retrieve.at, kind: "throw", who: retrieve.by, base: Math.min(4, reached + 1), arriveT: retrieve.at + this.throws.secondsTo(retrieve.spot, Math.min(4, reached + 1)) });
+        script.events.push({ t: retrieve.at, kind: "throw", who: retrieve.by, base: Math.min(4, reached + 1), arriveT: retrieve.at + this.throwsBy(retrieve.by).secondsTo(retrieve.spot, Math.min(4, reached + 1)) });
         return script;
     }
     applyMoves(script, moves, startAt) {
@@ -168,16 +169,16 @@ class BbPlayResolver {
         script.events = [{ t: 0, kind: "ballFlight", spot: [pick.spot.x, pick.spot.z], arriveT: pick.at }, { t: pick.at, kind: "field", who: pick.by, spot: [pick.spot.x, pick.spot.z] }];
         const shifted = this.running.onForcedShift(bases, situation.batter, abilities);
         if (this.errors.fumbles(random)) {
-            const through = this.throughBall(ball, pick, spots), moves = this.running.onHit(bases, situation.batter, abilities, through, this.throws);
+            const through = this.throughBall(ball, pick, spots), moves = this.running.onHit(bases, situation.batter, abilities, through, this.throwsBy(through.by));
             const reached = moves.find((move) => move.from === 0).to, next = Math.min(4, reached + 1);
             script.result = "ERROR";
             script.batterReached = reached;
             script.events.push({ t: pick.at, kind: "error", who: pick.by }, { t: through.at, kind: "field", who: through.by, spot: [through.spot.x, through.spot.z] });
             this.applyMoves(script, moves, 0);
-            script.events.push({ t: through.at, kind: "throw", who: through.by, base: next, arriveT: through.at + this.throws.secondsTo(through.spot, next) });
+            script.events.push({ t: through.at, kind: "throw", who: through.by, base: next, arriveT: through.at + this.throwsBy(through.by).secondsTo(through.spot, next) });
             return script;
         }
-        const batterAt = BbRunnerMotion.batterSeconds(1, abilities), runnerAt = BbRunnerMotion.fromBaseSeconds(1, abilities);
+        const batterAt = BbRunnerMotion.batterSeconds(1, abilities), runnerAt = (runner) => BbRunnerMotion.fromBaseSeconds(1, BbRunnerMotion.legsOf(runner, abilities));
         const loaded = !!(bases[0] && bases[1] && bases[2]), leadForce = loaded ? 4 : bases[0] && bases[1] ? 3 : bases[0] ? 2 : 0;
         const doubleBase = loaded ? 4 : bases[0] ? 2 : 0;
         const out = (who, base, at) => {
@@ -188,15 +189,16 @@ class BbPlayResolver {
             script.outsAdded++;
         };
         const runnerInto = (base) => shifted.find((entry) => entry.to === base && entry.from === base - 1).runner;
-        const readyAt = pick.at + BbThrowDecision.rangeDelay(pick.moved);
-        const firstAt = readyAt + this.throws.secondsTo(pick.spot, 1);
+        const readyAt = pick.at + BbThrowDecision.rangeDelay(pick.moved), arm = this.throwsBy(pick.by);
+        const firstAt = readyAt + arm.secondsTo(pick.spot, 1);
         if (situation.outs < 2 && doubleBase) {
-            const leadAt = readyAt + this.throws.secondsTo(pick.spot, doubleBase);
-            if (leadAt < runnerAt) {
-                out(runnerInto(doubleBase), doubleBase, leadAt);
+            const leadAt = readyAt + arm.secondsTo(pick.spot, doubleBase), lead = runnerInto(doubleBase);
+            if (leadAt < runnerAt(lead)) {
+                out(lead, doubleBase, leadAt);
                 script.events.push({ t: pick.at, kind: "throw", who: pick.by, base: doubleBase, arriveT: leadAt });
-                const turnAt = leadAt + this.throws.relaySeconds(doubleBase, 1);
-                script.events.push({ t: leadAt, kind: "throw", who: doubleBase === 4 ? "C" : BbCoverageTable.secondBaseCover(ball.spray), base: 1, arriveT: turnAt });
+                const pivot = doubleBase === 4 ? "C" : BbCoverageTable.secondBaseCover(ball.spray);
+                const turnAt = leadAt + this.throwsBy(pivot).relaySeconds(doubleBase, 1);
+                script.events.push({ t: leadAt, kind: "throw", who: pivot, base: 1, arriveT: turnAt });
                 if (turnAt < batterAt) {
                     out(situation.batter, 1, turnAt);
                     script.result = "DOUBLE_PLAY";
@@ -214,14 +216,14 @@ class BbPlayResolver {
             const second = shifted.find((entry) => entry.from === 2 && !entry.forced);
             if (second && ball.spray > 0 && !bases[2]) {
                 second.to = 3;
-                second.arriveAt = BbRunnerMotion.fromBaseSeconds(1, abilities);
+                second.arriveAt = runnerAt(second.runner);
             }
             return this.closeInfieldPlay(script, situation, shifted);
         }
         if (leadForce) {
-            const leadAt = readyAt + this.throws.secondsTo(pick.spot, leadForce);
-            if (leadAt < runnerAt) {
-                out(runnerInto(leadForce), leadForce, leadAt);
+            const leadAt = readyAt + arm.secondsTo(pick.spot, leadForce), lead = runnerInto(leadForce);
+            if (leadAt < runnerAt(lead)) {
+                out(lead, leadForce, leadAt);
                 script.events.push({ t: pick.at, kind: "throw", who: pick.by, base: leadForce, arriveT: leadAt });
                 script.result = "FIELDERS_CHOICE";
                 script.batterReached = 1;
@@ -235,7 +237,7 @@ class BbPlayResolver {
         if (situation.outs >= 2)
             shifted.forEach((move) => { if (!move.forced && move.from >= 1) {
                 move.to = move.from + 1;
-                move.arriveAt = runnerAt;
+                move.arriveAt = runnerAt(move.runner);
             } });
         return this.closeInfieldPlay(script, situation, shifted);
     }

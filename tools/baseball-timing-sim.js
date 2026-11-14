@@ -16,7 +16,7 @@ class TimingSim {
   run(deviation, widthScale) {
     const c = this.code, normal = c.BbAiLevel.ALL.normal, human = Object.assign({}, normal, { timingDeviation: deviation });
     c.BbTimingModel.WIDTH_POINTS = this.baseWidths.map(([off, seconds]) => [off, seconds * widthScale]);
-    const team = { lineup: [c.BbAiLevel.batterSheet("R")], pitchers: [c.BbAiLevel.pitcherSheet("R")] }, bat = c.BbBoxScoreBuilder.emptyBat(), random = new c.BbSeededRandom(4100);
+    const team = c.BbAiLevel.team("R"), bat = c.BbBoxScoreBuilder.emptyBat(), random = new c.BbSeededRandom(4100);
     let swings = 0, perfect = 0;
     for (let game = 0; game < this.games; game++) {
       const runner = new c.BbAiMatchRunner(new c.BbOneInningFormat(), new c.BbMainBallpark(), new c.BbInfieldGroundBallErrorPolicy(0.05), [team, team], [normal, normal], [human, human]);

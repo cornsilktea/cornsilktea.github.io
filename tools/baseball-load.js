@@ -7,7 +7,9 @@ class BaseballCode {
     "BbPitchLocationSampler", "BbPitchRoller", "BbBatterAbilityModel", "BbStrikeZoneJudge", "BbTimingModel", "BbContactModel", "BbSprayModel", "BbLaunchModel", "BbExitSpeedModel", "BbBattedBallPhysics",
     "BbSwingAction", "BbBatterActionSet", "BbDiamond", "BbRunnerMotion", "BbTagUpRule", "BbAutoBaseRunning", "BbFielderPositions", "BbFielderMotion", "BbThrowDecision", "BbCoverageTable",
     "BbInfieldGroundBallErrorPolicy", "BbNoErrorPolicy", "BbAutoFielding", "BbPlayCodes", "BbInfieldFlyRule", "BbPlayResolver", "BbOneInningFormat", "BbThreeInningFormat", "BbFullGameFormat", "BbLineup",
-    "BbBoxScoreBuilder", "BbEventHandlerRegistry", "BbMatchRules", "BbPitchJudge", "BbGameLogFold", "BbBaseballFormulas", "BbAiLevel", "BbAiPitcher", "BbAiBatter", "BbAiMatchRunner"];
+    "BbBoxScoreBuilder", "BbEventHandlerRegistry", "BbMatchRules", "BbPitchJudge", "BbGameLogFold", "BbBaseballFormulas", "BbAiLevel", "BbAiPitcher", "BbAiBatter", "BbAiMatchRunner",
+    "BbPitchCondition", "BbCatcherFraming", "BbFielderSkill", "BbDefenseCrew", "BbRosterPlan", "BbStaminaModel", "BbStaminaMeter", "BbNoStamina", "BbPitcherRoster", "BbNoSubstitution",
+    "BbTiredSubstitution", "BbLogEvents", "BbMatchEngine"];
 
   static load() {
     const folder = path.join(__dirname, "..", "games", "41.baseball-duel");

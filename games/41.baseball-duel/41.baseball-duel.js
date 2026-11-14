@@ -39,7 +39,7 @@ class BbModeRules {
         };
     }
     static showcase(seed) {
-        const team = () => ({ lineup: [BbAiLevel.batterSheet("R")], pitchers: [BbAiLevel.pitcherSheet("R")] });
+        const team = () => (BbAiLevel.team("R"));
         return { format: new BbThreeInningFormat(), teams: [team(), team()], names: ["", ""], seats: ["ai", "ai"], level: BbAiLevel.ALL.normal, seed, halvesToPlay: null, log: [], view: "pitcher", autoSwingAt: null, looks: [BbModeRules.aiLook(0), BbModeRules.aiLook(1)] };
     }
 }
@@ -522,7 +522,7 @@ class BbDuelGame {
         const guestId = this.guestId(session), guest = guestId ? session.players.get(guestId) || null : null, mine = session.me();
         if (!mine || (!guest && !setup.ai))
             return;
-        const rival = guest ? BbProfileStore.teamOf(guest.sheet) : { lineup: [BbAiLevel.batterSheet("R")], pitchers: [BbAiLevel.pitcherSheet("R")] };
+        const rival = guest ? BbProfileStore.teamOf(guest.sheet) : BbAiLevel.team("R");
         const flip = !randomMatch && this.flipped(session), rivalId = guest ? guestId : BbRoomRules.AI_SEAT, rivalName = guest ? guest.nick : "AI " + BbAiLevel.ALL[setup.level].label;
         const ids = BbRoomRules.seatIds(rivalId, this.myId, flip), ownSheet = BbProfileStore.teamOf(mine.sheet);
         const lookOf = (id, team) => { const record = session.players.get(id); return BbWardrobe.lookOf(record ? record.look : null, BbModeRules.aiLook(team)); };
@@ -583,7 +583,7 @@ class BbDuelGame {
         session.ref.child("end").transaction((current) => (current !== null && current !== undefined ? undefined : { winner, match: live.id })).catch(() => undefined);
     }
     startGame(mode, level) {
-        const profile = BbProfileStore.load(), mine = { lineup: profile.lineup, pitchers: profile.pitchers }, rival = { lineup: [BbAiLevel.batterSheet("R")], pitchers: [BbAiLevel.pitcherSheet("R")] };
+        const profile = BbProfileStore.load(), mine = { lineup: profile.lineup, pitchers: profile.pitchers }, rival = BbAiLevel.team("R");
         const human = BbModeRules.humanTeam(mode);
         this.last = { mode, level };
         this.play({ mode, level, seed: Math.floor(Math.random() * 1e9) + 1, me: this.myName(), teams: human === 1 ? [rival, mine] : [mine, rival], log: [] }, "");

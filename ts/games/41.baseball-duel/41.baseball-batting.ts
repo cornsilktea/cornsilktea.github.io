@@ -2,6 +2,13 @@ interface BbBatterAbilities {
   contact: number;
   power: number;
   speed: number;
+  defense: number;
+}
+
+class BbCatcherFraming {
+  static readonly TOP_WEIGHT: readonly number[] = [1, 1.36, 1.17, 1, 0.915, 0.84, 0.765, 0.69];
+
+  static topWeight(defense: number): number { return BbCatcherFraming.TOP_WEIGHT[Math.max(1, Math.min(7, Math.round(defense)))]; }
 }
 
 class BbBatterAbilityModel {
@@ -37,7 +44,7 @@ type BbTimingBand = "perfect" | "good" | "fair" | "poor" | "miss";
 class BbTimingModel {
   static readonly SWING_DELAY = 0.12;
   static readonly SIDE_SHIFT = 0.028;
-  static readonly WIDTH_POINTS: ReadonlyArray<readonly [offCenter: number, seconds: number]> = [[0, 0.055], [1, 0.028], [1.6, 0.012], [2, 0.006]];
+  static readonly WIDTH_POINTS: ReadonlyArray<readonly [offCenter: number, seconds: number]> = [[0, 0.066], [1, 0.0336], [1.6, 0.0144], [2, 0.0072]];
   static readonly BAND_EXTRA: Readonly<Record<Exclude<BbTimingBand, "perfect" | "miss">, number>> = { good: 0.04, fair: 0.08, poor: 0.13 };
 
   static idealShift(inside: number, noise: number): number { return BbTimingModel.SIDE_SHIFT * Math.max(-2, Math.min(2, inside)) + noise; }
@@ -66,7 +73,7 @@ class BbTimingModel {
 }
 
 class BbContactModel {
-  static readonly CONTACT_CHANCE: Readonly<Record<BbTimingBand, number>> = { perfect: 0.95, good: 0.84, fair: 0.64, poor: 0.44, miss: 0 };
+  static readonly CONTACT_CHANCE: Readonly<Record<BbTimingBand, number>> = { perfect: 0.97, good: 0.88, fair: 0.68, poor: 0.46, miss: 0 };
 
   static readonly FOUL_TIP_CHANCE: Readonly<Record<Exclude<BbTimingBand, "miss">, number>> = { perfect: 0.14, good: 0.3, fair: 0.46, poor: 0.6 };
 
@@ -114,8 +121,8 @@ class BbExitSpeedModel {
     poor: [{ weight: 0, mean: 110, deviation: 12 }, { weight: 25, mean: 100, deviation: 14 }, { weight: 75, mean: 80, deviation: 16 }]
   };
 
-  static sample(band: Exclude<BbTimingBand, "miss">, offCenter: number, pitchSpeed: number, power: number, random: BbSeededRandom): number {
-    const lift = BbBatterAbilityModel.topWeight(power);
+  static sample(band: Exclude<BbTimingBand, "miss">, offCenter: number, pitchSpeed: number, power: number, random: BbSeededRandom, catcherWeight = 1): number {
+    const lift = BbBatterAbilityModel.topWeight(power) * catcherWeight;
     const parts = BbExitSpeedModel.MIX[band].map((part, index) => index < BbExitSpeedModel.TOP_PARTS ? { ...part, weight: part.weight * lift } : part);
     const base = BbMixtureSampler.sample(parts, random);
     const tuned = base + BbExitSpeedModel.CENTER_BONUS * (1 - Math.min(offCenter, 1)) + BbExitSpeedModel.PITCH_SPEED_FACTOR * (pitchSpeed - 135) + BbBatterAbilityModel.exitBoost(power);
@@ -203,6 +210,7 @@ interface BbBatterContext {
   abilities: BbBatterAbilities;
   contactOffset: number | null;
   random: BbSeededRandom;
+  catcherDefense?: number;
 }
 
 interface BbBatterAction {
@@ -224,7 +232,8 @@ class BbSwingAction implements BbBatterAction {
     const tipped = random.chance(BbContactModel.FOUL_TIP_CHANCE[band]);
     const spray = tipped ? BbSprayModel.tippedDegrees(adjusted, context.batterHand, random) : BbSprayModel.sprayDegrees(adjusted, inside, context.batterHand, band, random);
     const launch = tipped ? random.between(-10, 30) : BbLaunchModel.launchDegrees(adjusted, roll.arrive.v, band, random);
-    const exitSpeed = BbExitSpeedModel.sample(band, offCenter, roll.speed, context.abilities.power, random);
+    const catcherWeight = context.catcherDefense === undefined ? 1 : BbCatcherFraming.topWeight(context.catcherDefense);
+    const exitSpeed = BbExitSpeedModel.sample(band, offCenter, roll.speed, context.abilities.power, random, catcherWeight);
     const ball: BbBattedBall = {
       exitSpeed, launch, spray, carry: BbBattedBallPhysics.carry(exitSpeed, launch), hang: BbBattedBallPhysics.hangSeconds(exitSpeed, launch),
       flight: BbBattedBallPhysics.kindOf(launch), foul: Math.abs(spray) > BbSprayModel.FOUL_DEGREES

@@ -64,12 +64,18 @@ interface BbAbilityPlan {
 
 class BbAbilityAllocator {
   static readonly PITCHER: BbAbilityPlan = {
-    total: 9, least: 1, most: 7,
-    items: [{ key: "control", label: "제구", effect: "구종이 더 정확한 위치로 간다" }, { key: "power", label: "구위", effect: "구속이 더 빨라진다" }, { key: "breaking", label: "변화", effect: "변화구 종류가 늘고 각이 커진다" }]
+    total: 12, least: 1, most: 7,
+    items: [
+      { key: "control", label: "제구", effect: "구종이 더 정확한 위치로 간다" }, { key: "power", label: "구위", effect: "구속이 더 빨라진다" },
+      { key: "breaking", label: "변화", effect: "변화구 종류가 늘고 각이 커진다" }, { key: "stamina", label: "체력", effect: "공을 던질 때 체력이 덜 줄어든다" }
+    ]
   };
   static readonly BATTER: BbAbilityPlan = {
-    total: 9, least: 1, most: 7,
-    items: [{ key: "contact", label: "컨택", effect: "타격 타이밍이 더 여유로워진다" }, { key: "power", label: "파워", effect: "비거리 분포가 더 위로 올라간다" }, { key: "speed", label: "주루", effect: "땅볼 세이프가 늘고 더 많은 베이스를 간다" }]
+    total: 12, least: 1, most: 7,
+    items: [
+      { key: "contact", label: "컨택", effect: "타격 타이밍이 더 여유로워진다" }, { key: "power", label: "파워", effect: "비거리 분포가 더 위로 올라간다" },
+      { key: "speed", label: "주루", effect: "땅볼 세이프가 늘고 더 많은 베이스를 간다" }, { key: "defense", label: "수비", effect: "수비 범위·이동·송구가 좋아진다" }
+    ]
   };
 
   readonly points: number[];
@@ -112,6 +118,12 @@ interface BbPitcherAbilities {
   control: number;
   power: number;
   breaking: number;
+  stamina: number;
+}
+
+class BbPitchCondition {
+  static readonly FRESH = new BbPitchCondition(1, 1);
+  constructor(readonly speedScale: number, readonly spreadScale: number) {}
 }
 
 type BbPitchId = "ft" | "cv" | "sl" | "ch" | "kn";
@@ -141,21 +153,21 @@ abstract class BbPitchKind {
     return degrees * Math.PI / 180;
   }
 
-  longDeviation(abilities: BbPitcherAbilities): number {
+  longDeviation(abilities: BbPitcherAbilities, condition: BbPitchCondition = BbPitchCondition.FRESH): number {
     const scale = this.isBreaking ? BbPitchTuning.breakScale(abilities.breaking) : 1;
-    return BbPitchTuning.sigmaFor(abilities.control) * this.longSpread * scale;
+    return BbPitchTuning.sigmaFor(abilities.control) * this.longSpread * scale * condition.spreadScale;
   }
 
-  shortDeviation(abilities: BbPitcherAbilities): number { return BbPitchTuning.sigmaFor(abilities.control) * this.shortSpread; }
+  shortDeviation(abilities: BbPitcherAbilities, condition: BbPitchCondition = BbPitchCondition.FRESH): number { return BbPitchTuning.sigmaFor(abilities.control) * this.shortSpread * condition.spreadScale; }
 
-  reach(abilities: BbPitcherAbilities, hand: BbHand): BbZonePoint {
-    const angle = this.axisRadians(hand), long = this.longDeviation(abilities) * this.cutRadius, short = this.shortDeviation(abilities) * this.cutRadius;
+  reach(abilities: BbPitcherAbilities, hand: BbHand, condition: BbPitchCondition = BbPitchCondition.FRESH): BbZonePoint {
+    const angle = this.axisRadians(hand), long = this.longDeviation(abilities, condition) * this.cutRadius, short = this.shortDeviation(abilities, condition) * this.cutRadius;
     return { u: Math.hypot(long * Math.cos(angle), short * Math.sin(angle)), v: Math.hypot(long * Math.sin(angle), short * Math.cos(angle)) };
   }
 }
 
 class BbPitchTuning {
-  static readonly SIGMA_BY_CONTROL: readonly number[] = [0, 0.55, 0.46, 0.38, 0.32, 0.27, 0.23, 0.2];
+  static readonly SIGMA_BY_CONTROL: readonly number[] = [0, 0.64, 0.53, 0.44, 0.37, 0.31, 0.27, 0.23];
   static readonly AIM_LIMIT = 2.2;
   static readonly FLIGHT_METERS = 17;
   static readonly FLIGHT_SCALE = 1.68;
@@ -249,15 +261,15 @@ class BbPitchSelection {
 }
 
 class BbAimLimiter {
-  static clamp(aim: BbZonePoint, kind: BbPitchKind, abilities: BbPitcherAbilities, hand: BbHand): BbZonePoint {
-    const reach = kind.reach(abilities, hand), limitU = Math.max(0, BbPitchTuning.AIM_LIMIT - reach.u), limitV = Math.max(0, BbPitchTuning.AIM_LIMIT - reach.v);
+  static clamp(aim: BbZonePoint, kind: BbPitchKind, abilities: BbPitcherAbilities, hand: BbHand, condition: BbPitchCondition = BbPitchCondition.FRESH): BbZonePoint {
+    const reach = kind.reach(abilities, hand, condition), limitU = Math.max(0, BbPitchTuning.AIM_LIMIT - reach.u), limitV = Math.max(0, BbPitchTuning.AIM_LIMIT - reach.v);
     return { u: Math.max(-limitU, Math.min(limitU, aim.u)), v: Math.max(-limitV, Math.min(limitV, aim.v)) };
   }
 }
 
 class BbPitchLocationSampler {
-  static sample(aim: BbZonePoint, kind: BbPitchKind, abilities: BbPitcherAbilities, hand: BbHand, random: BbSeededRandom): BbZonePoint {
-    const long = kind.longDeviation(abilities), short = kind.shortDeviation(abilities), angle = kind.axisRadians(hand), limit = kind.cutRadius * kind.cutRadius;
+  static sample(aim: BbZonePoint, kind: BbPitchKind, abilities: BbPitcherAbilities, hand: BbHand, random: BbSeededRandom, condition: BbPitchCondition = BbPitchCondition.FRESH): BbZonePoint {
+    const long = kind.longDeviation(abilities, condition), short = kind.shortDeviation(abilities, condition), angle = kind.axisRadians(hand), limit = kind.cutRadius * kind.cutRadius;
     const cos = Math.cos(angle), sin = Math.sin(angle), wall = BbPitchTuning.AIM_LIMIT;
     for (let attempt = 0; attempt < 96; attempt++) {
       const along = random.gaussian(), across = random.gaussian();
@@ -282,10 +294,10 @@ interface BbPitchRoll {
 class BbPitchRoller {
   static readonly TIMING_NOISE_SECONDS = 0.007;
 
-  static roll(pitch: BbPitchId, aim: BbZonePoint, abilities: BbPitcherAbilities, hand: BbHand, seed: number): BbPitchRoll {
+  static roll(pitch: BbPitchId, aim: BbZonePoint, abilities: BbPitcherAbilities, hand: BbHand, seed: number, condition: BbPitchCondition = BbPitchCondition.FRESH): BbPitchRoll {
     const random = new BbSeededRandom(seed), kind = BbPitchCatalog.of(pitch);
-    const safeAim = BbAimLimiter.clamp(aim, kind, abilities, hand);
-    const arrive = BbPitchLocationSampler.sample(safeAim, kind, abilities, hand, random), speed = kind.speedFor(abilities);
+    const safeAim = BbAimLimiter.clamp(aim, kind, abilities, hand, condition);
+    const arrive = BbPitchLocationSampler.sample(safeAim, kind, abilities, hand, random, condition), speed = kind.speedFor(abilities) * condition.speedScale;
     const flightSeconds = BbPitchTuning.flightSeconds(speed) + random.gaussian(0, kind.arrivalJitterSeconds);
     return { pitch, aim: safeAim, arrive, speed, flightSeconds, timingNoise: random.gaussian(0, BbPitchRoller.TIMING_NOISE_SECONDS), seed };
   }

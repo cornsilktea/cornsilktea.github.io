@@ -6,7 +6,7 @@ interface BbLocalGame {
   seed: number;
   me: string;
   teams: [BbTeamSheet, BbTeamSheet];
-  log: BbLogEntry[];
+  log: BbLogEvent[];
 }
 
 class BbLocalResume {
@@ -49,7 +49,7 @@ class BbModeRules {
   }
 
   static showcase(seed: number): BbMatchPlan {
-    const team = (): BbTeamSheet => ({ lineup: [BbAiLevel.batterSheet("R")], pitchers: [BbAiLevel.pitcherSheet("R")] });
+    const team = (): BbTeamSheet => (BbAiLevel.team("R"));
     return { format: new BbThreeInningFormat(), teams: [team(), team()], names: ["", ""], seats: ["ai", "ai"], level: BbAiLevel.ALL.normal, seed, halvesToPlay: null, log: [], view: "pitcher", autoSwingAt: null, looks: [BbModeRules.aiLook(0), BbModeRules.aiLook(1)] };
   }
 }
@@ -552,7 +552,7 @@ class BbDuelGame {
     const setup = randomMatch ? { mode: "match" as BbGameMode, level: "normal" as BbAiLevelId, ai: true } : BbRoomRules.setupOf(session.value<BbRoomSetup>("setup"));
     const guestId = this.guestId(session), guest = guestId ? session.players.get(guestId) || null : null, mine = session.me();
     if (!mine || (!guest && !setup.ai)) return;
-    const rival: BbTeamSheet = guest ? BbProfileStore.teamOf(guest.sheet) : { lineup: [BbAiLevel.batterSheet("R")], pitchers: [BbAiLevel.pitcherSheet("R")] };
+    const rival: BbTeamSheet = guest ? BbProfileStore.teamOf(guest.sheet) : BbAiLevel.team("R");
     const flip = !randomMatch && this.flipped(session), rivalId = guest ? guestId as string : BbRoomRules.AI_SEAT, rivalName = guest ? guest.nick : "AI " + BbAiLevel.ALL[setup.level].label;
     const ids = BbRoomRules.seatIds(rivalId, this.myId, flip) as [string, string], ownSheet = BbProfileStore.teamOf(mine.sheet);
     const lookOf = (id: string, team: 0 | 1): CharacterLook => { const record = session.players.get(id); return BbWardrobe.lookOf(record ? record.look : null, BbModeRules.aiLook(team)); };
@@ -610,7 +610,7 @@ class BbDuelGame {
   }
 
   private startGame(mode: BbGameMode, level: BbAiLevelId): void {
-    const profile = BbProfileStore.load(), mine: BbTeamSheet = { lineup: profile.lineup, pitchers: profile.pitchers }, rival: BbTeamSheet = { lineup: [BbAiLevel.batterSheet("R")], pitchers: [BbAiLevel.pitcherSheet("R")] };
+    const profile = BbProfileStore.load(), mine: BbTeamSheet = { lineup: profile.lineup, pitchers: profile.pitchers }, rival: BbTeamSheet = BbAiLevel.team("R");
     const human = BbModeRules.humanTeam(mode);
     this.last = { mode, level };
     this.play({ mode, level, seed: Math.floor(Math.random() * 1e9) + 1, me: this.myName(), teams: human === 1 ? [rival, mine] : [mine, rival], log: [] }, "");
@@ -628,7 +628,7 @@ class BbDuelGame {
     if (note) this.director.say(note);
   }
 
-  private logged(log: readonly BbLogEntry[]): void {
+  private logged(log: readonly BbLogEvent[]): void {
     if (!this.game) return;
     this.game.log = log.slice();
     BbLocalResume.save(this.game);

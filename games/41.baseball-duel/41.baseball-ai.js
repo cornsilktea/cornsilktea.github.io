@@ -1,12 +1,15 @@
 "use strict";
 class BbAiLevel {
-    static pitcherSheet(hand) {
+    static pitcherSheet(hand, role = "starter") {
         const points = BbAiLevel.ABILITY_POINTS;
-        return { abilities: { control: points, power: points, breaking: points }, hand, pitches: new BbPitchSelection(points).usable(), role: "starter" };
+        return { abilities: { control: points, power: points, breaking: points, stamina: points }, hand, pitches: new BbPitchSelection(points).usable(), role };
     }
-    static batterSheet(hand) {
+    static batterSheet(hand, position = BbRosterPlan.DESIGNATED) {
         const points = BbAiLevel.ABILITY_POINTS;
-        return { abilities: { contact: points, power: points, speed: points }, hand };
+        return { abilities: { contact: points, power: points, speed: points, defense: points }, hand, position };
+    }
+    static team(hand = "R") {
+        return { lineup: BbRosterPlan.BATTING_ORDER.map((position) => BbAiLevel.batterSheet(hand, position)), pitchers: BbRosterPlan.pitcherRoles().map((role) => BbAiLevel.pitcherSheet(hand, role)) };
     }
 }
 BbAiLevel.ABILITY_POINTS = 3;
@@ -19,7 +22,7 @@ class BbAiPitcher {
     constructor(level) {
         this.level = level;
     }
-    choose(balls, strikes, sheet, lastPitch, random) {
+    choose(balls, strikes, sheet, lastPitch, random, condition = BbPitchCondition.FRESH) {
         const ahead = balls < strikes, behind = balls >= 3, breakingShare = behind ? 0.25 : ahead ? 0.6 : 0.4;
         const breaking = sheet.pitches.filter((id) => id !== "ft");
         const weights = sheet.pitches.map((id) => {
@@ -36,7 +39,7 @@ class BbAiPitcher {
         }
         const target = random.chance(this.level.middleMistake) ? { u: random.gaussian(0, 0.25), v: random.gaussian(0, 0.25) } : this.target(ahead, behind, random);
         const noisy = { u: target.u + random.gaussian(0, this.level.aimDeviation), v: target.v + random.gaussian(0, this.level.aimDeviation) };
-        return { pitch, aim: BbAimLimiter.clamp(noisy, BbPitchCatalog.of(pitch), sheet.abilities, sheet.hand) };
+        return { pitch, aim: BbAimLimiter.clamp(noisy, BbPitchCatalog.of(pitch), sheet.abilities, sheet.hand, condition) };
     }
     target(ahead, behind, random) {
         const side = random.chance(0.5) ? 1 : -1, reach = behind ? random.between(0.55, 0.75) : ahead ? BbAiPitcher.EDGE_OUTSIDE : random.between(0.85, 1.15);
@@ -66,37 +69,43 @@ class BbAiBatter {
     }
 }
 BbAiBatter.TWO_STRIKE_REACH = 1.15;
-BbAiBatter.THREE_BALL_REACH = 0.7;
-BbAiBatter.NORMAL_REACH = 0.92;
+BbAiBatter.THREE_BALL_REACH = 0.6;
+BbAiBatter.NORMAL_REACH = 0.84;
 BbAiBatter.BREAK_READ_STEP = 0.5;
 BbAiBatter.SPEED_RUSH = 0.05;
 BbAiBatter.COMFORT_SPEED = 136.5;
 BbAiBatter.SPEED_CHANGE_BIAS = 0.0012;
 BbAiBatter.BIAS_LIMIT = 0.03;
 class BbAiMatchRunner {
-    constructor(format, dimensions, errors, teams, pitcherLevels, batterLevels) {
+    constructor(format, dimensions, errors, teams, pitcherLevels, batterLevels, substitutions = [new BbTiredSubstitution(), new BbTiredSubstitution()]) {
+        this.format = format;
+        this.dimensions = dimensions;
+        this.errors = errors;
         this.teams = teams;
         this.pitcherLevels = pitcherLevels;
         this.batterLevels = batterLevels;
-        this.rules = new BbMatchRules(format);
-        this.judge = new BbPitchJudge(dimensions, errors, this.rules);
+        this.substitutions = substitutions;
     }
-    play(random, onPitch, stopAfterHalves) {
-        const state = this.rules.start(), lineups = [new BbLineup(this.teams[0].lineup), new BbLineup(this.teams[1].lineup)];
+    play(random, onPitch, stopAfterHalves, onChange) {
+        const engine = new BbMatchEngine(this.format, this.dimensions, this.errors, this.teams), state = engine.state;
         let lastPitch = null, previousSpeed = null;
         while (!state.finished && (stopAfterHalves === undefined || state.halvesDone < stopAfterHalves)) {
-            const battingIndex = this.rules.battingIndex(state), fieldingIndex = this.rules.fieldingIndex(state);
-            const pitcher = this.teams[fieldingIndex].pitchers[0], batter = lineups[battingIndex].current();
-            const call = new BbAiPitcher(this.pitcherLevels[fieldingIndex]).choose(state.balls, state.strikes, pitcher, lastPitch, random);
-            const roll = BbPitchRoller.roll(call.pitch, call.aim, pitcher.abilities, pitcher.hand, random.seed());
+            const battingIndex = engine.battingIndex, fieldingIndex = engine.fieldingIndex, roster = engine.roster();
+            const relief = this.substitutions[fieldingIndex].nextPitcher(roster), leaving = roster.currentIndex();
+            if (relief !== null && engine.change(relief)) {
+                lastPitch = null;
+                if (onChange)
+                    onChange(engine, fieldingIndex, leaving);
+            }
+            const pitcher = engine.pitcher(), batter = engine.batter();
+            const call = new BbAiPitcher(this.pitcherLevels[fieldingIndex]).choose(state.balls, state.strikes, pitcher, lastPitch, random, engine.condition());
+            const roll = engine.roll(call, random.seed());
             const offset = new BbAiBatter(this.batterLevels[battingIndex]).decide(roll, state.balls, state.strikes, batter.hand, previousSpeed, pitcher.abilities, random);
-            const outcome = this.judge.judge(state, roll, offset, batter), note = this.rules.apply(state, outcome);
+            const settled = engine.settle(roll, offset), note = settled.note;
             if (onPitch)
-                onPitch(state, outcome, note, battingIndex);
+                onPitch(state, settled.outcome, note, battingIndex, engine);
             lastPitch = note.plateAppearanceOver ? null : call.pitch;
             previousSpeed = note.plateAppearanceOver ? null : roll.speed;
-            if (note.plateAppearanceOver)
-                lineups[battingIndex].advance();
         }
         return state;
     }

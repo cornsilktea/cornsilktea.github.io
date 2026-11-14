@@ -237,6 +237,7 @@ class BbMatchDirector {
             this.finish(null);
             return;
         }
+        this.relieveTiredAi();
         const session = this.session, seat = this.plan.seats[session.fieldingIndex], sequence = session.log.length;
         this.player.view = this.viewNow();
         this.show();
@@ -251,6 +252,14 @@ class BbMatchDirector {
         }
         else if (seat === "ai")
             this.link.pitchChosen(sequence, session.aiCall(this.plan.level));
+    }
+    relieveTiredAi() {
+        const session = this.session;
+        if (this.plan.seats[session.fieldingIndex] !== "ai" || !(this.link instanceof BbLocalLink))
+            return;
+        const relief = session.tiredRelief();
+        if (relief !== null && session.change(relief))
+            this.events.onLog(session.log);
     }
     humanThrows(call) {
         if (!this.running || !this.waitingForCall || this.halted || this.plan.seats[this.session.fieldingIndex] !== "human")

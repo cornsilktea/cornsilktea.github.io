@@ -8,7 +8,7 @@ interface BbMatchPlan {
   level: BbAiTuning;
   seed: number;
   halvesToPlay: number | null;
-  log: BbLogEntry[];
+  log: BbLogEvent[];
   view: BbLiveView | null;
   autoSwingAt: number | null;
   scouting?: [BbTeamScout | null, BbTeamScout | null];
@@ -35,7 +35,7 @@ interface BbMatchLink {
 
 interface BbMatchEvents {
   onEnd(summary: BbMatchSummary): void;
-  onLog(log: readonly BbLogEntry[]): void;
+  onLog(log: readonly BbLogEvent[]): void;
 }
 
 interface BbPendingPitch {
@@ -319,6 +319,7 @@ class BbMatchDirector {
 
   private nextPitch(): void {
     if (this.isOver()) { this.finish(null); return; }
+    this.relieveTiredAi();
     const session = this.session, seat = this.plan.seats[session.fieldingIndex], sequence = session.log.length;
     this.player.view = this.viewNow();
     this.show();
@@ -328,6 +329,13 @@ class BbMatchDirector {
     this.player.play(this.idleScene());
     if (seat === "human") { const batting = this.scoutOf(session.battingIndex); this.pad.open(session.pitcher(), batting ? batting.hitHeat : null); this.clock.start(BbMatchDirector.PITCH_SECONDS); }
     else if (seat === "ai") this.link.pitchChosen(sequence, session.aiCall(this.plan.level));
+  }
+
+  private relieveTiredAi(): void {
+    const session = this.session;
+    if (this.plan.seats[session.fieldingIndex] !== "ai" || !(this.link instanceof BbLocalLink)) return;
+    const relief = session.tiredRelief();
+    if (relief !== null && session.change(relief)) this.events.onLog(session.log);
   }
 
   private humanThrows(call: BbPitchCall): void {

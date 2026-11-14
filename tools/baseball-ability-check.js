@@ -38,7 +38,7 @@ class AbilityCheck {
   }
 
   pitcher() {
-    const c = this.code, levels = AbilityCheck.LEVELS, of = (control, power, breaking) => ({ control, power, breaking });
+    const c = this.code, levels = AbilityCheck.LEVELS, of = (control, power, breaking, stamina = 3) => ({ control, power, breaking, stamina });
     this.record("투수", "제구", "직구 도착 표준편차(표본)", levels.map((n) => this.spread("ft", of(n, 3, 3)).along), "down");
     this.record("투수", "제구", "커브 후보 범위 가로 반경", levels.map((n) => c.BbPitchCatalog.of("cv").reach(of(n, 3, 3), "R").u), "down");
     this.record("투수", "제구", "직구 구속(불변)", levels.map((n) => c.BbPitchCatalog.of("ft").speedFor(of(n, 3, 3))), "same");
@@ -51,10 +51,17 @@ class AbilityCheck {
     this.record("투수", "변화", "커브 짧은 방향(불변)", levels.map((n) => c.BbPitchCatalog.of("cv").shortDeviation(of(3, 3, n))), "same");
     this.record("투수", "변화", "직구 범위(불변)", levels.map((n) => c.BbPitchCatalog.of("ft").reach(of(3, 3, n), "R").u), "same");
     this.record("투수", "변화", "너클 범위(불변)", levels.map((n) => c.BbPitchCatalog.of("kn").reach(of(3, 3, n), "R").u), "same");
+    const ball = { kind: "ball", script: null }, single = { kind: "inPlay", script: { result: "SINGLE" } }, homer = { kind: "inPlay", script: { result: "HOME_RUN" } }, model = c.BbStaminaModel;
+    this.record("투수", "체력", "1구당 체력 소모", levels.map((n) => model.costOf(n, ball)), "down");
+    this.record("투수", "체력", "안타 맞은 공 체력 소모", levels.map((n) => model.costOf(n, single)), "down");
+    this.record("투수", "체력", "홈런 맞은 공 체력 소모", levels.map((n) => model.costOf(n, homer)), "down");
+    this.record("투수", "체력", "50 아래까지 공 수(볼만)", levels.map((n) => Math.ceil((model.FULL - model.TIRED_BELOW + 1e-9) / model.costOf(n, ball))), "up");
+    this.record("투수", "체력", "직구 구속(불변)", levels.map((n) => c.BbPitchCatalog.of("ft").speedFor(of(3, 3, 3, n))), "same");
+    this.record("투수", "체력", "직구 범위(불변)", levels.map((n) => c.BbPitchCatalog.of("ft").reach(of(3, 3, 3, n), "R").u), "same");
   }
 
   swings(abilities, samples) {
-    const c = this.code, random = new c.BbSeededRandom(4141), action = new c.BbSwingAction(), pitcher = { control: 3, power: 3, breaking: 3 };
+    const c = this.code, random = new c.BbSeededRandom(4141), action = new c.BbSwingAction(), pitcher = { control: 3, power: 3, breaking: 3, stamina: 3 };
     let contact = 0, perfect = 0, exit = 0, carry = 0, air = 0, homers = 0, fair = 0;
     const resolver = new c.BbPlayResolver(this.park, new c.BbAutoFielding(), new c.BbAutoBaseRunning(), new c.BbNoErrorPolicy());
     for (let index = 0; index < samples; index++) {
@@ -94,20 +101,28 @@ class AbilityCheck {
     const c = this.code, levels = AbilityCheck.LEVELS, model = c.BbBatterAbilityModel;
     this.record("타자", "컨택", "정타 폭 배율", levels.map((n) => model.leniency(n)), "up");
     this.record("타자", "컨택", "가운데 공 정타 폭(초)", levels.map((n) => c.BbTimingModel.width(0, 140, model.leniency(n))), "up");
-    const byContact = levels.map((n) => this.swings({ contact: n, power: 3, speed: 3 }, 30000));
+    const byContact = levels.map((n) => this.swings({ contact: n, power: 3, speed: 3, defense: 3 }, 30000));
     this.record("타자", "컨택", "접촉률(같은 타이밍 분포)", byContact.map((row) => row.contact), "up");
     this.record("타자", "컨택", "정타율", byContact.map((row) => row.perfect), "up");
-    const byPower = levels.map((n) => this.swings({ contact: 3, power: n, speed: 3 }, 30000));
+    const byPower = levels.map((n) => this.swings({ contact: 3, power: n, speed: 3, defense: 3 }, 30000));
     this.record("타자", "파워", "타구 속도 평균(km/h)", byPower.map((row) => row.exit), "up");
     this.record("타자", "파워", "뜬 타구 비거리 평균(m)", byPower.map((row) => row.carry), "up");
     this.record("타자", "파워", "스윙당 홈런율", byPower.map((row) => row.homers), "up");
     this.record("타자", "파워", "접촉률(불변)", byPower.map((row) => row.contact), "same");
     this.record("타자", "주루", "1루 도달 시간(초)", levels.map((n) => model.firstBaseSeconds(n)), "down");
     this.record("타자", "주루", "주자 최고 속도(m/s)", levels.map((n) => model.topSpeed(n)), "up");
-    const byRun = levels.map((n) => this.running({ contact: 3, power: 3, speed: n }, 12000));
+    const byRun = levels.map((n) => this.running({ contact: 3, power: 3, speed: n, defense: 3 }, 12000));
     this.record("타자", "주루", "땅볼 세이프율", byRun.map((row) => row.safe), "up");
     this.record("타자", "주루", "병살 회피율(주자 1루 땅볼)", byRun.map((row) => row.avoided), "up");
     this.record("타자", "주루", "외야 안타 때 추가 진루율", byRun.map((row) => row.extra), "up");
+    const skill = (n) => new c.BbFielderSkill(n), from = { x: -12, z: 38 }, to = { x: -18, z: 30 };
+    this.record("타자", "수비", "수비수 이동 속도 배율", levels.map((n) => skill(n).moveScale), "up");
+    this.record("타자", "수비", "송구 속도 배율", levels.map((n) => skill(n).throwScale), "up");
+    this.record("타자", "수비", "포구 범위 보너스(m)", levels.map((n) => skill(n).rangeBonus), "up");
+    this.record("타자", "수비", "유격수 10m 이동 시간(초)", levels.map((n) => c.BbFielderMotion.secondsTo("SS", from, to, false, skill(n))), "down");
+    this.record("타자", "수비", "포수 수비별 상대 장타 성분 배율", levels.map((n) => c.BbCatcherFraming.topWeight(n)), "down");
+    const byDefense = [1, 4, 7].map((n) => this.swings({ contact: 3, power: 3, speed: 3, defense: n }, 10000).contact);
+    this.record("타자", "수비", "자기 타격 접촉률(불변, 1·4·7)", byDefense, "same");
   }
 
   print() {

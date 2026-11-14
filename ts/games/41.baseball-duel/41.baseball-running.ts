@@ -1,6 +1,11 @@
 interface BbRunner {
   id: string;
   earned: boolean;
+  speed?: number;
+}
+
+interface BbLegs {
+  speed: number;
 }
 
 type BbBases = [BbRunner | null, BbRunner | null, BbRunner | null];
@@ -38,15 +43,17 @@ class BbRunnerMotion {
     return topSpeed / BbRunnerMotion.ACCELERATION + (distance - rampDistance) / topSpeed;
   }
 
-  static fromBaseSeconds(basesAhead: number, abilities: BbBatterAbilities): number {
+  static legsOf(runner: BbRunner, fallback: BbLegs): BbLegs { return runner.speed === undefined ? fallback : { speed: runner.speed }; }
+
+  static fromBaseSeconds(basesAhead: number, abilities: BbLegs): number {
     return BbRunnerMotion.REACTION + BbRunnerMotion.runSeconds(BbDiamond.GAP * basesAhead - BbRunnerMotion.LEAD, BbBatterAbilityModel.topSpeed(abilities.speed));
   }
 
-  static taggingSeconds(abilities: BbBatterAbilities): number {
+  static taggingSeconds(abilities: BbLegs): number {
     return BbRunnerMotion.REACTION + BbDiamond.GAP / BbBatterAbilityModel.topSpeed(abilities.speed);
   }
 
-  static batterSeconds(base: number, abilities: BbBatterAbilities): number {
+  static batterSeconds(base: number, abilities: BbLegs): number {
     return BbBatterAbilityModel.firstBaseSeconds(abilities.speed) + (base - 1) * BbDiamond.GAP / BbBatterAbilityModel.topSpeed(abilities.speed);
   }
 }
@@ -89,16 +96,17 @@ class BbAutoBaseRunning implements BbBaserunningController {
   static readonly FIRST_TO_THIRD_BONUS = 0.3;
 
   onHit(bases: BbBases, batter: BbRunner, abilities: BbBatterAbilities, retrieve: BbRetrieve, throws: BbThrowClock): BbAdvance[] {
-    const margin = BbBatterAbilityModel.advanceMargin(abilities.speed), moves: BbAdvance[] = [];
+    const moves: BbAdvance[] = [];
     const toRightField = retrieve.spot.x > 0 && BbDiamond.fromHome(retrieve.spot) >= BbAutoBaseRunning.RIGHT_FIELD_DEPTH;
     let ceiling = 4;
     for (let from = 3; from >= 0; from--) {
       const runner = from === 0 ? batter : bases[from - 1];
       if (!runner) continue;
+      const legs = from === 0 ? abilities : BbRunnerMotion.legsOf(runner, abilities), margin = BbBatterAbilityModel.advanceMargin(legs.speed);
       const forcedBase = this.isForced(bases, from) ? from + 1 : from;
       let to = from, arriveAt = 0;
       for (let next = from + 1; next <= Math.min(4, ceiling); next++) {
-        const runnerAt = from === 0 ? BbRunnerMotion.batterSeconds(next, abilities) : retrieve.holdSeconds + BbRunnerMotion.fromBaseSeconds(next - from, abilities);
+        const runnerAt = from === 0 ? BbRunnerMotion.batterSeconds(next, legs) : retrieve.holdSeconds + BbRunnerMotion.fromBaseSeconds(next - from, legs);
         const ballAt = retrieve.at + throws.secondsTo(retrieve.spot, next);
         const needed = toRightField && from === 1 && next === 3 ? margin - BbAutoBaseRunning.FIRST_TO_THIRD_BONUS : margin;
         if (next > forcedBase && ballAt - runnerAt < needed) break;
@@ -116,7 +124,7 @@ class BbAutoBaseRunning implements BbBaserunningController {
     for (let from = 3; from >= 1; from--) {
       const runner = bases[from - 1];
       if (!runner) continue;
-      const next = from + 1, runnerAt = catchAt + BbRunnerMotion.taggingSeconds(abilities), ballAt = catchAt + throws.secondsTo(spot, next) + BbTagUpRule.TAG_SECONDS;
+      const next = from + 1, runnerAt = catchAt + BbRunnerMotion.taggingSeconds(BbRunnerMotion.legsOf(runner, abilities)), ballAt = catchAt + throws.secondsTo(spot, next) + BbTagUpRule.TAG_SECONDS;
       const goes = next <= ceiling && BbTagUpRule.tries(from, depth) && ballAt > runnerAt;
       moves.push({ runner, from, to: goes ? next : from, arriveAt: goes ? runnerAt : catchAt, forced: false, out: false });
       ceiling = goes && next >= 4 ? 4 : (goes ? next : from) - 1;
@@ -130,7 +138,7 @@ class BbAutoBaseRunning implements BbBaserunningController {
       const runner = bases[from - 1];
       if (!runner) continue;
       const forced = this.isForced(bases, from);
-      moves.push({ runner, from, to: forced ? from + 1 : from, arriveAt: forced ? BbRunnerMotion.fromBaseSeconds(1, abilities) : 0, forced, out: false });
+      moves.push({ runner, from, to: forced ? from + 1 : from, arriveAt: forced ? BbRunnerMotion.fromBaseSeconds(1, BbRunnerMotion.legsOf(runner, abilities)) : 0, forced, out: false });
     }
     if (batter) moves.push({ runner: batter, from: 0, to: 1, arriveAt: BbRunnerMotion.batterSeconds(1, abilities), forced: true, out: false });
     return moves;

@@ -22,13 +22,45 @@ BbFielderPositions.ALL = ["P", "C", "1B", "2B", "SS", "3B", "LF", "CF", "RF"];
 BbFielderPositions.INFIELD = ["P", "C", "1B", "2B", "SS", "3B"];
 BbFielderPositions.OUTFIELD = ["LF", "CF", "RF"];
 BbFielderPositions.BASE = BbDefenseDepth.SPOTS;
+class BbFielderSkill {
+    constructor(points) {
+        this.points = points;
+        const gap = points - BbFielderSkill.BASE_POINTS;
+        this.moveScale = 1 + BbFielderSkill.MOVE_STEP * gap;
+        this.throwScale = 1 + BbFielderSkill.THROW_STEP * gap;
+        this.rangeBonus = BbFielderSkill.RANGE_STEP * gap;
+    }
+}
+BbFielderSkill.BASE_POINTS = 3;
+BbFielderSkill.MOVE_STEP = 0.02;
+BbFielderSkill.THROW_STEP = 0.02;
+BbFielderSkill.RANGE_STEP = 0.08;
+BbFielderSkill.BASE = new BbFielderSkill(BbFielderSkill.BASE_POINTS);
+class BbDefenseCrew {
+    constructor(points) {
+        this.skills = new Map();
+        this.arms = new Map();
+        points.forEach((value, position) => this.skills.set(position, new BbFielderSkill(value)));
+    }
+    skillOf(position) { return this.skills.get(position) || BbFielderSkill.BASE; }
+    pointsOf(position) { return this.skillOf(position).points; }
+    arm(position) {
+        let arm = this.arms.get(position);
+        if (!arm) {
+            arm = new BbThrowDecision(this.skillOf(position).throwScale);
+            this.arms.set(position, arm);
+        }
+        return arm;
+    }
+}
+BbDefenseCrew.STANDARD = new BbDefenseCrew(new Map());
 class BbFielderMotion {
-    static secondsTo(position, from, to, liner) {
+    static secondsTo(position, from, to, liner, skill = BbFielderSkill.BASE) {
         const outfield = BbFielderPositions.isOutfield(position);
-        const speed = position === "C" ? BbFielderMotion.CATCHER_SPEED : outfield ? BbFielderMotion.OUTFIELD_SPEED : BbFielderMotion.INFIELD_SPEED;
+        const speed = (position === "C" ? BbFielderMotion.CATCHER_SPEED : outfield ? BbFielderMotion.OUTFIELD_SPEED : BbFielderMotion.INFIELD_SPEED) * skill.moveScale;
         const quick = liner && !outfield;
         const reaction = quick ? BbFielderMotion.LINER_REACTION : position === "C" ? BbFielderMotion.CATCHER_REACTION : outfield ? BbFielderMotion.OUTFIELD_REACTION : BbFielderMotion.INFIELD_REACTION;
-        const dive = (outfield ? BbFielderMotion.OUTFIELD_DIVE : BbFielderMotion.INFIELD_DIVE) + (quick ? BbFielderMotion.LINER_DIVE_BONUS : 0);
+        const dive = (outfield ? BbFielderMotion.OUTFIELD_DIVE : BbFielderMotion.INFIELD_DIVE) + (quick ? BbFielderMotion.LINER_DIVE_BONUS : 0) + skill.rangeBonus;
         return reaction + Math.max(0, BbDiamond.distance(from, to) - dive) / speed;
     }
 }
@@ -43,14 +75,17 @@ BbFielderMotion.INFIELD_DIVE = 1.3;
 BbFielderMotion.OUTFIELD_DIVE = 2;
 BbFielderMotion.LINER_DIVE_BONUS = 0.5;
 class BbThrowDecision {
+    constructor(armScale = 1) {
+        this.armScale = armScale;
+    }
     static rangeDelay(moved) { return Math.min(BbThrowDecision.RANGE_SECONDS_LIMIT, moved * BbThrowDecision.RANGE_SECONDS_PER_METER); }
     secondsTo(from, base) {
         const distance = BbDiamond.distance(from, BbDiamond.base(base)), deep = BbDiamond.fromHome(from) >= BbThrowDecision.OUTFIELD_DEPTH;
-        const release = deep ? BbThrowDecision.OUTFIELD_RELEASE : BbThrowDecision.INFIELD_RELEASE, speed = deep ? BbThrowDecision.OUTFIELD_SPEED : BbThrowDecision.INFIELD_SPEED;
+        const release = deep ? BbThrowDecision.OUTFIELD_RELEASE : BbThrowDecision.INFIELD_RELEASE, speed = (deep ? BbThrowDecision.OUTFIELD_SPEED : BbThrowDecision.INFIELD_SPEED) * this.armScale;
         return release + distance / speed + (distance > BbThrowDecision.RELAY_BEYOND ? BbThrowDecision.RELAY_SECONDS : 0);
     }
     relaySeconds(fromBase, toBase) {
-        return BbThrowDecision.PIVOT_SECONDS + BbDiamond.distance(BbDiamond.base(fromBase), BbDiamond.base(toBase)) / BbThrowDecision.INFIELD_SPEED;
+        return BbThrowDecision.PIVOT_SECONDS + BbDiamond.distance(BbDiamond.base(fromBase), BbDiamond.base(toBase)) / (BbThrowDecision.INFIELD_SPEED * this.armScale);
     }
 }
 BbThrowDecision.INFIELD_RELEASE = 0.45;
@@ -86,6 +121,10 @@ class BbNoErrorPolicy {
     fumbles() { return false; }
 }
 class BbAutoFielding {
+    constructor(crew = BbDefenseCrew.STANDARD) {
+        this.crew = crew;
+    }
+    secondsTo(position, from, to, liner) { return BbFielderMotion.secondsTo(position, from, to, liner, this.crew.skillOf(position)); }
     static callerAmong(reach, order, leaderSlack) {
         let best = null, bestSeconds = Infinity;
         order.forEach((position, index) => {
@@ -104,7 +143,7 @@ class BbAutoFielding {
         const spot = BbDiamond.polar(ball.carry, ball.spray), liner = ball.flight === "line";
         const reach = new Map();
         among.forEach((position) => {
-            const seconds = BbFielderMotion.secondsTo(position, spots.get(position), spot, liner);
+            const seconds = this.secondsTo(position, spots.get(position), spot, liner);
             if (seconds <= ball.hang)
                 reach.set(position, seconds);
         });
@@ -126,7 +165,7 @@ class BbAutoFielding {
                 const home = spots.get(position);
                 if (!BbFielderPositions.isOutfield(position) && distance > BbDiamond.fromHome(home) + BbAutoFielding.INFIELD_BACKPEDAL)
                     return;
-                const seconds = BbFielderMotion.secondsTo(position, home, spot, false);
+                const seconds = this.secondsTo(position, home, spot, false);
                 if (seconds <= ballAt && seconds < bestSeconds) {
                     best = position;
                     bestSeconds = seconds;
@@ -140,7 +179,7 @@ class BbAutoFielding {
         const rest = BbDiamond.polar(Math.max(fromDistance, stop), ball.spray), stoppedAt = startSpeed / BbBattedBallPhysics.GROUND_SLOWING;
         let nearest = among[0], nearestSeconds = Infinity;
         among.forEach((position) => {
-            const seconds = BbFielderMotion.secondsTo(position, spots.get(position), rest, false);
+            const seconds = this.secondsTo(position, spots.get(position), rest, false);
             if (seconds < nearestSeconds) {
                 nearest = position;
                 nearestSeconds = seconds;
@@ -162,7 +201,7 @@ class BbAutoFielding {
         BbFielderPositions.ALL.forEach((position) => {
             if (position === "C" || position === "P")
                 return;
-            const seconds = BbFielderMotion.secondsTo(position, spots.get(position), spot, false);
+            const seconds = this.secondsTo(position, spots.get(position), spot, false);
             if (seconds < bySeconds) {
                 by = position;
                 bySeconds = seconds;

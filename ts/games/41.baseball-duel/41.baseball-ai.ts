@@ -17,14 +17,18 @@ class BbAiLevel {
     hard: { label: "어려움", readDeviation: 0.18, timingDeviation: 0.045, aimDeviation: 0.06, middleMistake: 0, repeatWeight: 0.3 }
   };
 
-  static pitcherSheet(hand: BbHand): BbPitcherSheet {
+  static pitcherSheet(hand: BbHand, role: BbPitcherRole = "starter"): BbPitcherSheet {
     const points = BbAiLevel.ABILITY_POINTS;
-    return { abilities: { control: points, power: points, breaking: points }, hand, pitches: new BbPitchSelection(points).usable(), role: "starter" };
+    return { abilities: { control: points, power: points, breaking: points, stamina: points }, hand, pitches: new BbPitchSelection(points).usable(), role };
   }
 
-  static batterSheet(hand: BbHand): BbBatterSheet {
+  static batterSheet(hand: BbHand, position: BbLineupPosition = BbRosterPlan.DESIGNATED): BbBatterSheet {
     const points = BbAiLevel.ABILITY_POINTS;
-    return { abilities: { contact: points, power: points, speed: points }, hand };
+    return { abilities: { contact: points, power: points, speed: points, defense: points }, hand, position };
+  }
+
+  static team(hand: BbHand = "R"): BbTeamSheet {
+    return { lineup: BbRosterPlan.BATTING_ORDER.map((position) => BbAiLevel.batterSheet(hand, position)), pitchers: BbRosterPlan.pitcherRoles().map((role) => BbAiLevel.pitcherSheet(hand, role)) };
   }
 }
 
@@ -38,7 +42,7 @@ class BbAiPitcher {
 
   constructor(private readonly level: BbAiTuning) {}
 
-  choose(balls: number, strikes: number, sheet: BbPitcherSheet, lastPitch: BbPitchId | null, random: BbSeededRandom): BbPitchCall {
+  choose(balls: number, strikes: number, sheet: BbPitcherSheet, lastPitch: BbPitchId | null, random: BbSeededRandom, condition: BbPitchCondition = BbPitchCondition.FRESH): BbPitchCall {
     const ahead = balls < strikes, behind = balls >= 3, breakingShare = behind ? 0.25 : ahead ? 0.6 : 0.4;
     const breaking = sheet.pitches.filter((id) => id !== "ft");
     const weights = sheet.pitches.map((id) => {
@@ -49,7 +53,7 @@ class BbAiPitcher {
     for (let index = 0; index < weights.length; index++) { roll -= weights[index]; if (roll <= 0) { pitch = sheet.pitches[index]; break; } }
     const target = random.chance(this.level.middleMistake) ? { u: random.gaussian(0, 0.25), v: random.gaussian(0, 0.25) } : this.target(ahead, behind, random);
     const noisy = { u: target.u + random.gaussian(0, this.level.aimDeviation), v: target.v + random.gaussian(0, this.level.aimDeviation) };
-    return { pitch, aim: BbAimLimiter.clamp(noisy, BbPitchCatalog.of(pitch), sheet.abilities, sheet.hand) };
+    return { pitch, aim: BbAimLimiter.clamp(noisy, BbPitchCatalog.of(pitch), sheet.abilities, sheet.hand, condition) };
   }
 
   private target(ahead: boolean, behind: boolean, random: BbSeededRandom): BbZonePoint {
@@ -62,8 +66,8 @@ class BbAiPitcher {
 
 class BbAiBatter {
   static readonly TWO_STRIKE_REACH = 1.15;
-  static readonly THREE_BALL_REACH = 0.7;
-  static readonly NORMAL_REACH = 0.92;
+  static readonly THREE_BALL_REACH = 0.6;
+  static readonly NORMAL_REACH = 0.84;
   static readonly BREAK_READ_STEP = 0.5;
   static readonly SPEED_RUSH = 0.05;
   static readonly COMFORT_SPEED = 136.5;
@@ -90,29 +94,26 @@ interface BbHalfInningTally {
   pitches: number;
 }
 
+type BbAiPitchWatcher = (state: BbGameState, outcome: BbPitchOutcome, note: BbOutcomeNote, battingIndex: number, engine: BbMatchEngine) => void;
+
 class BbAiMatchRunner {
-  private readonly rules: BbMatchRules;
-  private readonly judge: BbPitchJudge;
+  constructor(private readonly format: BbMatchFormat, private readonly dimensions: BbFieldDimensions, private readonly errors: BbErrorPolicy, private readonly teams: readonly [BbTeamSheet, BbTeamSheet], private readonly pitcherLevels: readonly [BbAiTuning, BbAiTuning], private readonly batterLevels: readonly [BbAiTuning, BbAiTuning], private readonly substitutions: readonly [BbSubstitutionPolicy, BbSubstitutionPolicy] = [new BbTiredSubstitution(), new BbTiredSubstitution()]) {}
 
-  constructor(format: BbMatchFormat, dimensions: BbFieldDimensions, errors: BbErrorPolicy, private readonly teams: readonly [BbTeamSheet, BbTeamSheet], private readonly pitcherLevels: readonly [BbAiTuning, BbAiTuning], private readonly batterLevels: readonly [BbAiTuning, BbAiTuning]) {
-    this.rules = new BbMatchRules(format);
-    this.judge = new BbPitchJudge(dimensions, errors, this.rules);
-  }
-
-  play(random: BbSeededRandom, onPitch?: (state: BbGameState, outcome: BbPitchOutcome, note: BbOutcomeNote, battingIndex: number) => void, stopAfterHalves?: number): BbGameState {
-    const state = this.rules.start(), lineups = [new BbLineup(this.teams[0].lineup), new BbLineup(this.teams[1].lineup)];
+  play(random: BbSeededRandom, onPitch?: BbAiPitchWatcher, stopAfterHalves?: number, onChange?: (engine: BbMatchEngine, team: 0 | 1, from: number) => void): BbGameState {
+    const engine = new BbMatchEngine(this.format, this.dimensions, this.errors, this.teams), state = engine.state;
     let lastPitch: BbPitchId | null = null, previousSpeed: number | null = null;
     while (!state.finished && (stopAfterHalves === undefined || state.halvesDone < stopAfterHalves)) {
-      const battingIndex = this.rules.battingIndex(state), fieldingIndex = this.rules.fieldingIndex(state);
-      const pitcher = this.teams[fieldingIndex].pitchers[0], batter = lineups[battingIndex].current();
-      const call = new BbAiPitcher(this.pitcherLevels[fieldingIndex]).choose(state.balls, state.strikes, pitcher, lastPitch, random);
-      const roll = BbPitchRoller.roll(call.pitch, call.aim, pitcher.abilities, pitcher.hand, random.seed());
+      const battingIndex = engine.battingIndex, fieldingIndex = engine.fieldingIndex, roster = engine.roster();
+      const relief = this.substitutions[fieldingIndex].nextPitcher(roster), leaving = roster.currentIndex();
+      if (relief !== null && engine.change(relief)) { lastPitch = null; if (onChange) onChange(engine, fieldingIndex, leaving); }
+      const pitcher = engine.pitcher(), batter = engine.batter();
+      const call = new BbAiPitcher(this.pitcherLevels[fieldingIndex]).choose(state.balls, state.strikes, pitcher, lastPitch, random, engine.condition());
+      const roll = engine.roll(call, random.seed());
       const offset = new BbAiBatter(this.batterLevels[battingIndex]).decide(roll, state.balls, state.strikes, batter.hand, previousSpeed, pitcher.abilities, random);
-      const outcome = this.judge.judge(state, roll, offset, batter), note = this.rules.apply(state, outcome);
-      if (onPitch) onPitch(state, outcome, note, battingIndex);
+      const settled = engine.settle(roll, offset), note = settled.note;
+      if (onPitch) onPitch(state, settled.outcome, note, battingIndex, engine);
       lastPitch = note.plateAppearanceOver ? null : call.pitch;
       previousSpeed = note.plateAppearanceOver ? null : roll.speed;
-      if (note.plateAppearanceOver) lineups[battingIndex].advance();
     }
     return state;
   }
