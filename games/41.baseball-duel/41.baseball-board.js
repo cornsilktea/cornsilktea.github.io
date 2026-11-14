@@ -32,9 +32,9 @@ class BbBoardCatalog {
     static entries(raw) {
         const slots = AccountShape.slots(raw);
         return Object.keys(slots).map((uid) => {
-            const row = slots[uid];
+            const row = slots[uid], who = BbStudentName.split(String(row && row.n || "학생"), String(row && row.c || BbStudentName.NO_CLASS));
             return {
-                uid, n: String(row && row.n || "학생"), c: String(row && row.c || "none"), g: AccountNumbers.count(row && row.g),
+                uid, n: who.name, c: who.cls, g: AccountNumbers.count(row && row.g),
                 bat: BbStatsMath.counts(row && row.bat, BbStatsKeys.BAT, BbBoxScoreBuilder.emptyBat()), pit: BbStatsMath.counts(row && row.pit, BbStatsKeys.PIT, BbBoxScoreBuilder.emptyPit())
             };
         });

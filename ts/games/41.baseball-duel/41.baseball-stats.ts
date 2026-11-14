@@ -279,11 +279,25 @@ class BbStatsMath {
   }
 }
 
+class BbStudentName {
+  private static readonly NUMBERED = /^\s*([1-3])(\d{2})\d{2}\s+(\S.*)$/;
+  private static readonly CLASS_KEY = /^[1-3]-[1-5]$/;
+  static readonly NO_CLASS = "none";
+
+  static split(rawName: string, rawClass: string): { name: string; cls: string } {
+    const found = BbStudentName.NUMBERED.exec(rawName);
+    if (!found) return { name: rawName, cls: rawClass };
+    const numbered = found[1] + "-" + Number(found[2]);
+    return { name: found[3].trim(), cls: BbStudentName.CLASS_KEY.test(numbered) ? numbered : rawClass };
+  }
+}
+
 class BbBoardRow {
   static readonly ROOT = "baseballduel/board";
 
   static of(user: PortalUser, cls: unknown, node: BbStatsNode): Record<string, unknown> {
-    return { n: String(user.name || "학생").slice(0, AccountClassRank.NAME_MAX) || "학생", c: AccountClassRank.classKey(cls), g: node.g, bat: Object.assign({}, node.bat), pit: Object.assign({}, node.pit) };
+    const who = BbStudentName.split(String(user.name || "학생").slice(0, AccountClassRank.NAME_MAX) || "학생", AccountClassRank.classKey(cls));
+    return { n: who.name, c: who.cls, g: node.g, bat: Object.assign({}, node.bat), pit: Object.assign({}, node.pit) };
   }
 }
 
