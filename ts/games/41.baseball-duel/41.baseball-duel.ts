@@ -7,6 +7,7 @@ interface BbLocalGame {
   me: string;
   teams: [BbTeamSheet, BbTeamSheet];
   log: BbLogEvent[];
+  crew?: BbRosterLooks;
 }
 
 class BbLocalResume {
@@ -44,13 +45,17 @@ class BbModeRules {
     return {
       format: new BbOneInningFormat(), teams: game.teams, names: human === 1 ? [rival, game.me] : [game.me, rival], seats: human === 1 ? ["ai", "human"] : ["human", "ai"],
       level, seed: game.seed, halvesToPlay: game.mode === "match" ? null : 1, log: game.log, view: null, autoSwingAt: null,
-      looks: human === 1 ? [BbModeRules.aiLook(0), mine] : [mine, BbModeRules.aiLook(1)]
+      looks: human === 1 ? [BbModeRules.aiLook(0), mine] : [mine, BbModeRules.aiLook(1)],
+      crews: human === 1 ? [BbCrewDresser.aiCrew(0), BbProfileStore.looksOf(game.crew)] : [BbProfileStore.looksOf(game.crew), BbCrewDresser.aiCrew(1)]
     };
   }
 
   static showcase(seed: number): BbMatchPlan {
     const team = (): BbTeamSheet => (BbAiLevel.team("R"));
-    return { format: new BbThreeInningFormat(), teams: [team(), team()], names: ["", ""], seats: ["ai", "ai"], level: BbAiLevel.ALL.normal, seed, halvesToPlay: null, log: [], view: "pitcher", autoSwingAt: null, looks: [BbModeRules.aiLook(0), BbModeRules.aiLook(1)] };
+    return {
+      format: new BbThreeInningFormat(), teams: [team(), team()], names: ["", ""], seats: ["ai", "ai"], level: BbAiLevel.ALL.normal, seed, halvesToPlay: null, log: [], view: "pitcher", autoSwingAt: null,
+      looks: [BbModeRules.aiLook(0), BbModeRules.aiLook(1)], crews: [BbCrewDresser.aiCrew(0), BbCrewDresser.aiCrew(1)]
+    };
   }
 }
 
@@ -218,7 +223,7 @@ class BbDuelGame {
   private static readonly NOTICE_SECONDS = 2.5;
   private static readonly SEED_SPAN = 1000000007;
   private static readonly AI_FALLBACK_MS = 120000;
-  private static readonly CLIENT_VERSION = 20261113;
+  private static readonly CLIENT_VERSION = 20261114;
   private static readonly QUALITY_KEY = "baseballduel_quality_v1";
 
   private readonly stage: BbStage;
@@ -328,7 +333,8 @@ class BbDuelGame {
   private myName(): string { return PlayerProfile.storedNick() || "나"; }
 
   private myRecord(): BbPlayerRecord {
-    const record: BbPlayerRecord = { nick: this.myName(), isBot: false, joinedAt: this.backend.now(), slot: BbRoomRules.HOST_TEAM, look: this.profile.look, spectator: false, sheet: BbProfileStore.teamOf(BbProfileStore.load()) };
+    const stored = BbProfileStore.load();
+    const record: BbPlayerRecord = { nick: this.myName(), isBot: false, joinedAt: this.backend.now(), slot: BbRoomRules.HOST_TEAM, look: this.profile.look, spectator: false, sheet: BbProfileStore.teamOf(stored), crew: stored.looks };
     const card = this.rates.forRoom();
     if (card) record.vs = card;
     return record;
@@ -533,7 +539,9 @@ class BbDuelGame {
   }
 
   private sheetChanged(): void {
-    if (this.session && !this.live) this.session.ref.child("players/" + this.myId + "/sheet").set(BbProfileStore.teamOf(BbProfileStore.load()));
+    if (!this.session || this.live) return;
+    const stored = BbProfileStore.load();
+    this.session.ref.child("players/" + this.myId).update({ sheet: BbProfileStore.teamOf(stored), crew: stored.looks });
   }
 
   private startFromRoom(): void {
@@ -560,9 +568,10 @@ class BbDuelGame {
     const flip = !randomMatch && this.flipped(session), rivalId = guest ? guestId as string : BbRoomRules.AI_SEAT, rivalName = guest ? guest.nick : "AI " + BbAiLevel.ALL[setup.level].label;
     const ids = BbRoomRules.seatIds(rivalId, this.myId, flip) as [string, string], ownSheet = BbProfileStore.teamOf(mine.sheet);
     const lookOf = (id: string, team: 0 | 1): CharacterLook => { const record = session.players.get(id); return BbWardrobe.lookOf(record ? record.look : null, BbModeRules.aiLook(team)); };
+    const crewOf = (id: string, team: 0 | 1): BbRosterLooks => { const record = session.players.get(id); return record ? BbProfileStore.looksOf(record.crew) : BbCrewDresser.aiCrew(team); };
     const match: BbRoomMatch = {
       id: this.backend.now(), seats: { s0: ids[0], s1: ids[1] }, sheets: flip ? [ownSheet, rival] : [rival, ownSheet],
-      names: flip ? [mine.nick, rivalName] : [rivalName, mine.nick], level: setup.level, looks: [lookOf(ids[0], 0), lookOf(ids[1], 1)]
+      names: flip ? [mine.nick, rivalName] : [rivalName, mine.nick], level: setup.level, looks: [lookOf(ids[0], 0), lookOf(ids[1], 1)], crews: [crewOf(ids[0], 0), crewOf(ids[1], 1)]
     };
     session.ref.update({ match, status: "play", end: null, log: null });
   }
@@ -590,10 +599,16 @@ class BbDuelGame {
       format: new BbOneInningFormat(), teams: [BbProfileStore.teamOf(match.sheets[0]), BbProfileStore.teamOf(match.sheets[1])], names: match.names,
       seats: BbRoomRules.seatsFor(match, this.myId, session.isHost()), level: BbAiLevel.ALL[match.level] || BbAiLevel.ALL.normal, seed: match.id % BbDuelGame.SEED_SPAN,
       halvesToPlay: null, log, view: BbRoomRules.teamOf(match, this.myId) === null ? "pitcher" : null, autoSwingAt: null, scouting: this.scouting(session, match),
-      looks: [BbWardrobe.lookOf(match.looks ? match.looks[0] : null, BbModeRules.aiLook(0)), BbWardrobe.lookOf(match.looks ? match.looks[1] : null, BbModeRules.aiLook(1))]
+      looks: [BbWardrobe.lookOf(match.looks ? match.looks[0] : null, BbModeRules.aiLook(0)), BbWardrobe.lookOf(match.looks ? match.looks[1] : null, BbModeRules.aiLook(1))],
+      crews: [this.crewOf(match, 0), this.crewOf(match, 1)]
     }, link);
     if (log.length) this.director.say("방금 상황을 불러왔어요");
     if (this.random) this.random.armMatch();
+  }
+
+  private crewOf(match: BbRoomMatch, team: 0 | 1): BbRosterLooks {
+    const seat = team === 0 ? match.seats.s0 : match.seats.s1, stored = match.crews ? match.crews[team] : null;
+    return seat === BbRoomRules.AI_SEAT ? BbCrewDresser.aiCrew(team) : BbProfileStore.looksOf(stored);
   }
 
   private closeLive(): void {
@@ -617,7 +632,7 @@ class BbDuelGame {
     const profile = BbProfileStore.load(), mine: BbTeamSheet = { lineup: profile.lineup, pitchers: profile.pitchers }, rival: BbTeamSheet = BbAiLevel.team("R");
     const human = BbModeRules.humanTeam(mode);
     this.last = { mode, level };
-    this.play({ mode, level, seed: Math.floor(Math.random() * 1e9) + 1, me: this.myName(), teams: human === 1 ? [rival, mine] : [mine, rival], log: [] }, "");
+    this.play({ mode, level, seed: Math.floor(Math.random() * 1e9) + 1, me: this.myName(), teams: human === 1 ? [rival, mine] : [mine, rival], log: [], crew: profile.looks }, "");
   }
 
   private play(game: BbLocalGame, note: string): void {

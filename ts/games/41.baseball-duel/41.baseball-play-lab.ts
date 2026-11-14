@@ -59,6 +59,7 @@ class BbPlayLab {
   private plan(): BbMatchPlan {
     const profile = BbProfileStore.load(), options = this.options;
     return {
+      crews: [BbCrewDresser.aiCrew(0), profile.looks],
       format: new BbThreeInningFormat(), names: ["AI " + this.level.label, "나"], seats: ["ai", options.autoPitch ? "ai" : "human"], level: this.level, seed: options.seed,
       halvesToPlay: null, log: [], view: null, autoSwingAt: options.autoSwingAt,
       teams: [

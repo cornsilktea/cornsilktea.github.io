@@ -10,6 +10,30 @@ interface BbStageCast {
   throwsLeft: boolean;
 }
 
+interface BbCrewDress {
+  pitchers: Array<{ look: CharacterLook; hand: BbHand }>;
+  batters: Array<{ look: CharacterLook; hand: BbHand; position: BbLineupPosition }>;
+}
+
+class BbCrewDresser {
+  private static readonly AI_TYPES = 13;
+
+  static of(team: BbTeamSheet, base: CharacterLook, crew: BbRosterLooks | null | undefined): BbCrewDress {
+    const order = team.pitchers.map((sheet, index) => ({ sheet, index })), roles = BbRosterPlan.PITCHER_SLOTS.map((slot) => slot.role);
+    order.sort((a, b) => (roles.indexOf(a.sheet.role) - roles.indexOf(b.sheet.role)) || a.index - b.index);
+    const pick = (list: ReadonlyArray<CharacterLook | null> | undefined, index: number) => (list && list[index] ? CharacterLooks.clean(list[index]) : base);
+    return {
+      pitchers: order.map((entry) => ({ look: pick(crew ? crew.p : undefined, entry.index), hand: entry.sheet.hand })),
+      batters: team.lineup.map((sheet, index) => ({ look: pick(crew ? crew.b : undefined, index), hand: sheet.hand, position: sheet.position || BbRosterPlan.DESIGNATED }))
+    };
+  }
+
+  static aiCrew(team: 0 | 1): BbRosterLooks {
+    const look = (index: number) => CharacterLooks.clean({ c: (index * 5 + team * 3) % BbCrewDresser.AI_TYPES, p: { skin: (index + team) % 5, hair: (index * 3 + team) % 8 } });
+    return { p: BbRosterPlan.pitcherRoles().map((_, index) => look(index + 9)), b: BbRosterPlan.BATTING_ORDER.map((_, index) => look(index)) };
+  }
+}
+
 class BbBroadcastShots {
   static pitcher(): BbCameraShot {
     return { position: BbFieldSpace.toWorld(-3.6, BbFieldGeometry.RUBBER_DISTANCE + 17, 7.2), look: BbFieldSpace.toWorld(0.5, 10, 0), fieldOfView: 19, keepsWidth: true };
@@ -69,6 +93,7 @@ class BbStage {
   private static readonly FIELDERS: readonly BbRoleId[] = ["pitcher", "catcher", "first", "second", "short", "third", "left", "center", "right"];
   private static readonly RUNNERS: readonly BbRoleId[] = ["runner", "runnerFirst", "runnerSecond", "runnerThird"];
   private static readonly TEAM_KITS: readonly BbTeamKit[] = [BbTeamKits.AWAY, BbTeamKits.HOME];
+  private static readonly ROLE_OF: Readonly<Record<BbLineupPosition, BbRoleId | null>> = { C: "catcher", "1B": "first", "2B": "second", "3B": "third", SS: "short", LF: "left", CF: "center", RF: "right", DH: null };
   private static readonly CUT_DISTANCE = 30;
   private static readonly WIDTH_KEPT_ASPECT = 1.6;
   private static readonly WIDEST_VIEW = 100;
@@ -96,6 +121,9 @@ class BbStage {
   private wardrobe: BbWardrobe | null = null;
   private studio: BbPortraitStudio | null = null;
   private tailor: { factory: CharacterModelFactory; assets: CharacterAssets } | null = null;
+  private readonly bench = new Map<string, BbPlayerActor>();
+  private bullpens: [BbPlayerActor[], BbPlayerActor[]] = [[], []];
+  private lineups: [BbPlayerActor[], BbPlayerActor[]] = [[], []];
   private pixelRatio = Math.min(window.devicePixelRatio, BbStage.PIXEL_RATIO_CAP);
 
   constructor(private readonly libs: ThreeLibs, canvas: HTMLCanvasElement) {
@@ -188,9 +216,63 @@ class BbStage {
     BbStage.RUNNERS.forEach((role) => make(role, { look: mine, kit: batKit, headGear: "helmet", gloveSide: null, chestProtector: false, carriesBat: false, flapOnLeft: batterFlapOnLeft }));
   }
 
+  private benched(actor: BbPlayerActor): boolean {
+    for (const kept of this.bench.values()) if (kept === actor) return true;
+    return false;
+  }
+
+  dressCrews(crews: readonly [BbCrewDress, BbCrewDress]): void {
+    if (!this.wardrobe) return;
+    const used = new Set<string>();
+    ([0, 1] as Array<0 | 1>).forEach((team) => {
+      const crew = crews[team], fieldKit = BbStage.TEAM_KITS[team], batKit = BbStage.TEAM_KITS[team === 0 ? 1 : 0];
+      crew.batters.forEach((batter) => {
+        const role = BbStage.ROLE_OF[batter.position], actor = role ? this.casts[team].get(role) : null;
+        if (role && actor && !BbWardrobe.sameLook(actor.outfit.look, batter.look)) this.place(team, role, { ...actor.outfit, look: batter.look });
+      });
+      this.bullpens[team] = crew.pitchers.map((pitcher) => this.reserve(used, "p", { look: pitcher.look, kit: fieldKit, headGear: "cap", gloveSide: pitcher.hand === "L" ? "right" : "left", chestProtector: false, carriesBat: false, flapOnLeft: false }));
+      this.lineups[team] = crew.batters.map((batter) => this.reserve(used, "b", { look: batter.look, kit: batKit, headGear: "helmet", gloveSide: null, chestProtector: false, carriesBat: true, flapOnLeft: batter.hand !== "L" }));
+    });
+    this.bench.forEach((actor, key) => { if (!used.has(key)) { this.scene.remove(actor.root); this.bench.delete(key); } });
+    ([0, 1] as Array<0 | 1>).forEach((team) => { this.mound(team, 0); this.atBat(team, 0); });
+    this.field(this.fielding);
+  }
+
+  undressCrews(): void {
+    this.bullpens = [[], []];
+    this.lineups = [[], []];
+  }
+
+  mound(team: 0 | 1, index: number): void { this.swapIn(team, "pitcher", this.bullpens[team][index]); }
+
+  atBat(team: 0 | 1, index: number): void { this.swapIn(team === 0 ? 1 : 0, "batter", this.lineups[team][index]); }
+
+  private reserve(used: Set<string>, kind: string, outfit: BbActorOutfit): BbPlayerActor {
+    const key = kind + "|" + outfit.kit.cap + "|" + outfit.gloveSide + "|" + outfit.flapOnLeft + "|" + JSON.stringify(outfit.look);
+    let actor = this.bench.get(key);
+    if (!actor) {
+      actor = (this.wardrobe as BbWardrobe).actor(outfit);
+      actor.root.visible = false;
+      this.scene.add(actor.root);
+      this.bench.set(key, actor);
+    }
+    used.add(key);
+    return actor;
+  }
+
+  private swapIn(castTeam: 0 | 1, role: BbRoleId, actor: BbPlayerActor | undefined): void {
+    const cast = this.casts[castTeam], old = cast.get(role);
+    if (!actor || old === actor) return;
+    if (!actor.root.parent) this.scene.add(actor.root);
+    actor.root.visible = !!old && old.root.visible;
+    if (old) old.root.visible = false;
+    cast.set(role, actor);
+  }
+
   private place(team: 0 | 1, role: BbRoleId, outfit: BbActorOutfit): void {
     const old = this.casts[team].get(role), actor = (this.wardrobe as BbWardrobe).actor(outfit);
-    if (old) this.scene.remove(old.root);
+    if (old && this.benched(old)) old.root.visible = false;
+    else if (old) this.scene.remove(old.root);
     this.scene.add(actor.root);
     actor.root.visible = false;
     this.casts[team].set(role, actor);

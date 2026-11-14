@@ -137,6 +137,15 @@ class BbProfileStore {
     return profile;
   }
 
+  static looksOf(raw: unknown): BbRosterLooks {
+    const source = raw && typeof raw === "object" ? raw as { p?: unknown; b?: unknown } : {}, blank = BbProfileStore.blankLooks();
+    const fit = (list: unknown, size: number) => Array.from({ length: size }, (_, index) => {
+      const item = list && typeof list === "object" ? (list as Record<string, unknown>)[index] : null;
+      return item && typeof item === "object" ? CharacterLooks.clean(item) : null;
+    });
+    return { p: fit(source.p, blank.p.length), b: fit(source.b, blank.b.length) };
+  }
+
   static pointsOf(plan: BbAbilityPlan, abilities: object): number[] {
     const values = abilities as Record<string, number>;
     return plan.items.map((item) => values[item.key]);

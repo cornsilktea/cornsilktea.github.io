@@ -1,4 +1,20 @@
 "use strict";
+class BbCrewDresser {
+    static of(team, base, crew) {
+        const order = team.pitchers.map((sheet, index) => ({ sheet, index })), roles = BbRosterPlan.PITCHER_SLOTS.map((slot) => slot.role);
+        order.sort((a, b) => (roles.indexOf(a.sheet.role) - roles.indexOf(b.sheet.role)) || a.index - b.index);
+        const pick = (list, index) => (list && list[index] ? CharacterLooks.clean(list[index]) : base);
+        return {
+            pitchers: order.map((entry) => ({ look: pick(crew ? crew.p : undefined, entry.index), hand: entry.sheet.hand })),
+            batters: team.lineup.map((sheet, index) => ({ look: pick(crew ? crew.b : undefined, index), hand: sheet.hand, position: sheet.position || BbRosterPlan.DESIGNATED }))
+        };
+    }
+    static aiCrew(team) {
+        const look = (index) => CharacterLooks.clean({ c: (index * 5 + team * 3) % BbCrewDresser.AI_TYPES, p: { skin: (index + team) % 5, hair: (index * 3 + team) % 8 } });
+        return { p: BbRosterPlan.pitcherRoles().map((_, index) => look(index + 9)), b: BbRosterPlan.BATTING_ORDER.map((_, index) => look(index)) };
+    }
+}
+BbCrewDresser.AI_TYPES = 13;
 class BbBroadcastShots {
     static pitcher() {
         return { position: BbFieldSpace.toWorld(-3.6, BbFieldGeometry.RUBBER_DISTANCE + 17, 7.2), look: BbFieldSpace.toWorld(0.5, 10, 0), fieldOfView: 19, keepsWidth: true };
@@ -54,6 +70,9 @@ class BbStage {
         this.wardrobe = null;
         this.studio = null;
         this.tailor = null;
+        this.bench = new Map();
+        this.bullpens = [[], []];
+        this.lineups = [[], []];
         this.pixelRatio = Math.min(window.devicePixelRatio, BbStage.PIXEL_RATIO_CAP);
         const THREE = libs.THREE;
         this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -140,9 +159,67 @@ class BbStage {
         make("batter", { look: mine, kit: batKit, headGear: "helmet", gloveSide: null, chestProtector: false, carriesBat: true, flapOnLeft: batterFlapOnLeft });
         BbStage.RUNNERS.forEach((role) => make(role, { look: mine, kit: batKit, headGear: "helmet", gloveSide: null, chestProtector: false, carriesBat: false, flapOnLeft: batterFlapOnLeft }));
     }
+    benched(actor) {
+        for (const kept of this.bench.values())
+            if (kept === actor)
+                return true;
+        return false;
+    }
+    dressCrews(crews) {
+        if (!this.wardrobe)
+            return;
+        const used = new Set();
+        [0, 1].forEach((team) => {
+            const crew = crews[team], fieldKit = BbStage.TEAM_KITS[team], batKit = BbStage.TEAM_KITS[team === 0 ? 1 : 0];
+            crew.batters.forEach((batter) => {
+                const role = BbStage.ROLE_OF[batter.position], actor = role ? this.casts[team].get(role) : null;
+                if (role && actor && !BbWardrobe.sameLook(actor.outfit.look, batter.look))
+                    this.place(team, role, { ...actor.outfit, look: batter.look });
+            });
+            this.bullpens[team] = crew.pitchers.map((pitcher) => this.reserve(used, "p", { look: pitcher.look, kit: fieldKit, headGear: "cap", gloveSide: pitcher.hand === "L" ? "right" : "left", chestProtector: false, carriesBat: false, flapOnLeft: false }));
+            this.lineups[team] = crew.batters.map((batter) => this.reserve(used, "b", { look: batter.look, kit: batKit, headGear: "helmet", gloveSide: null, chestProtector: false, carriesBat: true, flapOnLeft: batter.hand !== "L" }));
+        });
+        this.bench.forEach((actor, key) => { if (!used.has(key)) {
+            this.scene.remove(actor.root);
+            this.bench.delete(key);
+        } });
+        [0, 1].forEach((team) => { this.mound(team, 0); this.atBat(team, 0); });
+        this.field(this.fielding);
+    }
+    undressCrews() {
+        this.bullpens = [[], []];
+        this.lineups = [[], []];
+    }
+    mound(team, index) { this.swapIn(team, "pitcher", this.bullpens[team][index]); }
+    atBat(team, index) { this.swapIn(team === 0 ? 1 : 0, "batter", this.lineups[team][index]); }
+    reserve(used, kind, outfit) {
+        const key = kind + "|" + outfit.kit.cap + "|" + outfit.gloveSide + "|" + outfit.flapOnLeft + "|" + JSON.stringify(outfit.look);
+        let actor = this.bench.get(key);
+        if (!actor) {
+            actor = this.wardrobe.actor(outfit);
+            actor.root.visible = false;
+            this.scene.add(actor.root);
+            this.bench.set(key, actor);
+        }
+        used.add(key);
+        return actor;
+    }
+    swapIn(castTeam, role, actor) {
+        const cast = this.casts[castTeam], old = cast.get(role);
+        if (!actor || old === actor)
+            return;
+        if (!actor.root.parent)
+            this.scene.add(actor.root);
+        actor.root.visible = !!old && old.root.visible;
+        if (old)
+            old.root.visible = false;
+        cast.set(role, actor);
+    }
     place(team, role, outfit) {
         const old = this.casts[team].get(role), actor = this.wardrobe.actor(outfit);
-        if (old)
+        if (old && this.benched(old))
+            old.root.visible = false;
+        else if (old)
             this.scene.remove(old.root);
         this.scene.add(actor.root);
         actor.root.visible = false;
@@ -249,6 +326,7 @@ BbStage.HIDDEN_BEHIND_PLATE = ["catcher", "umpire"];
 BbStage.FIELDERS = ["pitcher", "catcher", "first", "second", "short", "third", "left", "center", "right"];
 BbStage.RUNNERS = ["runner", "runnerFirst", "runnerSecond", "runnerThird"];
 BbStage.TEAM_KITS = [BbTeamKits.AWAY, BbTeamKits.HOME];
+BbStage.ROLE_OF = { C: "catcher", "1B": "first", "2B": "second", "3B": "third", SS: "short", LF: "left", CF: "center", RF: "right", DH: null };
 BbStage.CUT_DISTANCE = 30;
 BbStage.WIDTH_KEPT_ASPECT = 1.6;
 BbStage.WIDEST_VIEW = 100;

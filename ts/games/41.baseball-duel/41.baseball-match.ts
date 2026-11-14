@@ -13,6 +13,7 @@ interface BbMatchPlan {
   autoSwingAt: number | null;
   scouting?: [BbTeamScout | null, BbTeamScout | null];
   looks?: [CharacterLook, CharacterLook];
+  crews?: [BbRosterLooks | null, BbRosterLooks | null];
 }
 
 interface BbTeamScout {
@@ -31,6 +32,8 @@ interface BbMatchSummary {
 interface BbMatchLink {
   pitchChosen(sequence: number, call: BbPitchCall): void;
   swingChosen(sequence: number, contactOffset: number | null): void;
+  changeChosen(sequence: number, index: number): void;
+  timeChosen(sequence: number, on: boolean): void;
 }
 
 interface BbMatchEvents {
@@ -61,6 +64,8 @@ class BbPitchClock {
   onWarn: () => void = () => undefined;
 
   constructor(host: HTMLElement) { this.element = BbHudParts.box("bb-clock", host); }
+
+  get remaining(): number { return this.left; }
 
   start(seconds: number): void {
     this.left = seconds;
@@ -97,12 +102,15 @@ class BbLocalLink implements BbMatchLink {
 
   pitchChosen(sequence: number, call: BbPitchCall): void { this.director.deliverPitch(sequence, call, this.seeds.seed()); }
   swingChosen(sequence: number, contactOffset: number | null): void { this.director.deliverSwing(sequence, contactOffset); }
+  changeChosen(sequence: number, index: number): void { this.director.deliverChange(sequence, index); }
+  timeChosen(): void { return; }
 }
 
 class BbMatchDirector {
   private static readonly SWING_CLOSES_AFTER = 0;
   private static readonly FAST_PACE = 2.2;
   private static readonly PITCH_SECONDS = 12;
+  static readonly TIME_OUT_SECONDS = 10;
   private static readonly REMOTE_LEAD = 0.8;
   private static readonly HOLD_BEFORE = 0.42;
   private static readonly AWAY_AFTER = 3;
@@ -125,7 +133,12 @@ class BbMatchDirector {
   private readonly cards: BbMatchupCards;
   private readonly toast: BbCallToast;
   private readonly clock: BbPitchClock;
+  private readonly picker: BbReliefPicker;
+  private readonly timeBanner: BbTimeBanner;
   private readonly queued: BbScene[] = [];
+  private timeLeft = 0;
+  private clockLeft = 0;
+  private remoteTime = 0;
   private plan!: BbMatchPlan;
   private session!: BbDuelSession;
   private link!: BbMatchLink;
@@ -142,10 +155,12 @@ class BbMatchDirector {
   private atmosphere: BbAtmosphere | null = null;
 
   constructor(private readonly stage: BbStage, private readonly hud: BbScoreHud, host: HTMLElement, private readonly events: BbMatchEvents) {
-    this.cards = new BbMatchupCards(host);
+    this.cards = new BbMatchupCards(host, () => this.callTime(), () => this.takeRelief());
     this.toast = new BbCallToast(host);
     this.report = new BbPitchReport(host);
     this.clock = new BbPitchClock(host);
+    this.picker = new BbReliefPicker(host, () => this.endTime());
+    this.timeBanner = new BbTimeBanner(host);
     this.ticker = new BbBoardTicker(hud);
     this.player = new BbScenePlayer(stage, hud, (call) => this.called(call));
     this.scenes = new BbSceneFactory(() => this.stage.metrics);
@@ -205,6 +220,10 @@ class BbMatchDirector {
     this.swing.hide();
     this.report.hide();
     this.clock.hide();
+    this.timeLeft = 0;
+    this.remoteTime = 0;
+    this.picker.close();
+    this.timeBanner.show(0);
   }
 
   skipScene(): void {
@@ -251,7 +270,8 @@ class BbMatchDirector {
     if (!this.staged) return;
     if (!this.running || this.waitingForCall || this.halted) {
       this.player.idle(frameSeconds);
-      if (this.running && !this.halted && this.clock.tick(frameSeconds)) this.pitchForIdler();
+      if (this.running && !this.halted) this.countTime(frameSeconds);
+      if (this.running && !this.halted && this.timeLeft <= 0 && this.clock.tick(frameSeconds)) this.pitchForIdler();
     } else this.advance(frameSeconds);
     if (!this.orbiting) { this.player.frame(frameSeconds); return; }
     this.orbitAngle += frameSeconds * BbMatchDirector.ORBIT_TURN;
@@ -265,6 +285,11 @@ class BbMatchDirector {
     this.session = new BbDuelSession(plan.format, BbBallparkRegistry.MAIN.dimensions, plan.teams, new BbSeededRandom(plan.seed + plan.log.length * BbMatchDirector.RESUME_STRIDE));
     this.session.restore(plan.log);
     if (plan.looks) this.stage.dress(plan.looks);
+    const crews = plan.crews;
+    if (crews) {
+      const base = (team: 0 | 1) => (plan.looks ? plan.looks[team] : new PlayerProfile().look);
+      this.stage.dressCrews([BbCrewDresser.of(plan.teams[0], base(0), crews[0]), BbCrewDresser.of(plan.teams[1], base(1), crews[1])]);
+    } else this.stage.undressCrews();
     if (this.atmosphere) this.atmosphere.tension(false);
     this.hud.players(plan.names[0], plan.names[1]);
     this.queued.length = 0;
@@ -282,12 +307,109 @@ class BbMatchDirector {
   private scoutOf(team: 0 | 1): BbTeamScout | null { return this.plan.scouting ? this.plan.scouting[team] : null; }
 
   private showCards(): void {
-    const session = this.session, names = this.plan.names, seats = this.plan.seats, batting = this.scoutOf(session.battingIndex), fielding = this.scoutOf(session.fieldingIndex);
+    const session = this.session, names = this.plan.names, seats = this.plan.seats, hitters = this.scoutOf(session.battingIndex), throwers = this.scoutOf(session.fieldingIndex);
     const facts: BbCardFacts = {
-      batting: batting ? batting.batStats : [], pitching: fielding ? fielding.pitStats : [],
-      batterHeat: seats[session.fieldingIndex] === "human" && batting ? batting.hitHeat : null, pitcherHeat: seats[session.battingIndex] === "human" && fielding ? fielding.pitchHeat : null
+      batting: hitters ? hitters.batStats : [], pitching: throwers ? throwers.pitStats : [],
+      batterHeat: seats[session.fieldingIndex] === "human" && hitters ? hitters.hitHeat : null, pitcherHeat: seats[session.battingIndex] === "human" && throwers ? throwers.pitchHeat : null
     };
-    this.cards.show(names[session.battingIndex], session.batter(), names[session.fieldingIndex], session.pitcher(), session.board().pitches, facts);
+    const batting = session.battingIndex, fielding = session.fieldingIndex, roster = session.roster(), lineup = session.engine.lineup();
+    this.stage.mound(fielding, roster.currentIndex());
+    this.stage.atBat(batting, lineup.currentIndex());
+    const stamina = roster.stamina().level(), choosing = this.canChange(), next = roster.recommended();
+    this.cards.show({
+      batterName: names[batting], batter: session.batter(), batterFace: this.faceOf(batting, "b", lineup.currentIndex()),
+      pitcherName: names[fielding], pitcher: session.pitcher(), pitcherFace: this.faceOf(fielding, "p", roster.currentIndex()),
+      pitches: roster.pitchesThisOuting(), stamina, canChange: choosing, facts,
+      relief: choosing && roster.stamina().isSpent() && next !== null ? { sheet: roster.pitchers[next], face: this.faceOf(fielding, "p", next) } : null
+    });
+  }
+
+  private faceOf(team: 0 | 1, kind: "p" | "b", index: number): string | null {
+    const plan = this.plan, crew = plan.crews ? plan.crews[team] : null, base = plan.looks ? plan.looks[team] : null;
+    if (!crew && !base) return null;
+    const dress = BbCrewDresser.of(plan.teams[team], base || new PlayerProfile().look, crew), entry = kind === "p" ? dress.pitchers[index] : dress.batters[index];
+    return entry ? this.stage.portrait(entry.look, team) : null;
+  }
+
+  private canChange(): boolean {
+    const session = this.session;
+    return this.running && this.waitingForCall && !this.pending && !this.halted && this.timeLeft <= 0 && this.plan.seats[session.fieldingIndex] === "human" && session.roster().available().length > 0;
+  }
+
+  private callTime(): void {
+    if (!this.canChange()) return;
+    const session = this.session, roster = session.roster();
+    this.timeLeft = BbMatchDirector.TIME_OUT_SECONDS;
+    this.clockLeft = this.clock.remaining;
+    this.clock.hide();
+    this.pad.close();
+    this.picker.count(this.timeLeft);
+    this.picker.open(roster.available().map((index) => ({ index, sheet: roster.pitchers[index], face: this.faceOf(session.fieldingIndex, "p", index), stamina: roster.stamina(index).level() })), (index) => this.chooseRelief(index));
+    this.link.timeChosen(session.log.length, true);
+    this.showCards();
+  }
+
+  private countTime(frameSeconds: number): void {
+    if (this.timeLeft > 0) {
+      this.timeLeft -= frameSeconds;
+      this.picker.count(this.timeLeft);
+      if (this.timeLeft <= 0) this.endTime();
+    }
+    if (this.remoteTime > 0) {
+      this.remoteTime = Math.max(0, this.remoteTime - frameSeconds);
+      this.timeBanner.show(this.remoteTime);
+    }
+  }
+
+  private endTime(): void {
+    const session = this.session, was = this.timeLeft > 0 || this.picker.isOpen;
+    this.timeLeft = 0;
+    this.picker.close();
+    if (!was || !this.running) return;
+    this.link.timeChosen(session.log.length, false);
+    if (this.waitingForCall && !this.pending && this.plan.seats[session.fieldingIndex] === "human") {
+      const batting = this.scoutOf(session.battingIndex);
+      this.pad.open(session.pitcher(), batting ? batting.hitHeat : null);
+      this.clock.start(Math.max(1, this.clockLeft));
+    }
+    this.showCards();
+  }
+
+  private chooseRelief(index: number): void {
+    if (this.timeLeft <= 0 && !this.picker.isOpen) return;
+    this.timeLeft = 0;
+    this.picker.close();
+    this.link.changeChosen(this.session.log.length, index);
+  }
+
+  private takeRelief(): void {
+    const roster = this.session.roster(), next = roster.recommended();
+    if (!this.canChange() || next === null) return;
+    this.pad.close();
+    this.clock.hide();
+    this.link.changeChosen(this.session.log.length, next);
+  }
+
+  showRemoteTime(seconds: number): void {
+    if (this.plan && this.session && this.plan.seats[this.session.fieldingIndex] === "human") return;
+    const left = Math.max(0, seconds);
+    if (Math.abs(left - this.remoteTime) < 0.5 && left > 0) return;
+    this.remoteTime = left;
+    this.timeBanner.show(left);
+  }
+
+  deliverChange(sequence: number, index: number): boolean {
+    const session = this.session;
+    if (!this.running || !this.waitingForCall || this.pending || sequence !== session.log.length) return false;
+    if (!session.change(index)) return false;
+    this.timeLeft = 0;
+    this.remoteTime = 0;
+    this.picker.close();
+    this.timeBanner.show(0);
+    this.events.onLog(session.log);
+    this.toast.show("투수 교체", BbRosterPlan.roleLabel(session.pitcher().role) + " 등판");
+    this.nextPitch();
+    return true;
   }
 
   matchProgress(): number { return this.session ? new BbMatchRules(this.plan.format).progress(this.session.state) : 0; }
@@ -319,23 +441,21 @@ class BbMatchDirector {
 
   private nextPitch(): void {
     if (this.isOver()) { this.finish(null); return; }
-    this.relieveTiredAi();
     const session = this.session, seat = this.plan.seats[session.fieldingIndex], sequence = session.log.length;
     this.player.view = this.viewNow();
+    this.waitingForCall = true;
+    this.timeLeft = 0;
+    this.picker.close();
     this.show();
     this.report.hide();
     this.swing.hide();
-    this.waitingForCall = true;
     this.player.play(this.idleScene());
     if (seat === "human") { const batting = this.scoutOf(session.battingIndex); this.pad.open(session.pitcher(), batting ? batting.hitHeat : null); this.clock.start(BbMatchDirector.PITCH_SECONDS); }
-    else if (seat === "ai") this.link.pitchChosen(sequence, session.aiCall(this.plan.level));
-  }
-
-  private relieveTiredAi(): void {
-    const session = this.session;
-    if (this.plan.seats[session.fieldingIndex] !== "ai" || !(this.link instanceof BbLocalLink)) return;
-    const relief = session.tiredRelief();
-    if (relief !== null && session.change(relief)) this.events.onLog(session.log);
+    else if (seat === "ai") {
+      const relief = session.tiredRelief();
+      if (relief !== null) this.link.changeChosen(sequence, relief);
+      else this.link.pitchChosen(sequence, session.aiCall(this.plan.level));
+    }
   }
 
   private humanThrows(call: BbPitchCall): void {

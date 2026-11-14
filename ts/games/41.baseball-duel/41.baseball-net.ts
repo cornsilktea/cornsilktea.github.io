@@ -1,5 +1,6 @@
 interface BbPlayerRecord extends RkPlayerRecord {
   sheet: BbTeamSheet;
+  crew?: BbRosterLooks;
   vs?: BbVersusCard;
 }
 
@@ -16,6 +17,7 @@ interface BbRoomMatch {
   names: [string, string];
   level: BbAiLevelId;
   looks?: [CharacterLook, CharacterLook];
+  crews?: [BbRosterLooks | null, BbRosterLooks | null];
 }
 
 interface BbRoomEnd {
@@ -26,7 +28,9 @@ interface BbRoomEnd {
 interface BbNetPitch { t: BbPitchId; u: number; v: number }
 interface BbNetRoll { seed: number; at: number }
 interface BbNetSwing { k: "take" | "swing"; o?: number }
-interface BbNetEntry { p?: BbNetPitch; r?: BbNetRoll; s?: BbNetSwing }
+interface BbNetChange { to: number }
+interface BbNetTime { at: number; done?: number }
+interface BbNetEntry { p?: BbNetPitch; r?: BbNetRoll; s?: BbNetSwing; c?: BbNetChange; t?: BbNetTime }
 
 class BbRoomRules {
   static readonly AI_SEAT = "ai";
@@ -81,17 +85,25 @@ class BbRoomLink implements BbMatchLink {
     this.log = session.ref.child("log");
   }
 
-  async open(): Promise<BbLogEntry[]> {
+  async open(): Promise<BbLogEvent[]> {
     const snapshot = await this.log.once("value"), stored = snapshot.val<Record<string, BbNetEntry>>() || {};
     Object.keys(stored).forEach((key) => this.entries.set(Number(key), stored[key]));
     this.log.on("child_added", this.onEntry);
     this.log.on("child_changed", this.onEntry);
-    const done: BbLogEntry[] = [];
+    const done: BbLogEvent[] = [];
     for (let sequence = 0; ; sequence++) {
-      const entry = this.entries.get(sequence);
+      const entry = this.entries.get(sequence), change = entry ? BbRoomLink.changeOf(entry) : null;
+      if (change !== null) { done.push({ change }); continue; }
       if (!entry || !entry.p || !entry.r || !entry.s) return done;
       done.push({ pitch: BbRoomLink.pitchOf(entry.p), aim: BbRoomLink.aimOf(entry.p), seed: entry.r.seed >>> 0, contactOffset: BbRoomLink.offsetOf(entry.s) });
     }
+  }
+
+  changeChosen(sequence: number, index: number): void { this.claim(sequence + "/c", { to: index }); }
+
+  timeChosen(sequence: number, on: boolean): void {
+    const time = this.log.child(sequence + "/t");
+    (on ? time.set({ at: this.backend.now() }) : time.child("done").set(1)).catch(() => undefined);
   }
 
   close(): void {
@@ -111,7 +123,10 @@ class BbRoomLink implements BbMatchLink {
   }
 
   pump(): void {
-    const sequence = this.director.sequence, entry = this.entries.get(sequence), hosting = this.session.isHost();
+    const sequence = this.director.sequence, entry = this.entries.get(sequence), hosting = this.session.isHost(), change = entry ? BbRoomLink.changeOf(entry) : null;
+    if (change !== null && this.director.deliverChange(sequence, change)) return;
+    const time = entry && entry.t && !entry.t.done && !entry.p && change === null ? entry.t : null;
+    this.director.showRemoteTime(time ? BbMatchDirector.TIME_OUT_SECONDS - (this.backend.now() - Number(time.at)) / 1000 : 0);
     if (!entry || !entry.p) return;
     if (!entry.r) {
       if (hosting && !this.asked.has(sequence)) { this.asked.add(sequence); this.claim(sequence + "/r", { seed: Math.floor(Math.random() * 4294967296), at: this.backend.now() }); }
@@ -125,6 +140,11 @@ class BbRoomLink implements BbMatchLink {
 
   private claim(path: string, value: object): void {
     this.log.child(path).transaction((current) => (current !== null && current !== undefined ? undefined : value)).catch(() => undefined);
+  }
+
+  private static changeOf(entry: BbNetEntry): number | null {
+    const to = entry.c ? Number(entry.c.to) : NaN;
+    return Number.isInteger(to) && to >= 0 && to < BbRosterPlan.pitcherCount() ? to : null;
   }
 
   private static pitchOf(pitch: BbNetPitch): BbPitchId { return BbPitchCatalog.ALL.some((kind) => kind.id === pitch.t) ? pitch.t : "ft"; }

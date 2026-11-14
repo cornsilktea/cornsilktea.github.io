@@ -6,6 +6,7 @@ class BbPitchClock {
         this.onWarn = () => undefined;
         this.element = BbHudParts.box("bb-clock", host);
     }
+    get remaining() { return this.left; }
     start(seconds) {
         this.left = seconds;
         this.shown = -1;
@@ -42,6 +43,8 @@ class BbLocalLink {
     }
     pitchChosen(sequence, call) { this.director.deliverPitch(sequence, call, this.seeds.seed()); }
     swingChosen(sequence, contactOffset) { this.director.deliverSwing(sequence, contactOffset); }
+    changeChosen(sequence, index) { this.director.deliverChange(sequence, index); }
+    timeChosen() { return; }
 }
 class BbMatchDirector {
     constructor(stage, hud, host, events) {
@@ -49,6 +52,9 @@ class BbMatchDirector {
         this.hud = hud;
         this.events = events;
         this.queued = [];
+        this.timeLeft = 0;
+        this.clockLeft = 0;
+        this.remoteTime = 0;
         this.chance = new BbSeededRandom(1);
         this.pending = null;
         this.waitingForCall = false;
@@ -60,10 +66,12 @@ class BbMatchDirector {
         this.halted = false;
         this.orbitAngle = 0;
         this.atmosphere = null;
-        this.cards = new BbMatchupCards(host);
+        this.cards = new BbMatchupCards(host, () => this.callTime(), () => this.takeRelief());
         this.toast = new BbCallToast(host);
         this.report = new BbPitchReport(host);
         this.clock = new BbPitchClock(host);
+        this.picker = new BbReliefPicker(host, () => this.endTime());
+        this.timeBanner = new BbTimeBanner(host);
         this.ticker = new BbBoardTicker(hud);
         this.player = new BbScenePlayer(stage, hud, (call) => this.called(call));
         this.scenes = new BbSceneFactory(() => this.stage.metrics);
@@ -115,6 +123,10 @@ class BbMatchDirector {
         this.swing.hide();
         this.report.hide();
         this.clock.hide();
+        this.timeLeft = 0;
+        this.remoteTime = 0;
+        this.picker.close();
+        this.timeBanner.show(0);
     }
     skipScene() {
         const pending = this.pending;
@@ -169,7 +181,9 @@ class BbMatchDirector {
             return;
         if (!this.running || this.waitingForCall || this.halted) {
             this.player.idle(frameSeconds);
-            if (this.running && !this.halted && this.clock.tick(frameSeconds))
+            if (this.running && !this.halted)
+                this.countTime(frameSeconds);
+            if (this.running && !this.halted && this.timeLeft <= 0 && this.clock.tick(frameSeconds))
                 this.pitchForIdler();
         }
         else
@@ -189,6 +203,13 @@ class BbMatchDirector {
         this.session.restore(plan.log);
         if (plan.looks)
             this.stage.dress(plan.looks);
+        const crews = plan.crews;
+        if (crews) {
+            const base = (team) => (plan.looks ? plan.looks[team] : new PlayerProfile().look);
+            this.stage.dressCrews([BbCrewDresser.of(plan.teams[0], base(0), crews[0]), BbCrewDresser.of(plan.teams[1], base(1), crews[1])]);
+        }
+        else
+            this.stage.undressCrews();
         if (this.atmosphere)
             this.atmosphere.tension(false);
         this.hud.players(plan.names[0], plan.names[1]);
@@ -204,12 +225,110 @@ class BbMatchDirector {
     }
     scoutOf(team) { return this.plan.scouting ? this.plan.scouting[team] : null; }
     showCards() {
-        const session = this.session, names = this.plan.names, seats = this.plan.seats, batting = this.scoutOf(session.battingIndex), fielding = this.scoutOf(session.fieldingIndex);
+        const session = this.session, names = this.plan.names, seats = this.plan.seats, hitters = this.scoutOf(session.battingIndex), throwers = this.scoutOf(session.fieldingIndex);
         const facts = {
-            batting: batting ? batting.batStats : [], pitching: fielding ? fielding.pitStats : [],
-            batterHeat: seats[session.fieldingIndex] === "human" && batting ? batting.hitHeat : null, pitcherHeat: seats[session.battingIndex] === "human" && fielding ? fielding.pitchHeat : null
+            batting: hitters ? hitters.batStats : [], pitching: throwers ? throwers.pitStats : [],
+            batterHeat: seats[session.fieldingIndex] === "human" && hitters ? hitters.hitHeat : null, pitcherHeat: seats[session.battingIndex] === "human" && throwers ? throwers.pitchHeat : null
         };
-        this.cards.show(names[session.battingIndex], session.batter(), names[session.fieldingIndex], session.pitcher(), session.board().pitches, facts);
+        const batting = session.battingIndex, fielding = session.fieldingIndex, roster = session.roster(), lineup = session.engine.lineup();
+        this.stage.mound(fielding, roster.currentIndex());
+        this.stage.atBat(batting, lineup.currentIndex());
+        const stamina = roster.stamina().level(), choosing = this.canChange(), next = roster.recommended();
+        this.cards.show({
+            batterName: names[batting], batter: session.batter(), batterFace: this.faceOf(batting, "b", lineup.currentIndex()),
+            pitcherName: names[fielding], pitcher: session.pitcher(), pitcherFace: this.faceOf(fielding, "p", roster.currentIndex()),
+            pitches: roster.pitchesThisOuting(), stamina, canChange: choosing, facts,
+            relief: choosing && roster.stamina().isSpent() && next !== null ? { sheet: roster.pitchers[next], face: this.faceOf(fielding, "p", next) } : null
+        });
+    }
+    faceOf(team, kind, index) {
+        const plan = this.plan, crew = plan.crews ? plan.crews[team] : null, base = plan.looks ? plan.looks[team] : null;
+        if (!crew && !base)
+            return null;
+        const dress = BbCrewDresser.of(plan.teams[team], base || new PlayerProfile().look, crew), entry = kind === "p" ? dress.pitchers[index] : dress.batters[index];
+        return entry ? this.stage.portrait(entry.look, team) : null;
+    }
+    canChange() {
+        const session = this.session;
+        return this.running && this.waitingForCall && !this.pending && !this.halted && this.timeLeft <= 0 && this.plan.seats[session.fieldingIndex] === "human" && session.roster().available().length > 0;
+    }
+    callTime() {
+        if (!this.canChange())
+            return;
+        const session = this.session, roster = session.roster();
+        this.timeLeft = BbMatchDirector.TIME_OUT_SECONDS;
+        this.clockLeft = this.clock.remaining;
+        this.clock.hide();
+        this.pad.close();
+        this.picker.count(this.timeLeft);
+        this.picker.open(roster.available().map((index) => ({ index, sheet: roster.pitchers[index], face: this.faceOf(session.fieldingIndex, "p", index), stamina: roster.stamina(index).level() })), (index) => this.chooseRelief(index));
+        this.link.timeChosen(session.log.length, true);
+        this.showCards();
+    }
+    countTime(frameSeconds) {
+        if (this.timeLeft > 0) {
+            this.timeLeft -= frameSeconds;
+            this.picker.count(this.timeLeft);
+            if (this.timeLeft <= 0)
+                this.endTime();
+        }
+        if (this.remoteTime > 0) {
+            this.remoteTime = Math.max(0, this.remoteTime - frameSeconds);
+            this.timeBanner.show(this.remoteTime);
+        }
+    }
+    endTime() {
+        const session = this.session, was = this.timeLeft > 0 || this.picker.isOpen;
+        this.timeLeft = 0;
+        this.picker.close();
+        if (!was || !this.running)
+            return;
+        this.link.timeChosen(session.log.length, false);
+        if (this.waitingForCall && !this.pending && this.plan.seats[session.fieldingIndex] === "human") {
+            const batting = this.scoutOf(session.battingIndex);
+            this.pad.open(session.pitcher(), batting ? batting.hitHeat : null);
+            this.clock.start(Math.max(1, this.clockLeft));
+        }
+        this.showCards();
+    }
+    chooseRelief(index) {
+        if (this.timeLeft <= 0 && !this.picker.isOpen)
+            return;
+        this.timeLeft = 0;
+        this.picker.close();
+        this.link.changeChosen(this.session.log.length, index);
+    }
+    takeRelief() {
+        const roster = this.session.roster(), next = roster.recommended();
+        if (!this.canChange() || next === null)
+            return;
+        this.pad.close();
+        this.clock.hide();
+        this.link.changeChosen(this.session.log.length, next);
+    }
+    showRemoteTime(seconds) {
+        if (this.plan && this.session && this.plan.seats[this.session.fieldingIndex] === "human")
+            return;
+        const left = Math.max(0, seconds);
+        if (Math.abs(left - this.remoteTime) < 0.5 && left > 0)
+            return;
+        this.remoteTime = left;
+        this.timeBanner.show(left);
+    }
+    deliverChange(sequence, index) {
+        const session = this.session;
+        if (!this.running || !this.waitingForCall || this.pending || sequence !== session.log.length)
+            return false;
+        if (!session.change(index))
+            return false;
+        this.timeLeft = 0;
+        this.remoteTime = 0;
+        this.picker.close();
+        this.timeBanner.show(0);
+        this.events.onLog(session.log);
+        this.toast.show("투수 교체", BbRosterPlan.roleLabel(session.pitcher().role) + " 등판");
+        this.nextPitch();
+        return true;
     }
     matchProgress() { return this.session ? new BbMatchRules(this.plan.format).progress(this.session.state) : 0; }
     summary() { return this.plan && this.session ? { plan: this.plan, state: this.session.state, forfeitedBy: null } : null; }
@@ -237,29 +356,27 @@ class BbMatchDirector {
             this.finish(null);
             return;
         }
-        this.relieveTiredAi();
         const session = this.session, seat = this.plan.seats[session.fieldingIndex], sequence = session.log.length;
         this.player.view = this.viewNow();
+        this.waitingForCall = true;
+        this.timeLeft = 0;
+        this.picker.close();
         this.show();
         this.report.hide();
         this.swing.hide();
-        this.waitingForCall = true;
         this.player.play(this.idleScene());
         if (seat === "human") {
             const batting = this.scoutOf(session.battingIndex);
             this.pad.open(session.pitcher(), batting ? batting.hitHeat : null);
             this.clock.start(BbMatchDirector.PITCH_SECONDS);
         }
-        else if (seat === "ai")
-            this.link.pitchChosen(sequence, session.aiCall(this.plan.level));
-    }
-    relieveTiredAi() {
-        const session = this.session;
-        if (this.plan.seats[session.fieldingIndex] !== "ai" || !(this.link instanceof BbLocalLink))
-            return;
-        const relief = session.tiredRelief();
-        if (relief !== null && session.change(relief))
-            this.events.onLog(session.log);
+        else if (seat === "ai") {
+            const relief = session.tiredRelief();
+            if (relief !== null)
+                this.link.changeChosen(sequence, relief);
+            else
+                this.link.pitchChosen(sequence, session.aiCall(this.plan.level));
+        }
     }
     humanThrows(call) {
         if (!this.running || !this.waitingForCall || this.halted || this.plan.seats[this.session.fieldingIndex] !== "human")
@@ -373,6 +490,7 @@ class BbMatchDirector {
 BbMatchDirector.SWING_CLOSES_AFTER = 0;
 BbMatchDirector.FAST_PACE = 2.2;
 BbMatchDirector.PITCH_SECONDS = 12;
+BbMatchDirector.TIME_OUT_SECONDS = 10;
 BbMatchDirector.REMOTE_LEAD = 0.8;
 BbMatchDirector.HOLD_BEFORE = 0.42;
 BbMatchDirector.AWAY_AFTER = 3;

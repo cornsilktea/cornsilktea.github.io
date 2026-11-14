@@ -50,11 +50,20 @@ class BbRoomLink {
         this.log.on("child_changed", this.onEntry);
         const done = [];
         for (let sequence = 0;; sequence++) {
-            const entry = this.entries.get(sequence);
+            const entry = this.entries.get(sequence), change = entry ? BbRoomLink.changeOf(entry) : null;
+            if (change !== null) {
+                done.push({ change });
+                continue;
+            }
             if (!entry || !entry.p || !entry.r || !entry.s)
                 return done;
             done.push({ pitch: BbRoomLink.pitchOf(entry.p), aim: BbRoomLink.aimOf(entry.p), seed: entry.r.seed >>> 0, contactOffset: BbRoomLink.offsetOf(entry.s) });
         }
+    }
+    changeChosen(sequence, index) { this.claim(sequence + "/c", { to: index }); }
+    timeChosen(sequence, on) {
+        const time = this.log.child(sequence + "/t");
+        (on ? time.set({ at: this.backend.now() }) : time.child("done").set(1)).catch(() => undefined);
     }
     close() {
         this.log.off("child_added", this.onEntry);
@@ -69,7 +78,11 @@ class BbRoomLink {
         this.claim(sequence + "/s", contactOffset === null ? { k: "take" } : { k: "swing", o: Number(contactOffset.toFixed(4)) });
     }
     pump() {
-        const sequence = this.director.sequence, entry = this.entries.get(sequence), hosting = this.session.isHost();
+        const sequence = this.director.sequence, entry = this.entries.get(sequence), hosting = this.session.isHost(), change = entry ? BbRoomLink.changeOf(entry) : null;
+        if (change !== null && this.director.deliverChange(sequence, change))
+            return;
+        const time = entry && entry.t && !entry.t.done && !entry.p && change === null ? entry.t : null;
+        this.director.showRemoteTime(time ? BbMatchDirector.TIME_OUT_SECONDS - (this.backend.now() - Number(time.at)) / 1000 : 0);
         if (!entry || !entry.p)
             return;
         if (!entry.r) {
@@ -91,6 +104,10 @@ class BbRoomLink {
     }
     claim(path, value) {
         this.log.child(path).transaction((current) => (current !== null && current !== undefined ? undefined : value)).catch(() => undefined);
+    }
+    static changeOf(entry) {
+        const to = entry.c ? Number(entry.c.to) : NaN;
+        return Number.isInteger(to) && to >= 0 && to < BbRosterPlan.pitcherCount() ? to : null;
     }
     static pitchOf(pitch) { return BbPitchCatalog.ALL.some((kind) => kind.id === pitch.t) ? pitch.t : "ft"; }
     static aimOf(pitch) {

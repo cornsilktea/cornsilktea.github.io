@@ -77,11 +77,18 @@ class BbCountLamps {
 BbCountLamps.ROWS = [["B", 3, "ball"], ["S", 2, "strike"], ["O", 2, "out"]];
 class BbPlayerCard {
     constructor(host, side, role, abilityLabels, statLabels) {
-        const card = BbHudParts.box("bb-card bb-card-" + side, host), head = BbHudParts.box("bb-card-head", card);
+        this.faceUrl = "";
+        const card = BbHudParts.box("bb-card bb-card-" + side, host);
+        this.head = BbHudParts.box("bb-card-head", card);
         this.heatGrid = BbHudParts.box("bb-card-heat", card);
         this.heatCells = Array.from({ length: BbZoneGrid.CELLS }, () => BbHudParts.box("bb-card-heat-cell", this.heatGrid));
-        BbHudParts.box("bb-card-role", head, role);
-        this.name = BbHudParts.box("bb-card-name", head);
+        this.face = document.createElement("img");
+        this.face.className = "bb-card-face";
+        this.face.alt = "";
+        this.face.hidden = true;
+        this.head.appendChild(this.face);
+        BbHudParts.box("bb-card-role", this.head, role);
+        this.name = BbHudParts.box("bb-card-name", this.head);
         const abilities = BbHudParts.box("bb-card-abilities", card);
         this.fills = [];
         this.points = [];
@@ -91,20 +98,26 @@ class BbPlayerCard {
             this.fills.push(BbHudParts.box("bb-card-fill", BbHudParts.box("bb-card-bar", row)));
             this.points.push(BbHudParts.box("bb-card-point", row));
         });
+        this.middle = BbHudParts.box("bb-card-middle", card);
         const stats = BbHudParts.box("bb-card-stats", card);
         this.values = statLabels.map((label) => {
             const cell = BbHudParts.box("bb-card-stat", stats);
             BbHudParts.box("bb-card-stat-label", cell, label);
             return BbHudParts.box("bb-card-stat-value", cell, BbPlayerCard.NO_RECORD);
         });
+        this.tail = BbHudParts.box("bb-card-tail", card);
     }
-    show(name, points, stats = []) {
+    show(name, points, stats = [], face = null) {
         this.name.textContent = name;
         points.forEach((value, index) => {
             this.fills[index].style.transform = "scaleX(" + BbCurve.clamp(value / BbPlayerCard.MOST_POINTS, 0, 1).toFixed(3) + ")";
             this.points[index].textContent = String(value);
         });
         this.values.forEach((cell, index) => { cell.textContent = stats[index] || BbPlayerCard.NO_RECORD; });
+        this.face.hidden = !face;
+        if (face && face !== this.faceUrl)
+            this.face.src = face;
+        this.faceUrl = face || "";
     }
     heat(tones) {
         this.heatGrid.classList.toggle("open", !!tones);
@@ -113,16 +126,131 @@ class BbPlayerCard {
 }
 BbPlayerCard.MOST_POINTS = 7;
 BbPlayerCard.NO_RECORD = "-";
-class BbMatchupCards {
+class BbStaminaGauge {
     constructor(host) {
-        this.batter = new BbPlayerCard(host, "left", "타자", ["컨택", "파워", "주루"], ["타율", "출루율", "장타율", "홈런"]);
-        this.pitcher = new BbPlayerCard(host, "right", "투수", ["제구", "구위", "변화"], ["평균자책점", "WHIP", "피OPS", "투구수"]);
+        this.shown = -1;
+        const row = BbHudParts.box("bb-stamina", host);
+        BbHudParts.box("bb-stamina-label", row, "체력");
+        const track = BbHudParts.box("bb-stamina-track", row);
+        this.fill = BbHudParts.box("bb-stamina-fill", track);
+        this.value = BbHudParts.box("bb-stamina-value", track);
     }
-    show(batterName, batter, pitcherName, pitcher, pitches, facts = null) {
-        this.batter.show(batterName, [batter.abilities.contact, batter.abilities.power, batter.abilities.speed], facts ? facts.batting : []);
-        this.pitcher.show(pitcherName, [pitcher.abilities.control, pitcher.abilities.power, pitcher.abilities.breaking], [0, 1, 2].map((index) => (facts && facts.pitching[index]) || "").concat([String(pitches)]));
+    show(level) {
+        const whole = Math.max(0, Math.round(level));
+        if (whole === this.shown)
+            return;
+        this.shown = whole;
+        this.fill.style.transform = "scaleX(" + BbCurve.clamp(level / BbStaminaModel.FULL, 0, 1).toFixed(3) + ")";
+        this.fill.className = "bb-stamina-fill" + (level < BbStaminaModel.WORN_BELOW ? " worn" : level < BbStaminaModel.TIRED_BELOW ? " tired" : "");
+        this.value.textContent = String(whole);
+    }
+}
+class BbMoundCard extends BbPlayerCard {
+    constructor(host, onChange, onRelief) {
+        super(host, "right", "투수", ["제구", "구위", "변화", "체력"], ["평균자책점", "WHIP", "피OPS", "투구수"]);
+        this.changer = document.createElement("button");
+        this.changer.type = "button";
+        this.changer.className = "bb-card-change";
+        this.changer.textContent = "투수 교체";
+        this.changer.hidden = true;
+        this.changer.addEventListener("click", onChange);
+        this.head.appendChild(this.changer);
+        this.gauge = new BbStaminaGauge(this.middle);
+        this.relief = BbHudParts.box("bb-relief", this.tail);
+        this.relief.hidden = true;
+        BbHudParts.box("bb-relief-title", this.relief, "체력이 떨어졌어요 · 추천 투수");
+        const line = BbHudParts.box("bb-relief-line", this.relief);
+        this.reliefFace = document.createElement("img");
+        this.reliefFace.className = "bb-relief-face";
+        this.reliefFace.alt = "";
+        line.appendChild(this.reliefFace);
+        this.reliefText = BbHudParts.box("bb-relief-text", line);
+        const go = document.createElement("button");
+        go.type = "button";
+        go.className = "bb-relief-go";
+        go.textContent = "<투수 교체>";
+        go.addEventListener("click", onRelief);
+        this.relief.appendChild(go);
+    }
+    mound(stamina, canChange, offer) {
+        this.gauge.show(stamina);
+        this.changer.hidden = !canChange;
+        this.relief.hidden = !offer;
+        if (!offer)
+            return;
+        const abilities = offer.sheet.abilities;
+        this.reliefText.textContent = BbRosterPlan.roleLabel(offer.sheet.role) + " · 제구 " + abilities.control + " 구위 " + abilities.power + " 변화 " + abilities.breaking + " 체력 " + abilities.stamina;
+        this.reliefFace.hidden = !offer.face;
+        if (offer.face)
+            this.reliefFace.src = offer.face;
+    }
+}
+class BbMatchupCards {
+    constructor(host, onChange, onRelief) {
+        this.batter = new BbPlayerCard(host, "left", "타자", ["컨택", "파워", "주루", "수비"], ["타율", "출루율", "장타율", "홈런"]);
+        this.pitcher = new BbMoundCard(host, onChange, onRelief);
+    }
+    show(view) {
+        const facts = view.facts, batter = view.batter.abilities, pitcher = view.pitcher.abilities;
+        this.batter.show(view.batterName, [batter.contact, batter.power, batter.speed, batter.defense], facts ? facts.batting : [], view.batterFace);
+        this.pitcher.show(view.pitcherName, [pitcher.control, pitcher.power, pitcher.breaking, pitcher.stamina], [0, 1, 2].map((index) => (facts && facts.pitching[index]) || "").concat([String(view.pitches)]), view.pitcherFace);
+        this.pitcher.mound(view.stamina, view.canChange, view.relief);
         this.batter.heat(facts ? facts.batterHeat : null);
         this.pitcher.heat(facts ? facts.pitcherHeat : null);
+    }
+}
+class BbReliefPicker {
+    constructor(host, onCancel) {
+        this.onPick = () => undefined;
+        this.screen = BbHudParts.box("bb-picker", host);
+        const box = BbHudParts.box("bb-picker-window", this.screen), head = BbHudParts.box("bb-picker-head", box);
+        BbHudParts.box("bb-picker-title", head, "투수 교체");
+        this.clock = BbHudParts.box("bb-picker-clock", head);
+        const cancel = document.createElement("button");
+        cancel.type = "button";
+        cancel.className = "bb-picker-cancel";
+        cancel.textContent = "취소";
+        cancel.addEventListener("click", onCancel);
+        head.appendChild(cancel);
+        this.list = BbHudParts.box("bb-picker-list", box);
+    }
+    get isOpen() { return this.screen.classList.contains("open"); }
+    open(offers, onPick) {
+        this.onPick = onPick;
+        this.list.innerHTML = "";
+        offers.forEach((offer) => {
+            const button = document.createElement("button"), abilities = offer.sheet.abilities;
+            button.type = "button";
+            button.className = "bb-picker-card";
+            button.addEventListener("click", () => this.onPick(offer.index));
+            BbHudParts.box("bb-picker-role", button, BbRosterPlan.roleLabel(offer.sheet.role));
+            if (offer.face) {
+                const image = document.createElement("img");
+                image.src = offer.face;
+                image.alt = "";
+                button.appendChild(image);
+            }
+            BbHudParts.box("bb-picker-abilities", button, "제구 " + abilities.control + " · 구위 " + abilities.power + " · 변화 " + abilities.breaking + " · 체력 " + abilities.stamina);
+            new BbStaminaGauge(button).show(offer.stamina);
+            this.list.appendChild(button);
+        });
+        this.screen.classList.add("open");
+    }
+    count(seconds) { this.clock.textContent = Math.max(0, Math.ceil(seconds)) + "초"; }
+    close() { this.screen.classList.remove("open"); }
+}
+class BbTimeBanner {
+    constructor(host) {
+        this.shown = "";
+        this.element = BbHudParts.box("bb-timeout", host);
+    }
+    show(seconds) {
+        const text = seconds > 0 ? "투수 교체 중 · " + Math.ceil(seconds) + "초" : "";
+        if (text === this.shown)
+            return;
+        this.shown = text;
+        this.element.textContent = text;
+        this.element.classList.toggle("open", !!text);
     }
 }
 class BbBoardTicker {
