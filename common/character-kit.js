@@ -163,8 +163,25 @@ class CharacterLooks {
         return value < low ? low : value > high ? high : value;
     }
 }
+// 저장하지 않는 외형 한 벌(41번 야구 선수별 외형). 바꿀 때마다 onChange 로만 알린다.
+class LookDraft {
+    constructor(look, onChange = () => undefined) {
+        this.onChange = onChange;
+        this.persistent = false;
+        this.nick = "";
+        this.look = CharacterLooks.clean(look);
+    }
+    setNick() {
+        return;
+    }
+    setLook(look) {
+        this.look = CharacterLooks.clean(look);
+        this.onChange(this.look);
+    }
+}
 class PlayerProfile {
     constructor() {
+        this.persistent = true;
         this.nick = "";
         this.look = CharacterLooks.createDefault();
         this.fallbackNick = "";
@@ -556,7 +573,7 @@ class NickEditor {
         if (document.activeElement !== this.input)
             this.input.value = this.profile.nick;
         const locked = PlayerProfile.isNickLocked();
-        this.root.hidden = locked;
+        this.root.hidden = locked || !this.profile.persistent;
     }
     focus() {
         this.input.focus();
@@ -646,7 +663,8 @@ class ProfileEditor {
         this.root.querySelector(".ce-turn-right").addEventListener("click", () => this.preview.turn(0.8));
     }
     announceSettled() {
-        document.dispatchEvent(new CustomEvent(PlayerProfile.SETTLED_EVENT));
+        if (this.profile.persistent)
+            document.dispatchEvent(new CustomEvent(PlayerProfile.SETTLED_EVENT));
         this.onLookChanged();
     }
     applyCustomColorSoon(part, hex) {

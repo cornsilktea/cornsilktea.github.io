@@ -261,10 +261,11 @@ class BbDuelGame {
     this.hud = new BbScoreHud(document.getElementById("hudTop") as HTMLElement);
     this.director = new BbMatchDirector(this.stage, this.hud, controls, { onEnd: (summary) => this.ended(summary), onLog: (log) => this.logged(log) });
     this.pause = new BbPauseBanner(controls);
-    this.sheet = new BbSheetDialog(dialogs, (profile) => { this.sheetChanged(); void this.roster.push(profile); });
+    this.sheet = new BbSheetDialog(dialogs, new BbStageFaces(this.stage), (profile) => { this.sheetChanged(); void this.roster.push(profile); });
     void this.roster.pull();
     this.corner = document.getElementById("sheetCorner") as HTMLElement;
     this.corner.addEventListener("click", () => this.sheet.open());
+    (document.getElementById("btnPartySheet") as HTMLElement).addEventListener("click", () => this.sheet.open());
     this.room = new BbRoomCard(document.getElementById("roomMount") as HTMLElement, { change: (setup) => this.changeSetup(setup), start: () => this.startFromRoom(), leave: () => this.leaveRoom("") });
     this.result = new BbResultCard(document.getElementById("resultMount") as HTMLElement, () => this.again(), () => this.leaveRoom(""));
     this.sound = new BbSoundDirector(() => this.stage.listener);
@@ -426,6 +427,7 @@ class BbDuelGame {
     BbDuelGame.SCREENS.forEach((id) => { (document.getElementById(id) as HTMLElement).hidden = id !== shown; });
     document.body.classList.toggle("menu", shown !== null);
     this.corner.hidden = shown !== "startScreen" && shown !== "roomScreen";
+    if (shown === null) this.sheet.shut();
     this.menu.shut();
   }
 

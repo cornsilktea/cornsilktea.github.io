@@ -19,7 +19,7 @@ class BbPlayLab {
         this.level = BbAiLevel.ALL[this.options.level];
         this.stage = new BbStage(libs, document.getElementById("labView"));
         this.director = new BbMatchDirector(this.stage, new BbScoreHud(document.getElementById("hudTop")), controls, { onEnd: (summary) => this.finish(summary), onLog: () => undefined });
-        this.sheet = new BbSheetDialog(controls, () => this.director.preview(this.plan()));
+        this.sheet = new BbSheetDialog(controls, new BbStageFaces(this.stage), () => this.director.preview(this.plan()));
         new BbGameMenu(controls, [{ label: "연출 빠르게", onFlip: (on) => this.director.quicken(on) }], [["연출 건너뛰기", () => this.director.skipScene()], ["나가기", () => location.reload()]]);
         if (this.options.plain)
             document.body.classList.add("plain");
@@ -38,13 +38,13 @@ class BbPlayLab {
         this.stage.run((frameSeconds) => this.director.tick(frameSeconds));
     }
     plan() {
-        const profile = BbProfileStore.load(), batter = profile.lineup[0], pitcher = profile.pitchers[0], options = this.options;
+        const profile = BbProfileStore.load(), options = this.options;
         return {
             format: new BbThreeInningFormat(), names: ["AI " + this.level.label, "나"], seats: ["ai", options.autoPitch ? "ai" : "human"], level: this.level, seed: options.seed,
             halvesToPlay: null, log: [], view: null, autoSwingAt: options.autoSwingAt,
             teams: [
                 BbAiLevel.team("R"),
-                { lineup: [{ ...batter, hand: options.batsLeft ? "L" : batter.hand }], pitchers: [{ ...pitcher, hand: options.throwsLeft ? "L" : pitcher.hand }] }
+                { lineup: profile.lineup.map((batter) => ({ ...batter, hand: options.batsLeft ? "L" : batter.hand })), pitchers: profile.pitchers.map((pitcher) => ({ ...pitcher, hand: options.throwsLeft ? "L" : pitcher.hand })) }
             ]
         };
     }

@@ -53,6 +53,7 @@ class BbStage {
         this.crowd = null;
         this.wardrobe = null;
         this.studio = null;
+        this.tailor = null;
         this.pixelRatio = Math.min(window.devicePixelRatio, BbStage.PIXEL_RATIO_CAP);
         const THREE = libs.THREE;
         this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -86,6 +87,7 @@ class BbStage {
         new BbParkLighting(this.libs).addTo(this.scene);
         this.wardrobe = new BbWardrobe(this.libs, factory, assets, gear);
         this.studio = new BbPortraitStudio(this.libs, this.wardrobe);
+        this.tailor = { factory, assets };
         this.createActors(0, cast);
         this.createActors(1, cast);
         this.field(1);
@@ -162,6 +164,7 @@ class BbStage {
         this.field(this.fielding);
     }
     portrait(look, team) { return this.studio ? this.studio.shoot(look, BbStage.TEAM_KITS[team]) : null; }
+    lookEditor(draft) { return this.tailor ? new ProfileEditor(this.libs, this.tailor.factory, this.tailor.assets, draft) : null; }
     cheer(moment, batting) { if (this.crowd)
         this.crowd.react(moment, batting); }
     tension(on) { if (this.crowd)

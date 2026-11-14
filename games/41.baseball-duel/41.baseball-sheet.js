@@ -184,6 +184,8 @@ class BbAbilityPane {
     constructor(host, plan, onChange) {
         this.plan = plan;
         this.onChange = onChange;
+        this.rows = [];
+        this.notes = [];
         this.values = [];
         this.fills = [];
         this.raisers = [];
@@ -193,13 +195,19 @@ class BbAbilityPane {
         plan.items.forEach((item, index) => {
             const row = BbHudParts.box("bb-sheet-ability", host), words = BbHudParts.box("bb-sheet-words", row);
             BbHudParts.box("bb-sheet-ability-name", words, item.label);
-            BbHudParts.box("bb-sheet-ability-effect", words, item.effect);
-            this.fills.push(BbHudParts.box("bb-card-fill", BbHudParts.box("bb-card-bar bb-sheet-bar", row)));
-            this.values.push(BbHudParts.box("bb-sheet-value", row));
-            this.lowerers.push(BbSheetParts.button("bb-sheet-step", row, "▼", () => this.step(index, false)));
-            this.raisers.push(BbSheetParts.button("bb-sheet-step", row, "▲", () => this.step(index, true)));
+            this.notes.push(BbHudParts.box("bb-sheet-ability-effect", words, item.effect));
+            const steps = BbHudParts.box("bb-sheet-steps", row);
+            this.fills.push(BbHudParts.box("bb-card-fill", BbHudParts.box("bb-card-bar bb-sheet-bar", steps)));
+            this.lowerers.push(BbSheetParts.button("bb-sheet-step", steps, "▼", () => this.step(index, false)));
+            this.values.push(BbHudParts.box("bb-sheet-value", steps));
+            this.raisers.push(BbSheetParts.button("bb-sheet-step", steps, "▲", () => this.step(index, true)));
+            this.rows.push(row);
         });
         this.hint = BbHudParts.box("bb-sheet-hint", host);
+    }
+    dim(index, note) {
+        this.rows[index].classList.toggle("dim", !!note);
+        this.notes[index].textContent = note || this.plan.items[index].effect;
     }
     load(points) {
         this.allocator = new BbAbilityAllocator(this.plan, points);
@@ -213,7 +221,8 @@ class BbAbilityPane {
     }
     draw() {
         const allocator = this.allocator, plan = this.plan, spare = allocator.spare();
-        this.budget.textContent = "사용 " + allocator.used() + " / 여분 " + spare;
+        this.budget.textContent = "여분 " + spare + " / " + plan.total;
+        this.budget.classList.toggle("left", spare > 0);
         allocator.points.forEach((value, index) => {
             this.values[index].textContent = String(value);
             this.fills[index].style.transform = "scaleX(" + (value / plan.most).toFixed(3) + ")";
@@ -267,52 +276,315 @@ class BbPitchChips {
         });
     }
 }
-class BbSheetDialog {
-    constructor(host, onClose) {
-        this.onClose = onClose;
-        this.profile = BbProfileStore.blank();
-        this.screen = BbHudParts.box("bb-sheet", host);
-        const sheet = BbHudParts.box("bb-sheet-window", this.screen), head = BbHudParts.box("bb-sheet-head", sheet);
-        BbHudParts.box("bb-sheet-title", head, "선수 정보 만들기");
+class BbStageFaces {
+    constructor(stage) {
+        this.stage = stage;
+        this.profile = new PlayerProfile();
+    }
+    portrait(look) { return this.stage.portrait(look, BbStageFaces.KIT_TEAM); }
+    baseLook() { return this.profile.look; }
+    editor(draft) { return this.stage.lookEditor(draft); }
+}
+BbStageFaces.KIT_TEAM = 1;
+class BbPortraitQueue {
+    constructor(faces) {
+        this.faces = faces;
+        this.waiting = new Map();
+        this.busy = false;
+    }
+    ask(image, look) {
+        this.waiting.set(image, look);
+        if (!this.busy)
+            this.next();
+    }
+    next() {
+        const first = this.waiting.entries().next();
+        if (first.done) {
+            this.busy = false;
+            return;
+        }
+        this.busy = true;
+        requestAnimationFrame(() => {
+            const [image, look] = first.value;
+            if (this.waiting.get(image) === look) {
+                this.waiting.delete(image);
+                const url = this.faces.portrait(look);
+                image.hidden = !url;
+                if (url)
+                    image.src = url;
+            }
+            this.next();
+        });
+    }
+}
+class BbPortraitButton {
+    constructor(host, queue, onPress) {
+        this.queue = queue;
+        const button = BbSheetParts.button("bb-sheet-face", host, "", onPress);
+        this.image = document.createElement("img");
+        this.image.alt = "";
+        this.image.hidden = true;
+        button.appendChild(this.image);
+        BbHudParts.box("bb-sheet-face-tag", button, "꾸미기");
+    }
+    show(look) { this.queue.ask(this.image, look); }
+}
+class BbPitcherCard {
+    constructor(host, role, index, hooks) {
+        this.index = index;
+        this.hooks = hooks;
+        this.sheet = null;
+        const card = BbHudParts.box("bb-sheet-card pitcher", host);
+        BbHudParts.box("bb-sheet-card-role", card, BbRosterPlan.roleLabel(role));
+        this.face = new BbPortraitButton(card, hooks.queue, () => hooks.editLook(index));
+        this.hand = new BbHandToggle(card, ["우투", "좌투"], (hand) => this.edit((sheet) => { sheet.hand = hand; }));
+        this.points = new BbAbilityPane(card, BbAbilityAllocator.PITCHER, (points) => this.pointsChanged(points));
+        this.chips = new BbPitchChips(card, (pitches) => this.edit((sheet) => { sheet.pitches = pitches.slice(); }));
+    }
+    load(sheet) {
+        this.sheet = sheet;
+        this.hand.load(sheet.hand);
+        this.points.load(BbProfileStore.pointsOf(BbAbilityAllocator.PITCHER, sheet.abilities));
+        this.chips.load(sheet.abilities.breaking, sheet.pitches);
+        this.dress();
+    }
+    dress() { this.face.show(this.hooks.look(this.index)); }
+    pointsChanged(points) {
+        const pitches = this.chips.reshape(points[2]);
+        this.edit((sheet) => { sheet.abilities = { control: points[0], power: points[1], breaking: points[2], stamina: points[3] }; sheet.pitches = pitches.slice(); });
+    }
+    edit(change) {
+        if (!this.sheet)
+            return;
+        change(this.sheet);
+        this.hooks.changed();
+    }
+}
+class BbBatterCard {
+    constructor(host, index, hooks, pickPosition) {
+        this.index = index;
+        this.hooks = hooks;
+        this.sheet = null;
+        const card = BbHudParts.box("bb-sheet-card batter", host), top = BbHudParts.box("bb-sheet-card-top", card);
+        BbHudParts.box("bb-sheet-order", top, String(index + 1));
+        this.position = BbSheetParts.button("bb-sheet-position", top, "", () => pickPosition(index));
+        this.face = new BbPortraitButton(card, hooks.queue, () => hooks.editLook(index));
+        this.hand = new BbHandToggle(card, ["우타", "좌타"], (hand) => this.edit((sheet) => { sheet.hand = hand; }));
+        this.points = new BbAbilityPane(card, BbAbilityAllocator.BATTER, (points) => this.edit((sheet) => { sheet.abilities = { contact: points[0], power: points[1], speed: points[2], defense: points[3] }; }));
+    }
+    load(sheet) {
+        this.sheet = sheet;
+        this.hand.load(sheet.hand);
+        this.points.load(BbProfileStore.pointsOf(BbAbilityAllocator.BATTER, sheet.abilities));
+        this.placed();
+        this.dress();
+    }
+    placed() {
+        const position = this.sheet ? this.sheet.position : BbRosterPlan.DESIGNATED;
+        this.position.textContent = BbRosterPlan.positionLabel(position);
+        this.points.dim(BbBatterCard.DEFENSE_ROW, position === BbRosterPlan.DESIGNATED ? "지명타자는 수비 안 함" : null);
+    }
+    dress() { this.face.show(this.hooks.look(this.index)); }
+    edit(change) {
+        if (!this.sheet)
+            return;
+        change(this.sheet);
+        this.hooks.changed();
+    }
+}
+BbBatterCard.DEFENSE_ROW = 3;
+class BbPositionPicker {
+    constructor(host) {
+        this.buttons = new Map();
+        this.lineup = [];
+        this.index = 0;
+        this.onPick = () => undefined;
+        this.screen = BbHudParts.box("bb-pos", host);
+        const box = BbHudParts.box("bb-pos-window", this.screen), head = BbHudParts.box("bb-pos-head", box);
+        this.title = BbHudParts.box("bb-pos-title", head);
         BbSheetParts.button("bb-sheet-close", head, "닫기", () => this.close());
-        const tabRow = BbHudParts.box("bb-sheet-tabs", sheet);
-        this.tabs = BbSheetDialog.TABS.map((label, index) => BbSheetParts.button("bb-sheet-tab", tabRow, label, () => this.turnTo(index)));
-        this.panes = BbSheetDialog.TABS.map(() => BbHudParts.box("bb-sheet-pane", sheet));
-        const [pitching, batting] = this.panes;
-        this.pitcherHand = new BbHandToggle(pitching, ["우투", "좌투"], (hand) => { this.profile.pitchers.forEach((sheet) => { sheet.hand = hand; }); this.keep(); });
-        this.pitcherPoints = new BbAbilityPane(pitching, BbAbilityAllocator.PITCHER, (points) => this.pitcherChanged(points));
-        this.chips = new BbPitchChips(pitching, (pitches) => { this.profile.pitchers.forEach((sheet) => { sheet.pitches = pitches.slice(); }); this.keep(); });
-        this.batterHand = new BbHandToggle(batting, ["우타", "좌타"], (hand) => { this.profile.lineup.forEach((sheet) => { sheet.hand = hand; }); this.keep(); });
-        this.batterPoints = new BbAbilityPane(batting, BbAbilityAllocator.BATTER, (points) => { this.profile.lineup.forEach((sheet) => { sheet.abilities = { contact: points[0], power: points[1], speed: points[2], defense: points[3] }; }); this.keep(); });
+        const field = BbHudParts.box("bb-pos-map", box);
+        field.innerHTML = BbPositionPicker.FIELD_SVG;
+        BbRosterPlan.BATTING_ORDER.forEach((position) => {
+            const [x, y] = BbPositionPicker.SPOTS[position], button = BbSheetParts.button("bb-pos-spot", field, "", () => this.pick(position));
+            button.style.left = x + "%";
+            button.style.top = y + "%";
+            this.buttons.set(position, button);
+        });
         this.screen.addEventListener("pointerdown", (event) => { if (event.target === this.screen)
             this.close(); });
     }
-    open() {
-        this.profile = BbProfileStore.load();
-        const pitcher = this.pitcher(), batter = this.batter();
-        this.pitcherHand.load(pitcher.hand);
-        this.pitcherPoints.load(BbProfileStore.pointsOf(BbAbilityAllocator.PITCHER, pitcher.abilities));
-        this.chips.load(pitcher.abilities.breaking, pitcher.pitches);
-        this.batterHand.load(batter.hand);
-        this.batterPoints.load(BbProfileStore.pointsOf(BbAbilityAllocator.BATTER, batter.abilities));
-        this.turnTo(0);
+    get isOpen() { return this.screen.classList.contains("open"); }
+    open(lineup, index, onPick) {
+        this.lineup = lineup;
+        this.index = index;
+        this.onPick = onPick;
+        this.draw();
         this.screen.classList.add("open");
     }
+    close() { this.screen.classList.remove("open"); }
+    pick(position) {
+        BbRosterPlan.swapPosition(this.lineup, this.index, position);
+        this.onPick();
+        this.close();
+    }
+    draw() {
+        const mover = this.lineup[this.index];
+        this.title.textContent = (this.index + 1) + "번 타자 포지션 바꾸기";
+        this.buttons.forEach((button, position) => {
+            const holder = this.lineup.findIndex((sheet) => sheet.position === position);
+            button.innerHTML = "";
+            BbHudParts.box("bb-pos-name", button, BbRosterPlan.positionLabel(position));
+            BbHudParts.box("bb-pos-order", button, holder >= 0 ? (holder + 1) + "번" : "");
+            button.classList.toggle("on", !!mover && mover.position === position);
+        });
+    }
+}
+BbPositionPicker.SPOTS = {
+    C: [50, 90], "1B": [71, 58], "2B": [61, 41], SS: [39, 41], "3B": [29, 58], LF: [20, 24], CF: [50, 11], RF: [80, 24], DH: [12, 88]
+};
+BbPositionPicker.FIELD_SVG = "<svg class='bb-pos-field' viewBox='0 0 520 420' aria-hidden='true'>" +
+    "<path d='M260 360 L18 118 A342 342 0 0 1 502 118 Z' fill='#3f7a45'/>" +
+    "<path d='M260 360 L150 250 L260 140 L370 250 Z' fill='#b98a5a'/>" +
+    "<path d='M260 330 L180 250 L260 170 L340 250 Z' fill='#4c8b50'/>" +
+    "<g fill='#f4f1e8'><rect x='253' y='133' width='14' height='14' transform='rotate(45 260 140)'/><rect x='143' y='243' width='14' height='14' transform='rotate(45 150 250)'/>" +
+    "<rect x='363' y='243' width='14' height='14' transform='rotate(45 370 250)'/><path d='M252 352 h16 v8 l-8 8 l-8 -8 Z'/></g>" +
+    "<circle cx='260' cy='250' r='12' fill='#c79a68'/></svg>";
+class BbLookEditor {
+    constructor(faces) {
+        this.faces = faces;
+        this.draft = new LookDraft(CharacterLooks.createDefault());
+        this.editor = null;
+        this.onDone = () => undefined;
+        this.reset = false;
+        this.modal = document.createElement("div");
+        this.modal.className = "st-screen maker-modal bb-look";
+        this.modal.hidden = true;
+        const wrap = BbHudParts.box("st-wrap", this.modal), card = BbHudParts.box("st-card", wrap), head = BbHudParts.box("maker-head", card);
+        const title = document.createElement("h2");
+        title.textContent = "선수 외형 꾸미기";
+        head.appendChild(title);
+        BbSheetParts.button("st-btn maker-save", head, "완료", () => this.finish());
+        this.host = BbHudParts.box("maker-host", card);
+        BbSheetParts.button("st-btn bb-look-reset", card, "내 캐릭터 모습으로 되돌리기", () => { this.reset = true; this.finish(); });
+        this.note = BbHudParts.box("st-hint maker-note", card, "이 선수에게만 쓰이는 모습이에요. 비워 두면 내 캐릭터 모습을 써요.");
+        document.body.appendChild(this.modal);
+    }
+    get isOpen() { return !this.modal.hidden; }
+    open(look, onDone) {
+        this.onDone = onDone;
+        this.reset = false;
+        this.draft.setLook(look);
+        if (!this.editor) {
+            this.editor = this.faces.editor(this.draft);
+            if (this.editor)
+                this.editor.mount(this.host);
+        }
+        if (!this.editor) {
+            this.note.textContent = "경기장을 불러온 다음에 꾸밀 수 있어요.";
+            this.modal.hidden = false;
+            return;
+        }
+        this.editor.refreshFromProfile();
+        this.modal.hidden = false;
+        this.editor.setActive(true);
+    }
+    finish() {
+        if (this.modal.hidden)
+            return;
+        this.modal.hidden = true;
+        if (this.editor)
+            this.editor.setActive(false);
+        if (this.editor)
+            this.onDone(this.reset ? null : this.draft.look);
+    }
+}
+class BbSheetDialog {
+    constructor(host, faces, onClose) {
+        this.faces = faces;
+        this.onClose = onClose;
+        this.profile = BbProfileStore.blank();
+        this.shown = 0;
+        this.screen = BbHudParts.box("bb-sheet", host);
+        const sheet = BbHudParts.box("bb-sheet-window", this.screen), head = BbHudParts.box("bb-sheet-head", sheet);
+        BbHudParts.box("bb-sheet-title", head, "선수 정보 만들기");
+        const tabRow = BbHudParts.box("bb-sheet-tabs", head);
+        this.tabs = BbSheetDialog.TABS.map((label, index) => BbSheetParts.button("bb-sheet-tab", tabRow, label, () => this.turnTo(index)));
+        this.note = BbHudParts.box("bb-sheet-note", head);
+        BbSheetParts.button("bb-sheet-close", head, "닫기", () => this.close());
+        this.panes = BbSheetDialog.TABS.map((_, index) => BbHudParts.box("bb-sheet-pane " + (index === 0 ? "pitchers" : "batters"), sheet));
+        const queue = new BbPortraitQueue(faces);
+        const hooks = (kind) => ({ queue, look: (index) => this.lookOf(kind, index), editLook: (index) => this.editLook(kind, index), changed: () => this.changed() });
+        this.pitcherCards = BbRosterPlan.pitcherRoles().map((role, index) => new BbPitcherCard(this.panes[0], role, index, hooks("p")));
+        this.batterCards = BbRosterPlan.BATTING_ORDER.map((_, index) => new BbBatterCard(this.panes[1], index, hooks("b"), (at) => this.pickPosition(at)));
+        this.picker = new BbPositionPicker(this.screen);
+        this.looks = new BbLookEditor(faces);
+        this.screen.addEventListener("pointerdown", (event) => { if (event.target === this.screen)
+            this.close(); });
+        document.addEventListener("keydown", (event) => this.escape(event));
+    }
+    get isOpen() { return this.screen.classList.contains("open"); }
+    open() {
+        this.profile = BbProfileStore.load();
+        this.profile.pitchers.forEach((sheet, index) => this.pitcherCards[index].load(sheet));
+        this.profile.lineup.forEach((sheet, index) => this.batterCards[index].load(sheet));
+        this.turnTo(this.shown);
+        this.drawNote();
+        this.screen.classList.add("open");
+    }
+    shut() {
+        if (!this.isOpen)
+            return;
+        this.picker.close();
+        this.looks.finish();
+        this.close();
+    }
     close() {
+        if (!this.isOpen)
+            return;
         this.screen.classList.remove("open");
         this.onClose(this.profile);
     }
-    pitcher() { return this.profile.pitchers[0]; }
-    batter() { return this.profile.lineup[0]; }
-    keep() { BbProfileStore.save(this.profile); }
-    pitcherChanged(points) {
-        const pitches = this.chips.reshape(points[2]);
-        this.profile.pitchers.forEach((sheet) => { sheet.abilities = { control: points[0], power: points[1], breaking: points[2], stamina: points[3] }; sheet.pitches = pitches.slice(); });
-        this.keep();
+    escape(event) {
+        if (event.key !== "Escape")
+            return;
+        if (this.looks.isOpen)
+            this.looks.finish();
+        else if (this.picker.isOpen)
+            this.picker.close();
+        else
+            this.close();
+    }
+    lookOf(kind, index) { return this.profile.looks[kind][index] || this.faces.baseLook(); }
+    editLook(kind, index) {
+        this.looks.open(this.lookOf(kind, index), (look) => {
+            this.profile.looks[kind][index] = look && !BbWardrobe.sameLook(CharacterLooks.clean(look), CharacterLooks.clean(this.faces.baseLook())) ? CharacterLooks.clean(look) : null;
+            (kind === "p" ? this.pitcherCards : this.batterCards)[index].dress();
+            this.changed();
+        });
+    }
+    pickPosition(index) {
+        this.picker.open(this.profile.lineup, index, () => {
+            this.batterCards.forEach((card) => card.placed());
+            this.changed();
+        });
+    }
+    changed() {
+        BbProfileStore.save(this.profile);
+        this.drawNote();
+    }
+    drawNote() {
+        const spare = (plan, list) => list.filter((sheet) => BbProfileStore.pointsOf(plan, sheet.abilities).reduce((sum, value) => sum + value, 0) < plan.total).length;
+        const left = this.shown === 0 ? spare(BbAbilityAllocator.PITCHER, this.profile.pitchers) : spare(BbAbilityAllocator.BATTER, this.profile.lineup);
+        const plan = this.shown === 0 ? BbAbilityAllocator.PITCHER : BbAbilityAllocator.BATTER;
+        this.note.textContent = "선수마다 " + plan.total + "포인트 · 능력치 " + plan.least + "~" + plan.most + (left ? " · 포인트가 남은 선수 " + left + "명" : "");
+        this.note.classList.toggle("left", left > 0);
     }
     turnTo(shown) {
+        this.shown = shown;
         this.tabs.forEach((tab, index) => tab.classList.toggle("on", index === shown));
         this.panes.forEach((pane, index) => pane.classList.toggle("on", index === shown));
+        this.drawNote();
     }
 }
 BbSheetDialog.TABS = ["투수", "타자"];

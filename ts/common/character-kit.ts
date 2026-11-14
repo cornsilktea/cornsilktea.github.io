@@ -223,7 +223,39 @@ class CharacterLooks {
   }
 }
 
-class PlayerProfile {
+// 꾸미기 화면(ProfileEditor)이 고치는 대상. 학생 본인 프로필(PlayerProfile)뿐 아니라
+// 게임 안 선수 한 명의 외형처럼 "넘겨받아 고쳐서 돌려주는" 외형도 같은 화면으로 고치기 위해 둔다.
+// persistent 가 false 이면 닉네임 칸을 숨기고 portal_profile_v1 도, 확정 알림(SETTLED_EVENT)도 건드리지 않는다.
+interface EditableLook {
+  readonly persistent: boolean;
+  nick: string;
+  look: CharacterLook;
+  setNick(text: string): void;
+  setLook(look: CharacterLook): void;
+}
+
+// 저장하지 않는 외형 한 벌(41번 야구 선수별 외형). 바꿀 때마다 onChange 로만 알린다.
+class LookDraft implements EditableLook {
+  readonly persistent = false;
+  nick = "";
+  look: CharacterLook;
+
+  constructor(look: CharacterLook, private readonly onChange: (look: CharacterLook) => void = () => undefined) {
+    this.look = CharacterLooks.clean(look);
+  }
+
+  setNick(): void {
+    return;
+  }
+
+  setLook(look: CharacterLook): void {
+    this.look = CharacterLooks.clean(look);
+    this.onChange(this.look);
+  }
+}
+
+class PlayerProfile implements EditableLook {
+  readonly persistent = true;
   static readonly STORAGE_KEY = "portal_profile_v1";
   static readonly CHANGE_EVENT = "portal-profile-changed";
   static readonly SETTLED_EVENT = "portal-profile-settled";
@@ -610,7 +642,7 @@ class NickEditor {
   private readonly input: HTMLInputElement;
   private onSettledListener: () => void = () => undefined;
 
-  constructor(private readonly profile: PlayerProfile) {
+  constructor(private readonly profile: EditableLook) {
     this.root = document.createElement("div");
     this.root.className = "ce-nickbox";
     this.root.innerHTML =
@@ -637,7 +669,7 @@ class NickEditor {
   refresh(): void {
     if (document.activeElement !== this.input) this.input.value = this.profile.nick;
     const locked = PlayerProfile.isNickLocked();
-    this.root.hidden = locked;
+    this.root.hidden = locked || !this.profile.persistent;
   }
 
   focus(): void {
@@ -658,7 +690,7 @@ class ProfileEditor {
   private onLookChanged: () => void = () => undefined;
   private customTimer = 0;
 
-  constructor(libs: ThreeLibs, factory: CharacterModelFactory, assets: CharacterAssets, private readonly profile: PlayerProfile) {
+  constructor(libs: ThreeLibs, factory: CharacterModelFactory, assets: CharacterAssets, private readonly profile: EditableLook) {
     this.root = document.createElement("div");
     this.root.className = "ce-editor";
     this.root.innerHTML =
@@ -748,7 +780,7 @@ class ProfileEditor {
   }
 
   private announceSettled(): void {
-    document.dispatchEvent(new CustomEvent(PlayerProfile.SETTLED_EVENT));
+    if (this.profile.persistent) document.dispatchEvent(new CustomEvent(PlayerProfile.SETTLED_EVENT));
     this.onLookChanged();
   }
 
