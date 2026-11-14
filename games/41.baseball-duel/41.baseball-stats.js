@@ -253,18 +253,37 @@ class BbStatsView {
         this.zonesShown = zonesShown;
         this.title = "야구 1대1 대전";
         this.emptyRecent = "아직 기록된 사람과의 경기가 없어요.";
+        this.wide = true;
     }
     statsHtml(node) {
         const s = node || BbStatsMath.empty(), thrown = BbStatsKeys.PITCHES.reduce((sum, id) => sum + s.bt[id].n, 0);
         const types = BbPitchCatalog.ALL.filter((kind) => s.bt[kind.id].n > 0).map((kind) => [kind.label, s.bt[kind.id].n + "개", AccountHtml.percent(s.bt[kind.id].n, thrown), AccountHtml.percent(s.bt[kind.id].s, s.bt[kind.id].n)]);
-        return AccountHtml.record(s.g, s.w, s.l) + (s.t ? '<div class="asd-sec">무승부 ' + s.t + "판</div>" : "")
-            + AccountHtml.grid(BbStatLines.player(s))
-            + '<div class="asd-sec">타자</div>' + AccountHtml.grid(BbStatLines.batting(s.bat, s.g))
-            + '<div class="asd-sec">투수</div>' + AccountHtml.grid(BbStatLines.pitching(s.pit, s.g))
-            + (types.length ? '<div class="asd-sec">구종별</div>' + AccountHtml.table(["구종", "던진 공", "사용 비율", "스트라이크"], types) : "")
-            + AccountHtml.grid([["최장 비거리", s.bd ? s.bd + "m" : "—"], ["최고 타구 속도", s.be ? s.be + "km/h" : "—"], ["최고 구속", s.bs ? s.bs + "km/h" : "—"]])
-            + (this.zonesShown() ? '<div class="asd-sec">핫콜드존 (내가 쳤을 때 · 투수 시점)</div>' + BbZoneMap.hittingHtml(s.zb, s.bat) + '<div class="asd-sec">내가 던진 위치</div>' + BbZoneMap.pitchingHtml(s.zp) : "")
-            + '<div class="asd-sec">사람과 한 경기(일반 방·랜덤 매칭)만 세요. AI 대전·연습은 기록하지 않아요.</div>';
+        const summary = '<div class="bb-stats-top">' + AccountHtml.record(s.g, s.w, s.l) + AccountHtml.grid(BbStatLines.player(s)) + "</div>";
+        const players = BbStatsView.columns('<div class="asd-sec">타자</div>' + AccountHtml.grid(BbStatLines.batting(s.bat, s.g)), '<div class="asd-sec">투수</div>' + AccountHtml.grid(BbStatLines.pitching(s.pit, s.g)));
+        const pitches = (types.length ? '<div class="asd-sec">구종별</div>' + AccountHtml.table(["구종", "던진 공", "사용 비율", "스트라이크"], types) : "")
+            + AccountHtml.grid([["최장 비거리", s.bd ? s.bd + "m" : "—"], ["최고 타구 속도", s.be ? s.be + "km/h" : "—"], ["최고 구속", s.bs ? s.bs + "km/h" : "—"]]);
+        const zones = this.zonesShown() ? '<div class="bb-stats-zones"><div><div class="asd-sec">핫콜드존 (내가 쳤을 때 · 투수 시점)</div>' + BbZoneMap.hittingHtml(s.zb, s.bat) + '</div><div><div class="asd-sec">내가 던진 위치</div>' + BbZoneMap.pitchingHtml(s.zp) + "</div></div>" : "";
+        return summary + players + BbStatsView.columns(pitches, zones) + '<div class="asd-sec">사람과 한 경기(일반 방·랜덤 매칭)만 세요. AI 대전·연습은 기록하지 않아요.</div>';
+    }
+    static columns(left, right) {
+        BbStatsView.ensureStyle();
+        return '<div class="bb-stats-cols"><div>' + left + "</div><div>" + right + "</div></div>";
+    }
+    static ensureStyle() {
+        if (typeof document === "undefined" || document.getElementById("bbStatsStyle"))
+            return;
+        const style = document.createElement("style");
+        style.id = "bbStatsStyle";
+        style.textContent = [
+            ".bb-stats-top{display:flex;align-items:center;gap:16px;flex-wrap:wrap;}",
+            ".bb-stats-top .asd-record{margin:0;flex:0 0 auto;}",
+            ".bb-stats-top .asd-grid{flex:1 1 420px;margin:0;}",
+            ".bb-stats-cols{display:grid;grid-template-columns:1fr 1fr;gap:0 18px;}",
+            ".bb-stats-cols>div{min-width:0;}",
+            ".bb-stats-zones{display:flex;gap:18px;flex-wrap:wrap;}",
+            "@media (max-width:760px){.bb-stats-cols{grid-template-columns:1fr;}}"
+        ].join("\n");
+        document.head.appendChild(style);
     }
     blockBodyHtml(entry) {
         const sheet = entry.sheet, me = sheet.me === null ? 1 : sheet.me, line = sheet.lines[me];

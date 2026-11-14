@@ -123,15 +123,21 @@ class BbBoardTable {
 }
 class BbBoardPanel {
     constructor(mount, backend, myClass) {
+        this.mount = mount;
         this.backend = backend;
         this.myClass = myClass;
+        this.full = false;
         this.entries = [];
         this.side = "bat";
         this.statIndex = 3;
         this.loaded = false;
         this.loading = false;
         this.mineOnly = !!myClass;
-        BbHudParts.box("bb-board-title", mount, "기록 순위");
+        const head = BbHudParts.box("bb-board-headline", mount);
+        BbHudParts.box("bb-board-title", head, "기록 순위");
+        this.sizeButton = BbSheetParts.button("bb-board-size", head, BbBoardPanel.ENLARGE, () => this.setFull(!this.full));
+        document.addEventListener("keydown", (event) => { if (event.key === "Escape" && this.full)
+            this.setFull(false); });
         const toggles = BbHudParts.box("bb-board-toggles", mount);
         this.sideButtons = ["bat", "pit"].map((side) => BbSheetParts.button("bb-room-chip", toggles, side === "bat" ? "타자" : "투수", () => { this.side = side; this.statIndex = side === "bat" ? 3 : 2; this.draw(); }));
         this.scopeButtons = [true, false].map((mine) => BbSheetParts.button("bb-room-chip", toggles, mine ? "우리 반" : "전체", () => { this.mineOnly = mine; this.draw(); }));
@@ -156,6 +162,15 @@ class BbBoardPanel {
         }).catch(() => this.say("순위를 불러오지 못했어요.")).then(() => { this.loading = false; });
     }
     say(text) { this.note.textContent = text; }
+    setFull(on) {
+        this.full = on;
+        this.mount.classList.toggle("bb-board-full", on);
+        const screen = this.mount.closest(".st-screen");
+        if (screen)
+            screen.classList.toggle("bb-board-raised", on);
+        this.sizeButton.textContent = on ? BbBoardPanel.CLOSE : BbBoardPanel.ENLARGE;
+        this.sizeButton.classList.toggle("close", on);
+    }
     draw() {
         const stats = BbBoardCatalog.of(this.side), sortIndex = stats[this.statIndex] ? this.statIndex : 0, stat = stats[sortIndex];
         this.sideButtons.forEach((button, index) => button.classList.toggle("on", (index === 0) === (this.side === "bat")));
@@ -172,4 +187,6 @@ class BbBoardPanel {
     }
 }
 BbBoardPanel.LIMIT = 30;
+BbBoardPanel.ENLARGE = "확대";
+BbBoardPanel.CLOSE = "닫기";
 BbBoardPanel.BLANK = { uid: "", n: "", c: "", g: 0, bat: BbBoxScoreBuilder.emptyBat(), pit: BbBoxScoreBuilder.emptyPit() };

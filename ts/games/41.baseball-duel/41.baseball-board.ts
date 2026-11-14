@@ -148,6 +148,10 @@ class BbBoardTable {
 
 class BbBoardPanel {
   static readonly LIMIT = 30;
+  private static readonly ENLARGE = "확대";
+  private static readonly CLOSE = "닫기";
+  private readonly sizeButton: HTMLButtonElement;
+  private full = false;
   private readonly sideButtons: HTMLButtonElement[];
   private readonly scopeButtons: HTMLButtonElement[];
   private readonly table: BbBoardTable;
@@ -159,9 +163,12 @@ class BbBoardPanel {
   private loaded = false;
   private loading = false;
 
-  constructor(mount: HTMLElement, private readonly backend: RkBackend, private readonly myClass: string | null) {
+  constructor(private readonly mount: HTMLElement, private readonly backend: RkBackend, private readonly myClass: string | null) {
     this.mineOnly = !!myClass;
-    BbHudParts.box("bb-board-title", mount, "기록 순위");
+    const head = BbHudParts.box("bb-board-headline", mount);
+    BbHudParts.box("bb-board-title", head, "기록 순위");
+    this.sizeButton = BbSheetParts.button("bb-board-size", head, BbBoardPanel.ENLARGE, () => this.setFull(!this.full));
+    document.addEventListener("keydown", (event) => { if (event.key === "Escape" && this.full) this.setFull(false); });
     const toggles = BbHudParts.box("bb-board-toggles", mount);
     this.sideButtons = (["bat", "pit"] as BbBoardSide[]).map((side) => BbSheetParts.button("bb-room-chip", toggles, side === "bat" ? "타자" : "투수", () => { this.side = side; this.statIndex = side === "bat" ? 3 : 2; this.draw(); }));
     this.scopeButtons = [true, false].map((mine) => BbSheetParts.button("bb-room-chip", toggles, mine ? "우리 반" : "전체", () => { this.mineOnly = mine; this.draw(); }));
@@ -184,6 +191,15 @@ class BbBoardPanel {
   }
 
   private say(text: string): void { this.note.textContent = text; }
+
+  private setFull(on: boolean): void {
+    this.full = on;
+    this.mount.classList.toggle("bb-board-full", on);
+    const screen = this.mount.closest(".st-screen");
+    if (screen) screen.classList.toggle("bb-board-raised", on);
+    this.sizeButton.textContent = on ? BbBoardPanel.CLOSE : BbBoardPanel.ENLARGE;
+    this.sizeButton.classList.toggle("close", on);
+  }
 
   private draw(): void {
     const stats = BbBoardCatalog.of(this.side), sortIndex = stats[this.statIndex] ? this.statIndex : 0, stat = stats[sortIndex];

@@ -610,7 +610,7 @@ class AccountStatsDialog {
         const screen = document.querySelector(".st-screen");
         const computed = screen ? getComputedStyle(screen) : null;
         const back = document.createElement("div");
-        back.className = "asd-back";
+        back.className = "asd-back" + (this.view.wide ? " asd-wide" : "");
         back.hidden = true;
         back.style.setProperty("--asd-bg", (computed && computed.getPropertyValue("--st-bg").trim()) || "14,20,17");
         back.style.setProperty("--asd-accent", (computed && computed.getPropertyValue("--st-accent").trim()) || "#D97B4F");
@@ -739,7 +739,22 @@ AccountStatsDialog.STYLE = [
     ".asd-item .asd-top{display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:17px;}",
     ".asd-item .asd-top small{font-size:12px;color:rgba(255,255,255,.75);font-weight:400;}",
     ".asd-item .asd-body{display:block;margin-top:2px;font-size:14px;color:rgba(255,255,255,.92);}",
-    ".asd-result-mine td{background:rgba(255,255,255,.1);font-weight:800;}"
+    ".asd-result-mine td{background:rgba(255,255,255,.1);font-weight:800;}",
+    ".asd-wide{padding:2vh 2vw;}",
+    ".asd-wide .asd-box{max-width:none;width:96vw;height:96vh;max-height:96vh;padding:14px 20px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,460px) auto;grid-template-rows:auto auto 1fr;column-gap:14px;align-content:start;overflow:hidden;}",
+    ".asd-wide .asd-head{display:contents;}",
+    ".asd-wide .asd-head h2{grid-column:1;grid-row:1;align-self:center;font-size:22px;}",
+    ".asd-wide .asd-tabs{grid-column:2;grid-row:1;margin:0;}",
+    ".asd-wide .asd-x{grid-column:3;grid-row:1;align-self:center;min-height:44px;padding:4px 18px;background:#D32F2F;border-color:#EF5350;color:#fff;font-size:16px;}",
+    ".asd-wide .asd-x:active{background:#B71C1C;}",
+    ".asd-wide .asd-msg{grid-column:1 / -1;grid-row:2;margin:8px 0 4px;}",
+    ".asd-wide .asd-body{grid-column:1 / -1;grid-row:3;min-height:0;overflow:auto;}",
+    ".asd-wide .asd-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:8px;}",
+    ".asd-wide .asd-grid{grid-template-columns:repeat(auto-fill,minmax(106px,1fr));gap:6px;margin-bottom:8px;}",
+    ".asd-wide .asd-grid div{padding:6px 10px;}",
+    ".asd-wide .asd-grid b{font-size:18px;}",
+    ".asd-wide .asd-sec{margin:8px 0 4px;}",
+    "@media (max-width:760px){.asd-wide .asd-box{grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto auto auto 1fr;}.asd-wide .asd-x{grid-column:2;}.asd-wide .asd-tabs{grid-column:1 / -1;grid-row:2;margin-top:8px;}.asd-wide .asd-msg{grid-row:3;}.asd-wide .asd-body{grid-row:4;}.asd-wide .asd-list{grid-template-columns:1fr;}}"
 ].join("\n");
 class RandomMatchPlan {
     constructor(report) {

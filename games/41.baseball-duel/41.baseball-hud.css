@@ -237,7 +237,17 @@ body.menu #hudTop,body.menu #bbControls{display:none}
 .bb-card-heat-cell.heat1{background:rgba(217,123,79,.3)}.bb-card-heat-cell.heat2{background:rgba(217,123,79,.5)}.bb-card-heat-cell.heat3{background:rgba(217,123,79,.75)}.bb-card-heat-cell.heat4{background:#D97B4F}
 .bb-result-streak:not(:empty){margin:0 0 8px;font-size:14px;font-weight:800;color:#F2C94C}
 .bb-result-lines .bbx{margin-bottom:10px}
-.bb-board-title{font-size:18px;font-weight:800;margin-bottom:8px}
+.bb-board-headline{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.bb-board-title{flex:1;font-size:18px;font-weight:800}
+.bb-board-size{min-height:38px;padding:4px 16px;border-radius:6px;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.08);color:#fff;font-family:inherit;font-size:15px;font-weight:800;cursor:pointer}
+.bb-board-size.close{background:#D32F2F;border-color:#EF5350}
+.bb-board-size.close:active{background:#B71C1C}
+#startScreen .bb-board-side.bb-board-full,.bb-board-side.bb-board-full{position:fixed;top:2vh;left:2vw;right:2vw;bottom:2vh;z-index:4000;width:auto;max-width:none;max-height:none;margin:0;display:flex;flex-direction:column;background:rgba(14,26,20,.97)}
+.st-screen.bb-board-raised{z-index:4000}
+.bb-board-full .bb-board-title{font-size:22px}
+.bb-board-full .bb-board-scroll{flex:1 1 auto;min-height:0;max-height:none}
+.bb-board-full .bb-board-table th,.bb-board-full .bb-board-table td{padding:9px 12px;font-size:16px}
+.bb-board-full .bb-board-head{font-size:15px;min-height:44px}
 .bb-board-toggles{display:flex;gap:6px;flex-wrap:wrap}
 .bb-board-toggles .bb-room-chip{flex:1 1 auto;min-height:38px;font-size:14px}
 .bb-board-side{width:100%;max-width:560px;margin:0 auto 14px}
