@@ -120,7 +120,7 @@ class BbMatchupCards {
     }
     show(batterName, batter, pitcherName, pitcher, pitches, facts = null) {
         this.batter.show(batterName, [batter.abilities.contact, batter.abilities.power, batter.abilities.speed], facts ? facts.batting : []);
-        this.pitcher.show(pitcherName, [pitcher.abilities.control, pitcher.abilities.power, pitcher.abilities.breaking], (facts ? facts.pitching.slice(0, 3) : ["", "", ""]).concat([String(pitches)]));
+        this.pitcher.show(pitcherName, [pitcher.abilities.control, pitcher.abilities.power, pitcher.abilities.breaking], [0, 1, 2].map((index) => (facts && facts.pitching[index]) || "").concat([String(pitches)]));
         this.batter.heat(facts ? facts.batterHeat : null);
         this.pitcher.heat(facts ? facts.pitcherHeat : null);
     }
