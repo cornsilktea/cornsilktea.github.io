@@ -225,6 +225,7 @@ class BbDuelGame {
   private readonly hud: BbScoreHud;
   private readonly director: BbMatchDirector;
   private readonly sheet: BbSheetDialog;
+  private readonly roster = new BbRosterAccount(() => this.sheetChanged());
   private readonly room: BbRoomCard;
   private readonly result: BbResultCard;
   private readonly menu: BbGameMenu;
@@ -260,7 +261,8 @@ class BbDuelGame {
     this.hud = new BbScoreHud(document.getElementById("hudTop") as HTMLElement);
     this.director = new BbMatchDirector(this.stage, this.hud, controls, { onEnd: (summary) => this.ended(summary), onLog: (log) => this.logged(log) });
     this.pause = new BbPauseBanner(controls);
-    this.sheet = new BbSheetDialog(dialogs, () => this.sheetChanged());
+    this.sheet = new BbSheetDialog(dialogs, (profile) => { this.sheetChanged(); void this.roster.push(profile); });
+    void this.roster.pull();
     this.corner = document.getElementById("sheetCorner") as HTMLElement;
     this.corner.addEventListener("click", () => this.sheet.open());
     this.room = new BbRoomCard(document.getElementById("roomMount") as HTMLElement, { change: (setup) => this.changeSetup(setup), start: () => this.startFromRoom(), leave: () => this.leaveRoom("") });

@@ -1,8 +1,111 @@
+interface BbRosterLooks {
+  p: Array<CharacterLook | null>;
+  b: Array<CharacterLook | null>;
+}
+
 interface BbStoredProfile {
   version: 3;
   lineup: BbBatterSheet[];
   pitchers: BbPitcherSheet[];
+  looks: BbRosterLooks;
   ballpark: string;
+}
+
+interface BbRosterRowPlayer {
+  a: number[];
+  h: BbHand;
+  l?: string;
+}
+
+interface BbRosterRowPitcher extends BbRosterRowPlayer {
+  k: string;
+}
+
+interface BbRosterRowBatter extends BbRosterRowPlayer {
+  o: BbLineupPosition;
+}
+
+interface BbRosterRow {
+  v: 3;
+  p: BbRosterRowPitcher[];
+  b: BbRosterRowBatter[];
+}
+
+class BbRosterCodec {
+  static readonly VERSION = 3;
+  static readonly LOOK_LIMIT = 400;
+
+  static toRow(profile: BbStoredProfile): BbRosterRow {
+    const lookText = (look: CharacterLook | null | undefined) => look ? { l: JSON.stringify(look) } : {};
+    return {
+      v: 3,
+      p: profile.pitchers.map((sheet, index) => ({ a: BbProfileStore.pointsOf(BbAbilityAllocator.PITCHER, sheet.abilities), h: sheet.hand, k: sheet.pitches.join(","), ...lookText(profile.looks.p[index]) })),
+      b: profile.lineup.map((sheet, index) => ({ a: BbProfileStore.pointsOf(BbAbilityAllocator.BATTER, sheet.abilities), h: sheet.hand, o: sheet.position, ...lookText(profile.looks.b[index]) }))
+    };
+  }
+
+  static fromRow(raw: unknown): BbStoredProfile | null {
+    if (!raw || typeof raw !== "object") return null;
+    const row = raw as Partial<BbRosterRow>, roles = BbRosterPlan.pitcherRoles();
+    if (row.v !== BbRosterCodec.VERSION) return null;
+    const pitchers = BbRosterCodec.listOf<BbRosterRowPitcher>(row.p), batters = BbRosterCodec.listOf<BbRosterRowBatter>(row.b);
+    if (pitchers.length !== roles.length || batters.length !== BbRosterPlan.batterCount()) return null;
+    const points = (entry: BbRosterRowPlayer) => BbRosterCodec.listOf<number>(entry && entry.a);
+    const profile: BbStoredProfile = {
+      version: 3, ballpark: "main",
+      pitchers: pitchers.map((entry, index) => { const a = points(entry); return { abilities: { control: a[0], power: a[1], breaking: a[2], stamina: a[3] }, hand: entry.h, pitches: String(entry.k || "").split(",") as BbPitchId[], role: roles[index] }; }),
+      lineup: batters.map((entry) => { const a = points(entry); return { abilities: { contact: a[0], power: a[1], speed: a[2], defense: a[3] }, hand: entry.h, position: entry.o }; }),
+      looks: { p: pitchers.map((entry) => BbRosterCodec.lookOf(entry)), b: batters.map((entry) => BbRosterCodec.lookOf(entry)) }
+    };
+    return BbProfileStore.isSound(profile) ? profile : null;
+  }
+
+  static lookOf(entry: BbRosterRowPlayer | null | undefined): CharacterLook | null {
+    if (!entry || typeof entry.l !== "string" || entry.l.length > BbRosterCodec.LOOK_LIMIT) return null;
+    try { return CharacterLooks.clean(JSON.parse(entry.l)); } catch (error) { return null; }
+  }
+
+  static listOf<T>(value: unknown): T[] {
+    if (Array.isArray(value)) return value as T[];
+    if (!value || typeof value !== "object") return [];
+    const keyed = value as Record<string, T>;
+    return Object.keys(keyed).filter((key) => /^[0-9]+$/.test(key)).sort((a, b) => Number(a) - Number(b)).map((key) => keyed[key]);
+  }
+}
+
+class BbRosterAccount {
+  static readonly PATH = "roster/baseballduel";
+  static readonly USER_EVENT = "portal-user-changed";
+  private sent = "";
+
+  constructor(private readonly onPulled: (profile: BbStoredProfile) => void) {
+    document.addEventListener(BbRosterAccount.USER_EVENT, () => { void this.pull(); });
+  }
+
+  async pull(): Promise<void> {
+    const database = BbRosterAccount.database();
+    if (!database) return;
+    try {
+      const remote = BbRosterCodec.fromRow(await database.read<unknown>(BbRosterAccount.PATH));
+      if (!remote) { await this.push(BbProfileStore.load()); return; }
+      this.sent = JSON.stringify(BbRosterCodec.toRow(remote));
+      BbProfileStore.save(remote);
+      this.onPulled(remote);
+    } catch (error) {
+      return;
+    }
+  }
+
+  async push(profile: BbStoredProfile): Promise<void> {
+    const database = BbRosterAccount.database(), row = BbRosterCodec.toRow(profile), text = JSON.stringify(row);
+    if (!database || text === this.sent) return;
+    try { await database.write(BbRosterAccount.PATH, row); this.sent = text; } catch (error) { return; }
+  }
+
+  private static database(): AccountDatabase | null {
+    const user = window.PORTAL_USER;
+    return user && typeof AccountDatabase === "function" ? new AccountDatabase(user) : null;
+  }
 }
 
 interface BbLegacyProfile {
@@ -18,7 +121,20 @@ class BbProfileStore {
 
   static blank(): BbStoredProfile {
     const team = BbAiLevel.team("R");
-    return { version: 3, ballpark: "main", lineup: team.lineup, pitchers: team.pitchers };
+    return { version: 3, ballpark: "main", lineup: team.lineup, pitchers: team.pitchers, looks: BbProfileStore.blankLooks() };
+  }
+
+  static blankLooks(): BbRosterLooks {
+    return { p: BbRosterPlan.pitcherRoles().map(() => null), b: BbRosterPlan.BATTING_ORDER.map(() => null) };
+  }
+
+  static withLooks(profile: BbStoredProfile): BbStoredProfile {
+    const looks = profile.looks, blank = BbProfileStore.blankLooks(), fit = (list: unknown, size: number) => Array.from({ length: size }, (_, index) => {
+      const item = Array.isArray(list) ? list[index] : null;
+      return item ? CharacterLooks.clean(item) : null;
+    });
+    profile.looks = { p: fit(looks ? looks.p : null, blank.p.length), b: fit(looks ? looks.b : null, blank.b.length) };
+    return profile;
   }
 
   static pointsOf(plan: BbAbilityPlan, abilities: object): number[] {
@@ -29,7 +145,7 @@ class BbProfileStore {
   static load(): BbStoredProfile {
     try {
       const raw = localStorage.getItem(BbProfileStore.KEY), parsed = raw ? JSON.parse(raw) as Partial<BbStoredProfile> : null;
-      if (parsed && BbProfileStore.isSound(parsed)) return parsed as BbStoredProfile;
+      if (parsed && BbProfileStore.isSound(parsed)) return BbProfileStore.withLooks(parsed as BbStoredProfile);
       const legacy = localStorage.getItem(BbProfileStore.LEGACY_KEY), migrated = legacy ? BbProfileStore.migrate(JSON.parse(legacy) as BbLegacyProfile) : null;
       if (migrated && BbProfileStore.isSound(migrated)) return migrated;
     } catch (error) {
@@ -45,7 +161,8 @@ class BbProfileStore {
     return {
       version: 3, ballpark: "main",
       lineup: BbRosterPlan.BATTING_ORDER.map((position) => ({ abilities: { contact: bat[0], power: bat[1], speed: bat[2], defense: rest(bat) }, hand: batter.hand, position })),
-      pitchers: BbRosterPlan.pitcherRoles().map((role) => ({ abilities: { control: pit[0], power: pit[1], breaking: pit[2], stamina: rest(pit) }, hand: pitcher.hand, pitches: pitcher.pitches.slice(), role }))
+      pitchers: BbRosterPlan.pitcherRoles().map((role) => ({ abilities: { control: pit[0], power: pit[1], breaking: pit[2], stamina: rest(pit) }, hand: pitcher.hand, pitches: pitcher.pitches.slice(), role })),
+      looks: BbProfileStore.blankLooks()
     };
   }
 
@@ -59,7 +176,7 @@ class BbProfileStore {
     try { localStorage.setItem(BbProfileStore.KEY, JSON.stringify(profile)); } catch (error) { return; }
   }
 
-  private static isSound(profile: Partial<BbStoredProfile>): boolean {
+  static isSound(profile: Partial<BbStoredProfile>): boolean {
     const lineup = profile.lineup, pitchers = profile.pitchers, roles = BbRosterPlan.pitcherRoles();
     if (profile.version !== 3 || !Array.isArray(lineup) || !Array.isArray(pitchers) || !BbRosterPlan.isFullLineup(lineup) || pitchers.length !== roles.length) return false;
     if (!pitchers.every((sheet, index) => !!sheet && sheet.role === roles[index])) return false;

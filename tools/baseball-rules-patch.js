@@ -87,6 +87,35 @@ class BaseballRules {
     };
   }
 
+  static roster(code) {
+    const plan = code.BbRosterPlan, closed = { ".validate": false };
+    const points = (abilityPlan) => {
+      const keys = abilityPlan.items.map((item, index) => String(index)), node = { ".validate": "newData.hasChildren(" + BaseballRuleText.list(keys) + ") && " + keys.map((key) => "newData.child('" + key + "').val()").join(" + ") + " <= " + abilityPlan.total };
+      keys.forEach((key) => { node[key] = { ".validate": "newData.isNumber() && newData.val() >= " + abilityPlan.least + " && newData.val() <= " + abilityPlan.most + " && newData.val() % 1 === 0" }; });
+      node.$other = closed;
+      return node;
+    };
+    const player = (abilityPlan, extra) => Object.assign({
+      ".validate": "newData.hasChildren(" + BaseballRuleText.list(["a", "h"].concat(Object.keys(extra))) + ")",
+      a: points(abilityPlan),
+      h: { ".validate": "newData.val() === 'R' || newData.val() === 'L'" },
+      l: { ".validate": "newData.isString() && newData.val().length <= 400" }
+    }, extra, { $other: closed });
+    const list = (count, item) => ({ ".validate": "newData.hasChildren(" + BaseballRuleText.list(Array.from({ length: count }, (_, index) => String(index))) + ")", $i: Object.assign({}, item, { ".validate": "$i.matches(/^[0-" + (count - 1) + "]$/) && " + item[".validate"] }) });
+    const pitcher = player(code.BbAbilityAllocator.PITCHER, { k: { ".validate": "newData.isString() && newData.val().matches(/^ft(,(cv|sl|ch|kn)){0,4}$/)" } });
+    const batter = player(code.BbAbilityAllocator.BATTER, { o: { ".validate": "newData.isString() && newData.val().matches(/^(" + plan.BATTING_ORDER.join("|") + ")$/)" } });
+    return {
+      baseballduel: {
+        ".validate": "newData.hasChildren(['v', 'p', 'b'])",
+        v: { ".validate": "newData.val() === 3" },
+        p: list(plan.pitcherCount(), pitcher),
+        b: list(plan.batterCount(), batter),
+        $other: closed
+      },
+      $other: closed
+    };
+  }
+
   static top() {
     const A = BaseballRuleText.admin(), school = "auth.token.email_verified === true && auth.token.email.endsWith('@dongma.sen.ms.kr')";
     const numbers = { $k: { ".validate": "newData.isNumber() && newData.val() >= 0" } };
@@ -163,6 +192,8 @@ class BaseballRulesPatch {
     this.insertBefore('    "waterballoon": {\n      ".read": true,', BaseballRulesPatch.block(game, BaseballRules.top(), 4));
     this.insertBefore('          "$game": { ".validate": "$game.matches(/^(teambattle|', BaseballRulesPatch.block(game, BaseballRules.stats(), 10));
     this.insertBefore('         "$game": { ".validate": "$game.matches(/^(teambattle|', BaseballRulesPatch.block(game, BaseballRules.recent(), 9));
+    this.removeBlock('        "roster": {');
+    this.insertBefore('        "personal": {', BaseballRulesPatch.block("roster", BaseballRules.roster(require("./baseball-load.js").load()), 8));
     this.addToGameLists();
   }
 
@@ -176,5 +207,5 @@ patch.save();
 const parsed = JSON.parse(fs.readFileSync(file, "utf8"));
 const users = parsed.rules.users.$uid;
 console.log("데이터베이스규칙.json 에 baseballduel 규칙을 넣었어요. JSON 문법 OK ·",
-  "stats:", !!users.stats.baseballduel, "recent:", !!users.recent.baseballduel, "board:", !!parsed.rules.baseballduel.board,
+  "stats:", !!users.stats.baseballduel, "recent:", !!users.recent.baseballduel, "roster:", !!(users.roster && users.roster.baseballduel), "board:", !!parsed.rules.baseballduel.board,
   "목록:", users.stats.$game[".validate"].indexOf("baseballduel") > 0 && users.recent.$game[".validate"].indexOf("baseballduel") > 0 && users.pending.$game[".validate"].indexOf("baseballduel") > 0 && parsed.rules.gameRanks.$game.$cls.$uid[".validate"].indexOf("baseballduel") > 0);

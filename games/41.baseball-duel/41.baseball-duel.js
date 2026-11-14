@@ -164,6 +164,7 @@ class BbResultCard {
 }
 class BbDuelGame {
     constructor(libs) {
+        this.roster = new BbRosterAccount(() => this.sheetChanged());
         this.profile = new PlayerProfile();
         this.backend = new RkBackend();
         this.directory = new RkDirectory(this.backend, BbRoomRules.RULES);
@@ -189,7 +190,8 @@ class BbDuelGame {
         this.hud = new BbScoreHud(document.getElementById("hudTop"));
         this.director = new BbMatchDirector(this.stage, this.hud, controls, { onEnd: (summary) => this.ended(summary), onLog: (log) => this.logged(log) });
         this.pause = new BbPauseBanner(controls);
-        this.sheet = new BbSheetDialog(dialogs, () => this.sheetChanged());
+        this.sheet = new BbSheetDialog(dialogs, (profile) => { this.sheetChanged(); void this.roster.push(profile); });
+        void this.roster.pull();
         this.corner = document.getElementById("sheetCorner");
         this.corner.addEventListener("click", () => this.sheet.open());
         this.room = new BbRoomCard(document.getElementById("roomMount"), { change: (setup) => this.changeSetup(setup), start: () => this.startFromRoom(), leave: () => this.leaveRoom("") });

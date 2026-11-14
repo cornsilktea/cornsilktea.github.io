@@ -1,8 +1,110 @@
 "use strict";
+class BbRosterCodec {
+    static toRow(profile) {
+        const lookText = (look) => look ? { l: JSON.stringify(look) } : {};
+        return {
+            v: 3,
+            p: profile.pitchers.map((sheet, index) => ({ a: BbProfileStore.pointsOf(BbAbilityAllocator.PITCHER, sheet.abilities), h: sheet.hand, k: sheet.pitches.join(","), ...lookText(profile.looks.p[index]) })),
+            b: profile.lineup.map((sheet, index) => ({ a: BbProfileStore.pointsOf(BbAbilityAllocator.BATTER, sheet.abilities), h: sheet.hand, o: sheet.position, ...lookText(profile.looks.b[index]) }))
+        };
+    }
+    static fromRow(raw) {
+        if (!raw || typeof raw !== "object")
+            return null;
+        const row = raw, roles = BbRosterPlan.pitcherRoles();
+        if (row.v !== BbRosterCodec.VERSION)
+            return null;
+        const pitchers = BbRosterCodec.listOf(row.p), batters = BbRosterCodec.listOf(row.b);
+        if (pitchers.length !== roles.length || batters.length !== BbRosterPlan.batterCount())
+            return null;
+        const points = (entry) => BbRosterCodec.listOf(entry && entry.a);
+        const profile = {
+            version: 3, ballpark: "main",
+            pitchers: pitchers.map((entry, index) => { const a = points(entry); return { abilities: { control: a[0], power: a[1], breaking: a[2], stamina: a[3] }, hand: entry.h, pitches: String(entry.k || "").split(","), role: roles[index] }; }),
+            lineup: batters.map((entry) => { const a = points(entry); return { abilities: { contact: a[0], power: a[1], speed: a[2], defense: a[3] }, hand: entry.h, position: entry.o }; }),
+            looks: { p: pitchers.map((entry) => BbRosterCodec.lookOf(entry)), b: batters.map((entry) => BbRosterCodec.lookOf(entry)) }
+        };
+        return BbProfileStore.isSound(profile) ? profile : null;
+    }
+    static lookOf(entry) {
+        if (!entry || typeof entry.l !== "string" || entry.l.length > BbRosterCodec.LOOK_LIMIT)
+            return null;
+        try {
+            return CharacterLooks.clean(JSON.parse(entry.l));
+        }
+        catch (error) {
+            return null;
+        }
+    }
+    static listOf(value) {
+        if (Array.isArray(value))
+            return value;
+        if (!value || typeof value !== "object")
+            return [];
+        const keyed = value;
+        return Object.keys(keyed).filter((key) => /^[0-9]+$/.test(key)).sort((a, b) => Number(a) - Number(b)).map((key) => keyed[key]);
+    }
+}
+BbRosterCodec.VERSION = 3;
+BbRosterCodec.LOOK_LIMIT = 400;
+class BbRosterAccount {
+    constructor(onPulled) {
+        this.onPulled = onPulled;
+        this.sent = "";
+        document.addEventListener(BbRosterAccount.USER_EVENT, () => { void this.pull(); });
+    }
+    async pull() {
+        const database = BbRosterAccount.database();
+        if (!database)
+            return;
+        try {
+            const remote = BbRosterCodec.fromRow(await database.read(BbRosterAccount.PATH));
+            if (!remote) {
+                await this.push(BbProfileStore.load());
+                return;
+            }
+            this.sent = JSON.stringify(BbRosterCodec.toRow(remote));
+            BbProfileStore.save(remote);
+            this.onPulled(remote);
+        }
+        catch (error) {
+            return;
+        }
+    }
+    async push(profile) {
+        const database = BbRosterAccount.database(), row = BbRosterCodec.toRow(profile), text = JSON.stringify(row);
+        if (!database || text === this.sent)
+            return;
+        try {
+            await database.write(BbRosterAccount.PATH, row);
+            this.sent = text;
+        }
+        catch (error) {
+            return;
+        }
+    }
+    static database() {
+        const user = window.PORTAL_USER;
+        return user && typeof AccountDatabase === "function" ? new AccountDatabase(user) : null;
+    }
+}
+BbRosterAccount.PATH = "roster/baseballduel";
+BbRosterAccount.USER_EVENT = "portal-user-changed";
 class BbProfileStore {
     static blank() {
         const team = BbAiLevel.team("R");
-        return { version: 3, ballpark: "main", lineup: team.lineup, pitchers: team.pitchers };
+        return { version: 3, ballpark: "main", lineup: team.lineup, pitchers: team.pitchers, looks: BbProfileStore.blankLooks() };
+    }
+    static blankLooks() {
+        return { p: BbRosterPlan.pitcherRoles().map(() => null), b: BbRosterPlan.BATTING_ORDER.map(() => null) };
+    }
+    static withLooks(profile) {
+        const looks = profile.looks, blank = BbProfileStore.blankLooks(), fit = (list, size) => Array.from({ length: size }, (_, index) => {
+            const item = Array.isArray(list) ? list[index] : null;
+            return item ? CharacterLooks.clean(item) : null;
+        });
+        profile.looks = { p: fit(looks ? looks.p : null, blank.p.length), b: fit(looks ? looks.b : null, blank.b.length) };
+        return profile;
     }
     static pointsOf(plan, abilities) {
         const values = abilities;
@@ -12,7 +114,7 @@ class BbProfileStore {
         try {
             const raw = localStorage.getItem(BbProfileStore.KEY), parsed = raw ? JSON.parse(raw) : null;
             if (parsed && BbProfileStore.isSound(parsed))
-                return parsed;
+                return BbProfileStore.withLooks(parsed);
             const legacy = localStorage.getItem(BbProfileStore.LEGACY_KEY), migrated = legacy ? BbProfileStore.migrate(JSON.parse(legacy)) : null;
             if (migrated && BbProfileStore.isSound(migrated))
                 return migrated;
@@ -30,7 +132,8 @@ class BbProfileStore {
         return {
             version: 3, ballpark: "main",
             lineup: BbRosterPlan.BATTING_ORDER.map((position) => ({ abilities: { contact: bat[0], power: bat[1], speed: bat[2], defense: rest(bat) }, hand: batter.hand, position })),
-            pitchers: BbRosterPlan.pitcherRoles().map((role) => ({ abilities: { control: pit[0], power: pit[1], breaking: pit[2], stamina: rest(pit) }, hand: pitcher.hand, pitches: pitcher.pitches.slice(), role }))
+            pitchers: BbRosterPlan.pitcherRoles().map((role) => ({ abilities: { control: pit[0], power: pit[1], breaking: pit[2], stamina: rest(pit) }, hand: pitcher.hand, pitches: pitcher.pitches.slice(), role })),
+            looks: BbProfileStore.blankLooks()
         };
     }
     static teamOf(sheet) {

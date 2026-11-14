@@ -1220,6 +1220,92 @@
             }
           }
         },
+        "roster": {
+          "baseballduel": {
+            ".validate": "newData.hasChildren(['v', 'p', 'b'])",
+            "v": {
+              ".validate": "newData.val() === 3"
+            },
+            "p": {
+              ".validate": "newData.hasChildren(['0', '1', '2'])",
+              "$i": {
+                ".validate": "$i.matches(/^[0-2]$/) && newData.hasChildren(['a', 'h', 'k'])",
+                "a": {
+                  "0": {
+                    ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 7 && newData.val() % 1 === 0"
+                  },
+                  "1": {
+                    ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 7 && newData.val() % 1 === 0"
+                  },
+                  "2": {
+                    ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 7 && newData.val() % 1 === 0"
+                  },
+                  "3": {
+                    ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 7 && newData.val() % 1 === 0"
+                  },
+                  ".validate": "newData.hasChildren(['0', '1', '2', '3']) && newData.child('0').val() + newData.child('1').val() + newData.child('2').val() + newData.child('3').val() <= 12",
+                  "$other": {
+                    ".validate": false
+                  }
+                },
+                "h": {
+                  ".validate": "newData.val() === 'R' || newData.val() === 'L'"
+                },
+                "l": {
+                  ".validate": "newData.isString() && newData.val().length <= 400"
+                },
+                "k": {
+                  ".validate": "newData.isString() && newData.val().matches(/^ft(,(cv|sl|ch|kn)){0,4}$/)"
+                },
+                "$other": {
+                  ".validate": false
+                }
+              }
+            },
+            "b": {
+              ".validate": "newData.hasChildren(['0', '1', '2', '3', '4', '5', '6', '7', '8'])",
+              "$i": {
+                ".validate": "$i.matches(/^[0-8]$/) && newData.hasChildren(['a', 'h', 'o'])",
+                "a": {
+                  "0": {
+                    ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 7 && newData.val() % 1 === 0"
+                  },
+                  "1": {
+                    ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 7 && newData.val() % 1 === 0"
+                  },
+                  "2": {
+                    ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 7 && newData.val() % 1 === 0"
+                  },
+                  "3": {
+                    ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 7 && newData.val() % 1 === 0"
+                  },
+                  ".validate": "newData.hasChildren(['0', '1', '2', '3']) && newData.child('0').val() + newData.child('1').val() + newData.child('2').val() + newData.child('3').val() <= 12",
+                  "$other": {
+                    ".validate": false
+                  }
+                },
+                "h": {
+                  ".validate": "newData.val() === 'R' || newData.val() === 'L'"
+                },
+                "l": {
+                  ".validate": "newData.isString() && newData.val().length <= 400"
+                },
+                "o": {
+                  ".validate": "newData.isString() && newData.val().matches(/^(DH|C|1B|2B|3B|SS|LF|CF|RF)$/)"
+                },
+                "$other": {
+                  ".validate": false
+                }
+              }
+            },
+            "$other": {
+              ".validate": false
+            }
+          },
+          "$other": {
+            ".validate": false
+          }
+        },
         "personal": {
           "$game": {
             "$k": {
