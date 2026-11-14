@@ -37,7 +37,7 @@ class BaseballRules {
 
   static ability(caps) {
     const node = BaseballRules.counts(caps);
-    node[".validate"] = "$k.matches(/^[1-7]-[1-7]-[1-7]$/) && newData.hasChildren(" + BaseballRuleText.list(["g"].concat(Object.keys(caps))) + ")";
+    node[".validate"] = "$k.matches(/^[1-7]-[1-7]-[1-7](-[1-7])?$/) && newData.hasChildren(" + BaseballRuleText.list(["g"].concat(Object.keys(caps))) + ")";
     node.g = { ".validate": BaseballRuleText.plusOne() };
     return { $k: node };
   }

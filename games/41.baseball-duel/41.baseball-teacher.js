@@ -1,5 +1,6 @@
 "use strict";
 class BbAbilityTable {
+    static label(key) { return "<b>" + key + "</b>" + (BbAbilityTable.OLD_KEY.test(key) ? ' <small style="opacity:.7">옛 3종</small>' : ""); }
     static sum(rows, keys, empty) {
         const total = Object.assign({}, empty);
         rows.forEach((row) => keys.forEach((key) => { total[key] += AccountNumbers.count(row[key]); }));
@@ -27,13 +28,14 @@ class BbAbilityTable {
     static html(head, rows, sortColumn, kind) {
         const sorted = rows.slice().sort((a, b) => (sortColumn < 0 ? a.key.localeCompare(b.key) : b.cells[sortColumn].sort - a.cells[sortColumn].sort));
         return '<table class="asd-table bb-ability-table"><thead><tr>' + head.map((label, index) => '<th data-bb-sort="' + kind + ":" + (index - 1) + '" style="cursor:pointer">' + label + "</th>").join("") + "</tr></thead><tbody>"
-            + sorted.map((row) => '<tr style="' + (row.g < BbAbilityTable.FEW_GAMES ? "opacity:.45" : "") + '"><td><b>' + row.key + "</b></td>" + row.cells.map((cell) => "<td>" + cell.text + "</td>").join("") + "</tr>").join("")
+            + sorted.map((row) => '<tr style="' + (row.g < BbAbilityTable.FEW_GAMES ? "opacity:.45" : "") + '"><td>' + BbAbilityTable.label(row.key) + "</td>" + row.cells.map((cell) => "<td>" + cell.text + "</td>").join("") + "</tr>").join("")
             + "</tbody></table>";
     }
 }
 BbAbilityTable.FEW_GAMES = 5;
-BbAbilityTable.BAT_HEAD = ["컨택-파워-주루", "게임", "타석", "타율", "출루율", "장타율", "OPS", "홈런율", "삼진율", "볼넷율"];
-BbAbilityTable.PIT_HEAD = ["제구-구위-변화", "게임", "상대 타자", "피OPS", "평균자책점", "WHIP", "삼진률", "볼넷율"];
+BbAbilityTable.BAT_HEAD = ["컨택-파워-주루-수비", "게임", "타석", "타율", "출루율", "장타율", "OPS", "홈런율", "삼진율", "볼넷율"];
+BbAbilityTable.PIT_HEAD = ["제구-구위-변화-체력", "게임", "상대 타자", "피OPS", "평균자책점", "WHIP", "삼진률", "볼넷율"];
+BbAbilityTable.OLD_KEY = /^[1-7]-[1-7]-[1-7]$/;
 class BbTeacherPanel {
     constructor(io, body, toggle) {
         this.io = io;
@@ -42,8 +44,8 @@ class BbTeacherPanel {
         this.opened = false;
         this.batRows = [];
         this.pitRows = [];
-        this.batSort = -1;
-        this.pitSort = -1;
+        this.batSort = 0;
+        this.pitSort = 0;
     }
     bind() {
         this.toggle.addEventListener("click", () => {

@@ -166,6 +166,21 @@ class BbNoSubstitution {
 class BbTiredSubstitution {
     nextPitcher(roster) { return roster.stamina().isSpent() ? roster.recommended() : null; }
 }
+class BbSlotTally {
+    static add(list, index, before, after, empty) {
+        while (list.length <= index)
+            list.push(empty());
+        const slot = list[index], from = before, to = after;
+        Object.keys(to).forEach((key) => { slot[key] = (slot[key] || 0) + (to[key] - (from[key] || 0)); });
+    }
+    static record(box, kind, index, before) {
+        const slots = box.slots || (box.slots = { bat: [], pit: [] });
+        if (kind === "bat")
+            BbSlotTally.add(slots.bat, index, before, box.bat, BbBoxScoreBuilder.emptyBat);
+        else
+            BbSlotTally.add(slots.pit, index, before, box.pit, BbBoxScoreBuilder.emptyPit);
+    }
+}
 class BbZoneGrid {
     static indexOf(point) {
         if (Math.abs(point.u) > 1 || Math.abs(point.v) > 1)
@@ -465,7 +480,11 @@ class BbMatchEngine {
     }
     preview(roll) { return this.judge.judge(this.state, roll, null, this.batter()); }
     settle(roll, contactOffset) {
-        const roster = this.roster(), lineup = this.lineup(), outcome = this.judge.judge(this.state, roll, contactOffset, lineup.current()), note = this.rules.apply(this.state, outcome);
+        const roster = this.roster(), lineup = this.lineup(), batting = this.battingIndex, fielding = this.fieldingIndex;
+        const hitter = lineup.currentIndex(), thrower = roster.currentIndex(), batBefore = Object.assign({}, this.state.box[batting].bat), pitBefore = Object.assign({}, this.state.box[fielding].pit);
+        const outcome = this.judge.judge(this.state, roll, contactOffset, lineup.current()), note = this.rules.apply(this.state, outcome);
+        BbSlotTally.record(this.state.box[batting], "bat", hitter, batBefore);
+        BbSlotTally.record(this.state.box[fielding], "pit", thrower, pitBefore);
         roster.afterPitch(outcome);
         if (note.plateAppearanceOver)
             lineup.advance();

@@ -440,7 +440,12 @@ const wbEnd = { match: 1, ranks: [1, 1, 2, 2], outTicks: [-1, 600, 300, 450], at
 }
 
 const baseball = new GameCase("41번", new K.BbStatsProfile(), K.BbStatsCodec, "baseballduel");
-const bbSheet = (b, p) => ({ lineup: [{ abilities: b, hand: "R" }], pitchers: [{ abilities: p, hand: "R", pitches: ["ft"], role: "starter" }] });
+const bbSheet = (b, p) => ({ lineup: [{ abilities: b, hand: "R", position: "DH" }, { abilities: { contact: 2, power: 2, speed: 2, defense: 6 }, hand: "L", position: "C" }], pitchers: [{ abilities: p, hand: "R", pitches: ["ft"], role: "starter" }, { abilities: { control: 4, power: 4, breaking: 2, stamina: 2 }, hand: "R", pitches: ["ft"], role: "reliever" }] });
+const bbSlots = (state) => {
+  const bat = (extra) => Object.assign({ pa: 0, ab: 0, h: 0, d2: 0, d3: 0, hr: 0, bb: 0, k: 0, sf: 0, rbi: 0, r: 0, roe: 0 }, extra);
+  const pit = (extra) => Object.assign({ bf: 0, ab: 0, h: 0, d2: 0, d3: 0, hr: 0, bb: 0, k: 0, sf: 0, outs: 0, r: 0, er: 0, pitches: 0, strikes: 0 }, extra);
+  state.box[1].slots = { bat: [bat({ pa: 3, ab: 3, h: 2, d2: 1, hr: 1, r: state.score[1], rbi: state.score[1] }), bat({ pa: 2, ab: 1, bb: 1, k: 1 })], pit: [pit(state.box[1].pit), pit()] };
+};
 const bbSummary = (score, extra) => {
   const rules = new K.BbMatchRules(new K.BbOneInningFormat()), state = rules.start();
   state.score = score; state.lineScore = [[score[0], score[1]]]; state.finished = true; state.winner = score[0] > score[1] ? 0 : score[1] > score[0] ? 1 : -1;
@@ -450,21 +455,24 @@ const bbSummary = (score, extra) => {
   Object.assign(state.box[0].pit, { bf: 5, ab: 4, h: 2, d2: 1, hr: 1, bb: 1, k: 1, outs: 2, r: score[1], er: score[1], pitches: 22, strikes: 13 });
   state.box[1].byType.ft = { n: 12, s: 8 }; state.box[1].byType.cv = { n: 5, s: 3 }; state.box[1].bestDistance = 112.4; state.box[1].bestExit = 151.6; state.box[1].bestPitch = 138.2;
   state.box[1].batZones[4] = { n: 3, ab: 2, h: 1, tb: 4 }; state.box[1].pitZones[0] = 6; state.box[1].pitZones[9] = 4;
-  return Object.assign({ plan: { format: new K.BbOneInningFormat(), names: ["가".repeat(25), "나"], teams: [bbSheet({ contact: 3, power: 3, speed: 3 }, { control: 3, power: 3, breaking: 3 }), bbSheet({ contact: 4, power: 3, speed: 2 }, { control: 2, power: 5, breaking: 2 })] }, state, forfeitedBy: null }, extra || {});
+  bbSlots(state);
+  return Object.assign({ plan: { format: new K.BbOneInningFormat(), names: ["가".repeat(25), "나"], teams: [bbSheet({ contact: 3, power: 3, speed: 3, defense: 3 }, { control: 3, power: 3, breaking: 3, stamina: 3 }), bbSheet({ contact: 4, power: 3, speed: 2, defense: 3 }, { control: 2, power: 5, breaking: 2, stamina: 3 })] }, state, forfeitedBy: null }, extra || {});
 };
 const bbReport = (extra, score) => Object.assign(K.BbReportBuilder.fromSummary("m41", bbSummary(score || [1, 2]), 1, true, false, false, 1), extra || {});
 {
   const win = bbReport();
   check("41번 판정: 사람 상대 승리는 최근·누적 모두, AI 상대는 기록 없음", (() => { const p = new K.BbStatsPlan(win); return p.recordsRecent && p.countsStats && p.win && !p.tie; })() && !new K.BbStatsPlan(bbReport({ rival: false })).recordsRecent);
   check("41번 판정: 무승부·패배·나가기", new K.BbStatsPlan(bbReport({}, [2, 2])).tie && !new K.BbStatsPlan(bbReport({}, [3, 2])).win && !new K.BbStatsPlan(bbReport({ iLeft: true, progress: 0.3 })).recordsRecent && !new K.BbStatsPlan(bbReport({ iLeft: true, progress: 0.6 })).win);
-  check("41번 보고서: 능력치 배분 열쇠·기권", win.batKey === "4-3-2" && win.pitKey === "2-5-2" && K.BbReportBuilder.fromSummary("m", bbSummary([5, 0], { forfeitedBy: 0 }), 1, true, false, false, 1).winner === 1);
+  check("41번 보고서: 타석마다 그 타자 4종 배분 열쇠, 던진 투수만 투수 열쇠·기권", Object.keys(win.batKeys).sort().join() === "2-2-2-6,4-3-2-3" && win.batKeys["4-3-2-3"].pa === 3 && win.batKeys["2-2-2-6"].bb === 1 && Object.keys(win.pitKeys).join() === "2-5-2-3" && K.BbReportBuilder.fromSummary("m", bbSummary([5, 0], { forfeitedBy: 0 }), 1, true, false, false, 1).winner === 1, [win.batKeys, win.pitKeys]);
   const r = baseball.roundTrip(win, true);
   check("41번 값 배열: 왕복(이름 20자·회별 점수·결과표 4줄·오늘의 장면)", r.back.sheet.names[0].length === 20 && r.back.sheet.score[1] === 2 && r.back.sheet.lines[1].bat[4] === 1 && r.back.sheet.lines[1].pit[0] === 3 && r.back.sheet.lines[0].pit[1] === 22 && r.back.sheet.bestDistance === 112 && r.back.sheet.bestPitch === 138 && r.back.sheet.me === 1 && r.size < 600, r.size);
   const a = K.BbStatsMath.apply(null, win, new K.BbStatsPlan(win), "k1", 1);
   const tieReport = bbReport({ matchId: "m2", random: true }, [2, 2]);
   const b = K.BbStatsMath.apply(JSON.parse(JSON.stringify(a.node)), tieReport, new K.BbStatsPlan(tieReport), "k2", 2);
   check("41번 누적: 판·승·무·득실·타격·투구·구종·최고 기록", b.node.g === 2 && b.node.w === 1 && b.node.t === 1 && b.node.l === 0 && b.node.rf === 4 && b.node.ra === 3 && b.node.bat.h === 4 && b.node.bat.hr === 2 && b.node.pit.outs === 6 && b.node.bt.ft.n === 24 && b.node.bd === 112 && b.node.bs === 138, b.node);
-  check("41번 누적: 핫콜드존·투구 위치·포인트별", b.node.zb[4].ab === 4 && b.node.zb[4].tb === 8 && b.node.zp[0] === 12 && b.node.zp[9] === 8 && b.node.ab["4-3-2"].g === 2 && b.node.ab["4-3-2"].h === 4 && b.node.ap["2-5-2"].outs === 6, [b.node.zb[4], b.node.ab]);
+  check("41번 누적: 핫콜드존·투구 위치·포인트별", b.node.zb[4].ab === 4 && b.node.zb[4].tb === 8 && b.node.zp[0] === 12 && b.node.zp[9] === 8 && b.node.ab["4-3-2-3"].g === 2 && b.node.ab["4-3-2-3"].h === 4 && b.node.ab["2-2-2-6"].pa === 4 && b.node.ap["2-5-2-3"].outs === 6 && !b.node.ap["4-4-2-2"], [b.node.zb[4], b.node.ab]);
+  const old = K.BbStatsMath.normalize({ ab: { "4-3-2": { g: 3, pa: 9, ab: 9, h: 3, d2: 0, d3: 0, hr: 0, bb: 0, k: 0, sf: 0, rbi: 0, r: 0, roe: 0 } } });
+  check("41번 옛 3종 배분 열쇠도 그대로 읽음", old.ab["4-3-2"] && old.ab["4-3-2"].pa === 9, old.ab);
   check("41번 랜덤 매칭 칸: 랜덤 매칭 판만 rm", a.node.rm.g === 0 && b.node.rm.g === 1 && b.node.rm.t === 1 && b.node.rm.rf === 2);
   check("41번 누적: 같은 열쇠는 무시", K.BbStatsMath.apply(b.node, win, new K.BbStatsPlan(win), "k1", 3) === null);
   check("41번 공식: 존 칸 번호(투수 시점 3×3, 밖은 9)", K.BbZoneGrid.indexOf({ u: -0.9, v: 0.9 }) === 0 && K.BbZoneGrid.indexOf({ u: 0, v: 0 }) === 4 && K.BbZoneGrid.indexOf({ u: 1, v: -1 }) === 8 && K.BbZoneGrid.indexOf({ u: 1.01, v: 0 }) === 9);
@@ -669,7 +677,7 @@ const gameChecks = (async () => {
     const tie = bbReport({ matchId: "m41b" }, [2, 2]), second = baseball.store({ "stats/baseballduel": ruled.stats, "recent/baseballduel": ruled.slots });
     await second.store.record(tie, null);
     const ruled2 = RuleChecker.check("baseballduel", second.writes[0], ruled.stats, ruled.slots);
-    check("41번 규칙: 무승부 둘째 판(존·포인트별 칸 포함) 통과", ruled2.errors.length === 0 && ruled2.stats.t === 1 && ruled2.stats.ab["4-3-2"].g === 2, ruled2.errors);
+    check("41번 규칙: 무승부 둘째 판(존·포인트별 칸 포함) 통과", ruled2.errors.length === 0 && ruled2.stats.t === 1 && ruled2.stats.ab["4-3-2-3"].g === 2 && ruled2.stats.ab["2-2-2-6"].g === 2, ruled2.errors);
     const cheat = JSON.parse(JSON.stringify(second.writes[0])); cheat["users/u1/stats/baseballduel/bat"] = Object.assign({}, cheat["users/u1/stats/baseballduel/bat"], { hr: 90 });
     check("41번 규칙: 홈런을 한 번에 60 넘게 올리면 거부", RuleChecker.check("baseballduel", cheat, ruled.stats, ruled.slots).errors.length > 0);
     const cheat2 = JSON.parse(JSON.stringify(second.writes[0])); cheat2["users/u1/stats/baseballduel/w"] = 2;

@@ -9,8 +9,8 @@ interface BbStatsReport {
   lineScore: Array<[number, number]>;
   score: [number, number];
   box: [BbTeamBox, BbTeamBox];
-  batKey: string;
-  pitKey: string;
+  batKeys: Record<string, BbBatCounts>;
+  pitKeys: Record<string, BbPitCounts>;
   progress: number;
   iLeft: boolean;
 }
@@ -65,10 +65,21 @@ class BbStatsKeys {
   static readonly PIT: readonly (keyof BbPitCounts)[] = ["bf", "ab", "h", "d2", "d3", "hr", "bb", "k", "sf", "outs", "r", "er", "pitches", "strikes"];
   static readonly RECORD = ["g", "w", "l", "t", "rf", "ra"] as const;
   static readonly PITCHES: readonly BbPitchId[] = ["ft", "cv", "sl", "ch", "kn"];
-  static readonly ABILITY_KEY = /^[1-7]-[1-7]-[1-7]$/;
+  static readonly ABILITY_KEY = /^[1-7]-[1-7]-[1-7](-[1-7])?$/;
 
-  static batKey(abilities: BbBatterAbilities): string { return abilities.contact + "-" + abilities.power + "-" + abilities.speed; }
-  static pitKey(abilities: BbPitcherAbilities): string { return abilities.control + "-" + abilities.power + "-" + abilities.breaking; }
+  static batKey(abilities: BbBatterAbilities): string { return abilities.contact + "-" + abilities.power + "-" + abilities.speed + "-" + abilities.defense; }
+  static pitKey(abilities: BbPitcherAbilities): string { return abilities.control + "-" + abilities.power + "-" + abilities.breaking + "-" + abilities.stamina; }
+
+  static grouped<S, C extends object>(sheets: readonly S[], slots: readonly C[] | undefined, keyOf: (sheet: S) => string, empty: () => C, used: (counts: C) => boolean, keys: readonly (keyof C)[]): Record<string, C> {
+    const groups: Record<string, C> = {};
+    (slots || []).forEach((counts, index) => {
+      const sheet = sheets[index];
+      if (!sheet || !counts || !used(counts)) return;
+      const key = keyOf(sheet);
+      groups[key] = BbStatsMath.addCounts(groups[key] || empty(), counts, keys);
+    });
+    return groups;
+  }
 }
 
 class BbResultColumns {
@@ -269,9 +280,14 @@ class BbStatsMath {
       ids: Object.assign({}, before.ids), rm: report.random ? BbStatsMath.addTally(before.rm, report, plan) : before.rm
     });
     BbStatsKeys.PITCHES.forEach((id) => { node.bt[id] = BbStatsMath.addCounts(before.bt[id], mine.byType[id], ["n", "s"]); });
-    const batBefore = before.ab[report.batKey] || Object.assign({ g: 0 }, BbBoxScoreBuilder.emptyBat()), pitBefore = before.ap[report.pitKey] || Object.assign({ g: 0 }, BbBoxScoreBuilder.emptyPit());
-    node.ab[report.batKey] = Object.assign(BbStatsMath.addCounts(batBefore, Object.assign({ g: 0 }, mine.bat), BbStatsKeys.BAT), { g: batBefore.g + 1 });
-    node.ap[report.pitKey] = Object.assign(BbStatsMath.addCounts(pitBefore, Object.assign({ g: 0 }, mine.pit), BbStatsKeys.PIT), { g: pitBefore.g + 1 });
+    Object.keys(report.batKeys).forEach((ability) => {
+      const was = before.ab[ability] || Object.assign({ g: 0 }, BbBoxScoreBuilder.emptyBat());
+      node.ab[ability] = Object.assign(BbStatsMath.addCounts(was, Object.assign({ g: 0 }, report.batKeys[ability]), BbStatsKeys.BAT), { g: was.g + 1 });
+    });
+    Object.keys(report.pitKeys).forEach((ability) => {
+      const was = before.ap[ability] || Object.assign({ g: 0 }, BbBoxScoreBuilder.emptyPit());
+      node.ap[ability] = Object.assign(BbStatsMath.addCounts(was, Object.assign({ g: 0 }, report.pitKeys[ability]), BbStatsKeys.PIT), { g: was.g + 1 });
+    });
     node.ids[key] = at;
     const evicted = AccountKeyLedger.overflowKeys(node.ids);
     evicted.forEach((id) => { delete node.ids[id]; });
@@ -331,8 +347,8 @@ class BbStatsProfile extends AccountGameProfile<BbStatsReport, BbStatsPlan, BbSt
     patch.bs = node.bs;
     patch.zb = node.zb.map((cell) => Object.assign({}, cell));
     patch.zp = node.zp.slice();
-    patch["ab/" + report.batKey] = Object.assign({}, node.ab[report.batKey]);
-    patch["ap/" + report.pitKey] = Object.assign({}, node.ap[report.pitKey]);
+    Object.keys(report.batKeys).forEach((ability) => { patch["ab/" + ability] = Object.assign({}, node.ab[ability]); });
+    Object.keys(report.pitKeys).forEach((ability) => { patch["ap/" + ability] = Object.assign({}, node.ap[ability]); });
     if (report.random) patch.rm = JSON.parse(JSON.stringify(node.rm));
     patch["ids/" + key] = node.ids[key];
     change.evicted.forEach((id) => { patch["ids/" + id] = null; });
@@ -456,13 +472,15 @@ class BbZoneMap {
 
 class BbReportBuilder {
   static fromSummary(matchId: string, summary: BbMatchSummary, me: 0 | 1, rival: boolean, random: boolean, iLeft: boolean, progress: number): BbStatsReport {
-    const state = summary.state, plan = summary.plan, mine = plan.teams[me];
+    const state = summary.state, plan = summary.plan, mine = plan.teams[me], slots = state.box[me].slots;
     const winner: 0 | 1 | -1 = iLeft ? (me === 0 ? 1 : 0) : summary.forfeitedBy !== null ? (summary.forfeitedBy === 0 ? 1 : 0) : state.winner === 0 ? 0 : state.winner === 1 ? 1 : -1;
     return {
       matchId, random, rival, me, names: [plan.names[0], plan.names[1]], winner, startInning: plan.format.startInning,
       lineScore: state.lineScore.map((inning) => [inning[0], inning[1]] as [number, number]), score: [state.score[0], state.score[1]],
       box: JSON.parse(JSON.stringify(state.box)) as [BbTeamBox, BbTeamBox],
-      batKey: BbStatsKeys.batKey(mine.lineup[0].abilities), pitKey: BbStatsKeys.pitKey(mine.pitchers[0].abilities), progress, iLeft
+      batKeys: BbStatsKeys.grouped(mine.lineup, slots ? slots.bat : undefined, (sheet) => BbStatsKeys.batKey(sheet.abilities), BbBoxScoreBuilder.emptyBat, (counts) => counts.pa > 0, BbStatsKeys.BAT),
+      pitKeys: BbStatsKeys.grouped(BbRosterPlan.orderedPitchers(mine.pitchers), slots ? slots.pit : undefined, (sheet) => BbStatsKeys.pitKey(sheet.abilities), BbBoxScoreBuilder.emptyPit, (counts) => counts.pitches > 0, BbStatsKeys.PIT),
+      progress, iLeft
     };
   }
 }

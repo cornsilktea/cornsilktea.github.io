@@ -11,8 +11,11 @@ interface BbAbilityRow {
 
 class BbAbilityTable {
   static readonly FEW_GAMES = 5;
-  static readonly BAT_HEAD = ["컨택-파워-주루", "게임", "타석", "타율", "출루율", "장타율", "OPS", "홈런율", "삼진율", "볼넷율"];
-  static readonly PIT_HEAD = ["제구-구위-변화", "게임", "상대 타자", "피OPS", "평균자책점", "WHIP", "삼진률", "볼넷율"];
+  static readonly BAT_HEAD = ["컨택-파워-주루-수비", "게임", "타석", "타율", "출루율", "장타율", "OPS", "홈런율", "삼진율", "볼넷율"];
+  static readonly PIT_HEAD = ["제구-구위-변화-체력", "게임", "상대 타자", "피OPS", "평균자책점", "WHIP", "삼진률", "볼넷율"];
+  static readonly OLD_KEY = /^[1-7]-[1-7]-[1-7]$/;
+
+  static label(key: string): string { return "<b>" + key + "</b>" + (BbAbilityTable.OLD_KEY.test(key) ? ' <small style="opacity:.7">옛 3종</small>' : ""); }
 
   static sum<T extends object>(rows: readonly T[], keys: readonly (keyof T)[], empty: T): T {
     const total = Object.assign({}, empty);
@@ -45,7 +48,7 @@ class BbAbilityTable {
   static html(head: readonly string[], rows: readonly BbAbilityRow[], sortColumn: number, kind: string): string {
     const sorted = rows.slice().sort((a, b) => (sortColumn < 0 ? a.key.localeCompare(b.key) : b.cells[sortColumn].sort - a.cells[sortColumn].sort));
     return '<table class="asd-table bb-ability-table"><thead><tr>' + head.map((label, index) => '<th data-bb-sort="' + kind + ":" + (index - 1) + '" style="cursor:pointer">' + label + "</th>").join("") + "</tr></thead><tbody>"
-      + sorted.map((row) => '<tr style="' + (row.g < BbAbilityTable.FEW_GAMES ? "opacity:.45" : "") + '"><td><b>' + row.key + "</b></td>" + row.cells.map((cell) => "<td>" + cell.text + "</td>").join("") + "</tr>").join("")
+      + sorted.map((row) => '<tr style="' + (row.g < BbAbilityTable.FEW_GAMES ? "opacity:.45" : "") + '"><td>' + BbAbilityTable.label(row.key) + "</td>" + row.cells.map((cell) => "<td>" + cell.text + "</td>").join("") + "</tr>").join("")
       + "</tbody></table>";
   }
 }
@@ -54,8 +57,8 @@ class BbTeacherPanel {
   private opened = false;
   private batRows: BbAbilityRow[] = [];
   private pitRows: BbAbilityRow[] = [];
-  private batSort = -1;
-  private pitSort = -1;
+  private batSort = 0;
+  private pitSort = 0;
 
   constructor(private readonly io: BbTeacherIo, private readonly body: HTMLElement, private readonly toggle: HTMLElement) {}
 

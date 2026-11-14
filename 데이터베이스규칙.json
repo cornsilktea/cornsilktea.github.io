@@ -713,7 +713,7 @@
             },
             "ab": {
               "$k": {
-                ".validate": "$k.matches(/^[1-7]-[1-7]-[1-7]$/) && newData.hasChildren(['g', 'pa', 'ab', 'h', 'd2', 'd3', 'hr', 'bb', 'k', 'sf', 'rbi', 'r', 'roe'])",
+                ".validate": "$k.matches(/^[1-7]-[1-7]-[1-7](-[1-7])?$/) && newData.hasChildren(['g', 'pa', 'ab', 'h', 'd2', 'd3', 'hr', 'bb', 'k', 'sf', 'rbi', 'r', 'roe'])",
                 "pa": {
                   ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 60) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
                 },
@@ -760,7 +760,7 @@
             },
             "ap": {
               "$k": {
-                ".validate": "$k.matches(/^[1-7]-[1-7]-[1-7]$/) && newData.hasChildren(['g', 'bf', 'ab', 'h', 'd2', 'd3', 'hr', 'bb', 'k', 'sf', 'outs', 'r', 'er', 'pitches', 'strikes'])",
+                ".validate": "$k.matches(/^[1-7]-[1-7]-[1-7](-[1-7])?$/) && newData.hasChildren(['g', 'bf', 'ab', 'h', 'd2', 'd3', 'hr', 'bb', 'k', 'sf', 'outs', 'r', 'er', 'pitches', 'strikes'])",
                 "bf": {
                   ".validate": "(newData.isNumber() && newData.val() >= (data.exists() ? data.val() : 0) && newData.val() <= (data.exists() ? data.val() : 0) + 60) || (auth.uid === 'use16pcii5RbEATuPtWhRDArmoj2' || auth.uid === 'HFcjiyXAl1YWzm3AyrZmzo4uMdG3')"
                 },
