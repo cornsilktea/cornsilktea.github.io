@@ -16,7 +16,7 @@ class ChoreoCheck {
     this.pitches = pitches;
     const folder = path.join(__dirname, "..", "games", "41.baseball-duel");
     const source = ChoreoCheck.FILES.map((name) => fs.readFileSync(path.join(folder, "41.baseball-" + name + ".js"), "utf8")).join("\n")
-      + "\n;({BbAiGameFeed,BbPlayChoreographer,BbSwapChoreographer,BbBallparkRegistry,BbBodyDefaults})";
+      + "\n;({BbAiGameFeed,BbPlayChoreographer,BbSwapChoreographer,BbBallparkRegistry,BbBodyDefaults,BbFieldGeometry})";
     this.code = vm.runInNewContext(source, { console, Math, Map, Set, Array, Object, Number, Infinity, JSON });
     this.problems = new Map();
     this.byResult = new Map();
@@ -53,6 +53,44 @@ class ChoreoCheck {
     }
   }
 
+  stealScenes(feed, setup) {
+    const c = this.code, bags = [null, c.BbFieldGeometry.FIRST, c.BbFieldGeometry.SECOND, c.BbFieldGeometry.THIRD];
+    const roleOf = { s1: "runnerFirst", s2: "runnerSecond" };
+    const kinds = [
+      ["도루 아웃", (speed) => ({ steal: { target: 2, offense: 0, defense: 0, runners: [{ id: "s1", from: 1, out: true, speed }] } }), false],
+      ["도루 세이프", (speed) => ({ steal: { target: 2, offense: 0, defense: 0, runners: [{ id: "s1", from: 1, out: false, speed }] } }), false],
+      ["이중 도루", (speed) => ({ steal: { target: 3, offense: 0, defense: 0, runners: [{ id: "s2", from: 2, out: speed < 4, speed }, { id: "s1", from: 1, out: false, speed }] } }), true],
+      ["견제 세이프", () => ({ pickoff: { base: 1, caught: false, runners: [] } }), false],
+      ["견제 아웃 1루", (speed) => ({ pickoff: { base: 1, caught: true, runners: [{ id: "s2", from: 2, out: false, speed }, { id: "s1", from: 1, out: true, speed }] } }), true],
+      ["견제 아웃 2루", (speed) => ({ pickoff: { base: 2, caught: true, runners: [{ id: "s2", from: 2, out: true, speed }, { id: "s1", from: 1, out: false, speed }] } }), true]
+    ];
+    let made = 0;
+    for (let index = 0; made < kinds.length * 7 && index < 5000; index++) {
+      const live = feed.next();
+      if (live.outcome.kind !== "ball" && live.outcome.kind !== "calledStrike") continue;
+      const [label, extra, two] = kinds[made % kinds.length], speed = 1 + Math.floor(made / kinds.length), add = extra(speed);
+      made++;
+      const cue = Object.assign({}, live, { setting: { outs: 0, runners: ["s1", two ? "s2" : null, null] } });
+      if (add.steal) cue.outcome = Object.assign({}, live.outcome, { steal: add.steal });
+      if (add.pickoff) cue.pickoff = add.pickoff;
+      let script;
+      try { script = new c.BbPlayChoreographer(cue).build(setup); } catch (error) { this.note("도루·견제 장면 오류", label + " " + error.message); continue; }
+      this.inspect(script, label + " 주루" + speed);
+      const runners = add.steal ? add.steal.runners : add.pickoff.runners;
+      runners.forEach((entry) => {
+        const end = script.placementOf(roleOf[entry.id], script.duration).position, bag = bags[entry.from + 1];
+        if (!entry.out && end.distanceTo(bag) > 1.5) this.note("도루 주자가 다음 루에 닿지 않음", label + " " + entry.id + " " + end.distanceTo(bag).toFixed(1) + "m");
+      });
+      if (add.pickoff && !add.pickoff.caught) {
+        const end = script.placementOf("runnerFirst", script.duration).position;
+        if (end.distanceTo(c.BbFieldGeometry.FIRST) > 3.5) this.note("견제 뒤 주자가 1루 근처에 없음", label + " " + end.distanceTo(c.BbFieldGeometry.FIRST).toFixed(1) + "m");
+      }
+      const tally = this.byResult.get(label) || { count: 0, seconds: 0, longest: 0 };
+      tally.count++; tally.seconds += script.duration; tally.longest = Math.max(tally.longest, script.duration);
+      this.byResult.set(label, tally);
+    }
+  }
+
   run() {
     const c = this.code, setup = { metrics: c.BbBodyDefaults.KAYKIT, batsLeft: false, throwsLeft: false };
     const feed = new c.BbAiGameFeed(c.BbBallparkRegistry.MAIN.dimensions, "R", "R", 4141);
@@ -67,6 +105,7 @@ class ChoreoCheck {
       this.inspect(script, label);
     }
     for (const entering of [false, true]) this.inspect(new c.BbSwapChoreographer(entering, 1).build(setup), "공수 교대", true);
+    this.stealScenes(feed, setup);
     console.log("결과 | 횟수 | 평균 길이(초) | 가장 긴 장면(초)");
     for (const [result, tally] of this.byResult) console.log(result + " | " + tally.count + " | " + (tally.seconds / tally.count).toFixed(1) + " | " + tally.longest.toFixed(1));
     let total = 0;

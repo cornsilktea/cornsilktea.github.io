@@ -101,6 +101,7 @@ class BbPlayerCard {
   protected readonly tail: HTMLElement;
   private readonly face: HTMLImageElement;
   private readonly name: HTMLElement;
+  private readonly tag: HTMLElement;
   private readonly fills: HTMLElement[];
   private readonly points: HTMLElement[];
   private readonly values: HTMLElement[];
@@ -120,6 +121,7 @@ class BbPlayerCard {
     this.head.appendChild(this.face);
     BbHudParts.box("bb-card-role", this.head, role);
     this.name = BbHudParts.box("bb-card-name", this.head);
+    this.tag = BbHudParts.box("bb-card-tag", this.head);
     const abilities = BbHudParts.box("bb-card-abilities", card);
     this.fills = [];
     this.points = [];
@@ -139,8 +141,9 @@ class BbPlayerCard {
     this.tail = BbHudParts.box("bb-card-tail", card);
   }
 
-  show(name: string, points: readonly number[], stats: readonly string[] = [], face: string | null = null): void {
+  show(name: string, points: readonly number[], stats: readonly string[] = [], face: string | null = null, tag = ""): void {
     this.name.textContent = name;
+    this.tag.textContent = tag;
     points.forEach((value, index) => {
       this.fills[index].style.transform = "scaleX(" + BbCurve.clamp(value / BbPlayerCard.MOST_POINTS, 0, 1).toFixed(3) + ")";
       this.points[index].textContent = String(value);
@@ -200,8 +203,9 @@ class BbMoundCard extends BbPlayerCard {
     this.changer.textContent = "투수 교체";
     this.changer.hidden = true;
     this.changer.addEventListener("click", onChange);
-    this.head.appendChild(this.changer);
-    this.gauge = new BbStaminaGauge(this.middle);
+    const row = BbHudParts.box("bb-mound-row", this.middle);
+    this.gauge = new BbStaminaGauge(row);
+    row.appendChild(this.changer);
     this.relief = BbHudParts.box("bb-relief", this.tail);
     this.relief.hidden = true;
     BbHudParts.box("bb-relief-title", this.relief, "체력이 떨어졌어요 · 추천 투수");
@@ -242,6 +246,7 @@ interface BbCardsView {
   batterName: string;
   batter: BbBatterSheet;
   batterFace: string | null;
+  batterOrder: number;
   pitcherName: string;
   pitcher: BbPitcherSheet;
   pitcherFace: string | null;
@@ -256,15 +261,16 @@ class BbMatchupCards {
   private readonly batter: BbPlayerCard;
   private readonly pitcher: BbMoundCard;
 
-  constructor(host: HTMLElement, onChange: () => void, onRelief: () => void) {
+  constructor(host: HTMLElement, rightStack: HTMLElement, onChange: () => void, onRelief: () => void) {
     this.batter = new BbPlayerCard(host, "left", "타자", ["컨택", "파워", "주루", "수비"], ["타율", "출루율", "장타율", "홈런"]);
-    this.pitcher = new BbMoundCard(host, onChange, onRelief);
+    this.pitcher = new BbMoundCard(rightStack, onChange, onRelief);
   }
 
   show(view: BbCardsView): void {
     const facts = view.facts, batter = view.batter.abilities, pitcher = view.pitcher.abilities;
-    this.batter.show(view.batterName, [batter.contact, batter.power, batter.speed, batter.defense], facts ? facts.batting : [], view.batterFace);
-    this.pitcher.show(view.pitcherName, [pitcher.control, pitcher.power, pitcher.breaking, pitcher.stamina], [0, 1, 2].map((index) => (facts && facts.pitching[index]) || "").concat([String(view.pitches)]), view.pitcherFace);
+    const order = (view.batterOrder + 1) + "번/" + BbRosterPlan.positionLabel(view.batter.position);
+    this.batter.show(view.batterName, [batter.contact, batter.power, batter.speed, batter.defense], facts ? facts.batting : [], view.batterFace, order);
+    this.pitcher.show(view.pitcherName, [pitcher.control, pitcher.power, pitcher.breaking, pitcher.stamina], [0, 1, 2].map((index) => (facts && facts.pitching[index]) || "").concat([String(view.pitches)]), view.pitcherFace, BbRosterPlan.roleLabel(view.pitcher.role));
     this.pitcher.mound(view.stamina, view.canChange, view.relief);
     this.batter.heat(facts ? facts.batterHeat : null);
     this.pitcher.heat(facts ? facts.pitcherHeat : null);

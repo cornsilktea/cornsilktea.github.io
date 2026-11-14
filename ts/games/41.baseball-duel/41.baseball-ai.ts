@@ -37,6 +37,29 @@ interface BbPitchCall {
   aim: BbZonePoint;
 }
 
+class BbAiRunner {
+  private static readonly SURE_CHANCE = 0.45;
+  private static readonly GAMBLE_CHANCE = 0.12;
+  private static readonly PICKOFF_CHANCE = 0.12;
+  private static readonly PICKOFFS_PER_BATTER = 1;
+
+  constructor(private readonly level: BbAiTuning) {}
+
+  decide(engine: BbMatchEngine, random: BbSeededRandom): number {
+    const bases = engine.state.bases, from = engine.stealable(2) ? 2 : engine.stealable(1) ? 1 : 0;
+    if (!from) return 0;
+    const offense = BbStealRules.offense(bases[from - 1] as BbRunner, from + 1);
+    const chance = offense > engine.stealDefense(BbStealRules.FASTBALL) ? BbAiRunner.SURE_CHANCE : offense > engine.stealDefense("cv") ? BbAiRunner.GAMBLE_CHANCE : 0;
+    return chance > 0 && random.chance(chance * (1 - this.level.middleMistake)) ? BbStealRules.pressed(bases, from) : 0;
+  }
+
+  pickoffBase(engine: BbMatchEngine, triesThisBatter: number, random: BbSeededRandom): number | null {
+    if (triesThisBatter >= BbAiRunner.PICKOFFS_PER_BATTER) return null;
+    const base = engine.stealable(2) ? 2 : engine.stealable(1) ? 1 : 0;
+    return base && random.chance(BbAiRunner.PICKOFF_CHANCE) ? base : null;
+  }
+}
+
 class BbAiPitcher {
   static readonly EDGE_OUTSIDE = 1.15;
 

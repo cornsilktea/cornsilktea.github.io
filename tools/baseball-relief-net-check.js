@@ -48,7 +48,28 @@ class FakeDirector {
   }
   deliverPitch(sequence) { this.calls.push("pitch " + sequence); }
   deliverSwing(sequence) { this.calls.push("swing " + sequence); }
+  pickoffCalled(sequence, base) { this.calls.push("asked " + sequence + " " + base); }
+  deliverPickoff(sequence, base, steal) { this.calls.push("pickoff " + sequence + " " + base + " " + steal); }
   showRemoteTime(seconds) { this.remote = seconds; }
+}
+
+class StealDirector extends FakeDirector {
+  constructor() { super(); this.settled = new Set(); }
+  get awaitsPitch() { return true; }
+  set awaitsPitch(value) { return; }
+  deliverPitch(sequence) { if (sequence === this.sequence && !this.calls.includes("pitch " + sequence)) this.calls.push("pitch " + sequence); }
+  deliverSwing(sequence, offset, steal) {
+    if (sequence !== this.sequence || this.settled.has(sequence)) return;
+    this.settled.add(sequence);
+    this.calls.push("swing " + sequence + " " + offset + " " + steal);
+    this.sequence++;
+  }
+  pickoffCalled(sequence, base) { if (sequence === this.sequence && !this.calls.includes("asked " + sequence)) this.calls.push("asked " + sequence); }
+  deliverPickoff(sequence, base, steal) {
+    if (sequence !== this.sequence) return;
+    this.calls.push("pickoff " + sequence + " " + base + " " + steal);
+    this.sequence++;
+  }
 }
 
 class NetCode {
@@ -69,6 +90,39 @@ class ReliefNetCheck {
     const session = { ref: tree.ref(["room"]), isHost: () => hosting };
     const backend = { now: () => tree.clock };
     return new this.code.BbRoomLink(director, session, backend);
+  }
+
+  async steals() {
+    const tree = new FakeTree(), pitcher = new StealDirector(), batter = new StealDirector();
+    const pitcherLink = this.link(tree, false, pitcher), batterLink = this.link(tree, true, batter);
+    await pitcherLink.open();
+    await batterLink.open();
+    const pumpAll = () => { pitcherLink.pump(); batterLink.pump(); };
+    pitcherLink.pitchChosen(0, { pitch: "cv", u: 0, v: 0, aim: { u: 0, v: 0 } });
+    pumpAll();
+    batterLink.swingChosen(0, null, 1);
+    pumpAll();
+    this.ok(tree.read(["room", "log", "0", "s"]).st === 1, "도루 의사는 스윙 기록(s.st)에 함께 저장", tree.read(["room", "log", "0", "s"]));
+    this.ok(pitcher.calls.includes("swing 0 null 1") && batter.calls.includes("swing 0 null 1"), "도루가 두 기기에서 같은 값으로 접힘", [pitcher.calls, batter.calls]);
+
+    pitcherLink.pickoffChosen(1, 2);
+    pumpAll();
+    this.ok(pitcher.calls.includes("asked 1") && batter.calls.includes("asked 1"), "견제(p.t=po)가 두 기기에 견제로 전달", [pitcher.calls, batter.calls]);
+    this.ok(!pitcher.calls.includes("pitch 1"), "견제는 투구로 처리하지 않음", pitcher.calls);
+    batterLink.pickoffAnswered(1, 2, 2);
+    pumpAll();
+    this.ok(pitcher.calls.includes("pickoff 1 2 2") && batter.calls.includes("pickoff 1 2 2"), "견제 결과(도루 중이었는지)가 두 기기에서 같음", [pitcher.calls, batter.calls]);
+
+    pitcherLink.pickoffChosen(2, 1);
+    pumpAll();
+    tree.clock += 8000;
+    pumpAll();
+    pumpAll();
+    this.ok(pitcher.calls.includes("pickoff 2 1 0") && batter.calls.includes("pickoff 2 1 0"), "타자 쪽 응답이 없으면 방장이 7초 뒤 '도루 안 함'으로 마무리", [pitcher.calls, batter.calls]);
+
+    tree.write(["room", "log", "3", "p"], { t: "po", b: 7 });
+    const late = await this.link(tree, false, new StealDirector()).open();
+    this.ok(late.length === 3 && late[0].steal === 1 && late[1].pickoff === 2 && late[1].steal === 2 && late[2].pickoff === 1 && late[2].steal === 0, "늦게 들어온 관전자: 도루·견제까지 복원", late);
   }
 
   async run() {
@@ -120,6 +174,8 @@ class ReliefNetCheck {
     both.write(["room", "log", "0", "s"], { k: "take" });
     const mixed = await this.link(both, false, new FakeDirector()).open();
     this.ok(mixed.length === 1 && mixed[0].change === 1, "같은 순번에 교체와 투구가 함께 있으면 교체로 접음(모든 기기 같은 규칙)", mixed);
+
+    await this.steals();
 
     this.failed.forEach((line) => console.log("실패  " + line));
     console.log(this.failed.length ? "실패 " + this.failed.length + "건 / 통과 " + this.passed + "건" : "모두 통과 (" + this.passed + "항목)");

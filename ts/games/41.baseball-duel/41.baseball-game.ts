@@ -112,6 +112,7 @@ class BbStaminaModel {
   static readonly TIRED_BELOW = 50;
   static readonly WORN_BELOW = 30;
   static readonly RELIEF_BELOW = 30;
+  static readonly PICKOFF_COST = 1;
   static readonly PITCH_COST: readonly number[] = [0, 4, 3.5, 3, 2.5, 2, 1.5, 1];
   static readonly HIT_COST: readonly number[] = [0, 2, 1.8, 1.7, 1.5, 1.3, 1.2, 1];
   static readonly HOME_RUN_COST: readonly number[] = [0, 4, 3.7, 3.3, 3, 2.7, 2.3, 2];
@@ -133,8 +134,95 @@ class BbStaminaModel {
   }
 }
 
+interface BbStealRunner {
+  id: string;
+  from: number;
+  out: boolean;
+  speed: number;
+}
+
+interface BbStealPlay {
+  target: number;
+  offense: number;
+  defense: number;
+  runners: BbStealRunner[];
+}
+
+interface BbPickoffPlay {
+  base: number;
+  caught: boolean;
+  runners: BbStealRunner[];
+}
+
+class BbStealRules {
+  static readonly FIRST = 1;
+  static readonly SECOND = 2;
+  static readonly BONUS_TO_SECOND = 2;
+  static readonly BONUS_TO_THIRD = 1;
+  static readonly BREAKING_EDGE = 1;
+  static readonly FASTBALL: BbPitchId = "ft";
+
+  static bitOf(from: number): number { return from === 1 ? BbStealRules.FIRST : from === 2 ? BbStealRules.SECOND : 0; }
+
+  static canSteal(bases: BbBases, from: number): boolean {
+    if (from === 2) return !!bases[1] && !bases[2];
+    if (from === 1) return !!bases[0] && (!bases[1] || !bases[2]);
+    return false;
+  }
+
+  static pressed(bases: BbBases, from: number): number {
+    if (!BbStealRules.canSteal(bases, from)) return 0;
+    return from === 1 && bases[1] ? BbStealRules.FIRST | BbStealRules.SECOND : BbStealRules.bitOf(from);
+  }
+
+  static clean(bases: BbBases, mask: number | undefined): number {
+    const wanted = Number(mask) || 0;
+    let result = 0;
+    if (wanted & BbStealRules.SECOND && BbStealRules.canSteal(bases, 2)) result |= BbStealRules.SECOND;
+    if (wanted & BbStealRules.FIRST && bases[0] && (!bases[1] || result & BbStealRules.SECOND)) result |= BbStealRules.FIRST;
+    return result;
+  }
+
+  static offense(runner: BbRunner, target: number): number { return BbRosterPlan.points(runner.speed) + (target === 2 ? BbStealRules.BONUS_TO_SECOND : BbStealRules.BONUS_TO_THIRD); }
+
+  static defense(pitcherPower: number, catcherDefense: number, pitch: BbPitchId): number {
+    return BbRosterPlan.points(pitcherPower) + BbRosterPlan.points(catcherDefense) - (pitch === BbStealRules.FASTBALL ? 0 : BbStealRules.BREAKING_EDGE);
+  }
+
+  static judge(bases: BbBases, mask: number, pitcherPower: number, catcherDefense: number, pitch: BbPitchId): BbStealPlay | null {
+    if (!mask) return null;
+    const lead = mask & BbStealRules.SECOND ? 2 : 1, target = lead + 1, leader = bases[lead - 1] as BbRunner;
+    const offense = BbStealRules.offense(leader, target), defense = BbStealRules.defense(pitcherPower, catcherDefense, pitch), safe = offense > defense;
+    const runners: BbStealRunner[] = [BbStealRules.entry(leader, lead, !safe)];
+    if (lead === 2 && mask & BbStealRules.FIRST) runners.push(BbStealRules.entry(bases[0] as BbRunner, 1, false));
+    return { target, offense, defense, runners };
+  }
+
+  static pickoff(bases: BbBases, mask: number, base: number): BbPickoffPlay {
+    const caught = (mask & BbStealRules.bitOf(base)) !== 0;
+    if (!caught) return { base, caught, runners: [] };
+    const runners: BbStealRunner[] = [];
+    [2, 1].forEach((from) => { if (mask & BbStealRules.bitOf(from)) runners.push(BbStealRules.entry(bases[from - 1] as BbRunner, from, from === base)); });
+    return { base, caught, runners };
+  }
+
+  private static entry(runner: BbRunner, from: number, out: boolean): BbStealRunner { return { id: runner.id, from, out, speed: BbRosterPlan.points(runner.speed) }; }
+
+  static move(bases: BbBases, runners: readonly BbStealRunner[]): { bases: BbBases; outs: number } {
+    const after: BbBases = [bases[0], bases[1], bases[2]];
+    let outs = 0;
+    runners.forEach((entry) => { after[entry.from - 1] = null; });
+    runners.forEach((entry) => {
+      if (entry.out) { outs++; return; }
+      after[entry.from] = bases[entry.from - 1];
+    });
+    return { bases: after, outs };
+  }
+}
+
 interface BbPitcherStamina {
   spend(outcome: BbPitchOutcome): void;
+  drain(amount: number): void;
   level(): number;
   condition(): BbPitchCondition;
   isSpent(): boolean;
@@ -142,6 +230,7 @@ interface BbPitcherStamina {
 
 class BbNoStamina implements BbPitcherStamina {
   spend(): void { return; }
+  drain(): void { return; }
   level(): number { return BbStaminaModel.FULL; }
   condition(): BbPitchCondition { return BbPitchCondition.FRESH; }
   isSpent(): boolean { return false; }
@@ -151,6 +240,7 @@ class BbStaminaMeter implements BbPitcherStamina {
   private value = BbStaminaModel.FULL;
   constructor(private readonly stamina: number) {}
   spend(outcome: BbPitchOutcome): void { this.value = Math.max(0, this.value - BbStaminaModel.costOf(this.stamina, outcome)); }
+  drain(amount: number): void { this.value = Math.max(0, this.value - amount); }
   level(): number { return this.value; }
   condition(): BbPitchCondition { return BbStaminaModel.condition(this.value); }
   isSpent(): boolean { return this.value < BbStaminaModel.RELIEF_BELOW; }
@@ -192,6 +282,8 @@ class BbPitcherRoster {
     this.thrown++;
     this.meters[this.mound].spend(outcome);
   }
+
+  afterPickoff(): void { this.meters[this.mound].drain(BbStaminaModel.PICKOFF_COST); }
 }
 
 interface BbSubstitutionPolicy {
@@ -297,6 +389,7 @@ interface BbPitchOutcome {
   swing: BbSwingResult;
   script: BbPlayScript | null;
   runnerSpeed?: number;
+  steal?: BbStealPlay;
 }
 
 interface BbOutcomeNote {
@@ -467,6 +560,17 @@ class BbMatchRules {
     return { toast, plateAppearanceOver: true, halfOver: true, runs };
   }
 
+  runnersOut(state: BbGameState, bases: BbBases, outs: number): boolean {
+    state.bases = bases;
+    if (!outs) return false;
+    this.addOuts(state, outs);
+    if (state.outs < 3) return false;
+    state.balls = 0;
+    state.strikes = 0;
+    this.endHalf(state, state.inning >= this.format.startInning + this.format.inningsToPlay - 1);
+    return true;
+  }
+
   private finish(state: BbGameState, winner: BbWinner, note: string): void {
     state.finished = true;
     state.winner = winner;
@@ -508,6 +612,8 @@ class BbPitchJudge {
     this.resolvers = [resolverFor(crews[0]), resolverFor(crews[1])];
   }
 
+  catcherOf(team: 0 | 1): number { return this.crews[team].pointsOf("C"); }
+
   judge(state: BbGameState, roll: BbPitchRoll, contactOffset: number | null, batter: BbBatterSheet): BbPitchOutcome {
     const random = new BbSeededRandom(roll.seed ^ 0x5bd1e995), fielding = this.rules.fieldingIndex(state), runnerSpeed = batter.abilities.speed;
     const swing = BbBatterActionSet.of("swing").resolve({ roll, batterHand: batter.hand, abilities: batter.abilities, contactOffset, random, catcherDefense: this.crews[fielding].pointsOf("C") });
@@ -527,16 +633,28 @@ interface BbLogEntry {
   aim: BbZonePoint;
   seed: number;
   contactOffset: number | null;
+  steal?: number;
 }
 
 interface BbPitcherChangeEntry {
   change: number;
 }
 
-type BbLogEvent = BbLogEntry | BbPitcherChangeEntry;
+interface BbPickoffEntry {
+  pickoff: number;
+  steal?: number;
+}
+
+type BbLogEvent = BbLogEntry | BbPitcherChangeEntry | BbPickoffEntry;
 
 class BbLogEvents {
   static isChange(event: BbLogEvent): event is BbPitcherChangeEntry { return typeof (event as BbPitcherChangeEntry).change === "number"; }
+  static isPickoff(event: BbLogEvent): event is BbPickoffEntry { return typeof (event as BbPickoffEntry).pickoff === "number"; }
+}
+
+interface BbSettledPickoff {
+  play: BbPickoffPlay;
+  halfOver: boolean;
 }
 
 interface BbSettledPitch {
@@ -580,15 +698,44 @@ class BbMatchEngine {
 
   preview(roll: BbPitchRoll): BbPitchOutcome { return this.judge.judge(this.state, roll, null, this.batter()); }
 
-  settle(roll: BbPitchRoll, contactOffset: number | null): BbSettledPitch {
-    const roster = this.roster(), lineup = this.lineup(), batting = this.battingIndex, fielding = this.fieldingIndex;
-    const hitter = lineup.currentIndex(), thrower = roster.currentIndex(), batBefore = Object.assign({}, this.state.box[batting].bat), pitBefore = Object.assign({}, this.state.box[fielding].pit);
-    const outcome = this.judge.judge(this.state, roll, contactOffset, lineup.current()), note = this.rules.apply(this.state, outcome);
-    BbSlotTally.record(this.state.box[batting], "bat", hitter, batBefore);
-    BbSlotTally.record(this.state.box[fielding], "pit", thrower, pitBefore);
+  stealable(from: number): boolean { return !this.state.finished && BbStealRules.canSteal(this.state.bases, from); }
+
+  canPickoff(base: number): boolean { return !this.state.finished && base >= 1 && base <= 3 && !!this.state.bases[base - 1]; }
+
+  previewSteal(roll: BbPitchRoll, steal: number): BbStealPlay | null {
+    const bases = this.state.bases;
+    return BbStealRules.judge(bases, BbStealRules.clean(bases, steal), this.pitcher().abilities.power, this.judge.catcherOf(this.fieldingIndex), roll.pitch);
+  }
+
+  stealDefense(pitch: BbPitchId): number { return BbStealRules.defense(this.pitcher().abilities.power, this.judge.catcherOf(this.fieldingIndex), pitch); }
+
+  settle(roll: BbPitchRoll, contactOffset: number | null, steal = 0): BbSettledPitch {
+    const roster = this.roster(), lineup = this.lineup(), batting = this.battingIndex, fielding = this.fieldingIndex, state = this.state;
+    const hitter = lineup.currentIndex(), thrower = roster.currentIndex(), batBefore = Object.assign({}, state.box[batting].bat), pitBefore = Object.assign({}, state.box[fielding].pit);
+    const bases: BbBases = [state.bases[0], state.bases[1], state.bases[2]], mask = BbStealRules.clean(bases, steal), power = this.pitcher().abilities.power;
+    const outcome = this.judge.judge(state, roll, contactOffset, lineup.current()), note = this.rules.apply(state, outcome);
+    const runs = outcome.kind === "calledStrike" || outcome.kind === "swingMiss" || (outcome.kind === "ball" && !note.plateAppearanceOver);
+    const play = mask && runs && !note.halfOver && !state.finished ? BbStealRules.judge(bases, mask, power, this.judge.catcherOf(fielding), roll.pitch) : null;
+    if (play) {
+      outcome.steal = play;
+      const moved = BbStealRules.move(bases, play.runners);
+      if (this.rules.runnersOut(state, moved.bases, moved.outs)) note.halfOver = true;
+    }
+    BbSlotTally.record(state.box[batting], "bat", hitter, batBefore);
+    BbSlotTally.record(state.box[fielding], "pit", thrower, pitBefore);
     roster.afterPitch(outcome);
     if (note.plateAppearanceOver) lineup.advance();
     return { outcome, note };
+  }
+
+  pickoff(base: number, steal = 0): BbSettledPickoff | null {
+    if (!this.canPickoff(base)) return null;
+    const state = this.state, roster = this.roster(), fielding = this.fieldingIndex, thrower = roster.currentIndex(), pitBefore = Object.assign({}, state.box[fielding].pit);
+    const bases: BbBases = [state.bases[0], state.bases[1], state.bases[2]], play = BbStealRules.pickoff(bases, BbStealRules.clean(bases, steal), base);
+    const moved = BbStealRules.move(bases, play.runners), halfOver = this.rules.runnersOut(state, moved.bases, moved.outs);
+    BbSlotTally.record(state.box[fielding], "pit", thrower, pitBefore);
+    roster.afterPickoff();
+    return { play, halfOver };
   }
 
   change(index: number): boolean { return !this.state.finished && this.roster().change(index); }
@@ -596,7 +743,8 @@ class BbMatchEngine {
   replay(event: BbLogEvent): void {
     if (this.state.finished) return;
     if (BbLogEvents.isChange(event)) { this.change(event.change); return; }
-    this.settle(this.roll(event, event.seed), event.contactOffset);
+    if (BbLogEvents.isPickoff(event)) { this.pickoff(event.pickoff, event.steal); return; }
+    this.settle(this.roll(event, event.seed), event.contactOffset, event.steal);
   }
 }
 

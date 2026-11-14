@@ -18,6 +18,29 @@ BbAiLevel.ALL = {
     normal: { label: "보통", readDeviation: 0.3, timingDeviation: 0.062, aimDeviation: 0.2, middleMistake: 0.08, repeatWeight: 0.5 },
     hard: { label: "어려움", readDeviation: 0.18, timingDeviation: 0.045, aimDeviation: 0.06, middleMistake: 0, repeatWeight: 0.3 }
 };
+class BbAiRunner {
+    constructor(level) {
+        this.level = level;
+    }
+    decide(engine, random) {
+        const bases = engine.state.bases, from = engine.stealable(2) ? 2 : engine.stealable(1) ? 1 : 0;
+        if (!from)
+            return 0;
+        const offense = BbStealRules.offense(bases[from - 1], from + 1);
+        const chance = offense > engine.stealDefense(BbStealRules.FASTBALL) ? BbAiRunner.SURE_CHANCE : offense > engine.stealDefense("cv") ? BbAiRunner.GAMBLE_CHANCE : 0;
+        return chance > 0 && random.chance(chance * (1 - this.level.middleMistake)) ? BbStealRules.pressed(bases, from) : 0;
+    }
+    pickoffBase(engine, triesThisBatter, random) {
+        if (triesThisBatter >= BbAiRunner.PICKOFFS_PER_BATTER)
+            return null;
+        const base = engine.stealable(2) ? 2 : engine.stealable(1) ? 1 : 0;
+        return base && random.chance(BbAiRunner.PICKOFF_CHANCE) ? base : null;
+    }
+}
+BbAiRunner.SURE_CHANCE = 0.45;
+BbAiRunner.GAMBLE_CHANCE = 0.12;
+BbAiRunner.PICKOFF_CHANCE = 0.12;
+BbAiRunner.PICKOFFS_PER_BATTER = 1;
 class BbAiPitcher {
     constructor(level) {
         this.level = level;

@@ -32,10 +32,24 @@ class BbDuelSession {
                 return;
             if (BbLogEvents.isChange(entry))
                 this.change(entry.change);
+            else if (BbLogEvents.isPickoff(entry))
+                this.pickoff(entry.pickoff, entry.steal || 0);
             else
-                this.settle(this.rollWith({ pitch: entry.pitch, aim: entry.aim }, entry.seed), entry.contactOffset);
+                this.settle(this.rollWith({ pitch: entry.pitch, aim: entry.aim }, entry.seed), entry.contactOffset, entry.steal || 0);
         });
     }
+    pickoff(base, steal) {
+        const settled = this.engine.pickoff(base, steal);
+        if (!settled)
+            return null;
+        const entry = { pickoff: base };
+        if (steal)
+            entry.steal = steal;
+        this.log.push(entry);
+        return settled;
+    }
+    aiSteal(level) { return new BbAiRunner(level).decide(this.engine, this.random); }
+    aiPickoff(level, triesThisBatter) { return new BbAiRunner(level).pickoffBase(this.engine, triesThisBatter, this.random); }
     roll(call) { return this.engine.roll(call, this.random.seed()); }
     aiSwing(roll, level) {
         return new BbAiBatter(level).decide(roll, this.state.balls, this.state.strikes, this.batter().hand, this.previousSpeed, this.pitcher().abilities, this.random);
@@ -49,11 +63,14 @@ class BbDuelSession {
         return true;
     }
     tiredRelief() { return new BbTiredSubstitution().nextPitcher(this.roster()); }
-    settle(roll, contactOffset) {
-        const settled = this.engine.settle(roll, contactOffset), note = settled.note;
+    settle(roll, contactOffset, steal = 0) {
+        const settled = this.engine.settle(roll, contactOffset, steal), note = settled.note;
         this.lastPitch = note.plateAppearanceOver ? null : roll.pitch;
         this.previousSpeed = note.plateAppearanceOver ? null : roll.speed;
-        this.log.push({ pitch: roll.pitch, aim: roll.aim, seed: roll.seed, contactOffset });
+        const entry = { pitch: roll.pitch, aim: roll.aim, seed: roll.seed, contactOffset };
+        if (steal)
+            entry.steal = steal;
+        this.log.push(entry);
         return settled;
     }
 }

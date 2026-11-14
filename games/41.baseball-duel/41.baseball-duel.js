@@ -716,5 +716,5 @@ BbDuelGame.SCREENS = ["startScreen", "roomScreen", "partyScreen", "resultScreen"
 BbDuelGame.NOTICE_SECONDS = 2.5;
 BbDuelGame.SEED_SPAN = 1000000007;
 BbDuelGame.AI_FALLBACK_MS = 120000;
-BbDuelGame.CLIENT_VERSION = 20261114;
+BbDuelGame.CLIENT_VERSION = 20261115;
 BbDuelGame.QUALITY_KEY = "baseballduel_quality_v1";

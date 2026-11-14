@@ -25,9 +25,9 @@ interface BbRoomEnd {
   match: number;
 }
 
-interface BbNetPitch { t: BbPitchId; u: number; v: number }
+interface BbNetPitch { t: BbPitchId | "po"; u?: number; v?: number; b?: number }
 interface BbNetRoll { seed: number; at: number }
-interface BbNetSwing { k: "take" | "swing"; o?: number }
+interface BbNetSwing { k: "take" | "swing"; o?: number; st?: number }
 interface BbNetChange { to: number }
 interface BbNetTime { at: number; done?: number }
 interface BbNetEntry { p?: BbNetPitch; r?: BbNetRoll; s?: BbNetSwing; c?: BbNetChange; t?: BbNetTime }
@@ -94,12 +94,18 @@ class BbRoomLink implements BbMatchLink {
     for (let sequence = 0; ; sequence++) {
       const entry = this.entries.get(sequence), change = entry ? BbRoomLink.changeOf(entry) : null;
       if (change !== null) { done.push({ change }); continue; }
-      if (!entry || !entry.p || !entry.r || !entry.s) return done;
-      done.push({ pitch: BbRoomLink.pitchOf(entry.p), aim: BbRoomLink.aimOf(entry.p), seed: entry.r.seed >>> 0, contactOffset: BbRoomLink.offsetOf(entry.s) });
+      const pickoff = entry ? BbRoomLink.pickoffOf(entry) : null;
+      if (entry && pickoff !== null && entry.s) { done.push({ pickoff, steal: BbRoomLink.stealOf(entry.s) }); continue; }
+      if (!entry || !entry.p || pickoff !== null || !entry.r || !entry.s) return done;
+      done.push({ pitch: BbRoomLink.pitchOf(entry.p), aim: BbRoomLink.aimOf(entry.p), seed: entry.r.seed >>> 0, contactOffset: BbRoomLink.offsetOf(entry.s), steal: BbRoomLink.stealOf(entry.s) });
     }
   }
 
   changeChosen(sequence: number, index: number): void { this.claim(sequence + "/c", { to: index }); }
+
+  pickoffChosen(sequence: number, base: number): void { this.claim(sequence + "/p", { t: "po", b: base }); }
+
+  pickoffAnswered(sequence: number, base: number, steal: number): void { this.claim(sequence + "/s", steal ? { k: "take", st: steal } : { k: "take" }); }
 
   timeChosen(sequence: number, on: boolean): void {
     const time = this.log.child(sequence + "/t");
@@ -117,9 +123,11 @@ class BbRoomLink implements BbMatchLink {
     this.claim(sequence + "/p", { t: call.pitch, u: Number(call.aim.u.toFixed(4)), v: Number(call.aim.v.toFixed(4)) });
   }
 
-  swingChosen(sequence: number, contactOffset: number | null): void {
-    this.director.deliverSwing(sequence, contactOffset);
-    this.claim(sequence + "/s", contactOffset === null ? { k: "take" } : { k: "swing", o: Number(contactOffset.toFixed(4)) });
+  swingChosen(sequence: number, contactOffset: number | null, steal: number): void {
+    const offset = contactOffset === null || !Number.isFinite(contactOffset) ? null : BbCurve.clamp(Number(contactOffset.toFixed(4)), -1, 1), swing: BbNetSwing = offset === null ? { k: "take" } : { k: "swing", o: offset };
+    if (steal) swing.st = steal;
+    this.director.deliverSwing(sequence, offset, steal);
+    this.claim(sequence + "/s", swing);
   }
 
   pump(): void {
@@ -128,13 +136,18 @@ class BbRoomLink implements BbMatchLink {
     const time = entry && entry.t && !entry.t.done && !entry.p && change === null ? entry.t : null;
     this.director.showRemoteTime(time ? BbMatchDirector.TIME_OUT_SECONDS - (this.backend.now() - Number(time.at)) / 1000 : 0);
     if (!entry || !entry.p) return;
+    const pickoff = BbRoomLink.pickoffOf(entry);
+    if (pickoff !== null) {
+      if (entry.s) { this.director.deliverPickoff(sequence, pickoff, BbRoomLink.stealOf(entry.s)); return; }
+      this.director.pickoffCalled(sequence, pickoff);
+    }
     if (!entry.r) {
       if (hosting && !this.asked.has(sequence)) { this.asked.add(sequence); this.claim(sequence + "/r", { seed: Math.floor(Math.random() * 4294967296), at: this.backend.now() }); }
       return;
     }
     const age = this.backend.now() - entry.r.at;
-    if (this.director.awaitsPitch) this.director.deliverPitch(sequence, { pitch: BbRoomLink.pitchOf(entry.p), aim: BbRoomLink.aimOf(entry.p) }, entry.r.seed >>> 0, age < BbRoomLink.FRESH_MS);
-    if (entry.s) this.director.deliverSwing(sequence, BbRoomLink.offsetOf(entry.s));
+    if (pickoff === null && this.director.awaitsPitch) this.director.deliverPitch(sequence, { pitch: BbRoomLink.pitchOf(entry.p), aim: BbRoomLink.aimOf(entry.p) }, entry.r.seed >>> 0, age < BbRoomLink.FRESH_MS);
+    if (entry.s && pickoff === null) this.director.deliverSwing(sequence, BbRoomLink.offsetOf(entry.s), BbRoomLink.stealOf(entry.s));
     else if (hosting && !this.held && age > BbRoomLink.TAKE_AFTER_MS && !this.asked.has(-1 - sequence)) { this.asked.add(-1 - sequence); this.claim(sequence + "/s", { k: "take" }); }
   }
 
@@ -147,10 +160,17 @@ class BbRoomLink implements BbMatchLink {
     return Number.isInteger(to) && to >= 0 && to < BbRosterPlan.pitcherCount() ? to : null;
   }
 
-  private static pitchOf(pitch: BbNetPitch): BbPitchId { return BbPitchCatalog.ALL.some((kind) => kind.id === pitch.t) ? pitch.t : "ft"; }
+  private static pitchOf(pitch: BbNetPitch): BbPitchId { const found = BbPitchCatalog.ALL.find((kind) => kind.id === pitch.t); return found ? found.id : "ft"; }
+
+  private static pickoffOf(entry: BbNetEntry): number | null {
+    const base = entry.p && entry.p.t === "po" ? Number(entry.p.b) : NaN;
+    return Number.isInteger(base) && base >= 1 && base <= 3 ? base : null;
+  }
+
+  private static stealOf(swing: BbNetSwing): number { const mask = Number(swing.st); return Number.isInteger(mask) && mask > 0 && mask <= 3 ? mask : 0; }
 
   private static aimOf(pitch: BbNetPitch): BbZonePoint {
-    const reach = BbRoomLink.AIM_REACH, safe = (value: number) => (Number.isFinite(value) ? BbCurve.clamp(value, -reach, reach) : 0);
+    const reach = BbRoomLink.AIM_REACH, safe = (value: number | undefined) => (typeof value === "number" && Number.isFinite(value) ? BbCurve.clamp(value, -reach, reach) : 0);
     return { u: safe(pitch.u), v: safe(pitch.v) };
   }
 

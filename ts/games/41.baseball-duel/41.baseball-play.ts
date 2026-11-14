@@ -55,13 +55,14 @@ class BbInfieldFlyRule {
 
 class BbPlayResolver {
   private static readonly INFIELD_REACH = 44;
-  private static readonly THROUGH_METERS = 15;
-  private static readonly THROUGH_DEPTH = 46;
-  private static readonly THROUGH_SECONDS = 1.3;
-  private static readonly THROUGH_SIDE_DEGREES = 15;
-  private static readonly THROUGH_CHASE_SPEED = 9;
-  private static readonly THROUGH_START = 0.45;
+  private static readonly BOBBLE_METERS = 5;
+  private static readonly BOBBLE_TURN_DEGREES = 6;
+  private static readonly BOBBLE_ROLL_SECONDS = 0.9;
+  private static readonly BOBBLE_PICKUP = 0.3;
+  private static readonly BOBBLE_LATE_BY = 0.25;
+  private static readonly FORCE_MARGIN = 0.1;
   private static readonly LATE_THROW_WITHIN = 0.7;
+  static readonly HOME_RUN_CLEARANCE = 0.4;
   constructor(private readonly dimensions: BbFieldDimensions, private readonly fielding: BbFieldingController, private readonly running: BbBaserunningController, private readonly errors: BbErrorPolicy, private readonly crew: BbDefenseCrew = BbDefenseCrew.STANDARD) {}
 
   private throwsBy(position: string): BbThrowDecision { return this.crew.arm(position); }
@@ -72,7 +73,7 @@ class BbPlayResolver {
     if (ball.flight === "ground") return this.grounder(situation, ball, spots, random);
     const fence = this.dimensions.fenceDistance(ball.spray);
     if (ball.carry >= fence) {
-      if (BbBattedBallPhysics.heightAt(fence, ball.carry, ball.launch) >= this.dimensions.wallHeight) return this.homeRun(situation, ball);
+      if (BbBattedBallPhysics.heightAt(fence, ball.carry, ball.launch) >= this.dimensions.wallHeight + BbPlayResolver.HOME_RUN_CLEARANCE) return this.homeRun(situation, ball);
       return this.hit(situation, ball, this.fielding.retrieve(ball, spots, fence, true));
     }
     if (BbInfieldFlyRule.applies(situation, ball, spots)) return this.infieldFly(situation, ball, spots);
@@ -87,11 +88,27 @@ class BbPlayResolver {
     return this.infieldPlay(situation, ball, { by, at: retrieve.at, spot: retrieve.spot, moved: BbDiamond.distance(spots.get(by) as BbSpot, retrieve.spot) }, spots, random);
   }
 
-  private throughBall(ball: BbBattedBall, pick: BbGroundPick, spots: Map<BbPosition, BbSpot>): BbRetrieve {
-    const side = BbPlayResolver.THROUGH_SIDE_DEGREES, by: BbPosition = ball.spray < -side ? "LF" : ball.spray > side ? "RF" : "CF";
-    const spot = BbDiamond.polar(Math.max(BbDiamond.fromHome(pick.spot) + BbPlayResolver.THROUGH_METERS, BbPlayResolver.THROUGH_DEPTH), ball.spray);
-    const chase = BbPlayResolver.THROUGH_START + BbDiamond.distance(spots.get(by) as BbSpot, spot) / BbPlayResolver.THROUGH_CHASE_SPEED;
-    return { at: Math.max(pick.at + BbPlayResolver.THROUGH_SECONDS, chase), spot, holdSeconds: 0, by };
+  private bobbled(ball: BbBattedBall, pick: BbGroundPick, spots: Map<BbPosition, BbSpot>, legs: BbLegs): BbRetrieve {
+    const spot = BbDiamond.polar(BbDiamond.fromHome(pick.spot) + BbPlayResolver.BOBBLE_METERS, ball.spray + (ball.spray >= 0 ? -1 : 1) * BbPlayResolver.BOBBLE_TURN_DEGREES);
+    let by: BbPosition = pick.by, reach = Infinity;
+    BbFielderPositions.ALL.forEach((position) => {
+      const from = position === pick.by ? pick.spot : spots.get(position) as BbSpot, seconds = (position === pick.by ? pick.at : 0) + BbFielderMotion.secondsTo(position, from, spot, false, this.crew.skillOf(position));
+      if (seconds < reach) { by = position; reach = seconds; }
+    });
+    let at = Math.max(pick.at + BbPlayResolver.BOBBLE_ROLL_SECONDS, reach) + BbPlayResolver.BOBBLE_PICKUP;
+    const late = BbRunnerMotion.batterSeconds(1, legs) + BbPlayResolver.BOBBLE_LATE_BY - (at + this.throwsBy(by).secondsTo(spot, 1));
+    if (late > 0) at += late;
+    return { at, spot, holdSeconds: 0, by };
+  }
+
+  private twoOutForce(situation: BbPlaySituation, pick: BbGroundPick, readyAt: number, runnerAt: (base: number) => number): number | null {
+    const bases = situation.bases, arm = this.throwsBy(pick.by), forced = [1];
+    if (bases[0]) forced.push(2);
+    if (bases[0] && bases[1]) forced.push(3);
+    if (bases[0] && bases[1] && bases[2]) forced.push(4);
+    const reachable = forced.filter((base) => runnerAt(base) - (readyAt + arm.secondsTo(pick.spot, base)) > BbPlayResolver.FORCE_MARGIN);
+    if (!reachable.length) return null;
+    return reachable.sort((a, b) => BbDiamond.distance(pick.spot, BbDiamond.base(a)) - BbDiamond.distance(pick.spot, BbDiamond.base(b)))[0];
   }
 
   private blank(situation: BbPlaySituation, result: BbPlayCode, ball: BbBattedBall): BbPlayScript {
@@ -190,8 +207,8 @@ class BbPlayResolver {
     script.events = [{ t: 0, kind: "ballFlight", spot: [pick.spot.x, pick.spot.z], arriveT: pick.at }, { t: pick.at, kind: "field", who: pick.by, spot: [pick.spot.x, pick.spot.z] }];
     const shifted = this.running.onForcedShift(bases, situation.batter, abilities);
     if (this.errors.fumbles(random)) {
-      const through = this.throughBall(ball, pick, spots), moves = this.running.onHit(bases, situation.batter, abilities, through, this.throwsBy(through.by));
-      const reached = (moves.find((move) => move.from === 0) as BbAdvance).to, next = Math.min(4, reached + 1);
+      const through = this.bobbled(ball, pick, spots, abilities), moves = this.running.onHit(bases, situation.batter, abilities, through, this.throwsBy(through.by));
+      const reached = (moves.find((move) => move.from === 0) as BbAdvance).to, next = reached <= 1 ? 1 : Math.min(4, reached + 1);
       script.result = "ERROR";
       script.batterReached = reached;
       script.events.push({ t: pick.at, kind: "error", who: pick.by }, { t: through.at, kind: "field", who: through.by, spot: [through.spot.x, through.spot.z] });
@@ -210,6 +227,16 @@ class BbPlayResolver {
     const runnerInto = (base: number) => (shifted.find((entry) => entry.to === base && entry.from === base - 1) as BbAdvance).runner;
     const readyAt = pick.at + BbThrowDecision.rangeDelay(pick.moved), arm = this.throwsBy(pick.by);
     const firstAt = readyAt + arm.secondsTo(pick.spot, 1);
+    if (situation.outs >= 2) {
+      const near = this.twoOutForce(situation, pick, readyAt, (base) => (base === 1 ? batterAt : runnerAt(runnerInto(base))));
+      if (near !== null) {
+        const nearAt = readyAt + arm.secondsTo(pick.spot, near);
+        out(near === 1 ? situation.batter : runnerInto(near), near, nearAt);
+        script.events.push({ t: pick.at, kind: "throw", who: pick.by, base: near, arriveT: nearAt });
+        if (near > 1) { script.result = "FIELDERS_CHOICE"; script.batterReached = 1; }
+        return this.closeInfieldPlay(script, situation, shifted);
+      }
+    }
     if (situation.outs < 2 && doubleBase) {
       const leadAt = readyAt + arm.secondsTo(pick.spot, doubleBase), lead = runnerInto(doubleBase);
       if (leadAt < runnerAt(lead)) {

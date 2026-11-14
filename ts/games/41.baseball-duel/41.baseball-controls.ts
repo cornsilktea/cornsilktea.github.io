@@ -105,8 +105,39 @@ class BbZoneAimWindow {
   }
 }
 
+class BbPickoffBases {
+  private static readonly LABELS: readonly string[] = ["1루", "2루", "3루"];
+  private readonly frame: HTMLElement;
+  private readonly bases: HTMLButtonElement[];
+
+  constructor(host: HTMLElement, onPick: (base: number) => void) {
+    this.frame = BbHudParts.box("bb-pickoff", host);
+    BbHudParts.box("bb-pickoff-title", this.frame, "견제할 루를 고르세요 · 키보드 1 2 3");
+    const field = BbHudParts.box("bb-pickoff-field", this.frame);
+    this.bases = BbPickoffBases.LABELS.map((label, index) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "bb-pitch-key bb-pickoff-base bb-pickoff-base" + (index + 1);
+      BbHudParts.box("bb-pitch-letter", button, String(index + 1));
+      BbHudParts.box("bb-pitch-name", button, label);
+      button.addEventListener("click", () => onPick(index + 1));
+      field.appendChild(button);
+      return button;
+    });
+  }
+
+  open(occupied: readonly boolean[]): void {
+    this.bases.forEach((button, index) => { button.disabled = !occupied[index]; });
+    this.frame.classList.add("open");
+  }
+
+  close(): void { this.frame.classList.remove("open"); }
+}
+
 class BbPitchPad {
   private static readonly THROW_CODES: readonly string[] = ["Space", "Enter", "NumpadEnter"];
+  private static readonly PICKOFF_CODES: readonly string[] = ["Digit1", "Digit2", "Digit3"];
+  private static readonly PICKOFF_PAD_CODES: readonly string[] = ["Numpad1", "Numpad2", "Numpad3"];
   private static readonly ARROW_SPEED = 1.5;
   private static readonly ARROWS: Readonly<Record<string, readonly [number, number]>> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] };
   private readonly row: HTMLElement;
@@ -116,11 +147,16 @@ class BbPitchPad {
   private readonly throwButton: HTMLButtonElement;
   private readonly aim: BbZoneAimWindow;
   private readonly held = new Set<string>();
+  private readonly pickoffKey: HTMLButtonElement;
+  private readonly pickoffBases: BbPickoffBases;
   private usable: readonly BbPitchId[] = [];
+  private occupied: readonly boolean[] = [false, false, false];
   private opened = false;
+  private pickingOff = false;
 
-  constructor(host: HTMLElement, private readonly onThrow: (call: BbPitchCall) => void) {
+  constructor(host: HTMLElement, private readonly onThrow: (call: BbPitchCall) => void, private readonly onPickoff: (base: number) => void) {
     this.aim = new BbZoneAimWindow(host);
+    this.pickoffBases = new BbPickoffBases(host, (base) => this.pickoff(base));
     this.row = BbHudParts.box("bb-pad", host);
     this.paths = [];
     this.dots = [];
@@ -138,6 +174,14 @@ class BbPitchPad {
       this.row.appendChild(key);
       return key;
     });
+    this.pickoffKey = document.createElement("button");
+    this.pickoffKey.type = "button";
+    this.pickoffKey.className = "bb-pitch-key bb-pickoff-key";
+    BbHudParts.box("bb-pitch-letter", this.pickoffKey, "1~3");
+    BbHudParts.box("bb-pitch-name", this.pickoffKey, "견제");
+    BbHudParts.box("bb-pickoff-mark", this.pickoffKey, "◆");
+    this.pickoffKey.addEventListener("click", () => this.togglePickoff());
+    this.row.appendChild(this.pickoffKey);
     this.throwButton = document.createElement("button");
     this.throwButton.className = "bb-action bb-throw";
     this.throwButton.type = "button";
@@ -157,9 +201,15 @@ class BbPitchPad {
     this.aim.nudge(sideways * reach, upward * reach);
   }
 
-  open(sheet: BbPitcherSheet, heat: readonly string[] | null = null): void {
+  open(sheet: BbPitcherSheet, heat: readonly string[] | null = null, occupied: readonly boolean[] = [false, false, false]): void {
     this.opened = true;
     this.usable = sheet.pitches;
+    this.occupied = occupied;
+    this.pickingOff = false;
+    this.pickoffBases.close();
+    this.pickoffKey.hidden = !occupied.some((on) => on);
+    this.pickoffKey.classList.remove("on");
+    this.row.classList.remove("picking");
     this.aim.begin(sheet);
     this.aim.heat(heat);
     BbPitchCatalog.ALL.forEach((kind, index) => {
@@ -176,14 +226,33 @@ class BbPitchPad {
 
   close(): void {
     this.opened = false;
+    this.pickingOff = false;
     this.held.clear();
     this.aim.close();
+    this.pickoffBases.close();
     this.row.classList.remove("open");
     this.throwButton.classList.remove("open");
   }
 
+  private togglePickoff(): void {
+    if (!this.opened || !this.occupied.some((on) => on)) return;
+    this.pickingOff = !this.pickingOff;
+    this.pickoffKey.classList.toggle("on", this.pickingOff);
+    this.row.classList.toggle("picking", this.pickingOff);
+    this.keys.forEach((key) => key.classList.remove("on"));
+    if (this.pickingOff) { this.aim.close(); this.throwButton.classList.remove("open"); this.pickoffBases.open(this.occupied); }
+    else this.pickoffBases.close();
+  }
+
+  private pickoff(base: number): void {
+    if (!this.opened || !this.occupied[base - 1]) return;
+    this.close();
+    this.onPickoff(base);
+  }
+
   private pick(kind: BbPitchKind): void {
     if (!this.opened || this.usable.indexOf(kind.id) < 0) return;
+    if (this.pickingOff) { this.pickingOff = false; this.pickoffKey.classList.remove("on"); this.row.classList.remove("picking"); this.pickoffBases.close(); }
     this.aim.choose(kind);
     this.keys.forEach((key, index) => key.classList.toggle("on", BbPitchCatalog.ALL[index] === kind));
     this.throwButton.classList.add("open");
@@ -203,8 +272,46 @@ class BbPitchPad {
     if (event.repeat) return;
     const kind = BbPitchCatalog.ALL.find((candidate) => event.code === "Key" + candidate.hotkey);
     if (kind) { this.pick(kind); return; }
+    const base = Math.max(BbPitchPad.PICKOFF_CODES.indexOf(event.code), BbPitchPad.PICKOFF_PAD_CODES.indexOf(event.code)) + 1;
+    if (base > 0) { event.preventDefault(); this.pickoff(base); return; }
     if (BbPitchPad.THROW_CODES.indexOf(event.code) >= 0) { event.preventDefault(); this.confirm(); }
   }
+}
+
+class BbStealButtons {
+  private static readonly LABELS: readonly string[] = ["1루 주자 도루", "2루 주자 도루"];
+  private readonly frame: HTMLElement;
+  private readonly buttons: HTMLButtonElement[];
+  private shown = "";
+
+  constructor(host: HTMLElement, onPress: (from: number) => void) {
+    this.frame = BbHudParts.box("bb-steal", host);
+    this.buttons = BbStealButtons.LABELS.map((label, index) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "bb-steal-button";
+      button.textContent = label;
+      button.addEventListener("click", () => onPress(index + 1));
+      this.frame.appendChild(button);
+      return button;
+    });
+  }
+
+  show(allowed: readonly boolean[], pressed: number, locked: boolean): void {
+    const key = allowed.join() + "|" + pressed + "|" + locked;
+    if (key === this.shown) return;
+    this.shown = key;
+    this.buttons.forEach((button, index) => {
+      const going = (pressed & BbStealRules.bitOf(index + 1)) !== 0;
+      button.hidden = !allowed[index] && !going;
+      button.disabled = locked || pressed !== 0;
+      button.classList.toggle("on", going);
+      button.textContent = going ? (index + 1) + "루 주자 도루 시작!" : BbStealButtons.LABELS[index];
+    });
+    this.frame.classList.toggle("open", this.buttons.some((button) => !button.hidden));
+  }
+
+  hide(): void { this.show([false, false], 0, true); }
 }
 
 class BbSwingButton {

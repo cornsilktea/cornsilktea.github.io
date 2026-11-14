@@ -45,18 +45,53 @@ class BbAbilityTable {
     });
   }
 
-  static html(head: readonly string[], rows: readonly BbAbilityRow[], sortColumn: number, kind: string): string {
+  static html(head: readonly string[], rows: readonly BbAbilityRow[], sortColumn: number, kind: string, faint: (row: BbAbilityRow) => boolean = (row) => row.g < BbAbilityTable.FEW_GAMES, label: (key: string) => string = BbAbilityTable.label): string {
     const sorted = rows.slice().sort((a, b) => (sortColumn < 0 ? a.key.localeCompare(b.key) : b.cells[sortColumn].sort - a.cells[sortColumn].sort));
-    return '<table class="asd-table bb-ability-table"><thead><tr>' + head.map((label, index) => '<th data-bb-sort="' + kind + ":" + (index - 1) + '" style="cursor:pointer">' + label + "</th>").join("") + "</tr></thead><tbody>"
-      + sorted.map((row) => '<tr style="' + (row.g < BbAbilityTable.FEW_GAMES ? "opacity:.45" : "") + '"><td>' + BbAbilityTable.label(row.key) + "</td>" + row.cells.map((cell) => "<td>" + cell.text + "</td>").join("") + "</tr>").join("")
+    return '<table class="asd-table bb-ability-table"><thead><tr>' + head.map((text, index) => '<th data-bb-sort="' + kind + ":" + (index - 1) + '" style="cursor:pointer">' + text + "</th>").join("") + "</tr></thead><tbody>"
+      + sorted.map((row) => '<tr style="' + (faint(row) ? "opacity:.45" : "") + '"><td>' + label(row.key) + "</td>" + row.cells.map((cell) => "<td>" + cell.text + "</td>").join("") + "</tr>").join("")
       + "</tbody></table>";
+  }
+}
+
+class BbAbilityAxis {
+  static readonly FEW_CHANCES = 30;
+  static readonly BAT_NAMES: readonly string[] = ["컨택", "파워", "주루", "수비"];
+  static readonly PIT_NAMES: readonly string[] = ["제구", "구위", "변화", "체력"];
+
+  static valueOf(key: string, axis: number): number | null {
+    const parts = key.split("-").map(Number);
+    return axis < parts.length && parts[axis] >= 1 && parts[axis] <= 7 ? parts[axis] : null;
+  }
+
+  static regroup<T>(groups: Record<string, T[]>, axis: number): Record<string, T[]> {
+    const merged: Record<string, T[]> = {};
+    Object.keys(groups).forEach((key) => {
+      const value = BbAbilityAxis.valueOf(key, axis);
+      if (value === null) return;
+      merged[String(value)] = (merged[String(value)] || []).concat(groups[key]);
+    });
+    return merged;
+  }
+
+  static head(names: readonly string[], axis: number, base: readonly string[]): string[] { return [names[axis]].concat(base.slice(1)); }
+
+  static faint(row: BbAbilityRow): boolean { return row.cells[1].sort < BbAbilityAxis.FEW_CHANCES; }
+
+  static label(key: string): string { return "<b>" + key + "</b>"; }
+
+  static switcher(kind: string, names: readonly string[], axis: number): string {
+    return '<div class="actions">' + names.map((name, index) => '<button type="button" data-bb-axis="' + kind + ":" + index + '"' + (index === axis ? ' style="background:#D97B4F;color:#fff"' : "") + ">" + name + "</button>").join("") + "</div>";
   }
 }
 
 class BbTeacherPanel {
   private opened = false;
-  private batRows: BbAbilityRow[] = [];
-  private pitRows: BbAbilityRow[] = [];
+  private batGroups: Record<string, BbAbilityBat[]> = {};
+  private pitGroups: Record<string, BbAbilityPit[]> = {};
+  private loaded = false;
+  private byAxis = false;
+  private batAxis = 1;
+  private pitAxis = 1;
   private batSort = 0;
   private pitSort = 0;
 
@@ -75,11 +110,25 @@ class BbTeacherPanel {
 
   private build(): void {
     this.body.innerHTML = '<p class="hint">41번 야구 1대1 대전. <b>핫콜드존</b>을 켜면 경기 중 투수에게 상대 타자의 구역별 타율이, 타자에게 상대 투수가 많이 던지는 위치가 보입니다(기본 꺼짐). '
-      + "<b>포인트별 성적</b>은 학생이 고른 능력치 배분별로 사람과 한 경기 기록을 합쳐 보여 줍니다(학생 화면에는 없음). 5경기 미만인 줄은 흐리게, 머리글을 누르면 정렬합니다.</p>"
-      + '<div class="actions"><button type="button" data-bb-zones>핫콜드존: 읽는 중…</button><button type="button" data-bb-load>포인트별 성적 불러오기</button></div><p class="msg" data-bb-msg></p><div data-bb-tables class="stats-box"></div>';
+      + "<b>포인트별 성적</b>은 학생이 고른 능력치 배분별로 사람과 한 경기 기록을 합쳐 보여 줍니다(학생 화면에는 없음). <b>능력치별</b>은 능력치 하나의 값(1~7)이 같은 배분을 모두 합쳐 7줄로 보여 줍니다. "
+      + "배분별은 5경기 미만, 능력치별은 30타석(상대 타자) 미만인 줄을 흐리게, 머리글을 누르면 정렬합니다.</p>"
+      + '<div class="actions"><button type="button" data-bb-zones>핫콜드존: 읽는 중…</button><button type="button" data-bb-load>포인트별 성적 불러오기</button><button type="button" data-bb-view>보기: 배분별</button></div><p class="msg" data-bb-msg></p><div data-bb-tables class="stats-box"></div>';
     this.part<HTMLButtonElement>("[data-bb-zones]").addEventListener("click", () => { this.flipZones(); });
     this.part<HTMLButtonElement>("[data-bb-load]").addEventListener("click", () => { this.load(); });
+    this.part<HTMLButtonElement>("[data-bb-view]").addEventListener("click", () => {
+      this.byAxis = !this.byAxis;
+      this.part<HTMLButtonElement>("[data-bb-view]").textContent = "보기: " + (this.byAxis ? "능력치별" : "배분별");
+      this.batSort = this.pitSort = this.byAxis ? -1 : 0;
+      this.draw();
+    });
     this.part("[data-bb-tables]").addEventListener("click", (event) => {
+      const axis = (event.target as HTMLElement).closest("[data-bb-axis]");
+      if (axis) {
+        const [kind, index] = String(axis.getAttribute("data-bb-axis")).split(":");
+        if (kind === "bat") this.batAxis = Number(index); else this.pitAxis = Number(index);
+        this.draw();
+        return;
+      }
       const target = (event.target as HTMLElement).closest("[data-bb-sort]");
       if (!target) return;
       const [kind, column] = String(target.getAttribute("data-bb-sort")).split(":");
@@ -124,8 +173,9 @@ class BbTeacherPanel {
         Object.keys(node.ab).forEach((key) => { (bat[key] = bat[key] || []).push(node.ab[key]); });
         Object.keys(node.ap).forEach((key) => { (pit[key] = pit[key] || []).push(node.ap[key]); });
       });
-      this.batRows = BbAbilityTable.batRows(bat);
-      this.pitRows = BbAbilityTable.pitRows(pit);
+      this.batGroups = bat;
+      this.pitGroups = pit;
+      this.loaded = true;
       this.say("학생 " + uids.length + "명의 기록을 합쳤어요.");
       this.draw();
     } catch (error) {
@@ -134,7 +184,18 @@ class BbTeacherPanel {
   }
 
   private draw(): void {
-    this.part("[data-bb-tables]").innerHTML = '<div class="asd-sec">타자 (' + this.batRows.length + "가지 배분)</div>" + BbAbilityTable.html(BbAbilityTable.BAT_HEAD, this.batRows, this.batSort, "bat")
-      + '<div class="asd-sec">투수 (' + this.pitRows.length + "가지 배분)</div>" + BbAbilityTable.html(BbAbilityTable.PIT_HEAD, this.pitRows, this.pitSort, "pit");
+    if (!this.loaded) return;
+    const table = this.part("[data-bb-tables]");
+    if (!this.byAxis) {
+      const batRows = BbAbilityTable.batRows(this.batGroups), pitRows = BbAbilityTable.pitRows(this.pitGroups);
+      table.innerHTML = '<div class="asd-sec">타자 (' + batRows.length + "가지 배분)</div>" + BbAbilityTable.html(BbAbilityTable.BAT_HEAD, batRows, this.batSort, "bat")
+        + '<div class="asd-sec">투수 (' + pitRows.length + "가지 배분)</div>" + BbAbilityTable.html(BbAbilityTable.PIT_HEAD, pitRows, this.pitSort, "pit");
+      return;
+    }
+    const axis = BbAbilityAxis, batRows = BbAbilityTable.batRows(axis.regroup(this.batGroups, this.batAxis)), pitRows = BbAbilityTable.pitRows(axis.regroup(this.pitGroups, this.pitAxis));
+    table.innerHTML = '<div class="asd-sec">타자 · ' + axis.BAT_NAMES[this.batAxis] + "별</div>" + axis.switcher("bat", axis.BAT_NAMES, this.batAxis)
+      + BbAbilityTable.html(axis.head(axis.BAT_NAMES, this.batAxis, BbAbilityTable.BAT_HEAD), batRows, this.batSort, "bat", axis.faint, axis.label)
+      + '<div class="asd-sec">투수 · ' + axis.PIT_NAMES[this.pitAxis] + "별</div>" + axis.switcher("pit", axis.PIT_NAMES, this.pitAxis)
+      + BbAbilityTable.html(axis.head(axis.PIT_NAMES, this.pitAxis, BbAbilityTable.PIT_HEAD), pitRows, this.pitSort, "pit", axis.faint, axis.label);
   }
 }

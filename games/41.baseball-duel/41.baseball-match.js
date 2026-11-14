@@ -42,7 +42,9 @@ class BbLocalLink {
         this.seeds = new BbSeededRandom(seed ^ 0x2f6e2b1);
     }
     pitchChosen(sequence, call) { this.director.deliverPitch(sequence, call, this.seeds.seed()); }
-    swingChosen(sequence, contactOffset) { this.director.deliverSwing(sequence, contactOffset); }
+    pickoffChosen(sequence, base) { this.director.pickoffCalled(sequence, base); }
+    pickoffAnswered(sequence, base, steal) { this.director.deliverPickoff(sequence, base, steal); }
+    swingChosen(sequence, contactOffset, steal) { this.director.deliverSwing(sequence, contactOffset, steal); }
     changeChosen(sequence, index) { this.director.deliverChange(sequence, index); }
     timeChosen() { return; }
 }
@@ -52,6 +54,10 @@ class BbMatchDirector {
         this.hud = hud;
         this.events = events;
         this.queued = [];
+        this.stealPressed = 0;
+        this.aiSteal = 0;
+        this.pickoffsThisBatter = 0;
+        this.pickoffWait = -1;
         this.timeLeft = 0;
         this.clockLeft = 0;
         this.remoteTime = 0;
@@ -66,17 +72,19 @@ class BbMatchDirector {
         this.halted = false;
         this.orbitAngle = 0;
         this.atmosphere = null;
-        this.cards = new BbMatchupCards(host, () => this.callTime(), () => this.takeRelief());
+        const rightStack = BbHudParts.box("bb-stack-right", host);
+        this.cards = new BbMatchupCards(host, rightStack, () => this.callTime(), () => this.takeRelief());
         this.toast = new BbCallToast(host);
-        this.report = new BbPitchReport(host);
+        this.report = new BbPitchReport(rightStack);
         this.clock = new BbPitchClock(host);
         this.picker = new BbReliefPicker(host, () => this.endTime());
         this.timeBanner = new BbTimeBanner(host);
         this.ticker = new BbBoardTicker(hud);
         this.player = new BbScenePlayer(stage, hud, (call) => this.called(call));
         this.scenes = new BbSceneFactory(() => this.stage.metrics);
-        this.pad = new BbPitchPad(host, (call) => this.humanThrows(call));
+        this.pad = new BbPitchPad(host, (call) => this.humanThrows(call), (base) => this.humanPicksOff(base));
         this.swing = new BbSwingButton(host, () => this.humanSwings());
+        this.steal = new BbStealButtons(host, (from) => this.pressSteal(from));
     }
     attach(atmosphere) {
         this.atmosphere = atmosphere;
@@ -86,7 +94,7 @@ class BbMatchDirector {
     }
     get isRunning() { return this.running; }
     get sequence() { return this.session.log.length; }
-    get awaitsPitch() { return this.running && this.waitingForCall && !this.pending; }
+    get awaitsPitch() { return this.running && this.waitingForCall && !this.pending && this.pickoffWait !== this.session.log.length; }
     halt(on) { this.halted = on; }
     watch(view) {
         if (!this.plan || !this.plan.view)
@@ -121,6 +129,7 @@ class BbMatchDirector {
         this.running = false;
         this.pad.close();
         this.swing.hide();
+        this.steal.hide();
         this.report.hide();
         this.clock.hide();
         this.timeLeft = 0;
@@ -136,7 +145,7 @@ class BbMatchDirector {
     }
     deliverPitch(sequence, call, seed, swingOpen = true) {
         const session = this.session;
-        if (!this.running || !this.waitingForCall || this.pending || sequence !== session.log.length)
+        if (!this.running || !this.waitingForCall || this.pending || sequence !== session.log.length || this.pickoffWait === sequence)
             return;
         this.pad.close();
         this.clock.hide();
@@ -147,20 +156,28 @@ class BbMatchDirector {
             leniency: BbBatterAbilityModel.leniency(batter.abilities.contact), settled: null, announced: false, started: false, batting: seat
         };
         if (seat === "ai") {
-            this.link.swingChosen(sequence, session.aiSwing(roll, this.plan.level));
+            this.link.swingChosen(sequence, session.aiSwing(roll, this.plan.level), this.aiSteal);
             return;
         }
-        this.player.play(this.sceneOf(session.preview(roll)), seat === "remote" ? BbMatchDirector.REMOTE_LEAD : 0);
+        this.player.play(this.sceneOf(this.previewWith(roll, seat === "human" ? this.stealPressed : 0)), seat === "remote" ? BbMatchDirector.REMOTE_LEAD : 0);
         this.pending.started = true;
         if (seat === "human")
             this.swing.arm();
     }
-    deliverSwing(sequence, contactOffset) {
+    previewWith(roll, steal) {
+        const outcome = this.session.preview(roll), play = steal ? this.session.engine.previewSteal(roll, steal) : null;
+        if (play)
+            outcome.steal = play;
+        return outcome;
+    }
+    deliverSwing(sequence, contactOffset, steal = 0) {
         const pending = this.pending;
         if (!this.running || !pending || pending.settled || pending.sequence !== sequence)
             return;
         this.swing.disarm();
-        const settled = this.session.settle(pending.roll, contactOffset);
+        const settled = this.session.settle(pending.roll, contactOffset, steal);
+        if (settled.note.plateAppearanceOver || settled.note.halfOver)
+            this.pickoffsThisBatter = 0;
         pending.settled = settled;
         if (settled.note.halfOver && !this.isOver())
             this.scenes.swap(pending.fielding, pending.hands).forEach((swap) => this.queued.push(swap));
@@ -179,6 +196,7 @@ class BbMatchDirector {
         this.pad.tick(frameSeconds);
         if (!this.staged)
             return;
+        this.refreshSteal();
         if (!this.running || this.waitingForCall || this.halted) {
             this.player.idle(frameSeconds);
             if (this.running && !this.halted)
@@ -216,6 +234,10 @@ class BbMatchDirector {
         this.queued.length = 0;
         this.pending = null;
         this.idlePitches = 0;
+        this.pickoffsThisBatter = 0;
+        this.stealPressed = 0;
+        this.aiSteal = 0;
+        this.pickoffWait = -1;
         this.staged = true;
         this.stop();
     }
@@ -235,7 +257,7 @@ class BbMatchDirector {
         this.stage.atBat(batting, lineup.currentIndex());
         const stamina = roster.stamina().level(), choosing = this.canChange(), next = roster.recommended();
         this.cards.show({
-            batterName: names[batting], batter: session.batter(), batterFace: this.faceOf(batting, "b", lineup.currentIndex()),
+            batterName: names[batting], batter: session.batter(), batterFace: this.faceOf(batting, "b", lineup.currentIndex()), batterOrder: lineup.currentIndex(),
             pitcherName: names[fielding], pitcher: session.pitcher(), pitcherFace: this.faceOf(fielding, "p", roster.currentIndex()),
             pitches: roster.pitchesThisOuting(), stamina, canChange: choosing, facts,
             relief: choosing && roster.stamina().isSpent() && next !== null ? { sheet: roster.pitchers[next], face: this.faceOf(fielding, "p", next) } : null
@@ -250,7 +272,7 @@ class BbMatchDirector {
     }
     canChange() {
         const session = this.session;
-        return this.running && this.waitingForCall && !this.pending && !this.halted && this.timeLeft <= 0 && this.plan.seats[session.fieldingIndex] === "human" && session.roster().available().length > 0;
+        return this.running && this.waitingForCall && !this.pending && this.pickoffWait !== session.log.length && !this.halted && this.timeLeft <= 0 && this.plan.seats[session.fieldingIndex] === "human" && session.roster().available().length > 0;
     }
     callTime() {
         if (!this.canChange())
@@ -285,8 +307,7 @@ class BbMatchDirector {
             return;
         this.link.timeChosen(session.log.length, false);
         if (this.waitingForCall && !this.pending && this.plan.seats[session.fieldingIndex] === "human") {
-            const batting = this.scoutOf(session.battingIndex);
-            this.pad.open(session.pitcher(), batting ? batting.hitHeat : null);
+            this.openPad();
             this.clock.start(Math.max(1, this.clockLeft));
         }
         this.showCards();
@@ -360,29 +381,110 @@ class BbMatchDirector {
         this.player.view = this.viewNow();
         this.waitingForCall = true;
         this.timeLeft = 0;
+        this.stealPressed = 0;
+        this.pickoffWait = -1;
+        this.aiSteal = this.plan.seats[session.battingIndex] === "ai" ? session.aiSteal(this.plan.level) : 0;
         this.picker.close();
         this.show();
         this.report.hide();
         this.swing.hide();
         this.player.play(this.idleScene());
         if (seat === "human") {
-            const batting = this.scoutOf(session.battingIndex);
-            this.pad.open(session.pitcher(), batting ? batting.hitHeat : null);
+            this.openPad();
             this.clock.start(BbMatchDirector.PITCH_SECONDS);
         }
         else if (seat === "ai") {
-            const relief = session.tiredRelief();
+            const relief = session.tiredRelief(), pickoff = relief === null ? session.aiPickoff(this.plan.level, this.pickoffsThisBatter) : null;
             if (relief !== null)
                 this.link.changeChosen(sequence, relief);
+            else if (pickoff !== null) {
+                this.pickoffsThisBatter++;
+                this.link.pickoffChosen(sequence, pickoff);
+            }
             else
                 this.link.pitchChosen(sequence, session.aiCall(this.plan.level));
         }
+    }
+    openPad() {
+        const session = this.session, batting = this.scoutOf(session.battingIndex);
+        this.pad.open(session.pitcher(), batting ? batting.hitHeat : null, session.state.bases.map((runner) => !!runner));
     }
     humanThrows(call) {
         if (!this.running || !this.waitingForCall || this.halted || this.plan.seats[this.session.fieldingIndex] !== "human")
             return;
         this.idlePitches = 0;
         this.link.pitchChosen(this.session.log.length, call);
+    }
+    humanPicksOff(base) {
+        const session = this.session;
+        if (!this.awaitsPitch || this.halted || this.timeLeft > 0 || this.plan.seats[session.fieldingIndex] !== "human" || !session.engine.canPickoff(base))
+            return;
+        this.idlePitches = 0;
+        this.link.pickoffChosen(session.log.length, base);
+    }
+    pickoffCalled(sequence, base) {
+        const session = this.session;
+        if (!this.awaitsPitch || sequence !== session.log.length || !session.engine.canPickoff(base))
+            return;
+        this.pickoffWait = sequence;
+        this.pad.close();
+        this.clock.hide();
+        const batting = this.plan.seats[session.battingIndex];
+        if (batting === "human")
+            this.link.pickoffAnswered(sequence, base, this.stealPressed);
+        else if (batting === "ai")
+            this.link.pickoffAnswered(sequence, base, this.aiSteal);
+    }
+    deliverPickoff(sequence, base, steal) {
+        const session = this.session;
+        if (!this.running || !this.waitingForCall || this.pending || sequence !== session.log.length)
+            return;
+        const fielding = session.fieldingIndex, hands = this.hands(), setting = session.setting(), pitcherHand = session.pitcher().hand, abilities = session.batter().abilities;
+        const still = session.preview(session.rollWith({ pitch: "ft", aim: { u: 0, v: 0 } }, BbMatchDirector.IDLE_SEED));
+        const settled = session.pickoff(base, steal);
+        if (!settled)
+            return;
+        this.pickoffWait = -1;
+        this.waitingForCall = false;
+        this.pad.close();
+        this.clock.hide();
+        this.steal.hide();
+        this.timeLeft = 0;
+        this.picker.close();
+        this.events.onLog(session.log);
+        if (settled.halfOver && !this.isOver())
+            this.scenes.swap(fielding, hands).forEach((swap) => this.queued.push(swap));
+        if (settled.halfOver)
+            this.pickoffsThisBatter = 0;
+        this.player.play(this.scenes.pitch({ outcome: still, pitcherHand, abilities, setting, pickoff: settled.play }, fielding, hands));
+        if (!settled.halfOver)
+            this.showCards();
+    }
+    stealWindow() {
+        const pending = this.pending, session = this.session;
+        if (!this.running || this.halted || this.plan.seats[session.battingIndex] !== "human")
+            return false;
+        if (this.waitingForCall)
+            return !pending && this.pickoffWait !== session.log.length;
+        return !!pending && !pending.settled && this.player.seconds < this.player.arriveAt - pending.roll.flightSeconds;
+    }
+    refreshSteal() {
+        const session = this.session, shown = this.running && this.plan.seats[session.battingIndex] === "human" && (this.waitingForCall || (!!this.pending && !this.pending.settled));
+        if (!shown) {
+            this.steal.hide();
+            return;
+        }
+        this.steal.show([session.engine.stealable(1), session.engine.stealable(2)], this.stealPressed, !this.stealWindow());
+    }
+    pressSteal(from) {
+        if (!this.stealWindow() || this.stealPressed)
+            return;
+        const mask = BbStealRules.pressed(this.session.state.bases, from), pending = this.pending;
+        if (!mask)
+            return;
+        this.stealPressed = mask;
+        if (pending && pending.started && !pending.settled)
+            this.player.replace(this.sceneOf(this.previewWith(pending.roll, mask)));
     }
     pitchForIdler() {
         const session = this.session;
@@ -401,7 +503,7 @@ class BbMatchDirector {
         const pending = this.pending;
         if (!pending || pending.settled || pending.batting !== "human" || this.halted)
             return;
-        this.link.swingChosen(pending.sequence, this.player.seconds + BbTimingModel.SWING_DELAY - this.player.arriveAt);
+        this.link.swingChosen(pending.sequence, this.player.seconds + BbTimingModel.SWING_DELAY - this.player.arriveAt, this.stealPressed);
     }
     called(call) {
         if (call.text)
@@ -468,7 +570,7 @@ class BbMatchDirector {
             if (auto !== null && player.seconds >= player.arriveAt + auto - BbTimingModel.SWING_DELAY)
                 this.humanSwings();
             else if (player.seconds >= player.arriveAt + BbMatchDirector.SWING_CLOSES_AFTER)
-                this.link.swingChosen(pending.sequence, null);
+                this.link.swingChosen(pending.sequence, null, this.stealPressed);
         }
         if (pending && pending.settled && !pending.announced && player.seconds >= player.arriveAt)
             this.announce(pending);

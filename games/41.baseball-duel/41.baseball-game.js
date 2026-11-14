@@ -108,13 +108,82 @@ BbStaminaModel.FULL = 100;
 BbStaminaModel.TIRED_BELOW = 50;
 BbStaminaModel.WORN_BELOW = 30;
 BbStaminaModel.RELIEF_BELOW = 30;
+BbStaminaModel.PICKOFF_COST = 1;
 BbStaminaModel.PITCH_COST = [0, 4, 3.5, 3, 2.5, 2, 1.5, 1];
 BbStaminaModel.HIT_COST = [0, 2, 1.8, 1.7, 1.5, 1.3, 1.2, 1];
 BbStaminaModel.HOME_RUN_COST = [0, 4, 3.7, 3.3, 3, 2.7, 2.3, 2];
 BbStaminaModel.TIRED = new BbPitchCondition(0.9, 1);
 BbStaminaModel.WORN = new BbPitchCondition(0.9, 1.3);
+class BbStealRules {
+    static bitOf(from) { return from === 1 ? BbStealRules.FIRST : from === 2 ? BbStealRules.SECOND : 0; }
+    static canSteal(bases, from) {
+        if (from === 2)
+            return !!bases[1] && !bases[2];
+        if (from === 1)
+            return !!bases[0] && (!bases[1] || !bases[2]);
+        return false;
+    }
+    static pressed(bases, from) {
+        if (!BbStealRules.canSteal(bases, from))
+            return 0;
+        return from === 1 && bases[1] ? BbStealRules.FIRST | BbStealRules.SECOND : BbStealRules.bitOf(from);
+    }
+    static clean(bases, mask) {
+        const wanted = Number(mask) || 0;
+        let result = 0;
+        if (wanted & BbStealRules.SECOND && BbStealRules.canSteal(bases, 2))
+            result |= BbStealRules.SECOND;
+        if (wanted & BbStealRules.FIRST && bases[0] && (!bases[1] || result & BbStealRules.SECOND))
+            result |= BbStealRules.FIRST;
+        return result;
+    }
+    static offense(runner, target) { return BbRosterPlan.points(runner.speed) + (target === 2 ? BbStealRules.BONUS_TO_SECOND : BbStealRules.BONUS_TO_THIRD); }
+    static defense(pitcherPower, catcherDefense, pitch) {
+        return BbRosterPlan.points(pitcherPower) + BbRosterPlan.points(catcherDefense) - (pitch === BbStealRules.FASTBALL ? 0 : BbStealRules.BREAKING_EDGE);
+    }
+    static judge(bases, mask, pitcherPower, catcherDefense, pitch) {
+        if (!mask)
+            return null;
+        const lead = mask & BbStealRules.SECOND ? 2 : 1, target = lead + 1, leader = bases[lead - 1];
+        const offense = BbStealRules.offense(leader, target), defense = BbStealRules.defense(pitcherPower, catcherDefense, pitch), safe = offense > defense;
+        const runners = [BbStealRules.entry(leader, lead, !safe)];
+        if (lead === 2 && mask & BbStealRules.FIRST)
+            runners.push(BbStealRules.entry(bases[0], 1, false));
+        return { target, offense, defense, runners };
+    }
+    static pickoff(bases, mask, base) {
+        const caught = (mask & BbStealRules.bitOf(base)) !== 0;
+        if (!caught)
+            return { base, caught, runners: [] };
+        const runners = [];
+        [2, 1].forEach((from) => { if (mask & BbStealRules.bitOf(from))
+            runners.push(BbStealRules.entry(bases[from - 1], from, from === base)); });
+        return { base, caught, runners };
+    }
+    static entry(runner, from, out) { return { id: runner.id, from, out, speed: BbRosterPlan.points(runner.speed) }; }
+    static move(bases, runners) {
+        const after = [bases[0], bases[1], bases[2]];
+        let outs = 0;
+        runners.forEach((entry) => { after[entry.from - 1] = null; });
+        runners.forEach((entry) => {
+            if (entry.out) {
+                outs++;
+                return;
+            }
+            after[entry.from] = bases[entry.from - 1];
+        });
+        return { bases: after, outs };
+    }
+}
+BbStealRules.FIRST = 1;
+BbStealRules.SECOND = 2;
+BbStealRules.BONUS_TO_SECOND = 2;
+BbStealRules.BONUS_TO_THIRD = 1;
+BbStealRules.BREAKING_EDGE = 1;
+BbStealRules.FASTBALL = "ft";
 class BbNoStamina {
     spend() { return; }
+    drain() { return; }
     level() { return BbStaminaModel.FULL; }
     condition() { return BbPitchCondition.FRESH; }
     isSpent() { return false; }
@@ -125,6 +194,7 @@ class BbStaminaMeter {
         this.value = BbStaminaModel.FULL;
     }
     spend(outcome) { this.value = Math.max(0, this.value - BbStaminaModel.costOf(this.stamina, outcome)); }
+    drain(amount) { this.value = Math.max(0, this.value - amount); }
     level() { return this.value; }
     condition() { return BbStaminaModel.condition(this.value); }
     isSpent() { return this.value < BbStaminaModel.RELIEF_BELOW; }
@@ -159,6 +229,7 @@ class BbPitcherRoster {
         this.thrown++;
         this.meters[this.mound].spend(outcome);
     }
+    afterPickoff() { this.meters[this.mound].drain(BbStaminaModel.PICKOFF_COST); }
 }
 class BbNoSubstitution {
     nextPitcher() { return null; }
@@ -392,6 +463,18 @@ class BbMatchRules {
         this.endHalf(state, lastOrLater);
         return { toast, plateAppearanceOver: true, halfOver: true, runs };
     }
+    runnersOut(state, bases, outs) {
+        state.bases = bases;
+        if (!outs)
+            return false;
+        this.addOuts(state, outs);
+        if (state.outs < 3)
+            return false;
+        state.balls = 0;
+        state.strikes = 0;
+        this.endHalf(state, state.inning >= this.format.startInning + this.format.inningsToPlay - 1);
+        return true;
+    }
     finish(state, winner, note) {
         state.finished = true;
         state.winner = winner;
@@ -438,6 +521,7 @@ class BbPitchJudge {
         const resolverFor = (crew) => new BbPlayResolver(dimensions, new BbAutoFielding(crew), new BbAutoBaseRunning(), errors, crew);
         this.resolvers = [resolverFor(crews[0]), resolverFor(crews[1])];
     }
+    catcherOf(team) { return this.crews[team].pointsOf("C"); }
     judge(state, roll, contactOffset, batter) {
         const random = new BbSeededRandom(roll.seed ^ 0x5bd1e995), fielding = this.rules.fieldingIndex(state), runnerSpeed = batter.abilities.speed;
         const swing = BbBatterActionSet.of("swing").resolve({ roll, batterHand: batter.hand, abilities: batter.abilities, contactOffset, random, catcherDefense: this.crews[fielding].pointsOf("C") });
@@ -457,6 +541,7 @@ class BbPitchJudge {
 }
 class BbLogEvents {
     static isChange(event) { return typeof event.change === "number"; }
+    static isPickoff(event) { return typeof event.pickoff === "number"; }
 }
 class BbMatchEngine {
     constructor(format, dimensions, errors, teams) {
@@ -479,16 +564,42 @@ class BbMatchEngine {
         return BbPitchRoller.roll(call.pitch, call.aim, pitcher.abilities, pitcher.hand, seed, this.condition());
     }
     preview(roll) { return this.judge.judge(this.state, roll, null, this.batter()); }
-    settle(roll, contactOffset) {
-        const roster = this.roster(), lineup = this.lineup(), batting = this.battingIndex, fielding = this.fieldingIndex;
-        const hitter = lineup.currentIndex(), thrower = roster.currentIndex(), batBefore = Object.assign({}, this.state.box[batting].bat), pitBefore = Object.assign({}, this.state.box[fielding].pit);
-        const outcome = this.judge.judge(this.state, roll, contactOffset, lineup.current()), note = this.rules.apply(this.state, outcome);
-        BbSlotTally.record(this.state.box[batting], "bat", hitter, batBefore);
-        BbSlotTally.record(this.state.box[fielding], "pit", thrower, pitBefore);
+    stealable(from) { return !this.state.finished && BbStealRules.canSteal(this.state.bases, from); }
+    canPickoff(base) { return !this.state.finished && base >= 1 && base <= 3 && !!this.state.bases[base - 1]; }
+    previewSteal(roll, steal) {
+        const bases = this.state.bases;
+        return BbStealRules.judge(bases, BbStealRules.clean(bases, steal), this.pitcher().abilities.power, this.judge.catcherOf(this.fieldingIndex), roll.pitch);
+    }
+    stealDefense(pitch) { return BbStealRules.defense(this.pitcher().abilities.power, this.judge.catcherOf(this.fieldingIndex), pitch); }
+    settle(roll, contactOffset, steal = 0) {
+        const roster = this.roster(), lineup = this.lineup(), batting = this.battingIndex, fielding = this.fieldingIndex, state = this.state;
+        const hitter = lineup.currentIndex(), thrower = roster.currentIndex(), batBefore = Object.assign({}, state.box[batting].bat), pitBefore = Object.assign({}, state.box[fielding].pit);
+        const bases = [state.bases[0], state.bases[1], state.bases[2]], mask = BbStealRules.clean(bases, steal), power = this.pitcher().abilities.power;
+        const outcome = this.judge.judge(state, roll, contactOffset, lineup.current()), note = this.rules.apply(state, outcome);
+        const runs = outcome.kind === "calledStrike" || outcome.kind === "swingMiss" || (outcome.kind === "ball" && !note.plateAppearanceOver);
+        const play = mask && runs && !note.halfOver && !state.finished ? BbStealRules.judge(bases, mask, power, this.judge.catcherOf(fielding), roll.pitch) : null;
+        if (play) {
+            outcome.steal = play;
+            const moved = BbStealRules.move(bases, play.runners);
+            if (this.rules.runnersOut(state, moved.bases, moved.outs))
+                note.halfOver = true;
+        }
+        BbSlotTally.record(state.box[batting], "bat", hitter, batBefore);
+        BbSlotTally.record(state.box[fielding], "pit", thrower, pitBefore);
         roster.afterPitch(outcome);
         if (note.plateAppearanceOver)
             lineup.advance();
         return { outcome, note };
+    }
+    pickoff(base, steal = 0) {
+        if (!this.canPickoff(base))
+            return null;
+        const state = this.state, roster = this.roster(), fielding = this.fieldingIndex, thrower = roster.currentIndex(), pitBefore = Object.assign({}, state.box[fielding].pit);
+        const bases = [state.bases[0], state.bases[1], state.bases[2]], play = BbStealRules.pickoff(bases, BbStealRules.clean(bases, steal), base);
+        const moved = BbStealRules.move(bases, play.runners), halfOver = this.rules.runnersOut(state, moved.bases, moved.outs);
+        BbSlotTally.record(state.box[fielding], "pit", thrower, pitBefore);
+        roster.afterPickoff();
+        return { play, halfOver };
     }
     change(index) { return !this.state.finished && this.roster().change(index); }
     replay(event) {
@@ -498,7 +609,11 @@ class BbMatchEngine {
             this.change(event.change);
             return;
         }
-        this.settle(this.roll(event, event.seed), event.contactOffset);
+        if (BbLogEvents.isPickoff(event)) {
+            this.pickoff(event.pickoff, event.steal);
+            return;
+        }
+        this.settle(this.roll(event, event.seed), event.contactOffset, event.steal);
     }
 }
 class BbGameLogFold {

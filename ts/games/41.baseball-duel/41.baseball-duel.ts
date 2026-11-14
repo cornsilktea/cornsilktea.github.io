@@ -223,7 +223,7 @@ class BbDuelGame {
   private static readonly NOTICE_SECONDS = 2.5;
   private static readonly SEED_SPAN = 1000000007;
   private static readonly AI_FALLBACK_MS = 120000;
-  private static readonly CLIENT_VERSION = 20261114;
+  private static readonly CLIENT_VERSION = 20261115;
   private static readonly QUALITY_KEY = "baseballduel_quality_v1";
 
   private readonly stage: BbStage;

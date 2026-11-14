@@ -127,7 +127,7 @@ class BbPitchChoreographer extends BbDrill {
         this.platePoint = null;
         this.lastMoment = 0;
         const roll = cue.outcome.roll;
-        this.title = BbPitchCatalog.of(roll.pitch).label + " " + Math.round(roll.speed) + "km/h";
+        this.title = cue.pickoff ? "견제" : BbPitchCatalog.of(roll.pitch).label + " " + Math.round(roll.speed) + "km/h";
     }
     get arriveAt() { return this.plateAt; }
     get crossedAt() { return this.platePoint; }
@@ -166,6 +166,11 @@ class BbPitchChoreographer extends BbDrill {
             this.stand(BbBasePath.RUNNER_ROLES[index], BbActorPlacement.facing(BbBasePath.leadSpot(index + 1), BbFieldGeometry.HOME), null);
             this.onBase(BbBasePath.RUNNER_ROLES[index], 0);
         });
+        if (this.cue.pickoff) {
+            this.pickoffPlay(this.cue.pickoff);
+            this.script.duration = this.lastMoment;
+            return;
+        }
         const pitchPose = new BbPitchPose(this.metrics), releaseAt = BbDrill.WINDUP_AT + pitchPose.keyTime;
         this.hold("pitcher", "throw", 0);
         this.pose("pitcher", pitchPose, BbDrill.WINDUP_AT, releaseAt, "투구");
@@ -195,6 +200,8 @@ class BbPitchChoreographer extends BbDrill {
             const caughtAt = this.receive(flight, releaseAt);
             this.sound(caughtAt, "mitt", 0.4 + pace * 0.6, plate);
             this.until(caughtAt + BbPitchChoreographer.TAIL_AFTER_CATCH);
+            if (outcome.steal)
+                this.stealPlay(outcome.steal, releaseAt, caughtAt);
         }
         this.script.duration = this.lastMoment;
     }
@@ -304,12 +311,15 @@ class BbPlayChoreographer extends BbPitchChoreographer {
         if (!picked)
             return;
         const fumbledAt = this.contactAt + event.t, home = BbFieldGeometry.HOME, chaser = this.role(picked.who), spot = picked.spot;
-        const rest = BbFieldSpace.toWorld(spot[0], spot[1]), stand = rest.plus(rest.unit().times(0.4)), leaveAt = this.contactAt + 0.35, pickAt = this.contactAt + picked.t;
-        this.face(this.role(event.who), rest, fumbledAt + 0.3);
+        const fumbler = this.role(event.who), pickAt = this.contactAt + picked.t;
+        const rest = BbFieldSpace.toWorld(spot[0], spot[1]), stand = rest.plus(rest.unit().times(0.4)), leaveAt = Math.min(pickAt - 0.2, chaser === fumbler ? fumbledAt + 0.25 : this.contactAt + 0.35);
+        if (chaser !== fumbler)
+            this.face(fumbler, rest, fumbledAt + 0.3);
         this.busy.add(chaser);
         this.freeAt.set(chaser, pickAt);
         this.move(chaser, stand, leaveAt, pickAt - 0.1);
         this.face(chaser, home, pickAt - 0.1);
+        this.until(pickAt);
         const pickup = this.gloveWorld(chaser, pickAt, BbDrill.GROUND_GLOVE);
         this.fly(new BbGroundRoll(glove.withY(BbThrowTrajectory.BALL_RADIUS), pickup, pickAt - fumbledAt, 2, 0.15), fumbledAt, 20);
         this.catchWith(chaser, "ground", BbDrill.GROUND_GLOVE, pickAt, "빠진 공 줍기");
@@ -361,7 +371,8 @@ class BbPlayChoreographer extends BbPitchChoreographer {
         const share = ball.foul || overWall || ball.carry < fence ? 1 : (fence - BbPlayChoreographer.WALL_GAP) / ball.carry;
         const airSeconds = ball.hang * share, reach = ball.carry * share;
         const down = share < 1 ? BbFieldSpace.polar(reach, ball.spray, BbBattedBallPhysics.heightAt(reach, ball.carry, ball.launch)) : landing;
-        this.flyBatted(new BbBattedFlight(contactPoint, down, airSeconds, this.apexOf(ball, share)), contactAt, 18, !glove);
+        const apex = overWall ? Math.max(this.apexOf(ball, share), this.apexOverWall(contactPoint, down, ball.carry, fence)) : this.apexOf(ball, share);
+        this.flyBatted(new BbBattedFlight(contactPoint, down, airSeconds, apex), contactAt, 18, !glove);
         if (overWall)
             this.sparks.push({ at: contactAt, point: contactPoint });
         if (glove && takenAt - contactAt - airSeconds > 0.05)
@@ -376,6 +387,11 @@ class BbPlayChoreographer extends BbPitchChoreographer {
         this.fly(blocked, startAt, spin);
         if (blocked.stoppedAt !== null && this.bounds.inTheSeats(blocked.stopsAt))
             this.vanish(startAt + blocked.stoppedAt);
+    }
+    apexOverWall(from, to, carry, fence) {
+        const ratio = BbCurve.clamp((fence + BbPlayChoreographer.WALL_TOP_DEPTH) / Math.max(carry, 1), 0.05, BbPlayChoreographer.LATEST_WALL_SHARE);
+        const straight = from.y * (1 - ratio) + to.y * ratio, needed = BbBallparkRegistry.MAIN.dimensions.wallHeight + BbPlayChoreographer.WALL_CLEAR_METERS;
+        return Math.max(0, (needed - straight) / (4 * ratio * (1 - ratio)));
     }
     apexOf(ball, share) {
         return ball.carry * Math.tan(Math.max(0, ball.launch) * Math.PI / 180) / 4 * share * share;
@@ -591,6 +607,67 @@ class BbPlayChoreographer extends BbPitchChoreographer {
                 this.move(role, spot.plus(wall.minus(spot).unit().times(reach)), this.contactAt + 0.4, landedAt);
         });
     }
+    stealArrival(entry, leaveAt) { return leaveAt + BbRunnerMotion.fromBaseSeconds(1, { speed: entry.speed }); }
+    stealRuns(runners, leaveAt, ballAt, tagger, outCall, safeCall, outTally) {
+        let last = ballAt;
+        runners.forEach((entry, index) => {
+            const role = this.runnerRole(entry.id), natural = this.stealArrival(entry, leaveAt), contested = index === 0;
+            const endAt = !contested ? natural : entry.out ? Math.max(natural, ballAt + BbPlayChoreographer.STEAL_OUT_MARGIN) : Math.min(natural, ballAt - 0.1);
+            this.runBases(role, entry.from, entry.from + 1, leaveAt, endAt, contested, true);
+            last = Math.max(last, endAt);
+            if (!contested)
+                return;
+            this.pose(tagger, new BbTagPose(this.metrics, BbPlayChoreographer.TAG_POINT), entry.out ? endAt - 0.3 : ballAt + 0.05, null, "태그");
+            if (entry.out) {
+                this.offBase(role, endAt + 0.5);
+                this.call(endAt, outCall, outTally);
+            }
+            else if (safeCall)
+                this.call(endAt, safeCall, null);
+        });
+        this.until(last + BbPlayChoreographer.TAIL);
+    }
+    stealPlay(play, releaseAt, caughtAt) {
+        const lead = play.runners[0], leaveAt = Math.max(0.05, releaseAt - BbPlayChoreographer.STEAL_JUMP), bag = BbBasePath.point(play.target);
+        const natural = this.stealArrival(lead, leaveAt), wanted = lead.out ? natural - BbPlayChoreographer.STEAL_OUT_MARGIN : natural + BbPlayChoreographer.STEAL_SAFE_MARGIN;
+        const receiver = BbPlayChoreographer.STEAL_COVERS[play.target];
+        this.contactAt = releaseAt;
+        this.holder = "catcher";
+        this.heldSince = caughtAt;
+        this.shoot(caughtAt + 0.05, "throw", BbFieldGeometry.HOME, bag);
+        this.passTo("catcher", receiver, bag, this.spotOf("catcher", caughtAt), wanted, "chest", false, play.target);
+        this.stealRuns(play.runners, leaveAt, this.heldSince, receiver, "도루 저지!", "도루 성공!", null);
+    }
+    pickoffPlay(play) {
+        const base = play.base, bag = BbBasePath.point(base), fielder = BbPlayChoreographer.PICKOFF_COVERS[base], setAt = BbPlayChoreographer.PICKOFF_SET;
+        const mound = this.spotOf("pitcher", 0);
+        this.hold("pitcher", "throw", 0);
+        this.contactAt = BbPlayChoreographer.PICKOFF_LOOK;
+        this.holder = "pitcher";
+        this.heldSince = setAt;
+        this.shoot(0, "throw", BbFieldGeometry.RUBBER, bag);
+        this.call(setAt, "견제!", null);
+        this.passTo("pitcher", fielder, bag, mound, setAt + BbPlayChoreographer.PICKOFF_THROW + mound.distanceTo(bag) / BbThrowTrajectory.INFIELD_SPEED, "chest", false, base);
+        const landed = this.heldSince;
+        if (!play.caught) {
+            const role = BbBasePath.RUNNER_ROLES[base - 1], backAt = landed - 0.05;
+            this.move(role, BbBasePath.point(base), setAt + 0.15, backAt, "slide");
+            this.synced(role, new BbSlidePose(this.metrics, backAt - setAt - 0.15), backAt, "귀루");
+            this.sound(backAt - 0.3, "slide", 0.6, BbBasePath.point(base));
+            this.pose(fielder, new BbTagPose(this.metrics, BbPlayChoreographer.TAG_POINT), landed + 0.03, null, "태그");
+            this.call(landed + 0.15, "세이프", null);
+            this.move(role, BbBasePath.leadSpot(base), landed + 1, landed + 2, "walk");
+            this.face(role, BbFieldGeometry.HOME, landed + 2);
+            this.passTo(fielder, "pitcher", mound, bag, landed + BbPlayChoreographer.PICKOFF_RETURN, "chest", false, null);
+            this.until(this.heldSince + 0.8);
+            return;
+        }
+        const next = base + 1, nextBag = BbBasePath.point(next), cover = BbPlayChoreographer.RELAY_COVERS[next];
+        this.shoot(landed + 0.1, "throw", bag, nextBag);
+        this.passTo(fielder, cover, nextBag, bag, landed + BbPlayChoreographer.PICKOFF_THROW + bag.distanceTo(nextBag) / BbThrowTrajectory.INFIELD_SPEED, "chest", false, next);
+        const ordered = play.runners.slice().sort((a, b) => (a.out === b.out ? 0 : a.out ? -1 : 1));
+        this.stealRuns(ordered, BbPlayChoreographer.PICKOFF_BREAK, this.heldSince, cover, "견제 아웃!", null, "out");
+    }
     send(role, point, facing) {
         if (this.busy.has(role))
             return;
@@ -640,6 +717,20 @@ BbPlayChoreographer.FIELDER_REACTION = 0.08;
 BbPlayChoreographer.CHASE_SPEED = 9;
 BbPlayChoreographer.FIELDER_SETTLE = 0.4;
 BbPlayChoreographer.WALL_GAP = 0.6;
+BbPlayChoreographer.STEAL_JUMP = 0.9;
+BbPlayChoreographer.STEAL_OUT_MARGIN = 0.35;
+BbPlayChoreographer.STEAL_SAFE_MARGIN = 0.25;
+BbPlayChoreographer.STEAL_COVERS = { 2: "short", 3: "third" };
+BbPlayChoreographer.PICKOFF_COVERS = { 1: "first", 2: "short", 3: "third" };
+BbPlayChoreographer.RELAY_COVERS = { 2: "second", 3: "third", 4: "catcher" };
+BbPlayChoreographer.PICKOFF_SET = 0.6;
+BbPlayChoreographer.PICKOFF_LOOK = 0.2;
+BbPlayChoreographer.PICKOFF_BREAK = 0.3;
+BbPlayChoreographer.PICKOFF_THROW = 0.55;
+BbPlayChoreographer.PICKOFF_RETURN = 1.6;
+BbPlayChoreographer.WALL_TOP_DEPTH = 1;
+BbPlayChoreographer.WALL_CLEAR_METERS = 0.8;
+BbPlayChoreographer.LATEST_WALL_SHARE = 0.97;
 BbPlayChoreographer.FOUL_ROLL_SECONDS = 1.2;
 BbPlayChoreographer.FOUL_ROLL_METERS = 14;
 BbPlayChoreographer.SHORTEST_THROW = 0.18;

@@ -89,13 +89,40 @@ class BbZoneAimWindow {
     }
 }
 BbZoneAimWindow.SPAN = 2.4;
+class BbPickoffBases {
+    constructor(host, onPick) {
+        this.frame = BbHudParts.box("bb-pickoff", host);
+        BbHudParts.box("bb-pickoff-title", this.frame, "견제할 루를 고르세요 · 키보드 1 2 3");
+        const field = BbHudParts.box("bb-pickoff-field", this.frame);
+        this.bases = BbPickoffBases.LABELS.map((label, index) => {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "bb-pitch-key bb-pickoff-base bb-pickoff-base" + (index + 1);
+            BbHudParts.box("bb-pitch-letter", button, String(index + 1));
+            BbHudParts.box("bb-pitch-name", button, label);
+            button.addEventListener("click", () => onPick(index + 1));
+            field.appendChild(button);
+            return button;
+        });
+    }
+    open(occupied) {
+        this.bases.forEach((button, index) => { button.disabled = !occupied[index]; });
+        this.frame.classList.add("open");
+    }
+    close() { this.frame.classList.remove("open"); }
+}
+BbPickoffBases.LABELS = ["1루", "2루", "3루"];
 class BbPitchPad {
-    constructor(host, onThrow) {
+    constructor(host, onThrow, onPickoff) {
         this.onThrow = onThrow;
+        this.onPickoff = onPickoff;
         this.held = new Set();
         this.usable = [];
+        this.occupied = [false, false, false];
         this.opened = false;
+        this.pickingOff = false;
         this.aim = new BbZoneAimWindow(host);
+        this.pickoffBases = new BbPickoffBases(host, (base) => this.pickoff(base));
         this.row = BbHudParts.box("bb-pad", host);
         this.paths = [];
         this.dots = [];
@@ -113,6 +140,14 @@ class BbPitchPad {
             this.row.appendChild(key);
             return key;
         });
+        this.pickoffKey = document.createElement("button");
+        this.pickoffKey.type = "button";
+        this.pickoffKey.className = "bb-pitch-key bb-pickoff-key";
+        BbHudParts.box("bb-pitch-letter", this.pickoffKey, "1~3");
+        BbHudParts.box("bb-pitch-name", this.pickoffKey, "견제");
+        BbHudParts.box("bb-pickoff-mark", this.pickoffKey, "◆");
+        this.pickoffKey.addEventListener("click", () => this.togglePickoff());
+        this.row.appendChild(this.pickoffKey);
         this.throwButton = document.createElement("button");
         this.throwButton.className = "bb-action bb-throw";
         this.throwButton.type = "button";
@@ -131,9 +166,15 @@ class BbPitchPad {
         this.held.forEach((key) => { sideways += BbPitchPad.ARROWS[key][0]; upward += BbPitchPad.ARROWS[key][1]; });
         this.aim.nudge(sideways * reach, upward * reach);
     }
-    open(sheet, heat = null) {
+    open(sheet, heat = null, occupied = [false, false, false]) {
         this.opened = true;
         this.usable = sheet.pitches;
+        this.occupied = occupied;
+        this.pickingOff = false;
+        this.pickoffBases.close();
+        this.pickoffKey.hidden = !occupied.some((on) => on);
+        this.pickoffKey.classList.remove("on");
+        this.row.classList.remove("picking");
         this.aim.begin(sheet);
         this.aim.heat(heat);
         BbPitchCatalog.ALL.forEach((kind, index) => {
@@ -149,14 +190,43 @@ class BbPitchPad {
     }
     close() {
         this.opened = false;
+        this.pickingOff = false;
         this.held.clear();
         this.aim.close();
+        this.pickoffBases.close();
         this.row.classList.remove("open");
         this.throwButton.classList.remove("open");
+    }
+    togglePickoff() {
+        if (!this.opened || !this.occupied.some((on) => on))
+            return;
+        this.pickingOff = !this.pickingOff;
+        this.pickoffKey.classList.toggle("on", this.pickingOff);
+        this.row.classList.toggle("picking", this.pickingOff);
+        this.keys.forEach((key) => key.classList.remove("on"));
+        if (this.pickingOff) {
+            this.aim.close();
+            this.throwButton.classList.remove("open");
+            this.pickoffBases.open(this.occupied);
+        }
+        else
+            this.pickoffBases.close();
+    }
+    pickoff(base) {
+        if (!this.opened || !this.occupied[base - 1])
+            return;
+        this.close();
+        this.onPickoff(base);
     }
     pick(kind) {
         if (!this.opened || this.usable.indexOf(kind.id) < 0)
             return;
+        if (this.pickingOff) {
+            this.pickingOff = false;
+            this.pickoffKey.classList.remove("on");
+            this.row.classList.remove("picking");
+            this.pickoffBases.close();
+        }
         this.aim.choose(kind);
         this.keys.forEach((key, index) => key.classList.toggle("on", BbPitchCatalog.ALL[index] === kind));
         this.throwButton.classList.add("open");
@@ -184,6 +254,12 @@ class BbPitchPad {
             this.pick(kind);
             return;
         }
+        const base = Math.max(BbPitchPad.PICKOFF_CODES.indexOf(event.code), BbPitchPad.PICKOFF_PAD_CODES.indexOf(event.code)) + 1;
+        if (base > 0) {
+            event.preventDefault();
+            this.pickoff(base);
+            return;
+        }
         if (BbPitchPad.THROW_CODES.indexOf(event.code) >= 0) {
             event.preventDefault();
             this.confirm();
@@ -191,8 +267,41 @@ class BbPitchPad {
     }
 }
 BbPitchPad.THROW_CODES = ["Space", "Enter", "NumpadEnter"];
+BbPitchPad.PICKOFF_CODES = ["Digit1", "Digit2", "Digit3"];
+BbPitchPad.PICKOFF_PAD_CODES = ["Numpad1", "Numpad2", "Numpad3"];
 BbPitchPad.ARROW_SPEED = 1.5;
 BbPitchPad.ARROWS = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] };
+class BbStealButtons {
+    constructor(host, onPress) {
+        this.shown = "";
+        this.frame = BbHudParts.box("bb-steal", host);
+        this.buttons = BbStealButtons.LABELS.map((label, index) => {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "bb-steal-button";
+            button.textContent = label;
+            button.addEventListener("click", () => onPress(index + 1));
+            this.frame.appendChild(button);
+            return button;
+        });
+    }
+    show(allowed, pressed, locked) {
+        const key = allowed.join() + "|" + pressed + "|" + locked;
+        if (key === this.shown)
+            return;
+        this.shown = key;
+        this.buttons.forEach((button, index) => {
+            const going = (pressed & BbStealRules.bitOf(index + 1)) !== 0;
+            button.hidden = !allowed[index] && !going;
+            button.disabled = locked || pressed !== 0;
+            button.classList.toggle("on", going);
+            button.textContent = going ? (index + 1) + "루 주자 도루 시작!" : BbStealButtons.LABELS[index];
+        });
+        this.frame.classList.toggle("open", this.buttons.some((button) => !button.hidden));
+    }
+    hide() { this.show([false, false], 0, true); }
+}
+BbStealButtons.LABELS = ["1루 주자 도루", "2루 주자 도루"];
 class BbSwingButton {
     constructor(host, onSwing) {
         this.onSwing = onSwing;

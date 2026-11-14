@@ -40,7 +40,7 @@ class BbPlayResolver {
             return this.grounder(situation, ball, spots, random);
         const fence = this.dimensions.fenceDistance(ball.spray);
         if (ball.carry >= fence) {
-            if (BbBattedBallPhysics.heightAt(fence, ball.carry, ball.launch) >= this.dimensions.wallHeight)
+            if (BbBattedBallPhysics.heightAt(fence, ball.carry, ball.launch) >= this.dimensions.wallHeight + BbPlayResolver.HOME_RUN_CLEARANCE)
                 return this.homeRun(situation, ball);
             return this.hit(situation, ball, this.fielding.retrieve(ball, spots, fence, true));
         }
@@ -57,11 +57,34 @@ class BbPlayResolver {
             return this.hit(situation, ball, retrieve);
         return this.infieldPlay(situation, ball, { by, at: retrieve.at, spot: retrieve.spot, moved: BbDiamond.distance(spots.get(by), retrieve.spot) }, spots, random);
     }
-    throughBall(ball, pick, spots) {
-        const side = BbPlayResolver.THROUGH_SIDE_DEGREES, by = ball.spray < -side ? "LF" : ball.spray > side ? "RF" : "CF";
-        const spot = BbDiamond.polar(Math.max(BbDiamond.fromHome(pick.spot) + BbPlayResolver.THROUGH_METERS, BbPlayResolver.THROUGH_DEPTH), ball.spray);
-        const chase = BbPlayResolver.THROUGH_START + BbDiamond.distance(spots.get(by), spot) / BbPlayResolver.THROUGH_CHASE_SPEED;
-        return { at: Math.max(pick.at + BbPlayResolver.THROUGH_SECONDS, chase), spot, holdSeconds: 0, by };
+    bobbled(ball, pick, spots, legs) {
+        const spot = BbDiamond.polar(BbDiamond.fromHome(pick.spot) + BbPlayResolver.BOBBLE_METERS, ball.spray + (ball.spray >= 0 ? -1 : 1) * BbPlayResolver.BOBBLE_TURN_DEGREES);
+        let by = pick.by, reach = Infinity;
+        BbFielderPositions.ALL.forEach((position) => {
+            const from = position === pick.by ? pick.spot : spots.get(position), seconds = (position === pick.by ? pick.at : 0) + BbFielderMotion.secondsTo(position, from, spot, false, this.crew.skillOf(position));
+            if (seconds < reach) {
+                by = position;
+                reach = seconds;
+            }
+        });
+        let at = Math.max(pick.at + BbPlayResolver.BOBBLE_ROLL_SECONDS, reach) + BbPlayResolver.BOBBLE_PICKUP;
+        const late = BbRunnerMotion.batterSeconds(1, legs) + BbPlayResolver.BOBBLE_LATE_BY - (at + this.throwsBy(by).secondsTo(spot, 1));
+        if (late > 0)
+            at += late;
+        return { at, spot, holdSeconds: 0, by };
+    }
+    twoOutForce(situation, pick, readyAt, runnerAt) {
+        const bases = situation.bases, arm = this.throwsBy(pick.by), forced = [1];
+        if (bases[0])
+            forced.push(2);
+        if (bases[0] && bases[1])
+            forced.push(3);
+        if (bases[0] && bases[1] && bases[2])
+            forced.push(4);
+        const reachable = forced.filter((base) => runnerAt(base) - (readyAt + arm.secondsTo(pick.spot, base)) > BbPlayResolver.FORCE_MARGIN);
+        if (!reachable.length)
+            return null;
+        return reachable.sort((a, b) => BbDiamond.distance(pick.spot, BbDiamond.base(a)) - BbDiamond.distance(pick.spot, BbDiamond.base(b)))[0];
     }
     blank(situation, result, ball) {
         const spot = BbDiamond.polar(ball.carry, ball.spray);
@@ -169,8 +192,8 @@ class BbPlayResolver {
         script.events = [{ t: 0, kind: "ballFlight", spot: [pick.spot.x, pick.spot.z], arriveT: pick.at }, { t: pick.at, kind: "field", who: pick.by, spot: [pick.spot.x, pick.spot.z] }];
         const shifted = this.running.onForcedShift(bases, situation.batter, abilities);
         if (this.errors.fumbles(random)) {
-            const through = this.throughBall(ball, pick, spots), moves = this.running.onHit(bases, situation.batter, abilities, through, this.throwsBy(through.by));
-            const reached = moves.find((move) => move.from === 0).to, next = Math.min(4, reached + 1);
+            const through = this.bobbled(ball, pick, spots, abilities), moves = this.running.onHit(bases, situation.batter, abilities, through, this.throwsBy(through.by));
+            const reached = moves.find((move) => move.from === 0).to, next = reached <= 1 ? 1 : Math.min(4, reached + 1);
             script.result = "ERROR";
             script.batterReached = reached;
             script.events.push({ t: pick.at, kind: "error", who: pick.by }, { t: through.at, kind: "field", who: through.by, spot: [through.spot.x, through.spot.z] });
@@ -191,6 +214,19 @@ class BbPlayResolver {
         const runnerInto = (base) => shifted.find((entry) => entry.to === base && entry.from === base - 1).runner;
         const readyAt = pick.at + BbThrowDecision.rangeDelay(pick.moved), arm = this.throwsBy(pick.by);
         const firstAt = readyAt + arm.secondsTo(pick.spot, 1);
+        if (situation.outs >= 2) {
+            const near = this.twoOutForce(situation, pick, readyAt, (base) => (base === 1 ? batterAt : runnerAt(runnerInto(base))));
+            if (near !== null) {
+                const nearAt = readyAt + arm.secondsTo(pick.spot, near);
+                out(near === 1 ? situation.batter : runnerInto(near), near, nearAt);
+                script.events.push({ t: pick.at, kind: "throw", who: pick.by, base: near, arriveT: nearAt });
+                if (near > 1) {
+                    script.result = "FIELDERS_CHOICE";
+                    script.batterReached = 1;
+                }
+                return this.closeInfieldPlay(script, situation, shifted);
+            }
+        }
         if (situation.outs < 2 && doubleBase) {
             const leadAt = readyAt + arm.secondsTo(pick.spot, doubleBase), lead = runnerInto(doubleBase);
             if (leadAt < runnerAt(lead)) {
@@ -250,10 +286,11 @@ class BbPlayResolver {
     }
 }
 BbPlayResolver.INFIELD_REACH = 44;
-BbPlayResolver.THROUGH_METERS = 15;
-BbPlayResolver.THROUGH_DEPTH = 46;
-BbPlayResolver.THROUGH_SECONDS = 1.3;
-BbPlayResolver.THROUGH_SIDE_DEGREES = 15;
-BbPlayResolver.THROUGH_CHASE_SPEED = 9;
-BbPlayResolver.THROUGH_START = 0.45;
+BbPlayResolver.BOBBLE_METERS = 5;
+BbPlayResolver.BOBBLE_TURN_DEGREES = 6;
+BbPlayResolver.BOBBLE_ROLL_SECONDS = 0.9;
+BbPlayResolver.BOBBLE_PICKUP = 0.3;
+BbPlayResolver.BOBBLE_LATE_BY = 0.25;
+BbPlayResolver.FORCE_MARGIN = 0.1;
 BbPlayResolver.LATE_THROW_WITHIN = 0.7;
+BbPlayResolver.HOME_RUN_CLEARANCE = 0.4;
