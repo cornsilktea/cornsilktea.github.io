@@ -47,7 +47,7 @@ BbBoardCatalog.MEAN = (value) => BbBaseballFormulas.meanText(value);
 BbBoardCatalog.PERCENT = (value) => (value * 100).toFixed(1) + "%";
 BbBoardCatalog.INNINGS = (value) => Math.floor(value / 3) + "." + value % 3;
 BbBoardCatalog.BAT = [
-    new BbBoardStat("게임 수", (e) => e.g, BbBoardCatalog.WHOLE, false, "bat", false),
+    new BbBoardStat("경기", (e) => e.g, BbBoardCatalog.WHOLE, false, "bat", false),
     new BbBoardStat("타석", (e) => e.bat.pa, BbBoardCatalog.WHOLE, false, "bat", false),
     new BbBoardStat("타수", (e) => e.bat.ab, BbBoardCatalog.WHOLE, false, "bat", false),
     new BbBoardStat("타율", (e) => BbBoardCatalog.f.average(e.bat), BbBoardCatalog.RATE, false, "bat", true),
@@ -63,7 +63,7 @@ BbBoardCatalog.BAT = [
     new BbBoardStat("볼넷율", (e) => BbBoardCatalog.f.perPlate(e.bat.bb, e.bat), BbBoardCatalog.PERCENT, false, "bat", true)
 ];
 BbBoardCatalog.PIT = [
-    new BbBoardStat("게임 수", (e) => e.g, BbBoardCatalog.WHOLE, false, "pit", false),
+    new BbBoardStat("경기", (e) => e.g, BbBoardCatalog.WHOLE, false, "pit", false),
     new BbBoardStat("이닝", (e) => e.pit.outs, BbBoardCatalog.INNINGS, false, "pit", false),
     new BbBoardStat("평균자책점", (e) => BbBoardCatalog.f.earnedRunAverage(e.pit), BbBoardCatalog.MEAN, true, "pit", true),
     new BbBoardStat("WHIP", (e) => BbBoardCatalog.f.whip(e.pit), BbBoardCatalog.MEAN, true, "pit", true),
@@ -104,7 +104,7 @@ class BbBoardTable {
         view.rows.forEach((row, rank) => {
             const line = body.insertRow();
             BbBoardTable.cell(line, "td", String(rank + 1), "bb-board-rank");
-            BbBoardTable.cell(line, "td", row.entry.n + (view.showClass ? BbBoardTable.classLabel(row.entry.c) : ""), "bb-board-name");
+            BbBoardTable.cell(line, "td", (view.showClass ? BbBoardTable.classLabel(row.entry.c) : "") + row.entry.n, "bb-board-name");
             view.stats.forEach((stat, index) => BbBoardTable.cell(line, "td", stat.cell(row.entry), index === view.sortIndex ? "on" : ""));
         });
         this.scroller.textContent = "";
@@ -112,7 +112,7 @@ class BbBoardTable {
             this.scroller.appendChild(table);
     }
     clear() { this.scroller.textContent = ""; }
-    static classLabel(id) { return id !== "none" ? " · " + id.replace("-", "학년 ") + "반" : ""; }
+    static classLabel(id) { return id !== "none" ? id + " " : ""; }
     static cell(row, tag, text, className) {
         const cell = document.createElement(tag);
         cell.className = className;

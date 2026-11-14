@@ -33,16 +33,23 @@ class BbBoxTable {
             bestPitch: Math.round(Math.max(report.box[0].bestPitch, report.box[1].bestPitch))
         };
     }
-    static html(sheet) {
+    static html(sheet, withScore = true) {
         BbBoxTable.ensureStyle();
-        const esc = AccountHtml.esc, names = sheet.names;
-        const score = '<div class="bbx-score">' + esc(names[0]) + " <b>" + sheet.score[0] + "</b> : <b>" + sheet.score[1] + "</b> " + esc(names[1]) + "</div>";
-        const head = "<tr><th></th>" + sheet.lineScore.map((unused, index) => "<th>" + (sheet.startInning + index) + "</th>").join("") + "<th>R</th></tr>";
-        const body = [0, 1].map((team) => '<tr><td class="bbx-name">' + esc(names[team]) + "</td>" + sheet.lineScore.map((inning) => "<td>" + inning[team] + "</td>").join("") + '<td class="bbx-total">' + sheet.score[team] + "</td></tr>").join("");
+        const esc = AccountHtml.esc, names = sheet.names, innings = Array.from({ length: BbBoxTable.BOARD_INNINGS }, (unused, index) => index + 1);
+        const score = withScore ? '<div class="bbx-score">' + esc(names[0]) + " <b>" + sheet.score[0] + "</b> : <b>" + sheet.score[1] + "</b> " + esc(names[1]) + "</div>" : "";
+        const head = "<tr><th></th>" + innings.map((inning) => "<th>" + inning + "</th>").join("") + '<th class="bbx-total">R</th></tr>';
+        const body = [0, 1].map((team) => '<tr><td class="bbx-name">' + esc(names[team]) + "</td>" + innings.map((inning) => BbBoxTable.inningCell(sheet, inning, team)).join("") + '<td class="bbx-total">' + sheet.score[team] + "</td></tr>").join("");
         const rows = [0, 1].map((team) => BbBoxTable.row(names[team], team === 0 ? "초 공격 · 타격" : "말 공격 · 타격", BbResultColumns.BAT.map(([label]) => label), sheet.lines[team].bat.map(String), sheet.me === team)
             + BbBoxTable.row(names[team], "투구", BbResultColumns.PIT.map(([label]) => label), sheet.lines[team].pit.map((value, index) => BbResultColumns.pitCell(index, value)), sheet.me === team)).join("");
         const facts = '<div class="bbx-facts"><span>최장 비거리 <b>' + (sheet.bestDistance ? sheet.bestDistance + "m" : "-") + "</b></span><span>최고 구속 <b>" + (sheet.bestPitch ? sheet.bestPitch + "km/h" : "-") + "</b></span></div>";
         return '<div class="bbx">' + score + '<table class="bbx-line"><thead>' + head + "</thead><tbody>" + body + '</tbody></table><div class="bbx-rows">' + rows + "</div>" + facts + "</div>";
+    }
+    static inningCell(sheet, inning, team) {
+        const index = inning - sheet.startInning;
+        if (index < 0)
+            return "<td>0</td>";
+        const played = sheet.lineScore[index];
+        return played ? "<td>" + played[team] + "</td>" : '<td class="bbx-unplayed">' + BbBoxTable.UNPLAYED + "</td>";
     }
     static row(name, role, labels, values, mine) {
         return '<div class="bbx-row' + (mine ? " mine" : "") + '"><span class="bbx-who"><b>' + AccountHtml.esc(name) + "</b><small>" + role + "</small></span>"
@@ -54,17 +61,25 @@ BbBoxTable.STYLE = [
     ".bbx{display:flex;flex-direction:column;gap:8px;font-family:var(--sg-font,'Nanum Gothic','Malgun Gothic',sans-serif);color:#EEF2EE;}",
     ".bbx-score{display:flex;align-items:center;justify-content:center;gap:10px;font-size:20px;font-weight:800;}",
     ".bbx-score b{font-size:30px;color:#F4F1E8;}",
-    ".bbx-line{width:100%;border-collapse:collapse;font-size:13px;text-align:center;}",
-    ".bbx-line th,.bbx-line td{padding:3px 4px;border-bottom:1px solid rgba(255,255,255,.12);}",
-    ".bbx-line th{color:#A3B0A6;font-weight:700;}.bbx-line td.bbx-name{text-align:left;font-weight:800;}",
-    ".bbx-line td.bbx-total{font-weight:800;color:#F4F1E8;}",
+    ".bbx-line{width:100%;border-collapse:collapse;font-size:13px;text-align:center;font-variant-numeric:tabular-nums;}",
+    ".bbx-line th,.bbx-line td{padding:4px 2px;border-bottom:1px solid rgba(255,255,255,.12);}",
+    ".bbx-line th{color:#A3B0A6;font-weight:700;}.bbx-line td.bbx-name{text-align:left;font-weight:800;white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis;padding-right:6px;}",
+    ".bbx-line td.bbx-unplayed{color:#6F7C73;}",
+    ".bbx-line .bbx-total{width:44px;background:rgba(217,123,79,.3);color:#fff;font-weight:900;font-size:16px;}",
+    ".bbx-line th.bbx-total{font-size:13px;color:#F4C7AE;}",
     ".bbx-rows{display:flex;flex-direction:column;gap:4px;}",
     ".bbx-row{display:grid;grid-template-columns:minmax(78px,1.4fr) repeat(8,minmax(0,1fr));align-items:center;gap:2px;padding:4px 6px;border-radius:6px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);}",
     ".bbx-row.mine{border-color:#D97B4F;background:rgba(217,123,79,.14);}",
     ".bbx-who{display:flex;flex-direction:column;min-width:0;}.bbx-who b{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}.bbx-who small{font-size:11px;color:#A3B0A6;}",
     ".bbx-cell{display:flex;flex-direction:column;align-items:center;min-width:0;}.bbx-cell small{font-size:10px;color:#A3B0A6;white-space:nowrap;}.bbx-cell b{font-size:15px;}",
-    ".bbx-facts{display:flex;gap:14px;justify-content:center;font-size:13px;color:#CFD8D0;}.bbx-facts b{color:#F4F1E8;}"
+    ".bbx-facts{display:flex;gap:14px;justify-content:center;font-size:13px;color:#CFD8D0;}.bbx-facts b{color:#F4F1E8;}",
+    ".asd-wide .bbx-line{font-size:17px;}.asd-wide .bbx-line th{font-size:14px;}.asd-wide .bbx-line th,.asd-wide .bbx-line td{padding:7px 4px;}",
+    ".asd-wide .bbx-line .bbx-total{width:64px;font-size:22px;}.asd-wide .bbx-line td.bbx-name{max-width:200px;}",
+    ".asd-wide .bbx-row{padding:8px 12px;}.asd-wide .bbx-who b{font-size:16px;}.asd-wide .bbx-who small{font-size:12px;}",
+    ".asd-wide .bbx-cell small{font-size:12px;}.asd-wide .bbx-cell b{font-size:20px;}.asd-wide .bbx-facts{font-size:15px;}"
 ].join("\n");
+BbBoxTable.BOARD_INNINGS = 15;
+BbBoxTable.UNPLAYED = "-";
 class BbStatsPlan {
     constructor(report) {
         this.recordsRecent = report.rival && !AccountForfeit.leftEarly(report.iLeft, report.progress);
@@ -291,7 +306,7 @@ class BbStatsView {
             + "<br>타격 " + line.bat[1] + "안타 " + line.bat[4] + "홈런 · 투구 " + BbResultColumns.pitCell(0, line.pit[0]) + "이닝 " + line.pit[6] + "실점";
     }
     resultTitle(entry) { return entry.tie ? "무승부" : entry.win ? "승리!" : "패배"; }
-    resultHtml(entry) { return BbBoxTable.html(entry.sheet); }
+    resultHtml(entry) { return BbBoxTable.html(entry.sheet, false); }
 }
 class BbZoneMap {
     static hittingCells(zones, overall) {

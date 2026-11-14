@@ -735,7 +735,13 @@ class AccountStatsDialog<N, E extends AccountRecentHeadEntry> {
     ".asd-wide .asd-grid div{padding:6px 10px;}",
     ".asd-wide .asd-grid b{font-size:18px;}",
     ".asd-wide .asd-sec{margin:8px 0 4px;}",
-    "@media (max-width:760px){.asd-wide .asd-box{grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto auto auto 1fr;}.asd-wide .asd-x{grid-column:2;}.asd-wide .asd-tabs{grid-column:1 / -1;grid-row:2;margin-top:8px;}.asd-wide .asd-msg{grid-row:3;}.asd-wide .asd-body{grid-row:4;}.asd-wide .asd-list{grid-template-columns:1fr;}}"
+    ".asd-wide .asd-box.asd-result-view{grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);}",
+    ".asd-wide .asd-result-view .asd-x{justify-self:end;}",
+    ".asd-wide .asd-result-view .asd-msg{grid-column:1;grid-row:1;align-self:center;margin:0;}",
+    ".asd-wide .asd-result-view h2{grid-column:2;text-align:center;font-size:34px;line-height:1.1;}",
+    ".asd-wide .asd-result-view .asd-body{grid-row:2 / 4;margin-top:10px;}",
+    ".asd-wide h2.asd-win{color:#8DB8FF;}.asd-wide h2.asd-lose{color:#FF9A92;}.asd-wide h2.asd-draw{color:#EEF2EE;}",
+    "@media (max-width:760px){.asd-wide .asd-box{grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto auto auto 1fr;}.asd-wide .asd-x{grid-column:2;}.asd-wide .asd-tabs{grid-column:1 / -1;grid-row:2;margin-top:8px;}.asd-wide .asd-msg{grid-row:3;}.asd-wide .asd-body{grid-row:4;}.asd-wide .asd-list{grid-template-columns:1fr;}.asd-wide .asd-result-view h2{grid-column:1;text-align:left;font-size:26px;}.asd-wide .asd-result-view .asd-msg{grid-column:1 / -1;grid-row:2;margin-top:6px;}.asd-wide .asd-result-view .asd-body{grid-row:3 / 5;}}"
   ].join("\n");
 
   private back: HTMLElement | null = null;
@@ -814,6 +820,7 @@ class AccountStatsDialog<N, E extends AccountRecentHeadEntry> {
 
   private load(): void {
     const seq = ++this.seq;
+    this.markResult(null);
     this.part(".asd-tabs").style.display = "";
     this.part("h2").textContent = this.titleText();
     this.part(".asd-body").innerHTML = "";
@@ -837,7 +844,15 @@ class AccountStatsDialog<N, E extends AccountRecentHeadEntry> {
     this.part(".asd-msg").textContent = text;
   }
 
+  /* 넓은 창에서 경기 결과를 열면 승리/패배/무승부를 가운데 크게, "내 결과" 줄은 왼쪽 위로 올린다(30번 결과 창처럼, 2026-11-14) */
+  private markResult(outcome: "win" | "lose" | "draw" | null): void {
+    const box = this.part(".asd-box"), title = this.part("h2");
+    box.classList.toggle("asd-result-view", !!outcome);
+    ["win", "lose", "draw"].forEach((name) => title.classList.toggle("asd-" + name, outcome === name));
+  }
+
   private renderRecent(): void {
+    this.markResult(null);
     this.part(".asd-tabs").style.display = "";
     this.part("h2").textContent = this.titleText();
     this.setMessage(this.entries.length ? "최근 " + this.entries.length + "경기 · 최신순 · 누르면 그 경기 결과가 열려요" : this.view.emptyRecent);
@@ -850,6 +865,7 @@ class AccountStatsDialog<N, E extends AccountRecentHeadEntry> {
   private showResult(index: number): void {
     const entry = this.entries[index];
     if (!entry) return;
+    this.markResult(RecentBlockList.outcomeClass(entry));
     this.part(".asd-tabs").style.display = "none";
     this.part("h2").textContent = this.view.resultTitle(entry);
     this.setMessage("내 결과: " + RecentBlockList.outcomeText(entry) + " · " + RecentBlockList.whenText(entry.at));
