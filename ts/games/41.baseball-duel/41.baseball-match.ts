@@ -549,9 +549,9 @@ class BbMatchDirector {
   }
 
   private pressSteal(from: number): void {
-    if (!this.stealWindow() || this.stealPressed) return;
-    const mask = BbStealRules.pressed(this.session.state.bases, from), pending = this.pending;
-    if (!mask) return;
+    if (!this.stealWindow()) return;
+    const mask = this.stealPressed ? 0 : BbStealRules.pressed(this.session.state.bases, from), pending = this.pending;
+    if (!mask && !this.stealPressed) return;
     this.stealPressed = mask;
     if (pending && pending.started && !pending.settled) this.player.replace(this.sceneOf(this.previewWith(pending.roll, mask)));
   }

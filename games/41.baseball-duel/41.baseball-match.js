@@ -477,10 +477,10 @@ class BbMatchDirector {
         this.steal.show([session.engine.stealable(1), session.engine.stealable(2)], this.stealPressed, !this.stealWindow());
     }
     pressSteal(from) {
-        if (!this.stealWindow() || this.stealPressed)
+        if (!this.stealWindow())
             return;
-        const mask = BbStealRules.pressed(this.session.state.bases, from), pending = this.pending;
-        if (!mask)
+        const mask = this.stealPressed ? 0 : BbStealRules.pressed(this.session.state.bases, from), pending = this.pending;
+        if (!mask && !this.stealPressed)
             return;
         this.stealPressed = mask;
         if (pending && pending.started && !pending.settled)

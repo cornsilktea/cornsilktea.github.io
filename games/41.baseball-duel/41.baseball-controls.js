@@ -293,7 +293,7 @@ class BbStealButtons {
         this.buttons.forEach((button, index) => {
             const going = (pressed & BbStealRules.bitOf(index + 1)) !== 0;
             button.hidden = !allowed[index] && !going;
-            button.disabled = locked || pressed !== 0;
+            button.disabled = locked || (pressed !== 0 && !going);
             button.classList.toggle("on", going);
             button.textContent = going ? (index + 1) + "루 주자 도루 시작!" : BbStealButtons.LABELS[index];
         });

@@ -739,7 +739,7 @@ class BbPlayChoreographer extends BbPitchChoreographer {
     this.heldSince = caughtAt;
     this.shoot(caughtAt + 0.05, "throw", BbFieldGeometry.HOME, bag);
     this.passTo("catcher", receiver, bag, this.spotOf("catcher", caughtAt), wanted, "chest", false, play.target);
-    this.stealRuns(play.runners, leaveAt, this.heldSince, receiver, "도루 저지!", "도루 성공!", null);
+    this.stealRuns(play.runners, leaveAt, this.heldSince, receiver, "아웃!", "도루 성공!", null);
   }
 
   protected pickoffPlay(play: BbPickoffPlay): void {
@@ -770,7 +770,7 @@ class BbPlayChoreographer extends BbPitchChoreographer {
     this.shoot(landed + 0.1, "throw", bag, nextBag);
     this.passTo(fielder, cover, nextBag, bag, landed + BbPlayChoreographer.PICKOFF_THROW + bag.distanceTo(nextBag) / BbThrowTrajectory.INFIELD_SPEED, "chest", false, next);
     const ordered = play.runners.slice().sort((a, b) => (a.out === b.out ? 0 : a.out ? -1 : 1));
-    this.stealRuns(ordered, BbPlayChoreographer.PICKOFF_BREAK, this.heldSince, cover, "견제 아웃!", null, "out");
+    this.stealRuns(ordered, BbPlayChoreographer.PICKOFF_BREAK, this.heldSince, cover, "아웃!", null, "out");
   }
 
   private send(role: BbRoleId, point: BbVec, facing: BbVec): void {

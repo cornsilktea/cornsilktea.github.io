@@ -141,6 +141,7 @@ class BbStage {
     this.clock = new THREE.Clock();
     this.renderer.domElement.classList.add("bb-view");
     window.addEventListener("resize", () => this.resize());
+    if (typeof ResizeObserver !== "undefined") new ResizeObserver(() => this.resize()).observe(canvas);
     this.resize();
   }
 
