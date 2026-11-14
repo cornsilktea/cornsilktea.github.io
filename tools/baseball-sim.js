@@ -224,7 +224,7 @@ class SimReport {
   keyDefense(rows, games) {
     this.line("## 7. 중요 수비 포지션(포수·유격수·중견수)에 수비를 몰아준 효과");
     this.line();
-    this.line("그 팀이 수비할 때의 실점만 본다(공격력이 줄어든 것은 9절 공정성에서 본다). 9회 1이닝, 각 " + games + "판(선공·후공 반씩). 나머지 6명은 3/3/3/3.");
+    this.line("그 팀이 수비할 때의 실점만 본다(공격력이 줄어든 것은 10절 공정성에서 본다). 9회 1이닝, 각 " + games + "판(선공·후공 반씩). 나머지 6명은 3/3/3/3.");
     this.line();
     this.line("| 수비 배치 | 경기당 실점 | 이닝당 실점 | 기준 대비 | 피안타율 | 장타 허용(타석당 2루타 이상) | 피장타율 |");
     this.line("|---|---|---|---|---|---|---|");
@@ -289,6 +289,8 @@ class SimCommand {
     this.refine = value("--refine", 8000);
     this.sideGames = value("--side", 6000);
     this.quick = argv.includes("--quick");
+    const part = argv.indexOf("--fair");
+    this.fairKinds = part >= 0 ? argv[part + 1].split(",") : ["batter", "pitcher"];
   }
 
   keyDefense(sim) {
@@ -342,6 +344,7 @@ class SimCommand {
     }
     if (this.withAbilities) {
       for (const [title, asBatter] of [["10. 타자 배분 149가지 (컨택/파워/주루/수비) — 9명 모두 그 배분 대 기준 선수단", true], ["11. 투수 배분 149가지 (제구/구위/변화/체력) — 투수 3명 모두 그 배분 대 기준 선수단", false]]) {
+        if (this.fairKinds.indexOf(asBatter ? "batter" : "pitcher") < 0) continue;
         const result = this.fairnessRows(sim, asBatter);
         report.fairness(title, result.refined, "149가지를 " + this.screen + "판씩 훑은 뒤 위·아래 끝 10가지씩과 대표 배분을 " + this.refine + "판씩 다시 돌린 표(9회 1이닝, 선공·후공 반씩). 공격과 수비(또는 투구)를 함께 보는 값은 경기당 득점 − 실점이다. 훑기에서 가장 좋았던 5가지: " + result.best.join(", ") + ".");
       }

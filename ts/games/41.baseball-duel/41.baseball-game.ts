@@ -111,6 +111,7 @@ class BbStaminaModel {
   static readonly FULL = 100;
   static readonly TIRED_BELOW = 50;
   static readonly WORN_BELOW = 30;
+  static readonly RELIEF_BELOW = 30;
   static readonly PITCH_COST: readonly number[] = [0, 4, 3.5, 3, 2.5, 2, 1.5, 1];
   static readonly HIT_COST: readonly number[] = [0, 2, 1.8, 1.7, 1.5, 1.3, 1.2, 1];
   static readonly HOME_RUN_COST: readonly number[] = [0, 4, 3.7, 3.3, 3, 2.7, 2.3, 2];
@@ -152,7 +153,7 @@ class BbStaminaMeter implements BbPitcherStamina {
   spend(outcome: BbPitchOutcome): void { this.value = Math.max(0, this.value - BbStaminaModel.costOf(this.stamina, outcome)); }
   level(): number { return this.value; }
   condition(): BbPitchCondition { return BbStaminaModel.condition(this.value); }
-  isSpent(): boolean { return this.value < BbStaminaModel.WORN_BELOW; }
+  isSpent(): boolean { return this.value < BbStaminaModel.RELIEF_BELOW; }
 }
 
 class BbPitcherRoster {

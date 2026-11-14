@@ -32,9 +32,9 @@ class BbFielderSkill {
     }
 }
 BbFielderSkill.BASE_POINTS = 3;
-BbFielderSkill.MOVE_STEP = 0.02;
-BbFielderSkill.THROW_STEP = 0.02;
-BbFielderSkill.RANGE_STEP = 0.08;
+BbFielderSkill.MOVE_STEP = 0.015;
+BbFielderSkill.THROW_STEP = 0.015;
+BbFielderSkill.RANGE_STEP = 0.06;
 BbFielderSkill.BASE = new BbFielderSkill(BbFielderSkill.BASE_POINTS);
 class BbDefenseCrew {
     constructor(points) {

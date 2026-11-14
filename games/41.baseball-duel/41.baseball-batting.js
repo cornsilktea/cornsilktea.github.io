@@ -12,7 +12,7 @@ class BbBatterAbilityModel {
     static advanceMargin(speed) { return 0.25 - BbBatterAbilityModel.MARGIN_STEP * (speed - BbBatterAbilityModel.BASE); }
 }
 BbBatterAbilityModel.BASE = 3;
-BbBatterAbilityModel.LENIENCY_STEP = 0.1;
+BbBatterAbilityModel.LENIENCY_STEP = 0.14;
 BbBatterAbilityModel.EXIT_SPEED_STEP = 1.15;
 BbBatterAbilityModel.TOP_WEIGHT_STEP = 0.037;
 BbBatterAbilityModel.RUN_SPEED_STEP = 0.6;

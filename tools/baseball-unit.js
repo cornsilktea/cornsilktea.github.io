@@ -115,7 +115,7 @@ class BaseballUnit {
     check.ok(!full.isOn("kn") && full.usable().length === 4, "7 밑으로 내리면 너클이 먼저 꺼짐");
     check.near(c.BbPitchKind.fastballSpeed(1), 129.5, 1e-9, "구위 1 직구 구속");
     check.near(c.BbPitchKind.fastballSpeed(7), 150.5, 1e-9, "구위 7 직구 구속");
-    check.near(c.BbBatterAbilityModel.leniency(7), 1.4, 1e-9, "컨택 7 배율");
+    check.near(c.BbBatterAbilityModel.leniency(7), 1.56, 1e-9, "컨택 7 배율(1점당 0.14)");
     check.near(c.BbBatterAbilityModel.firstBaseSeconds(3), 4.1, 1e-9, "주루 3 1루 도달");
   }
 
@@ -217,7 +217,7 @@ class BaseballUnit {
   timingExamples() {
     const c = this.code, check = this.check, timing = c.BbTimingModel;
     check.section("6. 타이밍·펜스 (사양서 8.9절 예)");
-    check.near(timing.width(0, 140, 1), 0.055, 1e-9, "예 A 한가운데 정타 폭 55ms");
+    check.near(timing.width(0, 140, 1), 0.066, 1e-9, "예 A 한가운데 정타 폭 66ms(사양 55ms × 1.2)");
     check.ok(timing.bandOf(-0.005, timing.width(0, 140, 1), 1) === "perfect", "예 A −5ms 정타");
     const shiftB = timing.idealShift(-0.8, 0), adjustedB = -0.075 - shiftB;
     check.near(shiftB, -0.0224, 1e-9, "예 B 몸쪽 이상 타이밍 −22ms");

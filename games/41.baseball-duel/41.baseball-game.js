@@ -107,6 +107,7 @@ class BbStaminaModel {
 BbStaminaModel.FULL = 100;
 BbStaminaModel.TIRED_BELOW = 50;
 BbStaminaModel.WORN_BELOW = 30;
+BbStaminaModel.RELIEF_BELOW = 30;
 BbStaminaModel.PITCH_COST = [0, 4, 3.5, 3, 2.5, 2, 1.5, 1];
 BbStaminaModel.HIT_COST = [0, 2, 1.8, 1.7, 1.5, 1.3, 1.2, 1];
 BbStaminaModel.HOME_RUN_COST = [0, 4, 3.7, 3.3, 3, 2.7, 2.3, 2];
@@ -126,7 +127,7 @@ class BbStaminaMeter {
     spend(outcome) { this.value = Math.max(0, this.value - BbStaminaModel.costOf(this.stamina, outcome)); }
     level() { return this.value; }
     condition() { return BbStaminaModel.condition(this.value); }
-    isSpent() { return this.value < BbStaminaModel.WORN_BELOW; }
+    isSpent() { return this.value < BbStaminaModel.RELIEF_BELOW; }
 }
 class BbPitcherRoster {
     constructor(pitchers, meterOf = (sheet) => new BbStaminaMeter(sheet.abilities.stamina)) {

@@ -13,7 +13,7 @@ class BbCatcherFraming {
 
 class BbBatterAbilityModel {
   static readonly BASE = 3;
-  static readonly LENIENCY_STEP = 0.1;
+  static readonly LENIENCY_STEP = 0.14;
   static readonly EXIT_SPEED_STEP = 1.15;
   static readonly TOP_WEIGHT_STEP = 0.037;
   static readonly RUN_SPEED_STEP = 0.6;

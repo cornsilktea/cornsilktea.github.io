@@ -28,9 +28,9 @@ class BbFielderPositions {
 
 class BbFielderSkill {
   static readonly BASE_POINTS = 3;
-  static readonly MOVE_STEP = 0.02;
-  static readonly THROW_STEP = 0.02;
-  static readonly RANGE_STEP = 0.08;
+  static readonly MOVE_STEP = 0.015;
+  static readonly THROW_STEP = 0.015;
+  static readonly RANGE_STEP = 0.06;
   static readonly BASE = new BbFielderSkill(BbFielderSkill.BASE_POINTS);
 
   readonly moveScale: number;
