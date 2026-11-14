@@ -15,13 +15,18 @@ class BbBoardStat {
     }
     value(entry) { return this.qualifies(entry) ? this.pick(entry) : null; }
     text(value) { return this.write(value); }
+    cell(entry) {
+        const value = this.pick(entry);
+        return value !== null && Number.isFinite(value) ? this.write(value) : BbBoardStat.EMPTY;
+    }
     top(entries, limit) {
-        return entries.map((entry) => ({ entry, value: this.value(entry) })).filter((row) => row.value !== null && row.entry.g > 0)
+        return entries.map((entry) => ({ entry, value: this.value(entry) })).filter((row) => row.value !== null && Number.isFinite(row.value) && row.entry.g > 0)
             .sort((a, b) => (this.lower ? a.value - b.value : b.value - a.value) || a.entry.n.localeCompare(b.entry.n)).slice(0, limit);
     }
 }
 BbBoardStat.MIN_PLATE = 10;
 BbBoardStat.MIN_OUTS = 9;
+BbBoardStat.EMPTY = "-";
 class BbBoardCatalog {
     static of(side) { return side === "bat" ? BbBoardCatalog.BAT : BbBoardCatalog.PIT; }
     static entries(raw) {
@@ -82,6 +87,40 @@ class BbZoneSwitch {
     }
 }
 BbZoneSwitch.PATH = "baseballduel/settings/zones";
+class BbBoardTable {
+    constructor(mount, onSort) {
+        this.onSort = onSort;
+        this.scroller = BbHudParts.box("bb-board-scroll", mount);
+    }
+    draw(view) {
+        const table = document.createElement("table"), head = table.createTHead().insertRow(), body = table.createTBody();
+        table.className = "bb-board-table";
+        BbBoardTable.cell(head, "th", "순위", "bb-board-rank");
+        BbBoardTable.cell(head, "th", "이름", "bb-board-name");
+        view.stats.forEach((stat, index) => {
+            const th = BbBoardTable.cell(head, "th", "", "bb-board-sort" + (index === view.sortIndex ? " on" : ""));
+            BbSheetParts.button("bb-board-head", th, stat.label + (index === view.sortIndex ? " ▼" : ""), () => this.onSort(index));
+        });
+        view.rows.forEach((row, rank) => {
+            const line = body.insertRow();
+            BbBoardTable.cell(line, "td", String(rank + 1), "bb-board-rank");
+            BbBoardTable.cell(line, "td", row.entry.n + (view.showClass ? BbBoardTable.classLabel(row.entry.c) : ""), "bb-board-name");
+            view.stats.forEach((stat, index) => BbBoardTable.cell(line, "td", stat.cell(row.entry), index === view.sortIndex ? "on" : ""));
+        });
+        this.scroller.textContent = "";
+        if (view.rows.length)
+            this.scroller.appendChild(table);
+    }
+    clear() { this.scroller.textContent = ""; }
+    static classLabel(id) { return id !== "none" ? " · " + id.replace("-", "학년 ") + "반" : ""; }
+    static cell(row, tag, text, className) {
+        const cell = document.createElement(tag);
+        cell.className = className;
+        cell.textContent = text;
+        row.appendChild(cell);
+        return cell;
+    }
+}
 class BbBoardPanel {
     constructor(mount, backend, myClass) {
         this.backend = backend;
@@ -97,8 +136,7 @@ class BbBoardPanel {
         this.sideButtons = ["bat", "pit"].map((side) => BbSheetParts.button("bb-room-chip", toggles, side === "bat" ? "타자" : "투수", () => { this.side = side; this.statIndex = side === "bat" ? 3 : 2; this.draw(); }));
         this.scopeButtons = [true, false].map((mine) => BbSheetParts.button("bb-room-chip", toggles, mine ? "우리 반" : "전체", () => { this.mineOnly = mine; this.draw(); }));
         BbSheetParts.button("bb-room-chip", toggles, "새로고침", () => { this.loaded = false; this.load(); });
-        this.statRow = BbHudParts.box("bb-board-stats", mount);
-        this.list = BbHudParts.box("bb-board-list", mount);
+        this.table = new BbBoardTable(mount, (index) => { this.statIndex = index; this.draw(); });
         this.note = BbHudParts.box("bb-board-note", mount);
         this.draw();
     }
@@ -119,22 +157,19 @@ class BbBoardPanel {
     }
     say(text) { this.note.textContent = text; }
     draw() {
-        const stats = BbBoardCatalog.of(this.side), stat = stats[this.statIndex] || stats[0];
+        const stats = BbBoardCatalog.of(this.side), sortIndex = stats[this.statIndex] ? this.statIndex : 0, stat = stats[sortIndex];
         this.sideButtons.forEach((button, index) => button.classList.toggle("on", (index === 0) === (this.side === "bat")));
         this.scopeButtons.forEach((button, index) => { button.classList.toggle("on", (index === 0) === this.mineOnly); button.disabled = index === 0 && !this.myClass; });
-        this.statRow.textContent = "";
-        stats.forEach((item, index) => BbSheetParts.button("bb-board-stat" + (item === stat ? " on" : ""), this.statRow, item.label, () => { this.statIndex = index; this.draw(); }));
-        this.list.textContent = "";
-        if (!this.loaded)
+        if (!this.loaded) {
+            this.table.clear();
             return;
-        const pool = this.mineOnly && this.myClass ? this.entries.filter((entry) => entry.c === this.myClass) : this.entries, rows = stat.top(pool, BbBoardPanel.LIMIT);
-        rows.forEach((row, index) => {
-            const line = BbHudParts.box("bb-board-row", this.list);
-            BbHudParts.box("bb-board-rank", line, String(index + 1));
-            BbHudParts.box("bb-board-name", line, row.entry.n + (this.mineOnly ? "" : row.entry.c !== "none" ? " · " + row.entry.c.replace("-", "학년 ") + "반" : ""));
-            BbHudParts.box("bb-board-value", line, stat.text(row.value));
-        });
-        this.say(rows.length ? (stat.lower ? "낮을수록 위" : "높을수록 위") + (stat.qualifies({ uid: "", n: "", c: "", g: 0, bat: BbBoxScoreBuilder.emptyBat(), pit: BbBoxScoreBuilder.emptyPit() }) ? "" : this.side === "bat" ? " · 10타석 이상만" : " · 3이닝 이상만") : "아직 기록이 없어요.");
+        }
+        const mine = this.mineOnly && !!this.myClass, pool = mine ? this.entries.filter((entry) => entry.c === this.myClass) : this.entries;
+        const rows = stat.top(pool, mine ? pool.length : BbBoardPanel.LIMIT);
+        this.table.draw({ stats, sortIndex, rows, showClass: !mine });
+        const order = stat.lower ? "낮을수록 위" : "높을수록 위", floor = stat.qualifies(BbBoardPanel.BLANK) ? "" : this.side === "bat" ? " · 10타석 이상만" : " · 3이닝 이상만";
+        this.say(rows.length ? stat.label + " " + order + floor + (mine ? "" : " · 상위 " + BbBoardPanel.LIMIT + "명") : "아직 기록이 없어요.");
     }
 }
-BbBoardPanel.LIMIT = 10;
+BbBoardPanel.LIMIT = 30;
+BbBoardPanel.BLANK = { uid: "", n: "", c: "", g: 0, bat: BbBoxScoreBuilder.emptyBat(), pit: BbBoxScoreBuilder.emptyPit() };
