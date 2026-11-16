@@ -3185,13 +3185,13 @@ const room = {
   startAt: 0, originZombieId: null, final: null, winner: null, fillBots: true
 };
 function isBot(id) { const p = room.players[id]; return !!(p && p.bot); }
-function humanIdsOf(ps) { return okeys(ps || {}).filter(id => ps[id] && !ps[id].bot); }
+function humanIdsOf(ps) { return okeys(ps || {}).filter(id => ps[id] && !ps[id].bot && ZombieSeatGate.present(ps[id])); }
 function botsWanted() { return room.fillBots !== false; }
 function sub(ref, ev, fn) { ref.on(ev, fn); room.subs.push([ref, ev, fn]); }
 function unsubAll() { room.subs.forEach(s => { try { s[0].off(s[1], s[2]); } catch (e) {} }); room.subs = []; }
 function isHost() { return !!room.ref && room.host === myId; }
 function byJoin(ps) { return (a, b) => ((ps[a] && ps[a].joinedAt) || 0) - ((ps[b] && ps[b].joinedAt) || 0); }
-function playerIds() { return okeys(room.players).filter(id => room.players[id]).sort(byJoin(room.players)); }
+function playerIds() { return okeys(room.players).filter(id => ZombieSeatGate.present(room.players[id])).sort(byJoin(room.players)); }
 function roundIds() { return playerIds().filter(id => room.players[id].inRound); }
 function isSpectator(id) { const p = room.players[id]; return !!(p && p.spec); }
 function countSlots(ps) {
@@ -3253,10 +3253,9 @@ async function joinRoom() {
     const ref = db.ref(ROOM_ROOT + "/" + code);
     const snap = await ref.once("value"), r = snap.val();
     if (!r || !humanIdsOf(r.players).length) { startMsg("그런 방이 없습니다. 방 코드를 확인해 주세요."); return; }
-    const slots = countSlots(r.players);
-    const asSpectator = r.status !== "lobby" || slots.players >= MAX_PLAYERS;
-    if (asSpectator && slots.spectators >= MAX_SPECTATORS) { startMsg(r.status !== "lobby" ? "경기 중인 방이고 관전 자리도 찼습니다. 다음 판에 들어와 주세요." : "플레이어·관전 자리가 모두 찼습니다."); return; }
-    await ref.child("players/" + myId).set(newPlayer(serverNow(), asSpectator));
+    const seat = await ZombieSeatGate.join(ref, r.status);
+    if (seat === ZombieSeatGate.FULL) { startMsg(r.status !== "lobby" ? "경기 중인 방이고 관전 자리도 찼습니다. 다음 판에 들어와 주세요." : "플레이어·관전 자리가 모두 찼습니다."); return; }
+    if (seat === ZombieSeatGate.GONE) { startMsg("그런 방이 없습니다. 방 코드를 확인해 주세요."); return; }
     enterRoom(code);
   } catch (e) { startMsg("입장하지 못했습니다. (인터넷 연결을 확인해 주세요)"); }
   finally { $("btnJoin").disabled = false; }
@@ -3274,12 +3273,17 @@ function enterRoom(code) {
   resumeStore.keepFresh(() => room.ref ? { code: room.code, myId, record: room.players[myId] || null } : null);
   zombieStateCache.clear();
   sub(pref, "child_added", s => {
-    const returning = !room.players[s.key];
-    room.players[s.key] = s.val(); if (s.key === myId) resumeStore.save(room.code, myId, s.val());
-    if (returning && s.key !== myId) zombieRejoin.otherCameBack(s.key);
+    const returning = !ZombieSeatGate.present(room.players[s.key]);
+    room.players[s.key] = ZombieInfectionLedger.overlay(s.key, s.val()); if (s.key === myId) ZombieSeatGate.mineArrived(s.val());
+    if (returning && s.key !== myId && ZombieSeatGate.present(room.players[s.key])) zombieRejoin.otherCameBack(s.key);
     playersChanged();
   });
-  sub(pref, "child_changed", s => { room.players[s.key] = s.val(); if (s.key === myId) resumeStore.save(room.code, myId, s.val()); playersChanged(); });
+  sub(pref, "child_changed", s => {
+    const returning = !ZombieSeatGate.present(room.players[s.key]);
+    room.players[s.key] = ZombieInfectionLedger.overlay(s.key, s.val()); if (s.key === myId) ZombieSeatGate.mineArrived(s.val());
+    if (returning && s.key !== myId && ZombieSeatGate.present(room.players[s.key])) zombieRejoin.otherCameBack(s.key);
+    playersChanged();
+  });
   sub(pref, "child_removed", s => {
     if (s.key === myId && !room.leaving) { room.drop.recover(s.val() || room.players[myId] || null); return; }
     const gone = room.players[s.key];
@@ -3292,6 +3296,7 @@ function enterRoom(code) {
   sub(ref.child("startAt"), "value", s => { room.startAt = s.val() || 0; });
   sub(ref.child("fillBots"), "value", s => { room.fillBots = s.val() !== false; playersChanged(); });
   sub(ref.child("originZombieId"), "value", s => { room.originZombieId = s.val(); });
+  ZombieInfectionLedger.watch(ref);
   zombieVersus.watch(ref);
   zombieMissions.watch(ref);
   sub(ref.child("final"), "value", s => { room.final = s.val(); if (screenNow === "result") renderResult(); else zombieReporter.endedWhenKnown(); });
@@ -3312,8 +3317,97 @@ class ZombieRoomDropHost {
   leaving() { return room.leaving; }
   exit(message) { exitToStart(message); }
   subscribe(ref, event, listener) { sub(ref, event, listener); }
-  returnRecord(saved) { return saved; }
+  returnRecord(saved, status) { return ZombieSeatGate.returning(saved, status, room.startAt, room.players); }
   afterReturn() { round.lastSent = ""; round.forceNet = true; }
+}
+class ZombieSeatGate {
+  static FULL = "full";
+  static GONE = "gone";
+  static SEATED = "seated";
+  static lastFull = null;
+  static present(p) { return !!p && (!!p.bot || !!p.nickname); }
+  static seatsLeft(players, status) {
+    const slots = countSlots(players || {});
+    if (status === "lobby" && slots.players < MAX_PLAYERS) return { spec: false };
+    return slots.spectators < MAX_SPECTATORS ? { spec: true } : null;
+  }
+  static async join(ref, status) {
+    let outcome = ZombieSeatGate.GONE;
+    const res = await ref.child("players").transaction(cur => {
+      if (!cur) { outcome = ZombieSeatGate.GONE; return cur; }
+      if (ZombieSeatGate.present(cur[myId])) { outcome = ZombieSeatGate.SEATED; return cur; }
+      if (!humanIdsOf(cur).length) { outcome = ZombieSeatGate.GONE; return; }
+      const seat = ZombieSeatGate.seatsLeft(cur, status);
+      if (!seat) { outcome = ZombieSeatGate.FULL; return; }
+      outcome = ZombieSeatGate.SEATED;
+      cur[myId] = newPlayer(serverNow(), seat.spec);
+      return cur;
+    });
+    const players = res.snapshot ? res.snapshot.val() : null;
+    return outcome === ZombieSeatGate.SEATED && players && ZombieSeatGate.present(players[myId]) ? outcome : outcome === ZombieSeatGate.FULL ? outcome : ZombieSeatGate.GONE;
+  }
+  static returning(saved, status, startAt, players) {
+    const record = Object.assign({}, saved, { nickname: saved.nickname || PlayerProfile.storedNick(), joinedAt: saved.joinedAt || serverNow() });
+    if (status !== "lobby" && record.roundAt && record.roundAt !== startAt) Object.assign(record, { inRound: false, role: "human", infected: false, infectedAt: null, infectedBy: null });
+    if (status === "lobby" && !record.spec) {
+      const others = Object.assign({}, players || {}); delete others[myId];
+      if (countSlots(others).players >= MAX_PLAYERS) record.spec = true;
+    }
+    return record;
+  }
+  static async resume(entry) {
+    const ref = db.ref(ROOM_ROOT + "/" + entry.code);
+    const [status, startAt] = await Promise.all([ref.child("status").once("value"), ref.child("startAt").once("value")]);
+    if (status.val() === null) return null;
+    const res = await ref.child("players").transaction(cur => {
+      if (!cur || !humanIdsOf(cur).length) return cur;
+      if (!ZombieSeatGate.present(cur[entry.myId])) cur[entry.myId] = ZombieSeatGate.returning(entry.record, status.val(), startAt.val() || 0, cur);
+      return cur;
+    });
+    const players = res.snapshot ? res.snapshot.val() : null;
+    return players && ZombieSeatGate.present(players[entry.myId]) ? entry.code : null;
+  }
+  static mineArrived(record) {
+    if (ZombieSeatGate.present(record)) { ZombieSeatGate.lastFull = record; resumeStore.save(room.code, myId, record); return; }
+    if (!record || !room.ref) return;
+    const known = ZombieSeatGate.lastFull || {};
+    room.ref.child("players/" + myId).update({ nickname: known.nickname || PlayerProfile.storedNick(), joinedAt: known.joinedAt || serverNow(), spec: !!known.spec });
+  }
+  static toggleSpectator() {
+    room.ref.child("players").transaction(cur => {
+      if (!cur || !ZombieSeatGate.present(cur[myId])) return cur;
+      const others = Object.assign({}, cur); delete others[myId];
+      const becomeSpec = !cur[myId].spec, slots = countSlots(others);
+      if (becomeSpec ? slots.spectators >= MAX_SPECTATORS : slots.players >= MAX_PLAYERS) return;
+      cur[myId].spec = becomeSpec;
+      return cur;
+    });
+  }
+}
+class ZombieInfectionLedger {
+  static marks = {};
+  static watch(ref) {
+    ZombieInfectionLedger.marks = {};
+    sub(ref.child("zombieIds"), "value", s => {
+      ZombieInfectionLedger.marks = s.val() || {};
+      for (const id in room.players) room.players[id] = ZombieInfectionLedger.overlay(id, room.players[id]);
+      playersChanged();
+    });
+  }
+  static infectedAt(id) {
+    const marks = ZombieInfectionLedger.marks, at = Number(marks[id]) || 0;
+    const roundStart = Math.min(...okeys(marks).map(k => Number(marks[k]) || Infinity));
+    return at > roundStart && at > (room.startAt || 0) ? at : 0;
+  }
+  static overlay(id, record) {
+    const at = ZombieInfectionLedger.infectedAt(id);
+    if (!record || !at || !record.inRound || (record.role === "zombie" && record.infected)) return record;
+    return Object.assign({}, record, { role: "zombie", infected: true, infectedAt: record.infectedAt || at });
+  }
+  static mark(id, t, byId) {
+    room.ref.child("zombieIds/" + id).set(t);
+    room.ref.child("players/" + id).transaction(cur => ZombieSeatGate.present(cur) ? Object.assign(cur, { infected: true, infectedAt: t, infectedBy: byId || null, role: "zombie" }) : undefined);
+  }
 }
 function nextHost(ps) { const joinOrder = byJoin(ps); return humanIdsOf(ps).sort((a, b) => (!!ps[a].spec - !!ps[b].spec) || joinOrder(a, b))[0]; }
 function checkHost() {
@@ -3611,7 +3705,7 @@ function participantCount() { return playerIds().filter(isParticipant).length; }
 function playersNeeded() { return botsWanted() ? 1 : MIN_PLAYERS; }
 function removeBotPlayers() {
   const u = {};
-  playerIds().filter(isBot).forEach(id => { u["players/" + id] = null; u["st/" + id] = null; });
+  okeys(room.players).filter(id => isBot(id) || !ZombieSeatGate.present(room.players[id])).forEach(id => { u["players/" + id] = null; u["st/" + id] = null; });
   if (okeys(u).length) room.ref.update(u);
 }
 function toggleBots() {
@@ -3650,10 +3744,10 @@ function toggleSpectator() {
   if (!room.ref || room.status !== "lobby" || !room.players[myId]) return;
   const becomeSpec = !isSpectator(myId), slots = countSlots(room.players);
   if (becomeSpec ? slots.spectators >= MAX_SPECTATORS : slots.players >= MAX_PLAYERS) return;
-  room.ref.child("players/" + myId).update({ spec: becomeSpec });
+  ZombieSeatGate.toggleSpectator();
 }
 function chooseOrigin() {
-  const participants = playerIds().filter(isParticipant);
+  const participants = playerIds().filter(isParticipant).slice(0, MAX_PLAYERS);
   return participants.length ? ZombieOriginRotation.pick(participants.map(id => ({ id, gap: ZombieOriginRotation.gapFromRoom(room.players[id].hostGap) })), Math.random) : null;
 }
 function hostStart() {
@@ -3663,10 +3757,11 @@ function hostStart() {
 }
 function beginRound() {
   if (!isHost() || room.status !== "lobby") return;
-  const participants = playerIds().filter(isParticipant);
+  const seated = playerIds().filter(isParticipant), participants = seated.slice(0, MAX_PLAYERS);
   if (participants.length < playersNeeded()) return;
   const u = {};
-  playerIds().filter(isBot).forEach(id => { u["players/" + id] = null; u["st/" + id] = null; });
+  okeys(room.players).filter(id => isBot(id) || !ZombieSeatGate.present(room.players[id])).forEach(id => { u["players/" + id] = null; u["st/" + id] = null; });
+  seated.slice(MAX_PLAYERS).forEach(id => { u["players/" + id + "/spec"] = true; });
   const t0 = serverNow(), botIds = [];
   if (botsWanted()) for (let k = participants.length; k < MAX_PLAYERS; k++) botIds.push("bot" + (botIds.length + 1) + Math.random().toString(36).slice(2, 8));
   const zombieId = participants.indexOf(room.originPick) >= 0 ? room.originPick : chooseOrigin();
@@ -3682,6 +3777,7 @@ function beginRound() {
   playerIds().filter(id => !isBot(id)).forEach(id => {
     const inRound = participants.includes(id);
     u["players/" + id + "/inRound"] = inRound;
+    u["players/" + id + "/roundAt"] = inRound ? startAt : null;
     u["players/" + id + "/role"] = id === zombieId ? "zombie" : "human";
     u["players/" + id + "/infected"] = false;
     u["players/" + id + "/infectedAt"] = null;
@@ -4049,13 +4145,7 @@ function pushKillFeed(zombieId, victimId) {
 function becomeInfected(t, byId) {
   if (round.infectSent || round.myInfectedAt) return;
   ZombieTouchJudge.enterMyInfection(t, byId);
-  room.ref.update({
-    ["players/" + myId + "/infected"]: true,
-    ["players/" + myId + "/infectedAt"]: t,
-    ["players/" + myId + "/infectedBy"]: byId || null,
-    ["players/" + myId + "/role"]: "zombie",
-    ["zombieIds/" + myId]: t
-  });
+  ZombieInfectionLedger.mark(myId, t, byId);
 }
 
 function updateRemotePlayers(dt, t, nowMs) {
@@ -4308,10 +4398,7 @@ function checkBotInfection(id, b, t) {
   const other = ZombieTouchJudge.zombieTouching(id, b.body.x, b.body.y, b.body.z, t);
   if (!other) return;
   b.infectSent = true;
-  room.ref.update({
-    ["players/" + id + "/infected"]: true, ["players/" + id + "/infectedAt"]: t, ["players/" + id + "/infectedBy"]: other,
-    ["players/" + id + "/role"]: "zombie", ["zombieIds/" + id]: t
-  });
+  ZombieInfectionLedger.mark(id, t, other);
 }
 function botsTick(dt, t, nowMs) {
   if (!isHost() || !round.active || room.status !== "playing") return;
@@ -5241,7 +5328,7 @@ class ZombieResumeStarter {
   static run() {
     if (!db || !resumeStore.read()) return;
     startMsg("이어서 들어가는 중…");
-    resumeStore.rejoin(db, ROOM_ROOT)
+    ZombieSeatGate.resume(resumeStore.read())
       .then(code => { if (code) { startMsg(""); enterRoom(code); } else { resumeStore.clear(); startMsg(""); } })
       .catch(() => { resumeStore.clear(); startMsg(""); });
   }
