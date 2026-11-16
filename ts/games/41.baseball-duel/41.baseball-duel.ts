@@ -260,9 +260,10 @@ class BbDuelGame {
   private readonly sound: BbSoundDirector;
   private quality: QualityGovernorHandle | null = null;
 
-  constructor(libs: ThreeLibs) {
+  constructor(libs: ThreeLibs, private readonly gauge: BbLoadGauge) {
     const controls = document.getElementById("bbControls") as HTMLElement, dialogs = document.getElementById("bbDialogs") as HTMLElement;
     this.stage = new BbStage(libs, document.getElementById("bbView") as HTMLCanvasElement);
+    this.stage.onContextChange = (lost) => this.gauge.contextLost(lost);
     this.hud = new BbScoreHud(document.getElementById("hudTop") as HTMLElement);
     this.director = new BbMatchDirector(this.stage, this.hud, controls, { onEnd: (summary) => this.ended(summary), onLog: (log) => this.logged(log) });
     this.pause = new BbPauseBanner(controls);
@@ -301,7 +302,17 @@ class BbDuelGame {
   private async load(): Promise<void> {
     this.zones.load(this.backend);
     this.board.load();
-    await this.stage.load(BbDuelGame.ASSET_DIRECTORY, BbBallparkRegistry.MAIN, { batsLeft: false, throwsLeft: false });
+    await this.loadStage();
+  }
+
+  private async loadStage(): Promise<void> {
+    try {
+      await this.stage.load(BbDuelGame.ASSET_DIRECTORY, BbBallparkRegistry.MAIN, { batsLeft: false, throwsLeft: false }, this.gauge);
+    } catch (error) {
+      this.gauge.fail(BbLoadGauge.describe(error), () => { void this.loadStage(); });
+      return;
+    }
+    this.gauge.finish();
     const govern = window.QualityGovernor;
     if (govern) {
       this.quality = govern({ steps: this.stage.qualitySteps(), storageKey: BbDuelGame.QUALITY_KEY, isPlaying: () => this.director.isRunning && !this.liveOver && this.shown === null, slowSec: 0.022, slowLimit: 90 });

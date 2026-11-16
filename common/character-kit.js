@@ -265,17 +265,31 @@ PlayerProfile.SETTLED_EVENT = "portal-profile-settled";
 PlayerProfile.MAX_NICK_LENGTH = 4;
 PlayerProfile.REAL_NAME_NOTICE = "닉네임은 본명으로 입력합니다";
 PlayerProfile.NICK_REQUIRED_NOTICE = "닉네임(본명)을 먼저 정해 주세요.";
+// 캐릭터 파일을 몇 개 받았는지(로딩 게이지용). 교실처럼 여러 기기가 한꺼번에 받으면 요청이 멈추거나 실패할 수 있어
+// 파일마다 시간 초과·재시도를 두고(CharacterAssets), 게임은 이 값으로 진행 막대를 그린다(41번, 2026-11-16).
+class CharacterLoadProgress {
+    constructor() {
+        this.total = 0;
+        this.done = 0;
+        this.failed = [];
+    }
+    get pending() { return this.total - this.done - this.failed.length; }
+    get ratio() { return this.total ? this.done / this.total : 0; }
+}
 class CharacterAssets {
     constructor(libs, directory = CharacterAssets.DEFAULT_DIRECTORY) {
         this.libs = libs;
         this.directory = directory;
         this.clips = new Map();
+        this.progress = new CharacterLoadProgress();
+        this.onProgress = () => undefined;
         this.templates = new Map();
         this.loading = null;
     }
+    // 실패하면 다시 부를 수 있다. 이미 받은 파일은 다시 받지 않는다.
     load() {
         if (!this.loading)
-            this.loading = this.loadAll();
+            this.loading = this.loadAll().catch((error) => { this.loading = null; throw error; });
         return this.loading;
     }
     template(file) {
@@ -285,18 +299,57 @@ class CharacterAssets {
         return template;
     }
     async loadAll() {
-        const loader = new this.libs.GLTFLoader();
-        const animations = loader.loadAsync(this.directory + CharacterAssets.ANIMATION_FILE).then((gltf) => {
-            gltf.animations.forEach((clip) => this.clips.set(clip.name, clip));
+        const loader = new this.libs.GLTFLoader(), progress = this.progress;
+        const jobs = [];
+        if (!this.clips.size)
+            jobs.push([CharacterAssets.ANIMATION_FILE, (gltf) => gltf.animations.forEach((clip) => this.clips.set(clip.name, clip))]);
+        CharacterCatalog.TYPES.forEach((type) => {
+            if (!this.templates.has(type.file))
+                jobs.push(["characters/" + type.file + ".glb", (gltf) => { this.templates.set(type.file, gltf.scene); }]);
         });
-        const characters = CharacterCatalog.TYPES.map((type) => loader.loadAsync(this.directory + "characters/" + type.file + ".glb").then((gltf) => {
-            this.templates.set(type.file, gltf.scene);
-        }));
-        await Promise.all([animations, ...characters]);
+        progress.total = progress.done + jobs.length;
+        progress.failed.length = 0;
+        this.onProgress(progress);
+        const results = await Promise.all(jobs.map(([file, keep]) => this.fetchFile(loader, file).then((gltf) => {
+            keep(gltf);
+            progress.done++;
+            this.onProgress(progress);
+            return true;
+        }, () => {
+            progress.failed.push(file.split("/").pop().split("?")[0]);
+            this.onProgress(progress);
+            return false;
+        })));
+        if (results.indexOf(false) >= 0)
+            throw new Error("캐릭터 파일 " + progress.failed.length + "개를 받지 못했어요(" + progress.failed.join(", ") + ")");
+    }
+    async fetchFile(loader, file) {
+        let lastError = null;
+        for (let attempt = 0; attempt <= CharacterAssets.RETRY_WAITS_MS.length; attempt++) {
+            if (attempt)
+                await CharacterAssets.wait(CharacterAssets.RETRY_WAITS_MS[attempt - 1]);
+            try {
+                return await CharacterAssets.within(loader.loadAsync(this.directory + file), CharacterAssets.FILE_TIMEOUT_MS);
+            }
+            catch (error) {
+                lastError = error;
+            }
+        }
+        throw lastError;
+    }
+    static wait(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
+    static within(work, ms) {
+        return new Promise((resolve, reject) => {
+            const timer = setTimeout(() => reject(new Error("시간 초과")), ms);
+            work.then((value) => { clearTimeout(timer); resolve(value); }, (error) => { clearTimeout(timer); reject(error); });
+        });
     }
 }
 CharacterAssets.DEFAULT_DIRECTORY = "assets/kaykit/";
 CharacterAssets.ANIMATION_FILE = "animations/teambattle_anims.glb?v=crossbow";
+// 응답이 없으면 이만큼 기다린 뒤 다시 요청한다. 늦게 온 앞 요청이 먼저 끝나도 그대로 쓴다.
+CharacterAssets.FILE_TIMEOUT_MS = 25000;
+CharacterAssets.RETRY_WAITS_MS = [1500, 4000];
 class CharacterModelFactory {
     constructor(libs, assets) {
         this.libs = libs;

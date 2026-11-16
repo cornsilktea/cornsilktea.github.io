@@ -88,6 +88,11 @@ class BbSparkBurst {
   clear(): void { this.age = BbSparkBurst.SECONDS; this.points.visible = false; }
 }
 
+class BbQuietLoadReport implements BbLoadReport {
+  files(): void { return; }
+  step(): Promise<void> { return Promise.resolve(); }
+}
+
 class BbStage {
   static readonly HIDDEN_BEHIND_PLATE: readonly BbRoleId[] = ["catcher", "umpire"];
   private static readonly FIELDERS: readonly BbRoleId[] = ["pitcher", "catcher", "first", "second", "short", "third", "left", "center", "right"];
@@ -126,6 +131,9 @@ class BbStage {
   private bullpens: [BbPlayerActor[], BbPlayerActor[]] = [[], []];
   private lineups: [BbPlayerActor[], BbPlayerActor[]] = [[], []];
   private pixelRatio = Math.min(window.devicePixelRatio, BbStage.PIXEL_RATIO_CAP);
+  private assets: CharacterAssets | null = null;
+  onContextChange: (lost: boolean) => void = () => undefined;
+  private built = false;
 
   constructor(private readonly libs: ThreeLibs, canvas: HTMLCanvasElement) {
     const THREE = libs.THREE;
@@ -141,6 +149,8 @@ class BbStage {
     this.goalLook = new THREE.Vector3();
     this.clock = new THREE.Clock();
     this.renderer.domElement.classList.add("bb-view");
+    canvas.addEventListener("webglcontextlost", () => this.onContextChange(true));
+    canvas.addEventListener("webglcontextrestored", () => this.onContextChange(false));
     window.addEventListener("resize", () => this.resize());
     if (typeof ResizeObserver !== "undefined") new ResizeObserver(() => this.resize()).observe(canvas);
     this.resize();
@@ -153,17 +163,22 @@ class BbStage {
     this.camera.updateProjectionMatrix();
   }
 
-  async load(assetDirectory: string, park: BbBallparkSpec, cast: BbStageCast): Promise<void> {
-    const assets = new CharacterAssets(this.libs, assetDirectory);
+  async load(assetDirectory: string, park: BbBallparkSpec, cast: BbStageCast, report: BbLoadReport = new BbQuietLoadReport()): Promise<void> {
+    const assets = this.assets || (this.assets = new CharacterAssets(this.libs, assetDirectory));
+    assets.onProgress = (progress) => report.files(progress);
     await assets.load();
+    if (this.built) return;
+    this.built = true;
+    await report.step("park");
     const factory = new CharacterModelFactory(this.libs, assets), gear = new BbGearFactory(this.libs), builder = new BbBallparkBuilder(this.libs, park);
     this.scene.add(builder.build());
     this.crowd = new BbCrowdSystem(this.libs, builder.crowdSeats);
     this.scene.add(this.crowd.group);
     new BbParkLighting(this.libs).addTo(this.scene);
     this.wardrobe = new BbWardrobe(this.libs, factory, assets, gear);
-    this.studio = new BbPortraitStudio(this.libs, this.wardrobe);
+    this.studio = new BbPortraitStudio(this.libs, this.wardrobe, this.renderer);
     this.tailor = { factory, assets };
+    await report.step("players");
     this.createActors(0, cast);
     this.createActors(1, cast);
     this.field(1);

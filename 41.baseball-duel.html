@@ -16,7 +16,7 @@
 <meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
 <meta name="twitter:card" content="summary">
 <link rel="stylesheet" href="common/theme.css">
-<link rel="stylesheet" href="games/41.baseball-duel/41.baseball-hud.css?v=20261115b">
+<link rel="stylesheet" href="games/41.baseball-duel/41.baseball-hud.css?v=20261116c">
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 <script async src="https://cdn.jsdelivr.net/npm/es-module-shims@1.10.1/dist/es-module-shims.js"></script>
@@ -107,7 +107,7 @@
 <div id="bbDialogs" class="bb-ui"></div>
 <div id="versusCurtain" hidden></div>
 
-<script charset="utf-8" src="common/character-kit.js?v=20261114v"></script>
+<script charset="utf-8" src="common/character-kit.js?v=20261116a"></script>
 <script charset="utf-8" src="common/match-kit.js?v=20261114g"></script>
 <script charset="utf-8" src="common/account-match-kit.js?v=20261114g"></script>
 <script charset="utf-8" src="common/versus-curtain.js?v=20261114g"></script>
@@ -124,11 +124,11 @@
 <script charset="utf-8" src="games/41.baseball-duel/41.baseball-ai.js?v=20261115b"></script>
 <script charset="utf-8" src="games/41.baseball-duel/41.baseball-drills.js?v=20261115b"></script>
 <script charset="utf-8" src="games/41.baseball-duel/41.baseball-choreo.js?v=20261116a"></script>
-<script charset="utf-8" src="games/41.baseball-duel/41.baseball-actors.js?v=20261115b"></script>
+<script charset="utf-8" src="games/41.baseball-duel/41.baseball-actors.js?v=20261116c"></script>
 <script charset="utf-8" src="games/41.baseball-duel/41.baseball-park.js?v=20261115b"></script>
 <script charset="utf-8" src="games/41.baseball-duel/41.baseball-sound.js?v=20261115b"></script>
 <script charset="utf-8" src="games/41.baseball-duel/41.baseball-crowd.js?v=20261115b"></script>
-<script charset="utf-8" src="games/41.baseball-duel/41.baseball-stage.js?v=20261116b"></script>
+<script charset="utf-8" src="games/41.baseball-duel/41.baseball-stage.js?v=20261116d"></script>
 <script charset="utf-8" src="games/41.baseball-duel/41.baseball-camera.js?v=20261115b"></script>
 <script charset="utf-8" src="games/41.baseball-duel/41.baseball-hud.js?v=20261115b"></script>
 <script charset="utf-8" src="games/41.baseball-duel/41.baseball-session.js?v=20261115b"></script>
@@ -140,12 +140,13 @@
 <script charset="utf-8" src="games/41.baseball-duel/41.baseball-versus.js?v=20261115b"></script>
 <script charset="utf-8" src="games/41.baseball-duel/41.baseball-board.js?v=20261115b"></script>
 <script charset="utf-8" src="games/41.baseball-duel/41.baseball-net.js?v=20261115b"></script>
-<script charset="utf-8" src="games/41.baseball-duel/41.baseball-duel.js?v=20261116b"></script>
+<script charset="utf-8" src="games/41.baseball-duel/41.baseball-duel.js?v=20261116d"></script>
+<script charset="utf-8" src="games/41.baseball-duel/41.baseball-boot.js?v=20261116d"></script>
 <script type="module">
-import * as THREE from "three";
-import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
-import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
-new BbDuelGame({ THREE, GLTFLoader, SkeletonUtils });
+new BbBoot(async () => {
+  const [THREE, loaders, SkeletonUtils] = await Promise.all([import("three"), import("three/addons/loaders/GLTFLoader.js"), import("three/addons/utils/SkeletonUtils.js")]);
+  return { THREE, GLTFLoader: loaders.GLTFLoader, SkeletonUtils };
+});
 </script>
 </body>
 </html>

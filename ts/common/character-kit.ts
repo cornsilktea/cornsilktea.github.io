@@ -346,18 +346,37 @@ class PlayerProfile implements EditableLook {
   }
 }
 
+type CharacterGltf = Awaited<ReturnType<InstanceType<GLTFLoaderClass>["loadAsync"]>>;
+
+// 캐릭터 파일을 몇 개 받았는지(로딩 게이지용). 교실처럼 여러 기기가 한꺼번에 받으면 요청이 멈추거나 실패할 수 있어
+// 파일마다 시간 초과·재시도를 두고(CharacterAssets), 게임은 이 값으로 진행 막대를 그린다(41번, 2026-11-16).
+class CharacterLoadProgress {
+  total = 0;
+  done = 0;
+  readonly failed: string[] = [];
+
+  get pending(): number { return this.total - this.done - this.failed.length; }
+  get ratio(): number { return this.total ? this.done / this.total : 0; }
+}
+
 class CharacterAssets {
   static readonly DEFAULT_DIRECTORY = "assets/kaykit/";
   static readonly ANIMATION_FILE = "animations/teambattle_anims.glb?v=crossbow";
+  // 응답이 없으면 이만큼 기다린 뒤 다시 요청한다. 늦게 온 앞 요청이 먼저 끝나도 그대로 쓴다.
+  private static readonly FILE_TIMEOUT_MS = 25000;
+  private static readonly RETRY_WAITS_MS: readonly number[] = [1500, 4000];
 
   readonly clips = new Map<string, Three<"AnimationClip">>();
+  readonly progress = new CharacterLoadProgress();
+  onProgress: (progress: CharacterLoadProgress) => void = () => undefined;
   private readonly templates = new Map<string, Three<"Object3D">>();
   private loading: Promise<void> | null = null;
 
   constructor(private readonly libs: ThreeLibs, private readonly directory: string = CharacterAssets.DEFAULT_DIRECTORY) {}
 
+  // 실패하면 다시 부를 수 있다. 이미 받은 파일은 다시 받지 않는다.
   load(): Promise<void> {
-    if (!this.loading) this.loading = this.loadAll();
+    if (!this.loading) this.loading = this.loadAll().catch((error: Error) => { this.loading = null; throw error; });
     return this.loading;
   }
 
@@ -368,16 +387,48 @@ class CharacterAssets {
   }
 
   private async loadAll(): Promise<void> {
-    const loader = new this.libs.GLTFLoader();
-    const animations = loader.loadAsync(this.directory + CharacterAssets.ANIMATION_FILE).then((gltf) => {
-      gltf.animations.forEach((clip) => this.clips.set(clip.name, clip));
+    const loader = new this.libs.GLTFLoader(), progress = this.progress;
+    const jobs: Array<[string, (gltf: CharacterGltf) => void]> = [];
+    if (!this.clips.size) jobs.push([CharacterAssets.ANIMATION_FILE, (gltf) => gltf.animations.forEach((clip) => this.clips.set(clip.name, clip))]);
+    CharacterCatalog.TYPES.forEach((type) => {
+      if (!this.templates.has(type.file)) jobs.push(["characters/" + type.file + ".glb", (gltf) => { this.templates.set(type.file, gltf.scene); }]);
     });
-    const characters = CharacterCatalog.TYPES.map((type) =>
-      loader.loadAsync(this.directory + "characters/" + type.file + ".glb").then((gltf) => {
-        this.templates.set(type.file, gltf.scene);
-      })
-    );
-    await Promise.all([animations, ...characters]);
+    progress.total = progress.done + jobs.length;
+    progress.failed.length = 0;
+    this.onProgress(progress);
+    const results = await Promise.all(jobs.map(([file, keep]) => this.fetchFile(loader, file).then((gltf) => {
+      keep(gltf);
+      progress.done++;
+      this.onProgress(progress);
+      return true;
+    }, () => {
+      progress.failed.push(file.split("/").pop()!.split("?")[0]);
+      this.onProgress(progress);
+      return false;
+    })));
+    if (results.indexOf(false) >= 0) throw new Error("캐릭터 파일 " + progress.failed.length + "개를 받지 못했어요(" + progress.failed.join(", ") + ")");
+  }
+
+  private async fetchFile(loader: InstanceType<GLTFLoaderClass>, file: string): Promise<CharacterGltf> {
+    let lastError: unknown = null;
+    for (let attempt = 0; attempt <= CharacterAssets.RETRY_WAITS_MS.length; attempt++) {
+      if (attempt) await CharacterAssets.wait(CharacterAssets.RETRY_WAITS_MS[attempt - 1]);
+      try {
+        return await CharacterAssets.within(loader.loadAsync(this.directory + file), CharacterAssets.FILE_TIMEOUT_MS);
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    throw lastError;
+  }
+
+  private static wait(ms: number): Promise<void> { return new Promise((resolve) => setTimeout(resolve, ms)); }
+
+  private static within<T>(work: Promise<T>, ms: number): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("시간 초과")), ms);
+      work.then((value) => { clearTimeout(timer); resolve(value); }, (error) => { clearTimeout(timer); reject(error); });
+    });
   }
 }
 

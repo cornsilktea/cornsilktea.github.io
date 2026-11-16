@@ -46,6 +46,11 @@ class CharacterMakerDialog {
         this.note = this.modal.querySelector(".maker-note");
         this.bindEvents();
     }
+    // 실패 이유를 화면에 짧게 보여 준다. 학생 기기에서만 나는 문제(3D 를 켜지 못함 등)를 사진으로 알 수 있게(2026-11-16).
+    static reasonOf(error) {
+        const text = error instanceof Error ? error.message : String(error || "알 수 없음");
+        return text.slice(0, 120);
+    }
     static requestOpen() {
         document.dispatchEvent(new CustomEvent(CharacterMakerDialog.OPEN_EVENT));
     }
@@ -91,9 +96,9 @@ class CharacterMakerDialog {
     prepare() {
         if (!this.loading)
             this.loading = this.build();
-        this.loading.catch(() => {
+        this.loading.catch((error) => {
             this.loading = null;
-            this.note.textContent = "캐릭터를 불러오지 못했어요. 인터넷 연결을 확인하고 다시 열어 주세요.";
+            this.note.textContent = "캐릭터를 불러오지 못했어요(" + CharacterMakerDialog.reasonOf(error) + "). 인터넷 연결을 확인하거나, 열려 있는 다른 게임 탭을 닫고 다시 열어 주세요.";
         });
     }
     buildNickOnly() {

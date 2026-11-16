@@ -61,6 +61,10 @@ class BbSparkBurst {
 BbSparkBurst.COUNT = 48;
 BbSparkBurst.SECONDS = 0.7;
 BbSparkBurst.GRAVITY = 7;
+class BbQuietLoadReport {
+    files() { return; }
+    step() { return Promise.resolve(); }
+}
 class BbStage {
     constructor(libs, canvas) {
         this.libs = libs;
@@ -74,6 +78,9 @@ class BbStage {
         this.bullpens = [[], []];
         this.lineups = [[], []];
         this.pixelRatio = Math.min(window.devicePixelRatio, BbStage.PIXEL_RATIO_CAP);
+        this.assets = null;
+        this.onContextChange = () => undefined;
+        this.built = false;
         const THREE = libs.THREE;
         this.renderer = new THREE.WebGLRenderer({ canvas, antialias: !BbStage.TOUCH_DEVICE, powerPreference: "high-performance" });
         this.renderer.setPixelRatio(this.pixelRatio);
@@ -87,6 +94,8 @@ class BbStage {
         this.goalLook = new THREE.Vector3();
         this.clock = new THREE.Clock();
         this.renderer.domElement.classList.add("bb-view");
+        canvas.addEventListener("webglcontextlost", () => this.onContextChange(true));
+        canvas.addEventListener("webglcontextrestored", () => this.onContextChange(false));
         window.addEventListener("resize", () => this.resize());
         if (typeof ResizeObserver !== "undefined")
             new ResizeObserver(() => this.resize()).observe(canvas);
@@ -98,17 +107,23 @@ class BbStage {
         this.camera.aspect = width / height;
         this.camera.updateProjectionMatrix();
     }
-    async load(assetDirectory, park, cast) {
-        const assets = new CharacterAssets(this.libs, assetDirectory);
+    async load(assetDirectory, park, cast, report = new BbQuietLoadReport()) {
+        const assets = this.assets || (this.assets = new CharacterAssets(this.libs, assetDirectory));
+        assets.onProgress = (progress) => report.files(progress);
         await assets.load();
+        if (this.built)
+            return;
+        this.built = true;
+        await report.step("park");
         const factory = new CharacterModelFactory(this.libs, assets), gear = new BbGearFactory(this.libs), builder = new BbBallparkBuilder(this.libs, park);
         this.scene.add(builder.build());
         this.crowd = new BbCrowdSystem(this.libs, builder.crowdSeats);
         this.scene.add(this.crowd.group);
         new BbParkLighting(this.libs).addTo(this.scene);
         this.wardrobe = new BbWardrobe(this.libs, factory, assets, gear);
-        this.studio = new BbPortraitStudio(this.libs, this.wardrobe);
+        this.studio = new BbPortraitStudio(this.libs, this.wardrobe, this.renderer);
         this.tailor = { factory, assets };
+        await report.step("players");
         this.createActors(0, cast);
         this.createActors(1, cast);
         this.field(1);

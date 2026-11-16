@@ -492,14 +492,22 @@ class BbWardrobe {
   actor(outfit: BbActorOutfit): BbPlayerActor { return new BbPlayerActor(this.libs, this.factory, this.assets, this.gear, outfit); }
 }
 
+type BbPortraitTarget = import("three").WebGLRenderTarget<import("three").Texture>;
+
 class BbPortraitStudio {
   private static readonly SIZE = 160;
+  private static readonly SAMPLES = 4;
   private readonly cache = new Map<string, string>();
-  private renderer: Three<"WebGLRenderer"> | null = null;
+  private target: BbPortraitTarget | null = null;
   private scene: Three<"Scene"> | null = null;
   private camera: Three<"PerspectiveCamera"> | null = null;
+  private pixels: Uint8Array | null = null;
+  private sheet: CanvasRenderingContext2D | null = null;
+  private readonly keptColor: Three<"Color">;
 
-  constructor(private readonly libs: ThreeLibs, private readonly wardrobe: BbWardrobe) {}
+  constructor(private readonly libs: ThreeLibs, private readonly wardrobe: BbWardrobe, private readonly renderer: Three<"WebGLRenderer">) {
+    this.keptColor = new libs.THREE.Color();
+  }
 
   shoot(look: CharacterLook, kit: BbTeamKit): string | null {
     const key = JSON.stringify(look) + "|" + kit.cap;
@@ -514,32 +522,59 @@ class BbPortraitStudio {
     }
   }
 
+  private prepare(): void {
+    if (this.target) return;
+    const THREE = this.libs.THREE, size = BbPortraitStudio.SIZE;
+    const target: BbPortraitTarget = new THREE.WebGLRenderTarget(size, size, { samples: BbPortraitStudio.SAMPLES });
+    target.texture.colorSpace = THREE.SRGBColorSpace;
+    this.target = target;
+    this.scene = new THREE.Scene();
+    this.scene.add(new THREE.HemisphereLight(0xfff6e4, 0x5a6a50, 1.4));
+    const sun = new THREE.DirectionalLight(0xffefd2, 1.3);
+    sun.position.set(-2, 4, 5);
+    this.scene.add(sun);
+    this.camera = new THREE.PerspectiveCamera(26, 1, 0.05, 50);
+    this.pixels = new Uint8Array(size * size * 4);
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = size;
+    this.sheet = canvas.getContext("2d") as CanvasRenderingContext2D;
+  }
+
   private render(look: CharacterLook, kit: BbTeamKit): string {
-    const THREE = this.libs.THREE;
-    if (!this.renderer || !this.scene || !this.camera) {
-      const canvas = document.createElement("canvas");
-      canvas.width = canvas.height = BbPortraitStudio.SIZE;
-      this.renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, preserveDrawingBuffer: true });
-      this.renderer.setClearColor(0x000000, 0);
-      this.renderer.setSize(BbPortraitStudio.SIZE, BbPortraitStudio.SIZE, false);
-      this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-      this.scene = new THREE.Scene();
-      this.scene.add(new THREE.HemisphereLight(0xfff6e4, 0x5a6a50, 1.4));
-      const sun = new THREE.DirectionalLight(0xffefd2, 1.3);
-      sun.position.set(-2, 4, 5);
-      this.scene.add(sun);
-      this.camera = new THREE.PerspectiveCamera(26, 1, 0.05, 50);
-    }
+    this.prepare();
+    const THREE = this.libs.THREE, scene = this.scene as Three<"Scene">, camera = this.camera as Three<"PerspectiveCamera">;
     const actor = this.wardrobe.actor({ look, kit, headGear: "cap", gloveSide: null, chestProtector: false, carriesBat: false, flapOnLeft: false });
     actor.standStill(0.4);
-    this.scene.add(actor.root);
+    scene.add(actor.root);
     actor.root.updateMatrixWorld(true);
     const box = new THREE.Box3().setFromObject(actor.root), size = box.getSize(new THREE.Vector3()), focus = new THREE.Vector3((box.min.x + box.max.x) / 2, box.max.y - size.y * 0.24, (box.min.z + box.max.z) / 2);
     const distance = size.y * 0.42 / Math.tan(13 * Math.PI / 180) + size.z * 0.5;
-    this.camera.position.set(focus.x + distance * 0.18, focus.y + size.y * 0.04, focus.z + distance);
-    this.camera.lookAt(focus);
-    this.renderer.render(this.scene, this.camera);
-    this.scene.remove(actor.root);
-    return this.renderer.domElement.toDataURL("image/png");
+    camera.position.set(focus.x + distance * 0.18, focus.y + size.y * 0.04, focus.z + distance);
+    camera.lookAt(focus);
+    this.capture(scene, camera);
+    scene.remove(actor.root);
+    return this.toImage();
+  }
+
+  private capture(scene: Three<"Scene">, camera: Three<"PerspectiveCamera">): void {
+    const renderer = this.renderer, target = this.target as BbPortraitTarget, before = renderer.getRenderTarget(), alpha = renderer.getClearAlpha();
+    renderer.getClearColor(this.keptColor);
+    try {
+      renderer.setRenderTarget(target);
+      renderer.setClearColor(0x000000, 0);
+      renderer.clear();
+      renderer.render(scene, camera);
+      renderer.readRenderTargetPixels(target, 0, 0, BbPortraitStudio.SIZE, BbPortraitStudio.SIZE, this.pixels as Uint8Array);
+    } finally {
+      renderer.setRenderTarget(before);
+      renderer.setClearColor(this.keptColor, alpha);
+    }
+  }
+
+  private toImage(): string {
+    const size = BbPortraitStudio.SIZE, pixels = this.pixels as Uint8Array, sheet = this.sheet as CanvasRenderingContext2D, image = sheet.createImageData(size, size), row = size * 4;
+    for (let y = 0; y < size; y++) image.data.set(pixels.subarray((size - 1 - y) * row, (size - y) * row), y * row);
+    sheet.putImageData(image, 0, 0);
+    return sheet.canvas.toDataURL("image/png");
   }
 }
