@@ -7333,6 +7333,18 @@ class GiantTests {
 
   register() {
     var self = this, api = this.api, run = this.kit.run, FRAME = this.kit.FRAME, ULT = api.ULT, G = GiantTests.GROUP, C = api.CHARS.giant, type = api.CHAR_TYPES.of("giant");
+    run(G, "거신 골렘 강림: 착지 때 체력 " + ULT.gjHeal + " 회복이 회복량(E.heal)에 쌓이고, 체력이 가득이면 쌓이지 않으며, 통계표에 회복 칸이 보이는가", function (done) {
+      var bad = [], W = self.giantWorld([{ id: "foe", x: 200 + 400 }]), gi = W.ent("gi");
+      gi.hp = gi.maxHp - 300; gi.heal = 0;
+      self.jump(W, 0, 100);
+      if (gi.hp !== gi.maxHp - 300 + ULT.gjHeal) bad.push("체력 " + gi.hp + " (기대 " + (gi.maxHp - 300 + ULT.gjHeal) + ")");
+      if (gi.heal !== ULT.gjHeal) bad.push("회복량 통계 " + gi.heal + " (기대 " + ULT.gjHeal + ")");
+      if (!C.heals) bad.push("통계표 회복 칸 표시(heals)가 꺼져 있음");
+      var W2 = self.giantWorld([{ id: "foe", x: 200 + 400 }]), full = W2.ent("gi");
+      full.heal = 0; self.jump(W2, 0, 100);
+      if (full.heal !== 0) bad.push("체력이 가득인데 회복량 " + full.heal);
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "착지 회복 " + ULT.gjHeal + "이 회복량에 쌓이고 가득이면 0, 통계표 회복 칸 표시");
+    });
     run(G, "거신 기본 공격: 앞쪽 반경 " + C.range + " 부채꼴 안의 적에게 " + C.dmg + "의 피해와 기본 게이지를 주고, 휘두르는 순간 바로 맞는가", function (done) {
       var bad = [], W = self.giantWorld([{ id: "near", x: 200 + 100 }, { id: "far", x: 200 + C.range + 120 }]), gi = W.ent("gi");
       gi.gauge = 0;
