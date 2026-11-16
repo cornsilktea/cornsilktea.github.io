@@ -1,0 +1,221 @@
+"use strict";
+class TowerClimbGame {
+    constructor(libs) {
+        this.libs = libs;
+        this.state = "loading";
+        this.sfx = new ClimbSfx();
+        this.probe = new ClimbGrabSpot();
+        this.lastFrame = 0;
+        this.countLeft = 0;
+        this.warmed = false;
+        this.freshBest = false;
+        this.frame = 0;
+        this.portalHint = "";
+        this.shownStage = -1;
+        this.handlers = {
+            jump: () => this.sfx.play("jump"),
+            land: (e) => { if (e.drop > 1.2)
+                this.sfx.play("land"); },
+            pad: () => this.sfx.play("pad"),
+            grab: () => this.sfx.play("grab"),
+            hop: () => this.sfx.play("grab"),
+            launch: (e) => { this.sfx.play("launch"); this.hud.banner("발사! 힘 " + Math.round(e.power * 100) + "%", false, 1.2); },
+            cannonLand: (e) => { if (e.hit)
+                this.hud.banner("발사대 성공!", true, 2); },
+            fellHome: () => this.fell(),
+            voidReturn: () => this.fell(),
+            stageClear: (e) => this.cleared(e.stage),
+            portalEnter: () => this.sfx.play("portal"),
+            portalArrive: (e) => { this.view.avatar.playOnce("Spawn_Air", 0.7); this.hud.banner("스테이지 " + e.stage + " 시작점", false, 2); },
+            slowEmpty: () => this.sfx.play("empty"),
+        };
+        this.boot().catch((error) => { ClimbDom.el("loading").textContent = "불러오기 실패: " + error; });
+    }
+    async boot() {
+        const assets = new CharacterAssets(this.libs);
+        await assets.load();
+        const library = new ClimbModelLibrary(this.libs);
+        await library.load(assets.clips);
+        const factory = new CharacterModelFactory(this.libs, assets);
+        this.level = new TowerLevel(TowerLevelData.spec());
+        this.startPanel = new ClimbStartPanel();
+        this.records = new ClimbRecords(() => this.recordsChanged());
+        this.progress = new StageProgress(this.records.best.s);
+        this.rules = new ClimbRules(this.level, this.progress);
+        const touchDevice = "ontouchstart" in window || navigator.maxTouchPoints > 0;
+        this.view = new ClimbWorldView(this.libs, ClimbDom.el("view"), library, factory, this.level, touchDevice, () => this.state === "play");
+        const profile = new PlayerProfile();
+        this.view.avatar.wear(profile.look);
+        profile.onChange(() => this.view.avatar.wear(profile.look));
+        new ProfileEditor(this.libs, factory, assets, profile).mount(ClimbDom.el("profileHost"));
+        FoldCard.bindAll(document);
+        this.hud = new ClimbHud(this.level);
+        const zone = ClimbDom.el("touchZone");
+        this.keyboard = new KeyboardMouseInput(zone);
+        this.touch = new TouchInput(zone, ClimbDom.el("joyBase"), ClimbDom.el("joyKnob"), ClimbDom.el("btnJump"), ClimbDom.el("btnSlow"), ClimbDom.el("btnGrab"), ClimbDom.el("btnPause"));
+        for (const input of [this.keyboard, this.touch]) {
+            input.onJump = () => this.rules.pressJump();
+            input.onGrab = () => this.rules.pressGrab();
+            input.onPause = () => this.pause();
+        }
+        if (touchDevice)
+            document.body.classList.add("touch");
+        ClimbDom.el("btnStart").addEventListener("click", () => this.startRun());
+        ClimbDom.el("btnResume").addEventListener("click", () => this.resume());
+        ClimbDom.el("btnRestart").addEventListener("click", () => this.startRun());
+        ClimbDom.el("btnQuit").addEventListener("click", () => this.showMenu());
+        this.view.portals.sync(this.progress);
+        this.view.quality.restore();
+        ClimbDom.el("loading").hidden = true;
+        this.showMenu();
+        requestAnimationFrame((now) => this.loop(now));
+    }
+    recordsChanged() {
+        this.startPanel.paint(this.records);
+        if (!this.progress || this.records.best.s <= this.progress.cleared)
+            return;
+        this.progress.cleared = this.records.best.s;
+        this.view.portals.sync(this.progress);
+    }
+    setInputs(enabled) {
+        for (const input of [this.keyboard, this.touch]) {
+            input.enabled = enabled;
+            if (!enabled)
+                input.release();
+        }
+    }
+    showMenu() {
+        if (this.state === "play" || this.state === "pause")
+            this.records.submitWorld(Math.floor(this.rules.peak + 1e-6));
+        this.state = "menu";
+        this.setInputs(false);
+        this.keyboard.unlock();
+        this.hud.showPlay(false);
+        ClimbDom.el("pauseBox").hidden = true;
+        ClimbDom.el("startScreen").hidden = false;
+        this.view.builder.showAround(1);
+        this.shownStage = -1;
+        this.startPanel.paint(this.records);
+    }
+    startRun() {
+        this.rules = new ClimbRules(this.level, this.progress);
+        this.view.rig.reset(0);
+        this.freshBest = false;
+        this.portalHint = "";
+        this.countLeft = TowerClimbGame.COUNTDOWN;
+        this.state = "countdown";
+        ClimbDom.el("startScreen").hidden = true;
+        ClimbDom.el("pauseBox").hidden = true;
+        this.hud.showPlay(true);
+        this.hud.banner("", false, 0);
+        this.setInputs(false);
+    }
+    pause() {
+        if (this.state !== "play")
+            return;
+        this.state = "pause";
+        this.setInputs(false);
+        this.keyboard.unlock();
+        ClimbDom.el("pauseBox").hidden = false;
+    }
+    resume() {
+        if (this.state !== "pause")
+            return;
+        this.state = "play";
+        ClimbDom.el("pauseBox").hidden = true;
+        this.setInputs(true);
+    }
+    fell() {
+        this.sfx.play("fall");
+        this.hud.banner("떨어졌어요! 처음으로", false, 2.5);
+        this.records.submitWorld(Math.floor(this.rules.peak + 1e-6));
+    }
+    cleared(stage) {
+        this.sfx.play("clear");
+        this.records.offerStage(stage);
+        if (this.rules.stageOneTime !== null && stage === 1)
+            this.records.offerTime(this.rules.stageOneTime);
+        this.view.portals.sync(this.progress);
+        this.view.avatar.playOnce("Cheering", 1.6);
+        const opened = this.level.hasStage(stage + 1) ? " 포탈 " + (stage + 1) + "가 열렸어요" : "";
+        this.hud.banner("스테이지 " + stage + " 클리어!" + opened, true, 4);
+        this.records.submitWorld(Math.floor(this.rules.peak + 1e-6));
+    }
+    dispatch(events) {
+        for (const event of events) {
+            const handler = this.handlers[event.t];
+            if (handler)
+                handler(event);
+        }
+    }
+    steer() {
+        const rig = this.view.rig;
+        const moveX = Math.max(-1, Math.min(1, this.keyboard.moveX + this.touch.moveX)), moveY = Math.max(-1, Math.min(1, this.keyboard.moveY + this.touch.moveY));
+        this.rules.steer(rig.rightX * moveX + rig.forwardX * moveY, rig.rightZ * moveX + rig.forwardZ * moveY);
+        this.rules.holdSlow(this.keyboard.slowHeld || this.touch.slowHeld);
+        rig.turn(this.keyboard.takeLookX() + this.touch.takeLookX(), this.keyboard.takeLookY() + this.touch.takeLookY());
+    }
+    hints() {
+        const body = this.rules.body;
+        this.hud.grabHint(body.mode === "free" && body.grabCooldown <= 0 && this.rules.grab.find(body.x, body.y, body.z, this.probe));
+        const hint = this.view.portals.hintNear(body.x, body.y, body.z, this.progress);
+        if (hint !== this.portalHint) {
+            this.portalHint = hint;
+            if (hint)
+                this.hud.banner(hint, false, 3);
+        }
+        const stage = Math.max(1, this.level.stageAt(body.y).index);
+        if (stage !== this.shownStage) {
+            this.shownStage = stage;
+            this.view.builder.showAround(stage);
+        }
+    }
+    playFrame(dt) {
+        this.steer();
+        this.dispatch(this.rules.advance(dt));
+        this.sfx.rate = this.rules.time.active ? 0.6 : 1;
+        if (this.records.offerHeight(Math.floor(this.rules.peak + 1e-6)))
+            this.freshBest = true;
+        if (this.frame % TowerClimbGame.HINT_EVERY === 0)
+            this.hints();
+    }
+    countdownFrame(dt) {
+        if (!this.warmed) {
+            this.warmed = true;
+            this.view.warmUp(this.progress);
+        }
+        this.countLeft -= dt;
+        this.hud.countdown(this.countLeft > 0 ? String(Math.ceil(this.countLeft)) : "");
+        if (this.countLeft > 0)
+            return;
+        this.state = "play";
+        this.setInputs(true);
+    }
+    loop(now) {
+        requestAnimationFrame((next) => this.loop(next));
+        const dt = Math.min(TowerClimbGame.MAX_FRAME, Math.max(0, (now - this.lastFrame) / 1000));
+        this.lastFrame = now;
+        this.frame++;
+        const view = this.view;
+        if (this.state === "menu") {
+            view.backdrop.update(dt);
+            view.portals.update(dt);
+            view.render();
+            return;
+        }
+        if (this.state === "countdown")
+            this.countdownFrame(dt);
+        else if (this.state === "play")
+            this.playFrame(dt);
+        const still = this.state === "pause" ? 0 : dt;
+        view.avatar.follow(this.rules, still);
+        view.rig.follow(this.rules, view.avatar.root.position, still);
+        view.portals.update(still * this.rules.time.scale);
+        this.hud.update(this.rules, this.records, this.freshBest, still);
+        view.render();
+        view.quality.update(dt);
+    }
+}
+TowerClimbGame.COUNTDOWN = 3;
+TowerClimbGame.HINT_EVERY = 4;
+TowerClimbGame.MAX_FRAME = 0.1;

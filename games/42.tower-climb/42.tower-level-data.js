@@ -45,22 +45,22 @@ class TowerStageOneLayout {
     static pieces() {
         const S = TowerStageOneLayout, pen = new ClimbLayoutPen(1);
         pen.round("trunk", "static", 0, 0, S.TOP_Y - 0.5, S.TRUNK_RADIUS, { depth: S.TOP_Y - 0.5, noLedge: true, look: "trunk" });
-        pen.round("t1", "static", 20, S.RING, 1, 1.3, { depth: 1, look: "rock" });
-        pen.round("t2", "static", 50, S.RING, 2, 1.2, { depth: 2, look: "stump" });
-        pen.round("t3", "static", 80, S.RING, 3, 1.3, { depth: 0.8, look: "rock" });
+        pen.box("t1", "static", 20, S.RING, 1, 2.4, 2.4, 20, { depth: 1, look: "rock" });
+        pen.box("t2", "static", 50, S.RING, 2, 2.3, 2.3, 50, { depth: 2, look: "stump" });
+        pen.box("t3", "static", 80, S.RING, 3, 2.4, 2.4, 80, { depth: 0.8, look: "rock" });
         pen.box("t4", "narrow", 112, S.RING, 3.6, 4.6, 0.9, 112, { depth: 0.8, look: "log" });
         pen.box("t5", "static", 148, S.RING, 4.2, 3.6, 3.6, 148, { depth: 0.8, look: "deck" });
         pen.box("t6", "static", 176, S.RING, 6.6, 3, 3, 176, { depth: 3, look: "block" });
-        pen.round("t7", "static", 202, S.RING, 7.6, 1.3, { depth: 0.8, look: "rock" });
+        pen.box("t7", "static", 202, S.RING, 7.6, 2.4, 2.4, 202, { depth: 0.8, look: "rock" });
         pen.box("t8", "static", 228, S.RING, 8.4, 3.4, 3.4, 228, { depth: 0.8, look: "deck" });
-        pen.round("pad", "pad", 252, S.RING, 8.4, 1, { depth: 0.6, look: "pad" });
+        pen.box("pad", "pad", 252, S.RING, 8.4, 2, 2, 252, { depth: 0.6, look: "pad" });
         pen.box("mid", "static", S.EASY_START_DEG, S.RING, S.MID_Y, 5, 5, S.EASY_START_DEG, { depth: 0.8, look: "deck" });
         for (let i = 1; i <= S.EASY_COUNT; i++) {
             const angle = S.EASY_START_DEG + S.EASY_STEP_DEG * i, y = S.MID_Y + S.EASY_RISE * i;
             if (i % S.EASY_REST_EVERY === 0)
                 pen.box("e" + i, "static", angle, S.EASY_RING, y, 3.2, 3.2, angle, { depth: 0.6, look: "deck" });
             else
-                pen.round("e" + i, "static", angle, S.EASY_RING, y, 1.25, { depth: 0.6, look: i % 2 ? "rock" : "stump" });
+                pen.box("e" + i, "static", angle, S.EASY_RING, y, 2.3, 2.3, angle, { depth: 0.6, look: i % 2 ? "rock" : "stump" });
         }
         const joinDeg = S.EASY_START_DEG + S.EASY_STEP_DEG * (S.EASY_COUNT + 1), joinY = S.MID_Y + S.EASY_RISE * (S.EASY_COUNT + 1);
         pen.box("join", "static", joinDeg, S.EASY_RING, joinY, 3.6, 3.6, joinDeg, { depth: 0.6, look: "deck" });
@@ -76,13 +76,13 @@ class TowerStageOneLayout {
         const cannonX = ClimbLayoutPen.ringX(S.HARD_DEG, S.HARD_RING) + along * Math.cos(ClimbLayoutPen.rad(tangentDeg));
         const cannonZ = ClimbLayoutPen.ringZ(S.HARD_DEG, S.HARD_RING) - along * Math.sin(ClimbLayoutPen.rad(tangentDeg));
         const cannonRho = Math.hypot(cannonX, cannonZ), cannonDeg = Math.atan2(cannonX, cannonZ) * 180 / Math.PI;
-        pen.roundAt("cannon", "cannon", cannonX, cannonZ, 14, S.CANNON_RADIUS, cannonDeg + 180, { depth: 0.8, look: "cannon" });
+        pen.boxAt("cannon", "cannon", cannonX, cannonZ, 14, S.CANNON_RADIUS * 2, S.CANNON_RADIUS * 2, cannonDeg + 180, { depth: 0.8, look: "cannon" });
         const flightTime = (ClimbBalance.CANNON_UP + Math.sqrt(ClimbBalance.CANNON_UP ** 2 - 2 * ClimbBalance.GRAVITY * 12)) / ClimbBalance.GRAVITY;
         const targetRho = cannonRho - ClimbBalance.CANNON_FORWARD * flightTime;
         pen.box("target", "static", cannonDeg, targetRho, 26, 3, 3, cannonDeg, { depth: 0.6, look: "deck" });
-        pen.round("u1", "static", joinDeg + 26, 6.4, joinY + 0.9, 1.2, { depth: 0.6, look: "rock" });
-        pen.round("u2", "static", joinDeg + 52, 6.4, joinY + 1.8, 1.2, { depth: 0.6, look: "stump" });
-        pen.round("u3", "static", joinDeg + 78, 6.4, joinY + 2.65, 1.2, { depth: 0.6, look: "rock" });
+        pen.box("u1", "static", joinDeg + 26, 6.4, joinY + 0.9, 2.2, 2.2, joinDeg + 26, { depth: 0.6, look: "rock" });
+        pen.box("u2", "static", joinDeg + 52, 6.4, joinY + 1.8, 2.2, 2.2, joinDeg + 52, { depth: 0.6, look: "stump" });
+        pen.box("u3", "static", joinDeg + 78, 6.4, joinY + 2.65, 2.2, 2.2, joinDeg + 78, { depth: 0.6, look: "rock" });
         pen.round("rest2", "rest", 0, 0, S.TOP_Y, 4.2, { depth: 0.5, startOf: 2, look: "rest" });
         return pen.pieces;
     }
