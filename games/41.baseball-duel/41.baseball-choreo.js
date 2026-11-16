@@ -285,7 +285,8 @@ class BbPlayChoreographer extends BbPitchChoreographer {
         const reached = script.events.find((event) => event.kind === "runnerMove" && this.runnerRole(event.who) === "batter" && event.from === 0);
         if (!reached || script.result === "HOME_RUN" || script.events.some((event) => event.kind === "callOut" && event.who === reached.who))
             return;
-        const safe = BbPlayChoreographer.SAFE_CALLS.indexOf(script.result) >= 0;
+        const inningOver = this.cue.setting.outs + script.outsAdded >= 3;
+        const safe = BbPlayChoreographer.SAFE_CALLS.indexOf(script.result) >= 0 && !inningOver;
         if (safe || BbPlayCodes.isHit(script.result))
             this.call(contactAt + reached.arriveT, safe ? "세이프!" : BbPlayCodes.LABELS[script.result], null);
     }
