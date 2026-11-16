@@ -275,7 +275,7 @@ class BbGearFactory {
   private batTexture(): Three<"CanvasTexture"> {
     const canvas = document.createElement("canvas");
     canvas.width = 64; canvas.height = 512;
-    const context = canvas.getContext("2d") as CanvasRenderingContext2D, profile = BbBatShape.PROFILE, last = profile.length - 1;
+    const context = canvas.getContext("2d", { willReadFrequently: true }) as CanvasRenderingContext2D, profile = BbBatShape.PROFILE, last = profile.length - 1;
     for (let row = 0; row < canvas.height; row++) {
       const position = (1 - row / (canvas.height - 1)) * last, index = Math.min(last - 1, Math.floor(position));
       const along = BbCurve.mix(profile[index][1], profile[index + 1][1], position - index);
@@ -462,7 +462,7 @@ class BbBallActor {
   private static seamTexture(libs: ThreeLibs): Three<"CanvasTexture"> {
     const canvas = document.createElement("canvas");
     canvas.width = 256; canvas.height = 128;
-    const context = canvas.getContext("2d") as CanvasRenderingContext2D;
+    const context = canvas.getContext("2d", { willReadFrequently: true }) as CanvasRenderingContext2D;
     context.fillStyle = "#f6f3ea";
     context.fillRect(0, 0, 256, 128);
     context.strokeStyle = "#c8322b";
@@ -537,7 +537,7 @@ class BbPortraitStudio {
     this.pixels = new Uint8Array(size * size * 4);
     const canvas = document.createElement("canvas");
     canvas.width = canvas.height = size;
-    this.sheet = canvas.getContext("2d") as CanvasRenderingContext2D;
+    this.sheet = canvas.getContext("2d", { willReadFrequently: true }) as CanvasRenderingContext2D;
   }
 
   private render(look: CharacterLook, kit: BbTeamKit): string {

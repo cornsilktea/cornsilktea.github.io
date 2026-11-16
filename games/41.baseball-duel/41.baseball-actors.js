@@ -233,7 +233,7 @@ class BbGearFactory {
         const canvas = document.createElement("canvas");
         canvas.width = 64;
         canvas.height = 512;
-        const context = canvas.getContext("2d"), profile = BbBatShape.PROFILE, last = profile.length - 1;
+        const context = canvas.getContext("2d", { willReadFrequently: true }), profile = BbBatShape.PROFILE, last = profile.length - 1;
         for (let row = 0; row < canvas.height; row++) {
             const position = (1 - row / (canvas.height - 1)) * last, index = Math.min(last - 1, Math.floor(position));
             const along = BbCurve.mix(profile[index][1], profile[index + 1][1], position - index);
@@ -398,7 +398,7 @@ class BbBallActor {
         const canvas = document.createElement("canvas");
         canvas.width = 256;
         canvas.height = 128;
-        const context = canvas.getContext("2d");
+        const context = canvas.getContext("2d", { willReadFrequently: true });
         context.fillStyle = "#f6f3ea";
         context.fillRect(0, 0, 256, 128);
         context.strokeStyle = "#c8322b";
@@ -480,7 +480,7 @@ class BbPortraitStudio {
         this.pixels = new Uint8Array(size * size * 4);
         const canvas = document.createElement("canvas");
         canvas.width = canvas.height = size;
-        this.sheet = canvas.getContext("2d");
+        this.sheet = canvas.getContext("2d", { willReadFrequently: true });
     }
     render(look, kit) {
         this.prepare();

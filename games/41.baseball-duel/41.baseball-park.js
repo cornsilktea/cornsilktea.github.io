@@ -51,7 +51,7 @@ class BbFieldCanvas {
         this.span = span;
         this.canvas = document.createElement("canvas");
         this.canvas.width = this.canvas.height = pixels;
-        this.context = this.canvas.getContext("2d");
+        this.context = this.canvas.getContext("2d", { willReadFrequently: true });
         this.pixelsPerMeter = pixels / span;
     }
     x(fieldX) { return (fieldX - this.centerX + this.span / 2) * this.pixelsPerMeter; }
@@ -76,7 +76,7 @@ class BbGroundPainter {
     constructor(outline) {
         this.outline = outline;
     }
-    paint(surface, fineDetail) {
+    paint(surface, fineDetail, scale = 1) {
         const context = surface.context;
         context.fillStyle = BbGroundPainter.APRON;
         context.fillRect(0, 0, surface.pixels, surface.pixels);
@@ -88,7 +88,7 @@ class BbGroundPainter {
         this.paintWarningTrack(surface);
         this.paintInfield(surface);
         this.paintWear(surface);
-        this.speckle(surface, fineDetail);
+        this.speckle(surface, fineDetail, scale);
         this.paintWallShade(surface);
         if (fineDetail)
             this.paintChalk(surface);
@@ -190,10 +190,10 @@ class BbGroundPainter {
         }
         context.restore();
     }
-    speckle(surface, fineDetail) {
-        const context = surface.context, random = new BbScatter(4141), count = fineDetail ? 26000 : 60000;
+    speckle(surface, fineDetail, scale) {
+        const context = surface.context, random = new BbScatter(4141), count = Math.round((fineDetail ? 26000 : 60000) * scale * scale);
         for (let index = 0; index < count; index++) {
-            const x = random.next() * surface.pixels, y = random.next() * surface.pixels, size = random.between(1, fineDetail ? 3.4 : 2.2);
+            const x = random.next() * surface.pixels, y = random.next() * surface.pixels, size = Math.max(1, random.between(1, fineDetail ? 3.4 : 2.2) * scale);
             context.fillStyle = random.next() < 0.5 ? "rgba(255,255,220,0.045)" : "rgba(20,40,10,0.05)";
             context.fillRect(x, y, size, size);
         }
@@ -247,9 +247,10 @@ BbGroundPainter.STRIPE_WIDTH = 5.6;
 BbGroundPainter.PATH_INSET = 1.25;
 BbGroundPainter.BASE_CUTOUT = 3.3;
 class BbBallparkBuilder {
-    constructor(libs, spec) {
+    constructor(libs, spec, groundScale = 1) {
         this.libs = libs;
         this.spec = spec;
+        this.groundScale = groundScale;
         this.crowdSeats = [];
         this.random = new BbScatter(20261112);
         this.group = new libs.THREE.Group();
@@ -287,8 +288,8 @@ class BbBallparkBuilder {
         this.group.add(apron);
         const layers = [[2048, 52, 300, false], [2048, 19.4, 74, true], [1024, 1.4, 15, true]];
         layers.forEach(([pixels, centerZ, span, fine], index) => {
-            const surface = new BbFieldCanvas(pixels, 0, centerZ, span);
-            painter.paint(surface, fine);
+            const surface = new BbFieldCanvas(Math.round(pixels * this.groundScale), 0, centerZ, span);
+            painter.paint(surface, fine, this.groundScale);
             const material = new THREE.MeshLambertMaterial({ map: this.textureOf(surface.canvas, false), polygonOffset: true, polygonOffsetFactor: -index, polygonOffsetUnits: -index * 2 });
             const plane = new THREE.Mesh(new THREE.PlaneGeometry(span, span), material);
             plane.rotation.x = -Math.PI / 2;
@@ -301,7 +302,7 @@ class BbBallparkBuilder {
     dirtTexture() {
         const canvas = document.createElement("canvas");
         canvas.width = canvas.height = 256;
-        const context = canvas.getContext("2d"), random = new BbScatter(77);
+        const context = canvas.getContext("2d", { willReadFrequently: true }), random = new BbScatter(77);
         context.fillStyle = "#bd8b5b";
         context.fillRect(0, 0, 256, 256);
         for (let index = 0; index < 5000; index++) {
@@ -367,7 +368,7 @@ class BbBallparkBuilder {
         const canvas = document.createElement("canvas");
         canvas.width = 2048;
         canvas.height = 128;
-        const context = canvas.getContext("2d"), panels = BbBallparkBuilder.WALL_PANELS, panelWidth = canvas.width / panels;
+        const context = canvas.getContext("2d", { willReadFrequently: true }), panels = BbBallparkBuilder.WALL_PANELS, panelWidth = canvas.width / panels;
         for (let panel = 0; panel < panels; panel++) {
             const left = panel * panelWidth, shade = context.createLinearGradient(0, 0, 0, 128);
             shade.addColorStop(0, panel % 2 ? "#1f6a45" : "#1b5f3e");
@@ -419,7 +420,7 @@ class BbBallparkBuilder {
             const canvas = document.createElement("canvas");
             canvas.width = 128;
             canvas.height = 64;
-            const context = canvas.getContext("2d");
+            const context = canvas.getContext("2d", { willReadFrequently: true });
             context.fillStyle = "#f6f1dc";
             context.font = '800 54px "Nanum Gothic", "Malgun Gothic", sans-serif';
             context.textAlign = "center";
@@ -436,7 +437,7 @@ class BbBallparkBuilder {
     addBackstop() {
         const THREE = this.libs.THREE, canvas = document.createElement("canvas");
         canvas.width = canvas.height = 64;
-        const context = canvas.getContext("2d");
+        const context = canvas.getContext("2d", { willReadFrequently: true });
         context.strokeStyle = "rgba(235,240,235,0.55)";
         context.lineWidth = 2;
         context.strokeRect(0, 0, 64, 64);
@@ -562,7 +563,7 @@ class BbBallparkBuilder {
         const THREE = this.libs.THREE, canvas = document.createElement("canvas");
         canvas.width = 1024;
         canvas.height = 384;
-        const context = canvas.getContext("2d"), font = '"Nanum Gothic", "Malgun Gothic", sans-serif';
+        const context = canvas.getContext("2d", { willReadFrequently: true }), font = '"Nanum Gothic", "Malgun Gothic", sans-serif';
         context.fillStyle = "#0d1413";
         context.fillRect(0, 0, 1024, 384);
         context.textBaseline = "middle";
@@ -646,7 +647,7 @@ class BbBallparkBuilder {
         const THREE = this.libs.THREE, canvas = document.createElement("canvas");
         canvas.width = 8;
         canvas.height = 256;
-        const context = canvas.getContext("2d"), gradient = context.createLinearGradient(0, 0, 0, 256);
+        const context = canvas.getContext("2d", { willReadFrequently: true }), gradient = context.createLinearGradient(0, 0, 0, 256);
         gradient.addColorStop(0, "#2f6fc4");
         gradient.addColorStop(0.42, "#78aee6");
         gradient.addColorStop(0.5, "#cfe4f4");
@@ -659,7 +660,7 @@ class BbBallparkBuilder {
         const puff = document.createElement("canvas");
         puff.width = 256;
         puff.height = 128;
-        const puffContext = puff.getContext("2d");
+        const puffContext = puff.getContext("2d", { willReadFrequently: true });
         for (let blob = 0; blob < 9; blob++) {
             const x = this.random.between(50, 206), y = this.random.between(50, 84), radius = this.random.between(26, 46);
             const soft = puffContext.createRadialGradient(x, y, 0, x, y, radius);

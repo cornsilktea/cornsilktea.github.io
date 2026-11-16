@@ -441,7 +441,8 @@ class CharacterModelFactory {
 
   private readonly textureCache = new Map<string, Three<"CanvasTexture">>();
 
-  constructor(private readonly libs: ThreeLibs, private readonly assets: CharacterAssets) {}
+  // textureSize: 부위 그림 한 장의 크기. 그래픽 메모리가 빠듯한 게임은 128 로 줄인다(41번 터치 기기, 2026-11-16).
+  constructor(private readonly libs: ThreeLibs, private readonly assets: CharacterAssets, private readonly textureSize: number = CharacterModelFactory.TEXTURE_SIZE) {}
 
   build(look: CharacterLook): Three<"Object3D"> {
     const typeIndex = look.c;
@@ -504,10 +505,11 @@ class CharacterModelFactory {
     const key = typeIndex + "|" + suffix + "|" + paint.map((cell) => cell.join(":")).join("/");
     const cached = this.textureCache.get(key);
     if (cached) return cached;
-    const size = CharacterModelFactory.TEXTURE_SIZE;
+    const size = this.textureSize;
     const canvas = document.createElement("canvas");
     canvas.width = canvas.height = size;
-    const context = canvas.getContext("2d") as CanvasRenderingContext2D;
+    // willReadFrequently: 안드로이드 크롬이 이 캔버스를 그래픽 메모리가 아닌 일반 메모리에 둔다(그래픽 메모리 절약).
+    const context = canvas.getContext("2d", { willReadFrequently: true }) as CanvasRenderingContext2D;
     const cellWidth = size / CharacterModelFactory.TEXTURE_COLUMNS, cellHeight = size / CharacterModelFactory.TEXTURE_ROWS;
     context.drawImage(sourceImage, 0, 0, size, size);
     paint.forEach(([row, column, color]) => {

@@ -351,9 +351,11 @@ CharacterAssets.ANIMATION_FILE = "animations/teambattle_anims.glb?v=crossbow";
 CharacterAssets.FILE_TIMEOUT_MS = 25000;
 CharacterAssets.RETRY_WAITS_MS = [1500, 4000];
 class CharacterModelFactory {
-    constructor(libs, assets) {
+    // textureSize: 부위 그림 한 장의 크기. 그래픽 메모리가 빠듯한 게임은 128 로 줄인다(41번 터치 기기, 2026-11-16).
+    constructor(libs, assets, textureSize = CharacterModelFactory.TEXTURE_SIZE) {
         this.libs = libs;
         this.assets = assets;
+        this.textureSize = textureSize;
         this.textureCache = new Map();
     }
     build(look) {
@@ -419,10 +421,11 @@ class CharacterModelFactory {
         const cached = this.textureCache.get(key);
         if (cached)
             return cached;
-        const size = CharacterModelFactory.TEXTURE_SIZE;
+        const size = this.textureSize;
         const canvas = document.createElement("canvas");
         canvas.width = canvas.height = size;
-        const context = canvas.getContext("2d");
+        // willReadFrequently: 안드로이드 크롬이 이 캔버스를 그래픽 메모리가 아닌 일반 메모리에 둔다(그래픽 메모리 절약).
+        const context = canvas.getContext("2d", { willReadFrequently: true });
         const cellWidth = size / CharacterModelFactory.TEXTURE_COLUMNS, cellHeight = size / CharacterModelFactory.TEXTURE_ROWS;
         context.drawImage(sourceImage, 0, 0, size, size);
         paint.forEach(([row, column, color]) => {

@@ -77,7 +77,7 @@ class BbStage {
         this.bench = new Map();
         this.bullpens = [[], []];
         this.lineups = [[], []];
-        this.pixelRatio = Math.min(window.devicePixelRatio, BbStage.PIXEL_RATIO_CAP);
+        this.pixelRatio = Math.min(window.devicePixelRatio || 1, BbStage.TOUCH_DEVICE ? BbStage.TOUCH_PIXEL_RATIO_CAP : BbStage.PIXEL_RATIO_CAP);
         this.assets = null;
         this.onContextChange = () => undefined;
         this.built = false;
@@ -115,7 +115,8 @@ class BbStage {
             return;
         this.built = true;
         await report.step("park");
-        const factory = new CharacterModelFactory(this.libs, assets), gear = new BbGearFactory(this.libs), builder = new BbBallparkBuilder(this.libs, park);
+        const touch = BbStage.TOUCH_DEVICE, factory = new CharacterModelFactory(this.libs, assets, touch ? BbStage.TOUCH_CHARACTER_TEXTURE : undefined);
+        const gear = new BbGearFactory(this.libs), builder = new BbBallparkBuilder(this.libs, park, touch ? BbStage.TOUCH_GROUND_SCALE : 1);
         this.scene.add(builder.build());
         this.crowd = new BbCrowdSystem(this.libs, builder.crowdSeats);
         this.scene.add(this.crowd.group);
@@ -146,7 +147,7 @@ class BbStage {
     ballStamp() {
         const THREE = this.libs.THREE, canvas = document.createElement("canvas");
         canvas.width = canvas.height = 96;
-        const context = canvas.getContext("2d");
+        const context = canvas.getContext("2d", { willReadFrequently: true });
         context.fillStyle = "#f6f3ea";
         context.beginPath();
         context.arc(48, 48, 44, 0, Math.PI * 2);
@@ -351,6 +352,9 @@ BbStage.MOVE_FOLLOW = 5.5;
 BbStage.LOOK_FOLLOW = 8;
 BbStage.LONGEST_FRAME_SECONDS = 0.05;
 BbStage.PIXEL_RATIO_CAP = 1.5;
+BbStage.TOUCH_PIXEL_RATIO_CAP = 1.25;
+BbStage.TOUCH_GROUND_SCALE = 0.5;
+BbStage.TOUCH_CHARACTER_TEXTURE = 128;
 BbStage.TOUCH_DEVICE = "ontouchstart" in window || (navigator.maxTouchPoints || 0) > 0;
 BbStage.PIXEL_RATIO_STEP = 0.25;
 BbStage.SMALL_SHADOW = 512;
