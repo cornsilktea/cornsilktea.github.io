@@ -116,6 +116,29 @@ interface MkLastMatch {
   rivals?: string[];
   ai?: boolean;
   recent?: string[][];
+  // 이 판의 표 번호와, 묶이기 전 기록(before). 경기에 실제로 들어가면(played) 이 판을 센다 — MkLastCount.
+  match?: string;
+  played?: boolean;
+  before?: MkLastMatch | null;
+}
+
+// "바로 전 상대·최근 상대"로 셀 판을 고른다(2026-11-16 선생님 요청, 30번).
+// 밴픽·매칭 화면에서 누가 나가 경기에 들어가지 못한 판은 만나지 않은 것으로 친다:
+// playedOnly 인 게임은 경기 시작을 알린(played) 판만 세고, 아니면 묶이기 전 기록(before)을 쓴다.
+class MkLastCount {
+  static of(last: MkLastMatch, playedOnly: boolean): MkLastMatch {
+    if (!playedOnly || !last.match || last.played) return last;
+    return last.before || {};
+  }
+
+  // 새 판의 before 에는 그 이전 판 기록만 남긴다(끝없이 겹치지 않게).
+  static before(entry: MkQueueEntry): MkLastMatch {
+    const before: MkLastMatch = {};
+    if (entry.avoid && entry.avoid.length) before.rivals = entry.avoid.slice();
+    if (entry.recent && Object.keys(entry.recent).length) before.recent = MkRecentRivals.push(entry.recent, []);
+    if (entry.owed) before.ai = true;
+    return before;
+  }
 }
 
 interface MkPartyRecord {
@@ -790,8 +813,14 @@ class MkParty {
     return new MkRecordBook(this.record && this.record.history);
   }
 
-  lastMatch(): MkLastMatch {
-    return (this.record && this.record.last) || {};
+  lastMatch(playedOnly: boolean = false): MkLastMatch {
+    return MkLastCount.of((this.record && this.record.last) || {}, playedOnly);
+  }
+
+  // 이 판이 실제로 경기에 들어갔다고 적는다(팀원 누구나, 판마다 한 번). MkLastCount 가 이 판을 센다.
+  markPlayed(matchId: string): void {
+    const last = this.record && this.record.last;
+    if (last && last.match === matchId && !last.played) this.ref.child("last/played").set(true).catch(() => undefined);
   }
 
   setBots(count: number): void {
@@ -987,7 +1016,7 @@ class MkQueue {
   ) {}
 
   // me: 내 기기가 지금 아는 내 정보(승률처럼 팀 대기실 기록보다 새로울 수 있는 값)를 내 자리에 덮어쓴다.
-  async enter(party: MkParty, me: MkMember | null = null): Promise<void> {
+  async enter(party: MkParty, me: MkMember | null = null, playedOnly: boolean = false): Promise<void> {
     const since = this.clock.now();
     this.since = since;
     const people: Record<string, MkMember> = {};
@@ -998,7 +1027,7 @@ class MkQueue {
       const recentMaps = MkRecentMaps.clean(id === party.myId && me && me.recentMaps !== undefined ? me.recentMaps : member.recentMaps);
       if (recentMaps) people[id].recentMaps = recentMaps;
     });
-    const last = party.lastMatch();
+    const last = party.lastMatch(playedOnly);
     const entry: MkQueueEntry = { leader: party.myId, people, bots: party.bots(), size: party.size(), at: since, claim: null };
     if (last.rivals && last.rivals.length) entry.avoid = last.rivals.slice();
     if (last.recent && Object.keys(last.recent).length) entry.recent = MkRecentRivals.push(last.recent, []);
@@ -1220,7 +1249,7 @@ class MkQueue {
       updates[this.paths.party(group.code) + "/match"] = ticket;
       updates[this.paths.party(group.code) + "/search"] = null;
       const rivalCodes = plan.groups.filter((other) => other !== group).map((other) => other.code);
-      const last: MkLastMatch = { rivals: rivalCodes, ai: plan.groups.length === 1 };
+      const last: MkLastMatch = { rivals: rivalCodes, ai: plan.groups.length === 1, match: plan.matchId, before: MkLastCount.before(group.entry) };
       const recent = MkRecentRivals.push(group.entry.recent, rivalCodes);
       if (recent.length) last.recent = recent;
       updates[this.paths.party(group.code) + "/last"] = last;
@@ -1303,6 +1332,8 @@ interface MkFlowOptions {
   // 이 기기가 불러온 게임 버전(올라가기만 하는 정수). 주면 팀 대기실에서 서로 비교해 낮은 학생이 있으면 매칭 시작을 막는다(MkVersionGate).
   clientVersion?: number;
   stats?: MkStatsLink;
+  // true 면 경기에 실제로 들어간 판(게임이 matchPlayed 를 부른 판)만 "바로 전·최근 상대"로 센다(30번, 2026-11-16).
+  playedOnly?: boolean;
   // 게임 쪽 "내 닉네임 · 닉네임 설정" 줄. 주면 팀 코드 줄 오른쪽으로 옮겨 자리가 되면 한 줄, 모자라면 팀 코드 아래 둘째 줄이 된다.
   headExtra?: HTMLElement | null;
 }
@@ -1507,6 +1538,7 @@ class MkRandomFlow {
   private fallbackFor = 0;
   private streakArmedFor = "";
   private statsArmedFor = "";
+  private playedFor = "";
   private readonly seenRivals = new Set<string>();
   private readonly streak: MkPersonalStreak;
 
@@ -1613,6 +1645,14 @@ class MkRandomFlow {
     if (guard && this.statsArmedFor !== ticket.matchId && guard.arm(ticket)) this.statsArmedFor = ticket.matchId;
   }
 
+  // 판이 밴픽·대기를 지나 실제 경기에 들어갔을 때 게임이 부른다(playedOnly 게임). 이 판의 상대를 최근 상대로 센다.
+  matchPlayed(): void {
+    const ticket = this.current;
+    if (!ticket || !this.party || this.playedFor === ticket.matchId) return;
+    this.playedFor = ticket.matchId;
+    this.party.markPlayed(ticket.matchId);
+  }
+
   private disarmMatch(ticket: MkTicket): void {
     if (this.streakArmedFor === ticket.matchId) this.streak.disarm(ticket.matchId);
     const guard = this.guard();
@@ -1685,7 +1725,7 @@ class MkRandomFlow {
     this.reported = false;
     this.hooks.leaveRoom();
     if (this.party) {
-      if (!this.party.searching()) this.sign.put(this.party, this.options.matcher.returnGraceMs, !!this.party.lastMatch().ai);
+      if (!this.party.searching()) this.sign.put(this.party, this.options.matcher.returnGraceMs, !!this.party.lastMatch(!!this.options.playedOnly).ai);
       this.hooks.showParty();
       this.panel.setNotice(note);
       this.render();
@@ -1725,7 +1765,7 @@ class MkRandomFlow {
         this.queue = new MkQueue(this.database, this.clock, this.paths, this.options.matcher, this.hooks);
         this.queue.onError = (message) => this.panel.setNotice(message);
         this.queue.onEntries = () => this.render();
-        await this.queue.enter(party, this.memberNow());
+        await this.queue.enter(party, this.memberNow(), !!this.options.playedOnly);
       }
     } catch (error) {
       this.panel.setNotice("매칭 서버에 연결하지 못했어요. (인터넷·데이터베이스 규칙 확인)");

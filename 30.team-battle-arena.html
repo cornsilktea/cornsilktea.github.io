@@ -5,7 +5,7 @@
 <script charset="utf-8" src="common/access-guard.js" data-game="teambattle"></script>
 <script charset="utf-8" src="common/quality-governor.js"></script>
 <script charset="utf-8" src="common/fullscreen-keeper.js"></script>
-<script charset="utf-8" src="common/match-kit.js?v=20261112b"></script>
+<script charset="utf-8" src="common/match-kit.js?v=20261116a"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>3v3 팀 배틀 아레나</title>
@@ -13500,10 +13500,13 @@ SinglePassMaterials.enable(THREE);
     static RESULT_RETRY_MS = 300;
     static AI_FALLBACK_MS = 120000;
     static MATCHER_TIMING = Object.assign({}, MkMatcher.TIMING, { rematchWaitMs: ArenaRandomMatch.AI_FALLBACK_MS + 30000, busyMs: 300000 });
-    constructor(services) { this.services = services; this.flow = null; this.quiet = false; }
+    static START_GUARD_MS = 25000;
+    static START_CHECK_MS = 2000;
+    static PLAYED_STATUS = ["countdown", "playing", "ended"];
+    constructor(services) { this.services = services; this.flow = null; this.quiet = false; this.startGuard = 0; this.matchedAt = 0; }
     ready() { var services = this.services;
       if (this.flow || !services.backend.db) return this.flow;
-      var options = { gameRoot: "teambattle", queue: "teambattle", clientVersion: StatsPatches.number, partyLimit: ArenaRandomMatch.PARTY_LIMIT, matcher: new MkVersusMatcher(ArenaRandomMatch.PARTY_LIMIT, ArenaRandomMatch.MATCHER_TIMING), allowBots: true, aiFallbackMs: ArenaRandomMatch.AI_FALLBACK_MS, actionsMount: Dom.$("partyActions"), stats: new AccountStatsOpener(function () { services.myStats.open(); }, new AccountLazyGuard(function () { return services.accountRecorder.guard; })),
+      var options = { gameRoot: "teambattle", queue: "teambattle", clientVersion: StatsPatches.number, playedOnly: true, partyLimit: ArenaRandomMatch.PARTY_LIMIT, matcher: new MkVersusMatcher(ArenaRandomMatch.PARTY_LIMIT, ArenaRandomMatch.MATCHER_TIMING), allowBots: true, aiFallbackMs: ArenaRandomMatch.AI_FALLBACK_MS, actionsMount: Dom.$("partyActions"), stats: new AccountStatsOpener(function () { services.myStats.open(); }, new AccountLazyGuard(function () { return services.accountRecorder.guard; })),
         intro: "팀을 짜고(빈 자리는 🤖 AI 추가) 매칭 시작을 누르면 아무 팀과 3대3 대회모드로 만나요. 맵은 무작위예요." };
       var panel = new ArenaPartyPanel(Dom.$("scrParty"), Dom.$("partyMount"), options);
       this.flow = new MkRandomFlow(services.backend.db, { now: function () { return services.clock.now(); } }, services.session.myId, options, this, panel);
@@ -13558,7 +13561,7 @@ SinglePassMaterials.enable(THREE);
     discard(made) { return this.services.backend.db.ref(RoomSession.ROOT + "/" + made.room).remove(); }
     enterRoom(ticket, hosting) { var services = this.services, myId = services.session.myId;
       var ref = services.backend.db.ref(RoomSession.ROOT + "/" + ticket.room), self = this;
-      function enter() { document.body.classList.add("mkMatched"); services.session.enterRoom(ticket.room); return true; }
+      function enter() { document.body.classList.add("mkMatched"); services.session.enterRoom(ticket.room); self.watchStart(); return true; }
       if (hosting) return Promise.resolve(enter());
       return Promise.all(["players", "status", "assign/" + myId].map(function (k) { return ref.child(k).once("value"); })).then(function (a) {
         var players = a[0].val(), team = a[2].val();
@@ -13588,7 +13591,21 @@ SinglePassMaterials.enable(THREE);
     }
     forfeitApplies() { return !!this.flow && this.flow.forfeitApplies(this.progress()); }
     forfeitIfLate() { if (this.flow) this.flow.forfeitIfLate(this.progress()); }
-    armMatch() { if (this.flow) this.flow.armMatch(); }
+    armMatch() { var room = this.services.session.room;
+      if (!this.flow) return;
+      this.flow.armMatch();
+      if (room && ArenaRandomMatch.PLAYED_STATUS.indexOf(room.status) >= 0) this.flow.matchPlayed();
+    }
+    watchStart() { var self = this;
+      clearInterval(this.startGuard);
+      this.matchedAt = performance.now();
+      this.startGuard = setInterval(function () { self.restartIfStuck(); }, ArenaRandomMatch.START_CHECK_MS);
+    }
+    restartIfStuck() { var services = this.services, room = services.session.room;
+      if (!this.ticket() || !room || room.status !== "lobby" || !document.body.classList.contains("mkMatched")) { clearInterval(this.startGuard); this.startGuard = 0; return; }
+      if (performance.now() - this.matchedAt < ArenaRandomMatch.START_GUARD_MS || !services.session.isHost()) return;
+      services.launcher.startGame();
+    }
     roomChanged() { var services = this.services;
       services.versus.refresh();
       if (!this.flow || !services.session.room) return;

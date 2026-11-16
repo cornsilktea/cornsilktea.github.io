@@ -75,7 +75,7 @@ class BbStage {
         this.lineups = [[], []];
         this.pixelRatio = Math.min(window.devicePixelRatio, BbStage.PIXEL_RATIO_CAP);
         const THREE = libs.THREE;
-        this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+        this.renderer = new THREE.WebGLRenderer({ canvas, antialias: !BbStage.TOUCH_DEVICE, powerPreference: "high-performance" });
         this.renderer.setPixelRatio(this.pixelRatio);
         this.renderer.shadowMap.enabled = true;
         this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -336,5 +336,6 @@ BbStage.MOVE_FOLLOW = 5.5;
 BbStage.LOOK_FOLLOW = 8;
 BbStage.LONGEST_FRAME_SECONDS = 0.05;
 BbStage.PIXEL_RATIO_CAP = 1.5;
+BbStage.TOUCH_DEVICE = "ontouchstart" in window || (navigator.maxTouchPoints || 0) > 0;
 BbStage.PIXEL_RATIO_STEP = 0.25;
 BbStage.SMALL_SHADOW = 512;

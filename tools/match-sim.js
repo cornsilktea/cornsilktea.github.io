@@ -1,7 +1,7 @@
 const fs = require("fs"), vm = require("vm"), path = require("path");
 
 class MatchKitLoader {
-  static NAMES = ["MkPaths", "MkMatcher", "MkRecentRivals", "MkVersusMatcher", "MkWinBandVersusMatcher", "MkWinBand", "MkRecentMaps", "MkFreeForAllMatcher", "MkRecordBook", "MkPartyDirectory", "MkParty", "MkQueue", "MkBusySign", "MkStreakMath", "MkPersonalStreak"];
+  static NAMES = ["MkPaths", "MkMatcher", "MkRecentRivals", "MkLastCount", "MkVersusMatcher", "MkWinBandVersusMatcher", "MkWinBand", "MkRecentMaps", "MkFreeForAllMatcher", "MkRecordBook", "MkPartyDirectory", "MkParty", "MkQueue", "MkBusySign", "MkStreakMath", "MkPersonalStreak"];
   static load() {
     const src = fs.readFileSync(path.join(__dirname, "..", "common/match-kit.js"), "utf8") + "\n;({" + MatchKitLoader.NAMES.join(",") + "})";
     return vm.runInNewContext(src, { console, Math, Date, JSON, Object, Array, String, Number, Set, Map, Promise, setTimeout, clearTimeout });
@@ -625,6 +625,17 @@ class Scenarios {
     Report.check("최근 상대 기록: 번호 키 객체로 돌아와도 읽음", Mk.MkRecentRivals.codes({ 0: { 0: "p" }, 1: { 0: "q", 1: "p" } }).join() === "p,q");
   }
 
+  static unitPlayedOnly() {
+    const last = { rivals: ["b"], recent: [["b"], ["c"]], match: "m2", before: { rivals: ["c"], recent: [["c"]] } };
+    Report.check("경기에 들어간 판만 세기: 끄면 묶인 판을 그대로 셈", Mk.MkLastCount.of(last, false).rivals.join() === "b");
+    Report.check("경기에 들어간 판만 세기: 경기 전에 끝난 판은 묶이기 전 기록을 씀", Mk.MkLastCount.of(last, true).rivals.join() === "c" && Mk.MkRecentRivals.codes(Mk.MkLastCount.of(last, true).recent).join() === "c");
+    Report.check("경기에 들어간 판만 세기: 경기에 들어간 판은 셈", Mk.MkLastCount.of(Object.assign({}, last, { played: true }), true).rivals.join() === "b");
+    Report.check("경기에 들어간 판만 세기: 예전 기록(match 없음)은 그대로", Mk.MkLastCount.of({ rivals: ["b"] }, true).rivals.join() === "b");
+    Report.check("경기에 들어간 판만 세기: 첫 판이 무산되면 아무도 피하지 않음", JSON.stringify(Mk.MkLastCount.of({ rivals: ["b"], match: "m1" }, true)) === "{}");
+    const before = Mk.MkLastCount.before({ avoid: ["c"], recent: [["c"]], owed: true });
+    Report.check("경기에 들어간 판만 세기: 묶이기 전 기록은 대기열 항목에서 만듦", before.rivals.join() === "c" && before.ai === true && before.before === undefined, before);
+  }
+
   // 1인 팀 3개가 여러 판 계속 매칭할 때: 바로 전 상대와 연달아 붙지 않고, AI 와 하는 판이 한 팀에 연달아 몰리지 않는가.
   // 게임 흐름(MkRandomFlow)을 줄여 흉내 낸다: 표를 받으면 경기 중 표지판 → 경기 → 결과 → 돌아옴 표지판 → 다시 매칭.
   static async scenarioRotation(teamCount, rounds) {
@@ -678,6 +689,7 @@ class SimRunner {
     Scenarios.unitMatcher();
     Scenarios.unitRotation();
     Scenarios.unitCrowdSpread();
+    Scenarios.unitPlayedOnly();
     Scenarios.unitWinBand();
     Scenarios.unitRecentMaps();
     await Scenarios.scenarioWinBand();

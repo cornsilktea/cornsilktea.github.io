@@ -58,6 +58,27 @@ class MkRecentMaps {
 }
 MkRecentMaps.KEEP = 2;
 MkRecentMaps.AVOID_LAST = 1;
+// "바로 전 상대·최근 상대"로 셀 판을 고른다(2026-11-16 선생님 요청, 30번).
+// 밴픽·매칭 화면에서 누가 나가 경기에 들어가지 못한 판은 만나지 않은 것으로 친다:
+// playedOnly 인 게임은 경기 시작을 알린(played) 판만 세고, 아니면 묶이기 전 기록(before)을 쓴다.
+class MkLastCount {
+    static of(last, playedOnly) {
+        if (!playedOnly || !last.match || last.played)
+            return last;
+        return last.before || {};
+    }
+    // 새 판의 before 에는 그 이전 판 기록만 남긴다(끝없이 겹치지 않게).
+    static before(entry) {
+        const before = {};
+        if (entry.avoid && entry.avoid.length)
+            before.rivals = entry.avoid.slice();
+        if (entry.recent && Object.keys(entry.recent).length)
+            before.recent = MkRecentRivals.push(entry.recent, []);
+        if (entry.owed)
+            before.ai = true;
+        return before;
+    }
+}
 class MkPaths {
     constructor(queue, parties, rooms) {
         this.queue = queue;
@@ -593,8 +614,14 @@ class MkParty {
     book() {
         return new MkRecordBook(this.record && this.record.history);
     }
-    lastMatch() {
-        return (this.record && this.record.last) || {};
+    lastMatch(playedOnly = false) {
+        return MkLastCount.of((this.record && this.record.last) || {}, playedOnly);
+    }
+    // 이 판이 실제로 경기에 들어갔다고 적는다(팀원 누구나, 판마다 한 번). MkLastCount 가 이 판을 센다.
+    markPlayed(matchId) {
+        const last = this.record && this.record.last;
+        if (last && last.match === matchId && !last.played)
+            this.ref.child("last/played").set(true).catch(() => undefined);
     }
     setBots(count) {
         if (!this.isLeader() || this.searching())
@@ -797,7 +824,7 @@ class MkQueue {
         this.onEntries = () => undefined;
     }
     // me: 내 기기가 지금 아는 내 정보(승률처럼 팀 대기실 기록보다 새로울 수 있는 값)를 내 자리에 덮어쓴다.
-    async enter(party, me = null) {
+    async enter(party, me = null, playedOnly = false) {
         const since = this.clock.now();
         this.since = since;
         const people = {};
@@ -810,7 +837,7 @@ class MkQueue {
             if (recentMaps)
                 people[id].recentMaps = recentMaps;
         });
-        const last = party.lastMatch();
+        const last = party.lastMatch(playedOnly);
         const entry = { leader: party.myId, people, bots: party.bots(), size: party.size(), at: since, claim: null };
         if (last.rivals && last.rivals.length)
             entry.avoid = last.rivals.slice();
@@ -1057,7 +1084,7 @@ class MkQueue {
             updates[this.paths.party(group.code) + "/match"] = ticket;
             updates[this.paths.party(group.code) + "/search"] = null;
             const rivalCodes = plan.groups.filter((other) => other !== group).map((other) => other.code);
-            const last = { rivals: rivalCodes, ai: plan.groups.length === 1 };
+            const last = { rivals: rivalCodes, ai: plan.groups.length === 1, match: plan.matchId, before: MkLastCount.before(group.entry) };
             const recent = MkRecentRivals.push(group.entry.recent, rivalCodes);
             if (recent.length)
                 last.recent = recent;
@@ -1308,6 +1335,7 @@ class MkRandomFlow {
         this.fallbackFor = 0;
         this.streakArmedFor = "";
         this.statsArmedFor = "";
+        this.playedFor = "";
         this.seenRivals = new Set();
         this.paths = MkPaths.forGame(options.gameRoot, options.queue);
         this.directory = new MkPartyDirectory(database, clock, this.paths, options.partyLimit);
@@ -1400,6 +1428,14 @@ class MkRandomFlow {
         if (guard && this.statsArmedFor !== ticket.matchId && guard.arm(ticket))
             this.statsArmedFor = ticket.matchId;
     }
+    // 판이 밴픽·대기를 지나 실제 경기에 들어갔을 때 게임이 부른다(playedOnly 게임). 이 판의 상대를 최근 상대로 센다.
+    matchPlayed() {
+        const ticket = this.current;
+        if (!ticket || !this.party || this.playedFor === ticket.matchId)
+            return;
+        this.playedFor = ticket.matchId;
+        this.party.markPlayed(ticket.matchId);
+    }
     disarmMatch(ticket) {
         if (this.streakArmedFor === ticket.matchId)
             this.streak.disarm(ticket.matchId);
@@ -1476,7 +1512,7 @@ class MkRandomFlow {
         this.hooks.leaveRoom();
         if (this.party) {
             if (!this.party.searching())
-                this.sign.put(this.party, this.options.matcher.returnGraceMs, !!this.party.lastMatch().ai);
+                this.sign.put(this.party, this.options.matcher.returnGraceMs, !!this.party.lastMatch(!!this.options.playedOnly).ai);
             this.hooks.showParty();
             this.panel.setNotice(note);
             this.render();
@@ -1522,7 +1558,7 @@ class MkRandomFlow {
                 this.queue = new MkQueue(this.database, this.clock, this.paths, this.options.matcher, this.hooks);
                 this.queue.onError = (message) => this.panel.setNotice(message);
                 this.queue.onEntries = () => this.render();
-                await this.queue.enter(party, this.memberNow());
+                await this.queue.enter(party, this.memberNow(), !!this.options.playedOnly);
             }
         }
         catch (error) {

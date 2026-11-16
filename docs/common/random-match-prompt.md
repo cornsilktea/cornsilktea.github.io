@@ -361,3 +361,9 @@
 - 36번은 아직 대기실로 돌아간다.
 
 - **게임 버전 검사(2026-11-12, 30번만 적용)**: `MkFlowOptions.clientVersion`(올라가기만 하는 정수)을 주면 팀원끼리 `members/<아이디>/ver` 를 비교해 낮은 학생이 있을 때 매칭 시작 버튼이 `○○ 학생의 버전이 낮습니다.`로 바뀌고 눌리지 않는다(`MkVersionGate`). 안 주는 게임은 영향 없음. 30번은 `StatsPatches.number`(패치 번호)를 쓴다.
+
+## 2026-11-16 선생님 요청: 경기에 들어가지 않은 판은 "만난 상대"로 세지 않기 (30번, `playedOnly`)
+- **왜**: 밴픽·매칭 화면에서 누가 나가 경기가 열리지 않은 판도 묶이는 순간 `last`(바로 전 상대)·`recent`(최근 2판)에 적혀, 다음 매칭에서 그 팀을 피했다.
+- **규칙**: `MkFlowOptions.playedOnly: true` 인 게임(지금 30번만)은 경기에 실제로 들어간 판만 센다. 묶을 때 `last` 에 판 번호(`match`)와 묶이기 전 기록(`before`, 대기열 항목의 `avoid`·`recent`·`owed` 로 만듦)을 함께 적고, 게임이 경기 시작(30번: 방 상태 `countdown`·`playing`·`ended`)에 `flow.matchPlayed()` 를 부르면 팀원 기기가 `last/played = true` 를 한 번 쓴다. 다음 매칭 때 `played` 가 없으면 `before` 를 쓴다(`MkLastCount`). 옛 기록(`match` 없음)과 `playedOnly` 를 안 주는 게임은 예전과 같다.
+- **요청 수**: 판마다 팀원 수만큼 `last/played` 쓰기 1번씩 늘었다(읽기는 그대로).
+- **검사**: `node tools/match-sim.js` 의 `unitPlayedOnly` 6개(총 229개).

@@ -101,6 +101,7 @@ class BbStage {
   private static readonly LOOK_FOLLOW = 8;
   private static readonly LONGEST_FRAME_SECONDS = 0.05;
   private static readonly PIXEL_RATIO_CAP = 1.5;
+  private static readonly TOUCH_DEVICE = "ontouchstart" in window || (navigator.maxTouchPoints || 0) > 0;
   private static readonly PIXEL_RATIO_STEP = 0.25;
   private static readonly SMALL_SHADOW = 512;
 
@@ -128,7 +129,7 @@ class BbStage {
 
   constructor(private readonly libs: ThreeLibs, canvas: HTMLCanvasElement) {
     const THREE = libs.THREE;
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: !BbStage.TOUCH_DEVICE, powerPreference: "high-performance" });
     this.renderer.setPixelRatio(this.pixelRatio);
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;

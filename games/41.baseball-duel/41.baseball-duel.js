@@ -234,15 +234,27 @@ class BbDuelGame {
             this.quality = govern({ steps: this.stage.qualitySteps(), storageKey: BbDuelGame.QUALITY_KEY, isPlaying: () => this.director.isRunning && !this.liveOver && this.shown === null, slowSec: 0.022, slowLimit: 90 });
             this.quality.restore();
         }
-        this.versus.sync();
-        const saved = BbLocalResume.load();
-        if (saved)
-            this.play(saved, "방금 상황을 불러왔어요");
-        else {
-            this.showcase();
-            RkReloadResume.resumeInto(this.backend, BbRoomRules.RULES, (code) => this.enterRoom(code, false, ""));
-        }
         this.stage.run((frameSeconds) => this.tick(frameSeconds));
+        this.versus.sync();
+        if (this.resumeSaved())
+            return;
+        this.showcase();
+        RkReloadResume.resumeInto(this.backend, BbRoomRules.RULES, (code) => this.enterRoom(code, false, ""));
+    }
+    resumeSaved() {
+        const saved = BbLocalResume.load();
+        if (!saved)
+            return false;
+        try {
+            this.play(saved, "방금 상황을 불러왔어요");
+            return true;
+        }
+        catch (error) {
+            BbLocalResume.clear();
+            this.game = null;
+            this.showScreen("startScreen");
+            return false;
+        }
     }
     tick(frameSeconds) {
         const live = this.live, link = this.link, presence = this.presence;

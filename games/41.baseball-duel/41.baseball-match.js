@@ -111,7 +111,11 @@ class BbMatchDirector {
     get board() { return this.session.board(); }
     say(text, detail = "", seconds) { this.toast.show(text, detail, seconds); }
     quicken(on) { this.fast = on; }
-    orbit(on) { this.orbiting = on; }
+    orbit(on) {
+        this.orbiting = on;
+        if (!on)
+            this.toast.hide();
+    }
     preview(plan) {
         this.load(plan);
         this.running = false;
@@ -507,7 +511,7 @@ class BbMatchDirector {
     }
     called(call) {
         if (call.text)
-            this.toast.show(call.text);
+            this.callOut(call.text);
         if (call.tally)
             this.ticker.tally(call.tally, this.session.board());
         const moment = BbMatchDirector.momentOf(call);
@@ -550,8 +554,10 @@ class BbMatchDirector {
         this.ticker.settle(session.board());
         if (!settled.note.halfOver)
             this.showCards();
-        this.toast.show(verdict);
+        this.callOut(verdict);
     }
+    callOut(text) { if (!this.orbiting)
+        this.toast.show(text); }
     forfeit(team) { if (this.running)
         this.finish(team); }
     finish(forfeitedBy) {
