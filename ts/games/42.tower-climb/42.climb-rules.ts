@@ -1,0 +1,840 @@
+type ClimbMode = "free" | "hang" | "portal" | "stun";
+
+interface ClimbPieceSpec {
+  id: string; kind: string; stage: number;
+  x: number; y: number; z: number;
+  sx?: number; sz?: number; radius?: number; depth?: number; yaw?: number; rise?: number;
+  noLedge?: boolean; startOf?: number; look?: string;
+}
+interface ClimbPortalSpec { stage: number; x: number; y: number; z: number; yaw: number }
+interface ClimbRouteSpec { stage: number; name: string; label: string; ratioLimit: number; steps: string[] }
+interface ClimbStageSpec { index: number; name: string; floor: number; ceiling: number }
+interface ClimbSpawnSpec { x: number; y: number; z: number; yaw: number }
+interface ClimbLevelSpec { stages: ClimbStageSpec[]; pieces: ClimbPieceSpec[]; portals: ClimbPortalSpec[]; routes: ClimbRouteSpec[]; spawn: ClimbSpawnSpec }
+interface ClimbEdgeProbe { x: number; z: number; nx: number; nz: number; dist: number; inside: boolean }
+
+type ClimbEvent =
+  | { t: "jump" }
+  | { t: "land"; piece: string; drop: number }
+  | { t: "pad"; piece: string }
+  | { t: "grab"; ledge: boolean }
+  | { t: "hop" }
+  | { t: "mantle" }
+  | { t: "release" }
+  | { t: "launch"; power: number }
+  | { t: "cannonLand"; hit: boolean }
+  | { t: "fellHome"; from: number }
+  | { t: "voidReturn" }
+  | { t: "stageClear"; stage: number }
+  | { t: "portalEnter"; stage: number }
+  | { t: "portalArrive"; stage: number }
+  | { t: "slowEmpty" };
+
+class ClimbBalance {
+  static readonly TICK = 1 / 120;
+  static readonly FRAME_CAP = 0.1;
+  static readonly RUN = 7;
+  static readonly GROUND_ACCEL = 40;
+  static readonly AIR_ACCEL = 12;
+  static readonly STOP_TIME = 0.05;
+  static readonly GRAVITY = 28;
+  static readonly JUMP = 9.5;
+  static readonly COYOTE = 0.12;
+  static readonly JUMP_BUFFER = 0.15;
+  static readonly FALL_MAX = 35;
+  static readonly SLOPE_LIMIT_DEG = 40;
+  static readonly PAD_SPEED = 15;
+  static readonly RADIUS = 0.4;
+  static readonly HEIGHT = 2;
+  static readonly STEP = 0.35;
+  static readonly GRAB_LOW = 1.2;
+  static readonly GRAB_HIGH = 2.6;
+  static readonly GRAB_SIDE = 1;
+  static readonly HANG_DROP = 2;
+  static readonly MANTLE_TIME = 0.4;
+  static readonly MANTLE_INSET = 0.55;
+  static readonly HOP_TIME = 0.2;
+  static readonly HOP_UP = 1.6;
+  static readonly HOP_MIN = 0.2;
+  static readonly HOP_SIDE = 1.3;
+  static readonly SHIFT_LEVEL = 0.6;
+  static readonly SHIFT_COOLDOWN = 0.3;
+  static readonly REGRAB = 0.2;
+  static readonly SLOW_SCALE = 0.3;
+  static readonly SLOW_BLEND = 0.15;
+  static readonly SLOW_GAUGE = 4;
+  static readonly SLOW_RECOVER = 0.5;
+  static readonly SLOW_COOLDOWN = 0.5;
+  static readonly CANNON_CHARGE = 0.8;
+  static readonly CANNON_MIN = 0.6;
+  static readonly CANNON_UP = 27;
+  static readonly CANNON_UP_FLOOR = 0.7;
+  static readonly CANNON_FORWARD = 6.5;
+  static readonly CANNON_FORWARD_WEAK = 9;
+  static readonly CANNON_GAIN = 8;
+  static readonly FLIGHT_STEER = 6;
+  static readonly FLIGHT_MAX = 9.5;
+  static readonly PORTAL_RADIUS = 1.2;
+  static readonly PORTAL_TIME = 1.5;
+  static readonly PORTAL_DROP = 1.5;
+  static readonly HOME_FALL = 6;
+  static readonly STUN = 0.9;
+  static readonly VOID_Y = -20;
+  static readonly REST_SIDE = 3;
+  static readonly STAGE_COUNT = 7;
+  static readonly TOP = 200;
+  static readonly GRID_CELL = 4;
+}
+
+class PlatformPiece {
+  readonly id: string;
+  readonly stage: number;
+  readonly x: number;
+  readonly z: number;
+  readonly top: number;
+  readonly depth: number;
+  readonly yaw: number;
+  readonly halfX: number;
+  readonly halfZ: number;
+  readonly radius: number;
+  readonly rise: number;
+  readonly look: string;
+  readonly startOf: number;
+  readonly cos: number;
+  readonly sin: number;
+  index = 0;
+  protected readonly ledgeAllowed: boolean;
+
+  constructor(spec: ClimbPieceSpec) {
+    this.id = spec.id;
+    this.stage = spec.stage;
+    this.x = spec.x;
+    this.z = spec.z;
+    this.top = spec.y;
+    this.depth = spec.depth ?? 0.6;
+    this.yaw = spec.yaw ?? 0;
+    this.radius = spec.radius ?? 0;
+    this.halfX = this.radius > 0 ? this.radius : (spec.sx ?? 1) / 2;
+    this.halfZ = this.radius > 0 ? this.radius : (spec.sz ?? 1) / 2;
+    this.rise = spec.rise ?? 0;
+    this.look = spec.look ?? "";
+    this.startOf = spec.startOf ?? 0;
+    this.cos = Math.cos(this.yaw);
+    this.sin = Math.sin(this.yaw);
+    this.ledgeAllowed = !spec.noLedge;
+  }
+
+  get solid(): boolean { return true; }
+  get ledge(): boolean { return this.ledgeAllowed && this.rise === 0; }
+  get hub(): boolean { return false; }
+  get round(): boolean { return this.radius > 0; }
+  get bottom(): number { return this.top - Math.abs(this.rise) / 2 - this.depth; }
+  get peak(): number { return this.top + Math.abs(this.rise) / 2; }
+  get span(): number { return this.round ? this.radius : Math.hypot(this.halfX, this.halfZ); }
+  get rest(): boolean { return this.solid && this.rise === 0 && Math.min(this.halfX, this.halfZ) * 2 >= ClimbBalance.REST_SIDE; }
+  get slopeDeg(): number { return Math.atan2(Math.abs(this.rise), this.halfX * 2) * 180 / Math.PI; }
+
+  localX(px: number, pz: number): number { return (px - this.x) * this.cos - (pz - this.z) * this.sin; }
+  localZ(px: number, pz: number): number { return (px - this.x) * this.sin + (pz - this.z) * this.cos; }
+  worldX(lx: number, lz: number): number { return this.x + lx * this.cos + lz * this.sin; }
+  worldZ(lx: number, lz: number): number { return this.z - lx * this.sin + lz * this.cos; }
+
+  covers(px: number, pz: number): boolean {
+    if (this.round) { const dx = px - this.x, dz = pz - this.z; return dx * dx + dz * dz <= this.radius * this.radius; }
+    return Math.abs(this.localX(px, pz)) <= this.halfX && Math.abs(this.localZ(px, pz)) <= this.halfZ;
+  }
+
+  topAt(px: number, pz: number): number {
+    if (this.rise === 0) return this.top;
+    const along = Math.max(-1, Math.min(1, this.localX(px, pz) / this.halfX));
+    return this.top + this.rise * along / 2;
+  }
+
+  edge(px: number, pz: number, out: ClimbEdgeProbe): ClimbEdgeProbe {
+    if (this.round) {
+      const dx = px - this.x, dz = pz - this.z, d = Math.hypot(dx, dz);
+      out.nx = d > 1e-6 ? dx / d : 1;
+      out.nz = d > 1e-6 ? dz / d : 0;
+      out.x = this.x + out.nx * this.radius;
+      out.z = this.z + out.nz * this.radius;
+      out.inside = d < this.radius;
+      out.dist = Math.abs(d - this.radius);
+      return out;
+    }
+    const lx = this.localX(px, pz), lz = this.localZ(px, pz);
+    let ex: number, ez: number, nlx: number, nlz: number;
+    const inside = Math.abs(lx) < this.halfX && Math.abs(lz) < this.halfZ;
+    if (inside) {
+      const gapX = this.halfX - Math.abs(lx), gapZ = this.halfZ - Math.abs(lz);
+      if (gapX < gapZ) { nlx = lx < 0 ? -1 : 1; nlz = 0; ex = nlx * this.halfX; ez = lz; out.dist = gapX; }
+      else { nlx = 0; nlz = lz < 0 ? -1 : 1; ex = lx; ez = nlz * this.halfZ; out.dist = gapZ; }
+    } else {
+      ex = Math.max(-this.halfX, Math.min(this.halfX, lx));
+      ez = Math.max(-this.halfZ, Math.min(this.halfZ, lz));
+      const d = Math.hypot(lx - ex, lz - ez);
+      nlx = d > 1e-6 ? (lx - ex) / d : 1;
+      nlz = d > 1e-6 ? (lz - ez) / d : 0;
+      out.dist = d;
+    }
+    out.inside = inside;
+    out.x = this.worldX(ex, ez);
+    out.z = this.worldZ(ex, ez);
+    out.nx = nlx * this.cos + nlz * this.sin;
+    out.nz = -nlx * this.sin + nlz * this.cos;
+    return out;
+  }
+
+  rayEnter(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, limit: number): number {
+    const lox = this.localX(ox, oz), loz = this.localZ(ox, oz);
+    const ldx = dx * this.cos - dz * this.sin, ldz = dx * this.sin + dz * this.cos;
+    let near = 0, far = limit;
+    const lows = [-this.halfX, this.bottom, -this.halfZ], highs = [this.halfX, this.peak, this.halfZ];
+    const origin = [lox, oy, loz], dir = [ldx, dy, ldz];
+    for (let axis = 0; axis < 3; axis++) {
+      if (Math.abs(dir[axis]) < 1e-9) { if (origin[axis] < lows[axis] || origin[axis] > highs[axis]) return limit; continue; }
+      let a = (lows[axis] - origin[axis]) / dir[axis], b = (highs[axis] - origin[axis]) / dir[axis];
+      if (a > b) { const swap = a; a = b; b = swap; }
+      near = Math.max(near, a); far = Math.min(far, b);
+      if (near > far) return limit;
+    }
+    return near;
+  }
+
+  stand(_rules: ClimbRules): void {}
+  takeJump(_rules: ClimbRules): boolean { return false; }
+}
+
+class StaticPlatform extends PlatformPiece {}
+class NarrowPlatform extends PlatformPiece {}
+
+class SlopePlatform extends PlatformPiece {
+  get ledge(): boolean { return false; }
+}
+
+class HubIsland extends PlatformPiece {
+  get hub(): boolean { return true; }
+  get ledge(): boolean { return false; }
+  stand(rules: ClimbRules): void { rules.touchHome(); }
+}
+
+class StageRest extends PlatformPiece {
+  stand(rules: ClimbRules): void { rules.touchStageStart(this.startOf); }
+}
+
+class JumpPad extends PlatformPiece {
+  get ledge(): boolean { return false; }
+  stand(rules: ClimbRules): void { rules.bounce(this); }
+}
+
+class LaunchCannon extends PlatformPiece {
+  get ledge(): boolean { return false; }
+  get dirX(): number { return this.sin; }
+  get dirZ(): number { return this.cos; }
+  stand(rules: ClimbRules): void { rules.charge(this); }
+  takeJump(rules: ClimbRules): boolean {
+    rules.fire(this, Math.max(ClimbBalance.CANNON_MIN, rules.body.charge / ClimbBalance.CANNON_CHARGE));
+    return true;
+  }
+  static launchUp(power: number): number { return ClimbBalance.CANNON_UP * (ClimbBalance.CANNON_UP_FLOOR + (1 - ClimbBalance.CANNON_UP_FLOOR) * power); }
+  static launchForward(power: number): number {
+    return ClimbBalance.CANNON_FORWARD + (1 - power) * (ClimbBalance.CANNON_FORWARD_WEAK - ClimbBalance.CANNON_FORWARD) / (1 - ClimbBalance.CANNON_MIN);
+  }
+}
+
+class GrabHold extends PlatformPiece {
+  get solid(): boolean { return false; }
+  get ledge(): boolean { return false; }
+  get nx(): number { return this.sin; }
+  get nz(): number { return this.cos; }
+}
+
+class ClimbGrabSpot {
+  x = 0; y = 0; z = 0; nx = 0; nz = 1;
+  piece: PlatformPiece | null = null;
+  ledge = false;
+
+  set(x: number, y: number, z: number, nx: number, nz: number, piece: PlatformPiece, ledge: boolean): void {
+    this.x = x; this.y = y; this.z = z; this.nx = nx; this.nz = nz; this.piece = piece; this.ledge = ledge;
+  }
+  copy(other: ClimbGrabSpot): void { if (other.piece) this.set(other.x, other.y, other.z, other.nx, other.nz, other.piece, other.ledge); }
+  get bodyX(): number { return this.x + this.nx * ClimbBalance.RADIUS; }
+  get bodyZ(): number { return this.z + this.nz * ClimbBalance.RADIUS; }
+  get bodyY(): number { return this.y - ClimbBalance.HANG_DROP; }
+}
+
+class ClimbCollisionWorld {
+  readonly pieces: PlatformPiece[];
+  private readonly cells = new Map<number, PlatformPiece[]>();
+  private readonly marks: Int32Array;
+  private stamp = 0;
+
+  constructor(pieces: PlatformPiece[]) {
+    this.pieces = pieces;
+    this.marks = new Int32Array(pieces.length);
+    pieces.forEach((piece, index) => { piece.index = index; this.insert(piece); });
+  }
+
+  private static cell(value: number): number { return Math.floor(value / ClimbBalance.GRID_CELL) + 512; }
+  private static key(ix: number, iy: number, iz: number): number { return ix + iz * 1024 + iy * 1048576; }
+
+  private insert(piece: PlatformPiece): void {
+    const C = ClimbCollisionWorld, span = piece.span;
+    for (let ix = C.cell(piece.x - span); ix <= C.cell(piece.x + span); ix++)
+      for (let iz = C.cell(piece.z - span); iz <= C.cell(piece.z + span); iz++)
+        for (let iy = C.cell(piece.bottom); iy <= C.cell(piece.peak); iy++) {
+          const key = C.key(ix, iy, iz), list = this.cells.get(key);
+          if (list) list.push(piece); else this.cells.set(key, [piece]);
+        }
+  }
+
+  near(x: number, z: number, low: number, high: number, reach: number, out: PlatformPiece[]): PlatformPiece[] {
+    const C = ClimbCollisionWorld;
+    out.length = 0;
+    this.stamp++;
+    for (let ix = C.cell(x - reach); ix <= C.cell(x + reach); ix++)
+      for (let iz = C.cell(z - reach); iz <= C.cell(z + reach); iz++)
+        for (let iy = C.cell(low); iy <= C.cell(high); iy++) {
+          const list = this.cells.get(C.key(ix, iy, iz));
+          if (!list) continue;
+          for (const piece of list) if (this.marks[piece.index] !== this.stamp) { this.marks[piece.index] = this.stamp; out.push(piece); }
+        }
+    return out;
+  }
+
+  rayReach(ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, limit: number): number {
+    let reach = limit;
+    for (const piece of this.pieces) if (piece.solid) reach = Math.min(reach, piece.rayEnter(ox, oy, oz, dx, dy, dz, reach));
+    return reach;
+  }
+}
+
+class ClimbGrabSystem {
+  private readonly found: PlatformPiece[] = [];
+  private readonly probe: ClimbEdgeProbe = { x: 0, z: 0, nx: 0, nz: 0, dist: 0, inside: false };
+
+  constructor(private readonly world: ClimbCollisionWorld) {}
+
+  private scan(x: number, z: number, low: number, high: number, side: number, out: ClimbGrabSpot): boolean {
+    let best = Infinity;
+    for (const piece of this.world.near(x, z, low, high, side + 0.5, this.found)) {
+      if (piece.top < low || piece.top > high) continue;
+      if (piece instanceof GrabHold) {
+        const d = Math.hypot(piece.x - x, piece.z - z);
+        if (d <= side && d < best) { best = d; out.set(piece.x, piece.top, piece.z, piece.nx, piece.nz, piece, false); }
+      } else if (piece.ledge && !piece.covers(x, z)) {
+        const edge = piece.edge(x, z, this.probe);
+        if (edge.dist <= side && edge.dist < best) { best = edge.dist; out.set(edge.x, piece.top, edge.z, edge.nx, edge.nz, piece, true); }
+      }
+    }
+    return best < Infinity;
+  }
+
+  find(x: number, y: number, z: number, out: ClimbGrabSpot): boolean {
+    return this.scan(x, z, y + ClimbBalance.GRAB_LOW, y + ClimbBalance.GRAB_HIGH, ClimbBalance.GRAB_SIDE, out);
+  }
+
+  above(from: ClimbGrabSpot, out: ClimbGrabSpot): boolean {
+    return this.scan(from.bodyX, from.bodyZ, from.y + ClimbBalance.HOP_MIN, from.y + ClimbBalance.HOP_UP + 1e-6, ClimbBalance.HOP_SIDE, out);
+  }
+
+  beside(from: ClimbGrabSpot, moveX: number, moveZ: number, out: ClimbGrabSpot): boolean {
+    let best = Infinity;
+    const B = ClimbBalance;
+    for (const piece of this.world.near(from.x, from.z, from.y - B.SHIFT_LEVEL, from.y + B.SHIFT_LEVEL, B.HOP_SIDE + 0.5, this.found)) {
+      if (!(piece instanceof GrabHold) || piece === from.piece || Math.abs(piece.top - from.y) > B.SHIFT_LEVEL) continue;
+      const dx = piece.x - from.x, dz = piece.z - from.z, d = Math.hypot(dx, dz);
+      if (d < B.HOP_MIN || d > B.HOP_SIDE || (dx * moveX + dz * moveZ) / d < 0.5 || d >= best) continue;
+      best = d;
+      out.set(piece.x, piece.top, piece.z, piece.nx, piece.nz, piece, false);
+    }
+    return best < Infinity;
+  }
+}
+
+class ClimbTimeScale {
+  gauge = ClimbBalance.SLOW_GAUGE;
+  scale = 1;
+  cooldown = 0;
+  active = false;
+
+  update(realDt: number, held: boolean): boolean {
+    const B = ClimbBalance;
+    let emptied = false;
+    if (this.cooldown > 0) this.cooldown = Math.max(0, this.cooldown - realDt);
+    this.active = held && this.gauge > 0 && this.cooldown <= 0;
+    if (this.active) {
+      this.gauge -= realDt;
+      if (this.gauge <= 0) { this.gauge = 0; this.cooldown = B.SLOW_COOLDOWN; this.active = false; emptied = true; }
+    } else if (!held) this.gauge = Math.min(B.SLOW_GAUGE, this.gauge + B.SLOW_RECOVER * realDt);
+    const target = this.active ? B.SLOW_SCALE : 1, pace = (1 - B.SLOW_SCALE) / B.SLOW_BLEND * realDt;
+    this.scale = this.scale < target ? Math.min(target, this.scale + pace) : Math.max(target, this.scale - pace);
+    return emptied;
+  }
+
+  refill(): void { this.gauge = ClimbBalance.SLOW_GAUGE; }
+  get fill(): number { return this.gauge / ClimbBalance.SLOW_GAUGE; }
+}
+
+class StageProgress {
+  constructor(public cleared = 0) {}
+
+  clear(stage: number): boolean {
+    if (stage <= this.cleared || stage < 1 || stage > ClimbBalance.STAGE_COUNT) return false;
+    this.cleared = stage;
+    return true;
+  }
+  unlocked(portalStage: number): boolean { return portalStage >= 2 && portalStage - 1 <= this.cleared; }
+  portalOpen(portalStage: number, level: TowerLevel): boolean { return this.unlocked(portalStage) && level.hasStage(portalStage); }
+}
+
+class TowerStage {
+  readonly pieces: PlatformPiece[] = [];
+  readonly routes: ClimbRouteSpec[] = [];
+  constructor(readonly index: number, readonly name: string, readonly floor: number, readonly ceiling: number) {}
+  get built(): boolean { return this.pieces.length > 0; }
+}
+
+class TowerLevel {
+  static readonly PIECE_KINDS: Readonly<Record<string, new (spec: ClimbPieceSpec) => PlatformPiece>> = {
+    static: StaticPlatform, narrow: NarrowPlatform, slope: SlopePlatform, hub: HubIsland,
+    rest: StageRest, pad: JumpPad, cannon: LaunchCannon, hold: GrabHold,
+  };
+
+  readonly pieces: PlatformPiece[];
+  readonly stages: TowerStage[];
+  readonly portals: readonly ClimbPortalSpec[];
+  readonly routes: readonly ClimbRouteSpec[];
+  readonly spawn: ClimbSpawnSpec;
+  private readonly byId = new Map<string, PlatformPiece>();
+  private readonly starts = new Map<number, PlatformPiece>();
+
+  constructor(spec: ClimbLevelSpec) {
+    this.stages = spec.stages.map((s) => new TowerStage(s.index, s.name, s.floor, s.ceiling));
+    this.pieces = spec.pieces.map((pieceSpec) => {
+      const Kind = TowerLevel.PIECE_KINDS[pieceSpec.kind];
+      if (!Kind) throw new Error("unknown piece kind " + pieceSpec.kind);
+      return new Kind(pieceSpec);
+    });
+    for (const piece of this.pieces) {
+      if (this.byId.has(piece.id)) throw new Error("duplicate piece id " + piece.id);
+      this.byId.set(piece.id, piece);
+      if (piece.startOf > 0) this.starts.set(piece.startOf, piece);
+      this.stageOf(piece.stage)?.pieces.push(piece);
+    }
+    for (const route of spec.routes) this.stageOf(route.stage)?.routes.push(route);
+    this.portals = spec.portals;
+    this.routes = spec.routes;
+    this.spawn = spec.spawn;
+  }
+
+  stageOf(index: number): TowerStage | undefined { return this.stages.find((s) => s.index === index); }
+  stageAt(height: number): TowerStage {
+    let current = this.stages[0];
+    for (const stage of this.stages) if (height >= stage.floor - 1e-6) current = stage;
+    return current;
+  }
+  piece(id: string): PlatformPiece {
+    const found = this.byId.get(id);
+    if (!found) throw new Error("no piece " + id);
+    return found;
+  }
+  stageStart(index: number): PlatformPiece | null { return this.starts.get(index) ?? null; }
+  hasStage(index: number): boolean { return this.starts.has(index); }
+}
+
+class ClimbCharacterBody {
+  x = 0; y = 0; z = 0;
+  prevX = 0; prevY = 0; prevZ = 0;
+  vx = 0; vy = 0; vz = 0;
+  yaw = 0;
+  mode: ClimbMode = "free";
+  grounded = false;
+  ground: PlatformPiece | null = null;
+  sliding = false;
+  coyote = 0;
+  jumpBuffer = 0;
+  airPeak = 0;
+  flight = false;
+  flightFrom = 0;
+  charge = 0;
+  chargeOn: PlatformPiece | null = null;
+  readonly spot = new ClimbGrabSpot();
+  hangTime = 0;
+  hopTime = 0;
+  shiftCooldown = 0;
+  grabCooldown = 0;
+  stunTime = 0;
+  portalTime = 0;
+  portalTo = 0;
+
+  place(x: number, y: number, z: number): void {
+    this.x = this.prevX = x; this.y = this.prevY = y; this.z = this.prevZ = z;
+    this.vx = this.vy = this.vz = 0;
+  }
+  remember(): void { this.prevX = this.x; this.prevY = this.y; this.prevZ = this.z; }
+  get speed(): number { return Math.hypot(this.vx, this.vz); }
+  get hanging(): boolean { return this.mode === "hang"; }
+}
+
+class FallReturnWatcher {
+  falls = 0;
+  constructor(private readonly rules: ClimbRules) {}
+
+  landed(piece: PlatformPiece, drop: number): void {
+    if (!piece.hub || drop < ClimbBalance.HOME_FALL) return;
+    const body = this.rules.body;
+    this.falls++;
+    body.mode = "stun";
+    body.stunTime = ClimbBalance.STUN;
+    body.vx = body.vz = 0;
+    this.rules.emit({ t: "fellHome", from: body.airPeak });
+  }
+
+  watch(): void {
+    const body = this.rules.body, spawn = this.rules.level.spawn;
+    if (body.y >= ClimbBalance.VOID_Y) return;
+    this.falls++;
+    body.place(spawn.x, spawn.y + 0.5, spawn.z);
+    body.mode = "free";
+    body.grounded = false;
+    body.ground = null;
+    body.flight = false;
+    body.airPeak = body.y;
+    this.rules.emit({ t: "voidReturn" });
+  }
+}
+
+class ClimbRules {
+  readonly world: ClimbCollisionWorld;
+  readonly grab: ClimbGrabSystem;
+  readonly time = new ClimbTimeScale();
+  readonly body = new ClimbCharacterBody();
+  readonly watcher: FallReturnWatcher;
+  readonly events: ClimbEvent[] = [];
+  clock = 0;
+  started = false;
+  peak = 0;
+  portalsUsed = 0;
+  cannonHits = 0;
+  cannonMisses = 0;
+  stageOneTime: number | null = null;
+  private moveX = 0;
+  private moveZ = 0;
+  private jumpLatch = false;
+  private grabLatch = false;
+  private slowHeld = false;
+  private bank = 0;
+  private readonly found: PlatformPiece[] = [];
+  private readonly probe: ClimbEdgeProbe = { x: 0, z: 0, nx: 0, nz: 0, dist: 0, inside: false };
+  private readonly nextSpot = new ClimbGrabSpot();
+  private readonly modeSteps: Record<ClimbMode, (grab: boolean) => void>;
+
+  constructor(readonly level: TowerLevel, readonly progress: StageProgress) {
+    this.world = new ClimbCollisionWorld(level.pieces);
+    this.grab = new ClimbGrabSystem(this.world);
+    this.watcher = new FallReturnWatcher(this);
+    this.modeSteps = {
+      free: (grab) => this.stepFree(grab),
+      hang: (grab) => this.stepHang(grab),
+      portal: () => this.stepPortal(),
+      stun: () => this.stepStun(),
+    };
+    this.body.place(level.spawn.x, level.spawn.y, level.spawn.z);
+    this.body.yaw = level.spawn.yaw;
+    this.body.airPeak = level.spawn.y;
+  }
+
+  steer(x: number, z: number): void {
+    const length = Math.hypot(x, z);
+    this.moveX = length > 1e-6 ? x / length : 0;
+    this.moveZ = length > 1e-6 ? z / length : 0;
+  }
+  pressJump(): void { this.jumpLatch = true; }
+  pressGrab(): void { this.grabLatch = true; }
+  holdSlow(held: boolean): void { this.slowHeld = held; }
+  emit(event: ClimbEvent): void { this.events.push(event); }
+
+  get falls(): number { return this.watcher.falls; }
+  get height(): number { return Math.max(0, this.body.y); }
+  get blend(): number { return this.bank / ClimbBalance.TICK; }
+  get steering(): boolean { return this.moveX !== 0 || this.moveZ !== 0; }
+  get chargeFill(): number { return this.body.chargeOn ? Math.min(1, this.body.charge / ClimbBalance.CANNON_CHARGE) : 0; }
+
+  advance(realDt: number): ClimbEvent[] {
+    const B = ClimbBalance, dt = Math.min(Math.max(realDt, 0), B.FRAME_CAP);
+    this.events.length = 0;
+    if (!this.started && (this.steering || this.jumpLatch)) this.started = true;
+    if (this.started) this.clock += dt;
+    if (this.time.update(dt, this.slowHeld)) this.emit({ t: "slowEmpty" });
+    this.bank += dt * this.time.scale;
+    while (this.bank >= B.TICK - 1e-12) { this.bank -= B.TICK; this.step(); }
+    if (this.bank < 0) this.bank = 0;
+    return this.events;
+  }
+
+  step(): void {
+    const B = ClimbBalance, body = this.body;
+    body.remember();
+    body.grabCooldown = Math.max(0, body.grabCooldown - B.TICK);
+    body.shiftCooldown = Math.max(0, body.shiftCooldown - B.TICK);
+    body.jumpBuffer = Math.max(0, body.jumpBuffer - B.TICK);
+    if (this.jumpLatch) { body.jumpBuffer = B.JUMP_BUFFER; this.jumpLatch = false; }
+    const grab = this.grabLatch;
+    this.grabLatch = false;
+    this.modeSteps[body.mode](grab);
+    this.watcher.watch();
+  }
+
+  touchHome(): void { this.time.refill(); }
+
+  touchStageStart(stage: number): void {
+    this.time.refill();
+    if (!this.progress.clear(stage - 1)) return;
+    if (stage === 2 && this.portalsUsed === 0 && this.stageOneTime === null) this.stageOneTime = this.clock;
+    this.emit({ t: "stageClear", stage: stage - 1 });
+  }
+
+  bounce(pad: PlatformPiece): void {
+    this.body.vy = ClimbBalance.PAD_SPEED;
+    this.leaveGround();
+    this.body.coyote = 0;
+    this.emit({ t: "pad", piece: pad.id });
+  }
+
+  charge(cannon: LaunchCannon): void {
+    const body = this.body;
+    if (body.chargeOn !== cannon) { body.chargeOn = cannon; body.charge = 0; }
+    body.charge += ClimbBalance.TICK;
+    if (body.charge >= ClimbBalance.CANNON_CHARGE) this.fire(cannon, 1);
+  }
+
+  fire(cannon: LaunchCannon, power: number): void {
+    const body = this.body, forward = LaunchCannon.launchForward(power);
+    body.x = cannon.x; body.z = cannon.z;
+    body.vx = cannon.dirX * forward; body.vz = cannon.dirZ * forward;
+    body.vy = LaunchCannon.launchUp(power);
+    this.leaveGround();
+    body.coyote = 0;
+    body.jumpBuffer = 0;
+    body.flight = true;
+    body.flightFrom = body.y;
+    body.charge = 0;
+    body.chargeOn = null;
+    this.emit({ t: "launch", power });
+  }
+
+  private leaveGround(): void {
+    const body = this.body;
+    body.grounded = false;
+    body.ground = null;
+    body.sliding = false;
+    body.airPeak = body.y;
+  }
+
+  private approach(targetX: number, targetZ: number, maxDelta: number): void {
+    const body = this.body, dx = targetX - body.vx, dz = targetZ - body.vz, d = Math.hypot(dx, dz);
+    if (d <= maxDelta) { body.vx = targetX; body.vz = targetZ; return; }
+    body.vx += dx / d * maxDelta; body.vz += dz / d * maxDelta;
+  }
+
+  private endFlight(height: number): void {
+    const body = this.body;
+    if (!body.flight) return;
+    const hit = height >= body.flightFrom + ClimbBalance.CANNON_GAIN;
+    body.flight = false;
+    if (hit) this.cannonHits++; else this.cannonMisses++;
+    this.emit({ t: "cannonLand", hit });
+  }
+
+  private stepFree(grab: boolean): void {
+    const B = ClimbBalance, T = B.TICK, body = this.body;
+    if (grab && body.grabCooldown <= 0 && this.grab.find(body.x, body.y, body.z, body.spot)) { this.startHang(); return; }
+
+    const ground = body.grounded ? body.ground : null;
+    body.sliding = !!ground && ground.slopeDeg > B.SLOPE_LIMIT_DEG;
+    if (ground && body.sliding) {
+      const down = ground.rise > 0 ? -1 : 1, angle = ground.slopeDeg * Math.PI / 180, pull = B.GRAVITY * Math.sin(angle) * Math.cos(angle) * T;
+      body.vx += down * ground.cos * pull; body.vz += down * -ground.sin * pull;
+    } else if (body.grounded) {
+      if (this.steering) this.approach(this.moveX * B.RUN, this.moveZ * B.RUN, B.GROUND_ACCEL * T);
+      else this.approach(0, 0, B.RUN / B.STOP_TIME * T);
+    } else if (body.flight) {
+      body.vx += this.moveX * B.FLIGHT_STEER * T; body.vz += this.moveZ * B.FLIGHT_STEER * T;
+      const speed = body.speed;
+      if (speed > B.FLIGHT_MAX) { body.vx *= B.FLIGHT_MAX / speed; body.vz *= B.FLIGHT_MAX / speed; }
+    } else if (this.steering) this.approach(this.moveX * B.RUN, this.moveZ * B.RUN, B.AIR_ACCEL * T);
+
+    body.coyote = body.grounded ? B.COYOTE : Math.max(0, body.coyote - T);
+    if (body.jumpBuffer > 0 && body.coyote > 0 && !body.sliding) {
+      body.jumpBuffer = 0;
+      body.coyote = 0;
+      if (!(ground && ground.takeJump(this))) { body.vy = B.JUMP; this.leaveGround(); this.emit({ t: "jump" }); }
+    }
+    if (!body.grounded) body.vy = Math.max(body.vy - B.GRAVITY * T, -B.FALL_MAX);
+
+    let nextX = body.x + body.vx * T, nextZ = body.z + body.vz * T;
+    const near = this.world.near(nextX, nextZ, body.y - 1.5, body.y + B.HEIGHT + 1.5, B.RADIUS + 0.5, this.found);
+    for (let pass = 0; pass < 2; pass++)
+      for (const piece of near) {
+        if (!piece.solid) continue;
+        const edge = piece.edge(nextX, nextZ, this.probe);
+        if (!edge.inside && edge.dist >= B.RADIUS) continue;
+        if (body.y + B.STEP >= piece.topAt(edge.x, edge.z) || body.y + B.HEIGHT <= piece.bottom) continue;
+        nextX = edge.x + edge.nx * B.RADIUS; nextZ = edge.z + edge.nz * B.RADIUS;
+        const into = body.vx * edge.nx + body.vz * edge.nz;
+        if (into < 0) { body.vx -= into * edge.nx; body.vz -= into * edge.nz; }
+      }
+
+    const wasGrounded = body.grounded;
+    let nextY = body.y + body.vy * T, floor = -Infinity, floorPiece: PlatformPiece | null = null;
+    for (const piece of near) {
+      if (!piece.solid || !piece.covers(nextX, nextZ)) continue;
+      const top = piece.topAt(nextX, nextZ);
+      if (top <= body.y + B.STEP + 1e-6) { if (top > floor) { floor = top; floorPiece = piece; } }
+      else if (body.vy > 0 && piece.bottom >= body.y + B.HEIGHT - 1e-6 && piece.bottom < nextY + B.HEIGHT) { nextY = piece.bottom - B.HEIGHT; body.vy = 0; }
+    }
+    body.x = nextX; body.z = nextZ;
+    if (body.vy <= 0 && floorPiece && floor >= nextY - (wasGrounded ? B.STEP : 0)) this.land(floorPiece, floor, wasGrounded);
+    else {
+      body.y = nextY;
+      if (wasGrounded) this.leaveGround();
+      body.airPeak = Math.max(body.airPeak, body.y);
+    }
+
+    if (body.grounded && body.ground) body.ground.stand(this);
+    if (body.chargeOn && (!body.grounded || body.ground !== body.chargeOn)) { body.charge = 0; body.chargeOn = null; }
+    if (body.speed > 0.5) body.yaw = Math.atan2(body.vx, body.vz);
+    if (body.grounded) { this.peak = Math.max(this.peak, body.y); this.enterPortalIfInside(); }
+  }
+
+  private land(piece: PlatformPiece, top: number, wasGrounded: boolean): void {
+    const body = this.body;
+    body.y = top;
+    body.vy = 0;
+    body.grounded = true;
+    body.ground = piece;
+    if (wasGrounded) return;
+    const drop = body.airPeak - top;
+    this.emit({ t: "land", piece: piece.id, drop });
+    this.endFlight(top);
+    this.watcher.landed(piece, drop);
+  }
+
+  private enterPortalIfInside(): void {
+    const B = ClimbBalance, body = this.body;
+    if (body.mode !== "free") return;
+    for (const portal of this.level.portals) {
+      if (!this.progress.portalOpen(portal.stage, this.level)) continue;
+      if (Math.hypot(portal.x - body.x, portal.z - body.z) > B.PORTAL_RADIUS || Math.abs(portal.y - body.y) > 1) continue;
+      body.mode = "portal";
+      body.portalTime = B.PORTAL_TIME;
+      body.portalTo = portal.stage;
+      body.vx = body.vy = body.vz = 0;
+      this.emit({ t: "portalEnter", stage: portal.stage });
+      return;
+    }
+  }
+
+  private startHang(): void {
+    const body = this.body;
+    this.endFlight(body.spot.y);
+    body.mode = "hang";
+    body.hangTime = 0;
+    body.hopTime = 0;
+    body.grounded = false;
+    body.ground = null;
+    body.sliding = false;
+    body.charge = 0;
+    body.chargeOn = null;
+    this.settleOnSpot();
+    this.emit({ t: "grab", ledge: body.spot.ledge });
+  }
+
+  private settleOnSpot(): void {
+    const body = this.body, spot = body.spot;
+    body.x = spot.bodyX; body.y = spot.bodyY; body.z = spot.bodyZ;
+    body.vx = body.vy = body.vz = 0;
+    body.yaw = Math.atan2(-spot.nx, -spot.nz);
+    body.airPeak = body.y;
+    this.peak = Math.max(this.peak, body.y);
+  }
+
+  private stepHang(grab: boolean): void {
+    const B = ClimbBalance, T = B.TICK, body = this.body, spot = body.spot;
+    if (body.hopTime > 0) { body.hopTime = Math.max(0, body.hopTime - T); return; }
+    if (grab) { this.release(false); return; }
+    if (spot.ledge) {
+      body.hangTime += T;
+      if (body.hangTime >= B.MANTLE_TIME) this.mantle();
+      return;
+    }
+    if (body.jumpBuffer > 0) {
+      body.jumpBuffer = 0;
+      if (this.grab.above(spot, this.nextSpot)) this.hopTo(this.nextSpot); else this.release(true);
+      return;
+    }
+    if (this.steering && body.shiftCooldown <= 0 && this.grab.beside(spot, this.moveX, this.moveZ, this.nextSpot)) {
+      this.hopTo(this.nextSpot);
+      body.shiftCooldown = B.SHIFT_COOLDOWN;
+    }
+  }
+
+  private hopTo(next: ClimbGrabSpot): void {
+    const body = this.body;
+    body.spot.copy(next);
+    body.hopTime = ClimbBalance.HOP_TIME;
+    body.hangTime = 0;
+    this.settleOnSpot();
+    this.emit({ t: "hop" });
+  }
+
+  private mantle(): void {
+    const B = ClimbBalance, body = this.body, spot = body.spot, piece = spot.piece;
+    if (!piece) { this.release(false); return; }
+    const x = spot.x - spot.nx * B.MANTLE_INSET, z = spot.z - spot.nz * B.MANTLE_INSET;
+    body.x = piece.covers(x, z) ? x : piece.x;
+    body.z = piece.covers(x, z) ? z : piece.z;
+    body.y = piece.top;
+    body.mode = "free";
+    body.grounded = true;
+    body.ground = piece;
+    body.coyote = B.COYOTE;
+    body.airPeak = body.y;
+    this.peak = Math.max(this.peak, body.y);
+    this.emit({ t: "mantle" });
+  }
+
+  private release(jump: boolean): void {
+    const B = ClimbBalance, body = this.body;
+    body.mode = "free";
+    body.grabCooldown = B.REGRAB;
+    body.grounded = false;
+    body.ground = null;
+    body.coyote = 0;
+    body.airPeak = body.y;
+    if (jump) { body.vy = B.JUMP; body.vx = this.moveX * B.RUN; body.vz = this.moveZ * B.RUN; this.emit({ t: "jump" }); }
+    else this.emit({ t: "release" });
+  }
+
+  private stepStun(): void {
+    const body = this.body;
+    body.stunTime -= ClimbBalance.TICK;
+    if (body.stunTime <= 0) body.mode = "free";
+    if (body.ground) body.ground.stand(this);
+  }
+
+  private stepPortal(): void {
+    const B = ClimbBalance, body = this.body;
+    body.portalTime -= B.TICK;
+    if (body.portalTime > 0) return;
+    const start = this.level.stageStart(body.portalTo);
+    body.mode = "free";
+    if (!start) return;
+    body.place(start.x, start.top + B.PORTAL_DROP, start.z);
+    body.grounded = false;
+    body.ground = null;
+    body.airPeak = start.top;
+    this.portalsUsed++;
+    this.emit({ t: "portalArrive", stage: body.portalTo });
+  }
+}
