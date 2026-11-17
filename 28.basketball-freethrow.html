@@ -171,7 +171,7 @@
       <h2>규칙</h2>
       <ul class="st-rules">
         <li>림·백보드를 안 건드리고 들어가면 <b>클린 슛 3점</b>, 맞고 들어가면 <b>뱅크 슛 2점</b>.</li>
-        <li>1~5라운드는 <b>40초</b>, 그 뒤로 점점 길어져 <b>20라운드는 120초</b>입니다.</li>
+        <li>1~7라운드는 <b>40초</b>, 그 뒤로 점점 길어져 <b>20라운드는 120초</b>입니다.</li>
         <li>통과 기준은 라운드가 올라갈수록 크게 오릅니다. <b>20라운드</b>까지 통과하면 클리어!</li>
         <li>라운드가 끝날 때 누적 점수가 통과 기준에 못 미치면 <b>탈락</b>합니다.</li>
         <li>🔥 마지막 <b>15초는 피버 타임</b> — 점수 2배!</li>
@@ -221,8 +221,8 @@ const CFG = {
   GRAVITY: 9.81,
 };
 class StageTable {
-  static PASS = Object.freeze([60, 120, 190, 270, 360, 460, 570, 690, 820, 960, 1110, 1270, 1440, 1620, 1820, 2040, 2280, 2540, 2820, 3150]);
-  static SECONDS = Object.freeze([40, 40, 40, 40, 40, 45, 45, 50, 50, 55, 60, 60, 65, 70, 80, 85, 95, 100, 110, 120]);
+  static PASS = Object.freeze([60, 120, 190, 260, 340, 400, 500, 610, 730, 870, 1020, 1190, 1380, 1590, 1820, 2070, 2340, 2630, 2940, 3270]);
+  static SECONDS = Object.freeze([40, 40, 40, 40, 40, 40, 40, 45, 45, 50, 55, 60, 65, 70, 80, 85, 95, 100, 110, 120]);
   static get last() { return StageTable.PASS.length; }
   static passOf(r) { return StageTable.PASS[Math.min(r, StageTable.last) - 1]; }
   static secondsOf(r) { return StageTable.SECONDS[Math.min(r, StageTable.last) - 1]; }
