@@ -201,7 +201,6 @@ class JumpPad extends PlatformPiece {
     stand(rules) { rules.bounce(this); }
 }
 class LaunchCannon extends PlatformPiece {
-    get ledge() { return false; }
     get dirX() { return this.sin; }
     get dirZ() { return this.cos; }
     stand(rules) { rules.charge(this); }

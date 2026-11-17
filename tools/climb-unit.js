@@ -217,6 +217,20 @@ function box(id, x, z, y, sx, sz, more = {}) { return { id, kind: "static", stag
   check("발사대: 낮은 곳에 내리면 실패로 셈", weak.misses === 1, weak.misses);
 }
 {
+  const r = world([{ id: "c", kind: "cannon", stage: 1, x: 2.6, y: 2.4, z: 0, radius: 1.3, depth: 2.4, yaw: 0 }], { x: 0.5, y: 0, z: 0, yaw: 0 });
+  settle(r);
+  r.steer(1, 0);
+  run(r, 0.2);
+  r.pressJump();
+  const grab = run(r, 0.3);
+  check("발사대 모서리도 점프하면 저절로 잡음", r.body.hanging && grab.some((e) => e.t === "grab" && e.ledge), r.body.mode);
+  r.steer(0, 0);
+  run(r, 0.3);
+  r.pressJump();
+  const up = run(r, 2.5);
+  check("발사대 모서리에서 기어오르면 발사대가 저절로 쏨", up.some((e) => e.t === "launch"), up.map((e) => e.t));
+}
+{
   const path = (slow) => {
     const r = world([]);
     const trace = [];

@@ -234,7 +234,6 @@ class JumpPad extends PlatformPiece {
 }
 
 class LaunchCannon extends PlatformPiece {
-  get ledge(): boolean { return false; }
   get dirX(): number { return this.sin; }
   get dirZ(): number { return this.cos; }
   stand(rules: ClimbRules): void { rules.charge(this); }
