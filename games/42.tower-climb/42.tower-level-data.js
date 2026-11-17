@@ -23,6 +23,11 @@ TowerPropShapes.SHAPES = {
     fridge: { model: "fridge", turn: 0, top: 2.5, base: 0, cx: 0, cz: 0.12, span: 2, across: 2.24, round: false },
     board: { model: "board", turn: 0, top: 0.15, base: 0, cx: 0, cz: 0, span: 1.5, across: 1, round: false },
     plate: { model: "plate", turn: 0, top: 0.1, base: 0, cx: 0, cz: 0, span: 0.95, across: 0.95, round: true },
+    tomb: { model: "gravePillar", turn: 0, top: 4.4, base: 0, cx: 0, cz: 0, span: 2, across: 2, round: false, cap: "plaque" },
+    coffin: { model: "coffin", turn: 0, top: 1.32, base: 0, cx: 0, cz: 0, span: 2, across: 3, round: false },
+    slab: { model: "plaque", turn: 0, top: 0.4, base: 0, cx: 0, cz: 0, span: 2, across: 2, round: false },
+    dirt: { model: "dirtPlot", turn: 0, top: 0.03, base: -0.5, cx: 0, cz: 0, span: 4, across: 4, round: false },
+    pumpkin: { model: "pumpkin", turn: 0, top: 0.6, base: 0, cx: 0, cz: 0, span: 1, across: 1, round: true },
 };
 TowerPropShapes.ROOFS = {
     houseA: { eaveHalf: 0.4, eaveY: 0.37, wallHalf: 0.3, wallTop: 0.28 },
@@ -206,6 +211,13 @@ class ClimbRingBuilder {
         const shape = TowerPropShapes.SHAPES[look], middle = (outerRho + this.restRadius) / 2;
         this.pen.boxAt(id, "static", ClimbLayoutPen.ringX(deg, middle), ClimbLayoutPen.ringZ(deg, middle), top, outerRho - this.restRadius + 0.2, shape.across * scale, deg - 90, { depth: (shape.top - shape.base) * scale, look });
     }
+    longJump(spec) {
+        const along = ClimbLayoutPen.halfOf(spec.launchLook, spec.launchScale) - spec.padSize / 2, sense = this.trail.sense;
+        const deg = this.ring(spec.launch, spec.launchLook, spec.rho, spec.top, spec.launchScale, spec.approach);
+        this.pad(spec.pad, deg, spec.rho, spec.top, spec.padSize, sense * along);
+        this.follow(deg + sense * Math.atan2(along, spec.rho) * 180 / Math.PI, spec.rho, spec.padSize / 2, sense);
+        this.ring(spec.goal, spec.goalLook, spec.rho, spec.top + 0.3 + spec.rise, spec.goalScale, spec.gap);
+    }
     arrive(id, look, rho, top, scale, gap, bridgeId, bridgeLook, bridgeScale) {
         const deg = this.ring(id, look, rho, top, scale, gap);
         this.bridge(bridgeId, bridgeLook, deg, rho - ClimbLayoutPen.halfOf(look, scale), top, bridgeScale);
@@ -214,7 +226,6 @@ class ClimbRingBuilder {
 class TowerStageTwoLayout {
     static pieces() {
         const S = TowerStageTwoLayout, pen = new ClimbLayoutPen(2), go = new ClimbRingBuilder(pen, S.REST_RADIUS);
-        pen.round("tower2", "static", 0, 0, S.TOP_Y - 0.5, TowerStageOneLayout.TRUNK_RADIUS, { depth: S.TOP_Y - 0.5 - S.TOWER_BASE, noLedge: true, look: "tower" });
         const isleOf = (scale) => S.HEX * 0.75 * scale / S.HOUSE_A;
         go.spoke("vw1", "wall", 0, S.FLOOR, S.WALL);
         go.follow(0, S.LOOP_RHO, ClimbLayoutPen.halfOf("hex", S.HEX));
@@ -267,7 +278,6 @@ class TowerStageTwoLayout {
     }
 }
 TowerStageTwoLayout.FLOOR = 30;
-TowerStageTwoLayout.TOWER_BASE = 34;
 TowerStageTwoLayout.TOP_Y = 60;
 TowerStageTwoLayout.REST_RADIUS = 4.2;
 TowerStageTwoLayout.LOOP_RHO = 14;
@@ -284,7 +294,6 @@ TowerStageTwoLayout.ROOF_RHO = 20;
 class TowerStageThreeLayout {
     static pieces() {
         const S = TowerStageThreeLayout, pen = new ClimbLayoutPen(3), go = new ClimbRingBuilder(pen, S.REST_RADIUS);
-        pen.round("tower3", "static", 0, 0, S.TOP_Y - 0.5, TowerStageOneLayout.TRUNK_RADIUS, { depth: S.TOP_Y - 0.5 - S.TOWER_BASE, noLedge: true, look: "tower" });
         go.follow(S.EASY_SPOKE, go.spoke("dw1", "dwall", S.EASY_SPOKE, S.FLOOR, S.SPOKE), 0);
         go.hop("dt1", "tile", S.EASY_SPOKE, S.FLOOR, S.TILE, 3.9);
         const R = S.EASY_RHO;
@@ -334,7 +343,6 @@ class TowerStageThreeLayout {
     }
 }
 TowerStageThreeLayout.FLOOR = 60;
-TowerStageThreeLayout.TOWER_BASE = 64;
 TowerStageThreeLayout.TOP_Y = 90;
 TowerStageThreeLayout.REST_RADIUS = 4.2;
 TowerStageThreeLayout.SPOKE = 1.5;
@@ -352,7 +360,6 @@ TowerStageThreeLayout.WALL_RHO = 22;
 class TowerStageFourLayout {
     static pieces() {
         const S = TowerStageFourLayout, pen = new ClimbLayoutPen(4), go = new ClimbRingBuilder(pen, S.REST_RADIUS);
-        pen.round("tower4", "static", 0, 0, S.TOP_Y - 0.5, TowerStageOneLayout.TRUNK_RADIUS, { depth: S.TOP_Y - 0.5 - S.TOWER_BASE, noLedge: true, look: "tower" });
         go.follow(S.EASY_SPOKE, go.spoke("ks1", "counter", S.EASY_SPOKE, S.FLOOR, S.SPOKE), 0);
         go.hop("kr1", "rtable", S.EASY_SPOKE, S.FLOOR, S.RTABLE, 3.9);
         const R = S.EASY_RHO;
@@ -374,7 +381,7 @@ class TowerStageFourLayout {
         go.ring("kt3", "ktable", R, 112.3, S.KTABLE, 4.3);
         go.ring("kv2", "stove", R, 113.1, S.STOVE, 3.5);
         const lastFridge = go.ring("kf5", "fridge", R, 116.9, S.FRIDGE, 1.4);
-        S.longJump(go, R - 1.5);
+        go.longJump({ launch: "kb6", pad: "kj3", goal: "kc1", launchLook: "board", launchScale: S.BOARD, goalLook: "counter", goalScale: S.COUNTER, rho: R - 1.5, top: S.LAUNCH_TOP, approach: 4, padSize: S.PAD, gap: S.LONG_GAP, rise: S.LONG_RISE });
         go.arrive("kf6", "fridge", S.ARRIVE_RHO, S.TOP_Y, S.FRIDGE, 1.4, "kw1", "counter", S.SPOKE);
         go.follow(S.SHELF_SPOKE, go.spoke("gs1", "counter", S.SHELF_SPOKE, S.FLOOR, S.SPOKE), 0, -1);
         go.hop("gr1", "rtable", S.SHELF_SPOKE, S.FLOOR, S.RTABLE, 4.1);
@@ -394,13 +401,6 @@ class TowerStageFourLayout {
         pen.round("rest5", "rest", 0, 0, S.TOP_Y, S.REST_RADIUS, { depth: 0.5, startOf: 5, look: "rest" });
         return pen.pieces;
     }
-    static longJump(go, rho) {
-        const S = TowerStageFourLayout, along = ClimbLayoutPen.halfOf("board", S.BOARD) - S.PAD / 2;
-        const deg = go.ring("kb6", "board", rho, S.LAUNCH_TOP, S.BOARD, 4);
-        go.pad("kj3", deg, rho, S.LAUNCH_TOP, S.PAD, along);
-        go.follow(deg + Math.atan2(along, rho) * 180 / Math.PI, rho, S.PAD / 2);
-        go.ring("kc1", "counter", rho, S.LAUNCH_TOP + 0.3 + S.LONG_RISE, S.COUNTER, S.LONG_GAP);
-    }
     static routes() {
         const tail = ["kb6", "kj3", "kc1", "kf6", "kw1", "rest5"];
         return [
@@ -410,7 +410,6 @@ class TowerStageFourLayout {
     }
 }
 TowerStageFourLayout.FLOOR = 90;
-TowerStageFourLayout.TOWER_BASE = 94;
 TowerStageFourLayout.TOP_Y = 120;
 TowerStageFourLayout.REST_RADIUS = 4.2;
 TowerStageFourLayout.SPOKE = 2;
@@ -431,13 +430,86 @@ TowerStageFourLayout.JOIN_GAP = 1.2;
 TowerStageFourLayout.LAUNCH_TOP = 115.5;
 TowerStageFourLayout.LONG_GAP = 4.2;
 TowerStageFourLayout.LONG_RISE = 2;
+class TowerStageFiveLayout {
+    static pieces() {
+        const S = TowerStageFiveLayout, pen = new ClimbLayoutPen(5), go = new ClimbRingBuilder(pen, S.REST_RADIUS);
+        go.follow(S.EASY_SPOKE, go.spoke("ms1", "slab", S.EASY_SPOKE, S.FLOOR, S.SPOKE), 0);
+        go.hop("mu1", "pumpkin", S.EASY_SPOKE, S.FLOOR, S.HOP_PUMPKIN, 3.9);
+        const R = S.EASY_RHO;
+        go.ring("mh1", "tomb", R, 123.8, S.TOMB, 1.4);
+        go.ring("mc1", "coffin", R, 123.4, S.COFFIN, 4.3);
+        go.ring("mq1", "slab", R, 124.2, S.SLAB, 3.5);
+        const dirt1 = go.ring("md1", "dirt", R + 0.5, 124.2, S.DIRT, 4.1);
+        go.pad("mj1", dirt1, R + 0.5, 124.2, S.PAD, 0.6);
+        go.ring("md2", "dirt", R + 0.5, 127.5, S.DIRT, 1.8);
+        go.ring("mh2", "tomb", R, 131.3, S.TOMB, 1.4);
+        go.ring("mc2", "coffin", R, 130.9, S.COFFIN, 4.3);
+        go.ring("md3", "dirt", R + 0.5, 131.7, S.DIRT, 3.8);
+        go.ring("mh3", "tomb", R, 135.5, S.TOMB, 1.4);
+        go.ring("mu2", "pumpkin", R, 135.1, S.PUMPKIN, 4.25);
+        const dirt4 = go.ring("md4", "dirt", R + 0.5, 135.6, S.DIRT, 3.6);
+        go.pad("mj2", dirt4, R + 0.5, 135.6, S.PAD, 0.6);
+        go.ring("md5", "dirt", R + 0.5, 138.9, S.DIRT, 1.8);
+        go.ring("mh4", "tomb", R, 142.7, S.TOMB, 1.4);
+        go.ring("mc3", "coffin", R, 142.3, S.COFFIN, 4.3);
+        go.ring("mq2", "slab", R, 143.1, S.SLAB, 3.5);
+        const lastShrine = go.ring("mh5", "tomb", R, 146.9, S.TOMB, 1.4);
+        go.longJump({ launch: "md6", pad: "mj3", goal: "mq3", launchLook: "dirt", launchScale: S.DIRT, goalLook: "slab", goalScale: S.SPOKE, rho: R - 1.5, top: S.LAUNCH_TOP, approach: 4, padSize: S.PAD, gap: S.LONG_GAP, rise: S.LONG_RISE });
+        go.arrive("mh6", "tomb", S.ARRIVE_RHO, S.TOP_Y, S.TOMB, 1.4, "mw1", "slab", S.SPOKE);
+        go.follow(S.CRYPT_SPOKE, go.spoke("ys1", "slab", S.CRYPT_SPOKE, S.FLOOR, S.SPOKE), 0, -1);
+        go.hop("yu1", "pumpkin", S.CRYPT_SPOKE, S.FLOOR, S.HOP_PUMPKIN, 4.1);
+        const W = S.CRYPT_RHO;
+        go.ring("yh1", "tomb", S.FIRST_TOMB_RHO, 123.8, S.TOMB, 1.5);
+        go.ring("yh2", "tomb", S.FIRST_TOMB_RHO + 3.2, 127.6, S.TOMB, 1.5);
+        go.ring("yd1", "dirt", W, 127.2, S.DIRT, 4.5);
+        go.ring("yc1", "coffin", W, 128, S.COFFIN, 3.6);
+        go.ring("yh3", "tomb", W, 131.8, S.TOMB, 1.5);
+        go.ring("yh4", "tomb", W, 135.6, S.TOMB, 1.5);
+        go.ring("yd2", "dirt", W, 135.2, S.DIRT, 4.5);
+        go.ring("yc2", "coffin", W, 136, S.COFFIN, 3.6);
+        go.ring("yh5", "tomb", W, 139.8, S.TOMB, 1.5);
+        go.ring("yh6", "tomb", W, 143.6, S.TOMB, 1.5);
+        const joinRho = R + TowerPropShapes.SHAPES.tomb.across * S.TOMB / 2 + S.JOIN_GAP + TowerPropShapes.SHAPES.dirt.across * S.DIRT / 2;
+        pen.prop("yd3", "static", "dirt", ClimbLayoutPen.ringX(lastShrine, joinRho), ClimbLayoutPen.ringZ(lastShrine, joinRho), 143.2, S.DIRT, lastShrine);
+        pen.round("rest6", "rest", 0, 0, S.TOP_Y, S.REST_RADIUS, { depth: 0.5, startOf: 6, look: "rest" });
+        return pen.pieces;
+    }
+    static routes() {
+        const tail = ["md6", "mj3", "mq3", "mh6", "mw1", "rest6"];
+        return [
+            { stage: 5, name: "easy5", label: "쉬운 길", ratioLimit: 0.85, steps: ["rest5", "ms1", "mu1", "mh1", "mc1", "mq1", "md1", "mj1", "md2", "mh2", "mc2", "md3", "mh3", "mu2", "md4", "mj2", "md5", "mh4", "mc3", "mq2", "mh5", ...tail] },
+            { stage: 5, name: "normal5", label: "비석 길", ratioLimit: 0.9, steps: ["rest5", "ys1", "yu1", "yh1", "yh2", "yd1", "yc1", "yh3", "yh4", "yd2", "yc2", "yh5", "yh6", "yd3", "mh5", ...tail] },
+        ];
+    }
+}
+TowerStageFiveLayout.FLOOR = 120;
+TowerStageFiveLayout.TOP_Y = 150;
+TowerStageFiveLayout.REST_RADIUS = 4.2;
+TowerStageFiveLayout.SPOKE = 2;
+TowerStageFiveLayout.TOMB = 0.935;
+TowerStageFiveLayout.COFFIN = 1.4;
+TowerStageFiveLayout.SLAB = 1.5;
+TowerStageFiveLayout.DIRT = 0.75;
+TowerStageFiveLayout.PUMPKIN = 2.6;
+TowerStageFiveLayout.HOP_PUMPKIN = 3;
+TowerStageFiveLayout.PAD = 1.8;
+TowerStageFiveLayout.ARRIVE_RHO = 11.5;
+TowerStageFiveLayout.EASY_SPOKE = 290;
+TowerStageFiveLayout.EASY_RHO = 15.5;
+TowerStageFiveLayout.CRYPT_SPOKE = 8;
+TowerStageFiveLayout.CRYPT_RHO = 24;
+TowerStageFiveLayout.FIRST_TOMB_RHO = 17.5;
+TowerStageFiveLayout.JOIN_GAP = 1.2;
+TowerStageFiveLayout.LAUNCH_TOP = 145.5;
+TowerStageFiveLayout.LONG_GAP = 4.4;
+TowerStageFiveLayout.LONG_RISE = 2;
 class TowerLevelData {
     static spec() {
         return {
             stages: TowerLevelData.STAGES.map((s) => ({ ...s })),
-            pieces: [...TowerHubLayout.pieces(), ...TowerStageOneLayout.pieces(), ...TowerStageTwoLayout.pieces(), ...TowerStageThreeLayout.pieces(), ...TowerStageFourLayout.pieces()],
+            pieces: [...TowerHubLayout.pieces(), ...TowerStageOneLayout.pieces(), ...TowerStageTwoLayout.pieces(), ...TowerStageThreeLayout.pieces(), ...TowerStageFourLayout.pieces(), ...TowerStageFiveLayout.pieces()],
             portals: TowerHubLayout.portals(),
-            routes: [...TowerStageOneLayout.routes(), ...TowerStageTwoLayout.routes(), ...TowerStageThreeLayout.routes(), ...TowerStageFourLayout.routes()],
+            routes: [...TowerStageOneLayout.routes(), ...TowerStageTwoLayout.routes(), ...TowerStageThreeLayout.routes(), ...TowerStageFourLayout.routes(), ...TowerStageFiveLayout.routes()],
             spawn: TowerHubLayout.spawn(),
         };
     }

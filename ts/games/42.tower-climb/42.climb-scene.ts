@@ -18,7 +18,7 @@ class ClimbModelLibrary {
     barrel: "dungeon/barrel_large.gltf", door: "dungeon/wall_doorway.gltf",
     pebble: "forest/Rock_1_A_Color1.gltf", boulder: "forest/Rock_3_C_Color1.gltf", bush: "forest/Bush_1_C_Color1.gltf",
     tuft: "forest/Grass_1_A_Singlesided_Color1.gltf", treeA: "forest/Tree_1_B_Color1.gltf", treeB: "forest/Tree_2_B_Color1.gltf", treeC: "forest/Tree_4_B_Color1.gltf",
-    foundation: "dungeon/floor_foundation_allsides.gltf", column: "dungeon/column.gltf",
+    foundation: "dungeon/floor_foundation_allsides.gltf",
     ruinHouse: "medieval-hexagon/building_destroyed.gltf", houseA: "medieval-hexagon/building_home_A_blue.gltf", houseB: "medieval-hexagon/building_home_B_blue.gltf",
     watchtower: "medieval-hexagon/building_tower_A_blue.gltf", church: "medieval-hexagon/building_church_blue.gltf", rampart: "medieval-hexagon/wall_straight.gltf",
     turret: "medieval-hexagon/building_tower_base_blue.gltf", hexIsle: "medieval-hexagon/hex_grass.gltf", crate: "medieval-hexagon/crate_A_big.gltf", barrelProp: "medieval-hexagon/barrel.gltf",
@@ -26,6 +26,9 @@ class ClimbModelLibrary {
     kitchenTable: "kitchen/kitchentable_A.gltf", roundTable: "kitchen/table_round_A.gltf", counter: "kitchen/kitchencounter_straight_A.gltf", stove: "kitchen/stove_multi.gltf",
     fridge: "kitchen/fridge_A.gltf", board: "kitchen/cuttingboard.gltf", plate: "kitchen/plate.gltf", oven: "kitchen/oven.gltf", pot: "kitchen/pot_large.gltf",
     tomato: "kitchen/food_ingredient_tomato.gltf", cheese: "kitchen/food_ingredient_cheese.gltf", kitchenFloor: "kitchen/floor_kitchen.gltf",
+    gravePillar: "graveyard/pillar.gltf", coffin: "graveyard/coffin.gltf", plaque: "graveyard/plaque.gltf", dirtPlot: "graveyard/floor_dirt.gltf", pumpkin: "graveyard/pumpkin_orange.gltf",
+    crypt: "graveyard/crypt.gltf", grave: "graveyard/grave_A.gltf", gravestone: "graveyard/gravestone.gltf", fence: "graveyard/fence.gltf", lantern: "graveyard/pumpkin_orange_jackolantern.gltf",
+    deadTree: "graveyard/tree_dead_large.gltf",
   };
 
   static readonly TINTS: Readonly<Record<string, number>> = { hexIsle: 0x9FB878 };
@@ -156,7 +159,6 @@ class TowerLevelBuilder {
     deck: "grass", block: "dirt", root: "dirt", rock: "stone", stump: "dirt", log: "wood", ramp: "wood", pad: "yellow",
     ruin: "foundation", slab: "stone", beam: "wood",
   };
-  static readonly COLUMN_SEGMENT = 4;
   static readonly RUIN_ISLANDS: readonly (readonly [number, number, number, string])[] = [
     [15, 34, 33, "church"], [75, 36, 39, "ruinHouse"], [130, 33, 45, "watchtower"], [195, 35, 50, "ruinHouse"], [285, 34, 42, "watchtower"], [330, 36, 54, "church"],
   ];
@@ -166,6 +168,9 @@ class TowerLevelBuilder {
   ];
   static readonly KITCHEN_ISLANDS: readonly (readonly [number, number, number])[] = [
     [10, 35, 96], [70, 33, 104], [130, 36, 112], [190, 34, 100], [250, 36, 108], [310, 33, 116],
+  ];
+  static readonly GRAVE_ISLANDS: readonly (readonly [number, number, number])[] = [
+    [40, 34, 126], [100, 36, 134], [160, 33, 142], [220, 35, 130], [280, 36, 138], [340, 33, 146],
   ];
   static readonly TRUNK_SEGMENT = 5.9;
   static readonly MARK_COLOR = 0xFF9A4A;
@@ -182,7 +187,6 @@ class TowerLevelBuilder {
     this.specials = {
       island: (piece) => this.island(piece),
       trunk: (piece) => this.trunk(piece),
-      tower: (piece) => this.tower(piece),
       hold: (piece) => this.hold(piece as GrabHold),
       rest: (piece) => this.rest(piece),
     };
@@ -191,6 +195,7 @@ class TowerLevelBuilder {
     this.decorateRuins();
     this.decorateDungeon();
     this.decorateKitchen();
+    this.decorateGraveyard();
     this.batchers.forEach((batcher, stage) => batcher.build(this.groupOf(stage), true));
     this.buildMarks();
   }
@@ -235,6 +240,16 @@ class TowerLevelBuilder {
     matrix.multiply(new THREE.Matrix4().makeScale(wide, tall, wide));
     matrix.multiply(new THREE.Matrix4().makeTranslation(-shape.cx, -shape.top, -shape.cz));
     this.batcherOf(piece.stage).add(shape.model, matrix);
+    if (shape.cap) this.capOn(piece, shape.cap, wide, tall);
+  }
+
+  private capOn(piece: PlatformPiece, name: string, wide: number, tall: number): void {
+    const THREE = this.libs.THREE, model = this.library.model(name);
+    const matrix = new THREE.Matrix4().makeTranslation(piece.x, piece.top, piece.z);
+    matrix.multiply(new THREE.Matrix4().makeRotationY(piece.yaw));
+    matrix.multiply(new THREE.Matrix4().makeScale(wide, tall, wide));
+    matrix.multiply(new THREE.Matrix4().makeTranslation(-model.centerX, -model.max.y, -model.centerZ));
+    this.batcherOf(piece.stage).add(name, matrix);
   }
 
   private block(piece: PlatformPiece): void {
@@ -247,12 +262,6 @@ class TowerLevelBuilder {
     const model = this.library.model("barrel"), T = TowerLevelBuilder, height = piece.top - piece.bottom, count = Math.ceil(height / T.TRUNK_SEGMENT), each = height / count;
     for (let i = 0; i < count; i++)
       this.batcherOf(piece.stage).add("barrel", this.fit(model, piece.x, piece.top - each * i, piece.z, i * 0.7, 0, piece.radius * 2, each, piece.radius * 2));
-  }
-
-  private tower(piece: PlatformPiece): void {
-    const model = this.library.model("column"), T = TowerLevelBuilder, height = piece.top - piece.bottom, count = Math.ceil(height / T.COLUMN_SEGMENT), each = height / count;
-    for (let i = 0; i < count; i++)
-      this.batcherOf(piece.stage).add("column", this.fit(model, piece.x, piece.top - each * i, piece.z, i * 0.4, 0, piece.radius * 2, each, piece.radius * 2));
   }
 
   private marksOf(stage: number): Three<"Matrix4">[] {
@@ -317,11 +326,16 @@ class TowerLevelBuilder {
     }
   }
 
-  private decorateKitchen(): void {
-    const batcher = this.batcherOf(4), add = (name: string, x: number, top: number, z: number, yaw: number, scale: number): void => {
+  private placer(stage: number): (name: string, x: number, top: number, z: number, yaw: number, scale: number) => void {
+    const batcher = this.batcherOf(stage);
+    return (name, x, top, z, yaw, scale) => {
       const model = this.library.model(name);
       batcher.add(name, this.fit(model, x, top + model.sizeY * scale, z, yaw, 0, model.sizeX * scale, model.sizeY * scale, model.sizeZ * scale));
     };
+  }
+
+  private decorateKitchen(): void {
+    const add = this.placer(4);
     for (const [deg, rho, top] of TowerLevelBuilder.KITCHEN_ISLANDS) {
       const angle = deg * Math.PI / 180, x = Math.sin(angle) * rho, z = Math.cos(angle) * rho, sideX = Math.cos(angle), sideZ = -Math.sin(angle), outX = Math.sin(angle), outZ = Math.cos(angle);
       add("kitchenFloor", x, top - 1, z, angle, 2);
@@ -330,6 +344,20 @@ class TowerLevelBuilder {
       add("pot", x - sideX * 1.8 - outX * 1.2, top + 1.4, z - sideZ * 1.8 - outZ * 1.2, angle + 0.6, 1.4);
       add("tomato", x + sideX * 2.4 - outX * 1.5, top, z + sideZ * 2.4 - outZ * 1.5, angle, 2.6);
       add("cheese", x + sideX * 1.2 - outX * 2.6, top, z + sideZ * 1.2 - outZ * 2.6, angle + 1.1, 2.4);
+    }
+  }
+
+  private decorateGraveyard(): void {
+    const add = this.placer(5);
+    for (const [deg, rho, top] of TowerLevelBuilder.GRAVE_ISLANDS) {
+      const angle = deg * Math.PI / 180, x = Math.sin(angle) * rho, z = Math.cos(angle) * rho, sideX = Math.cos(angle), sideZ = -Math.sin(angle), outX = Math.sin(angle), outZ = Math.cos(angle);
+      add("dirtPlot", x, top - 1, z, angle, 2);
+      add("crypt", x + outX * 1.5, top, z + outZ * 1.5, angle + Math.PI, 0.7);
+      add("deadTree", x - sideX * 2.6 - outX * 1.2, top, z - sideZ * 2.6 - outZ * 1.2, angle + 0.8, 1.2);
+      add("grave", x + sideX * 2.4 - outX * 2, top, z + sideZ * 2.4 - outZ * 2, angle + Math.PI, 0.8);
+      add("gravestone", x + sideX * 0.6 - outX * 2.6, top, z + sideZ * 0.6 - outZ * 2.6, angle + Math.PI + 0.2, 0.9);
+      add("lantern", x - sideX * 1 - outX * 2.8, top, z - sideZ * 1 - outZ * 2.8, angle + Math.PI, 1);
+      add("fence", x - outX * 3.7, top, z - outZ * 3.7, angle, 1);
     }
   }
 
