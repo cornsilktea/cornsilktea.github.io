@@ -6,7 +6,6 @@ class ClimbInputRouter {
         this.slowHeld = false;
         this.enabled = false;
         this.onJump = () => undefined;
-        this.onGrab = () => undefined;
         this.onPause = () => undefined;
         this.lookX = 0;
         this.lookY = 0;
@@ -69,8 +68,6 @@ class KeyboardInput extends ClimbInputRouter {
             this.onJump();
             e.preventDefault();
         }
-        else if (e.code === "KeyE")
-            this.onGrab();
     }
 }
 KeyboardInput.TURN_SPEED = 2.4;
@@ -78,7 +75,7 @@ KeyboardInput.PITCH_SPEED = 1.4;
 KeyboardInput.MOVE_OF_CODE = { KeyW: "up", KeyS: "down", KeyA: "left", KeyD: "right" };
 KeyboardInput.LOOK_OF_KEY = { ArrowUp: "lookUp", ArrowDown: "lookDown", ArrowLeft: "lookLeft", ArrowRight: "lookRight" };
 class TouchInput extends ClimbInputRouter {
-    constructor(zone, base, knob, jump, slow, grab, pause) {
+    constructor(zone, base, knob, jump, slow, pause) {
         super();
         this.base = base;
         this.knob = knob;
@@ -93,7 +90,6 @@ class TouchInput extends ClimbInputRouter {
         zone.addEventListener("pointerup", up);
         zone.addEventListener("pointercancel", up);
         this.press(jump, () => this.onJump());
-        this.press(grab, () => this.onGrab());
         this.press(pause, () => this.onPause());
         this.press(slow, () => { this.slowHeld = true; slow.classList.add("on"); });
         const slowOff = () => { this.slowHeld = false; slow.classList.remove("on"); };

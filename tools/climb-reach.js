@@ -124,13 +124,12 @@ class RouteInspector {
 class CannonInspector {
   constructor(level, report) { this.level = level; this.report = report; }
 
-  shoot(cannon, power, rescue) {
-    const rules = new ClimbRules(this.level, new StageProgress(0)), body = rules.body, spot = new K.ClimbGrabSpot();
+  shoot(cannon, power) {
+    const rules = new ClimbRules(this.level, new StageProgress(0)), body = rules.body;
     body.place(cannon.x, cannon.top, cannon.z);
     let fired = false, grabbed = false;
     for (let i = 0; i < 120 * 12; i++) {
       if (!fired && power < 1 && rules.chargeFill >= power - 1e-9) rules.pressJump();
-      if (rescue && body.flight && body.vy < 0 && rules.grab.find(body.x, body.y, body.z, spot)) rules.pressGrab();
       if (body.hanging && body.spot.ledge && i % 12 === 0) rules.pressJump();
       for (const e of rules.advance(B.TICK)) { if (e.t === "launch") fired = true; if (e.t === "grab") grabbed = true; }
       if (fired && !body.flight && body.grounded) break;
@@ -143,11 +142,11 @@ class CannonInspector {
     if (at < 0) return;
     const cannon = this.level.piece(route.steps[at]), goal = this.level.piece(route.steps[at + 1]);
     for (const power of [0.6, 0.7, 0.8, 0.9, 1]) {
-      const plain = this.shoot(cannon, power, false), saved = this.shoot(cannon, power, true);
-      this.report.note("  발사대 힘 " + Math.round(power * 100) + "%: " + (plain.hit ? "착지 " + plain.on : plain.home ? "허브까지 추락" : "낮은 곳 " + plain.on + " (" + plain.y.toFixed(1) + "m)") + " / 잡기 쓰면 " + (saved.hit ? "성공" + (saved.grabbed ? "(모서리 잡음)" : "") : saved.home ? "허브까지 추락" : "낮은 곳 " + saved.on));
-      this.report.check("발사대 " + Math.round(power * 100) + "% 결과가 정해짐", plain.on !== "?" && saved.on !== "?");
+      const shot = this.shoot(cannon, power);
+      this.report.note("  발사대 힘 " + Math.round(power * 100) + "%: " + (shot.hit ? (shot.grabbed ? "모서리를 저절로 잡고 올라 " : "착지 ") + shot.on : shot.home ? "허브까지 추락" : "낮은 곳 " + shot.on + " (" + shot.y.toFixed(1) + "m)"));
+      this.report.check("발사대 " + Math.round(power * 100) + "% 결과가 정해짐", shot.on !== "?");
       if (power === 1) {
-        this.report.check("발사대 100% 는 목표 발판 안에 착지", plain.hit && plain.on === goal.id, plain);
+        this.report.check("발사대 100% 는 목표 발판 안에 착지", shot.hit && shot.on === goal.id && !shot.grabbed, shot);
         this.report.check("발사대 얻는 높이 +12m 이상", goal.top - cannon.top >= 12 - 1e-9, goal.top - cannon.top);
       }
     }

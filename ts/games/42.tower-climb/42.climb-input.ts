@@ -4,7 +4,6 @@ abstract class ClimbInputRouter {
   slowHeld = false;
   enabled = false;
   onJump: () => void = () => undefined;
-  onGrab: () => void = () => undefined;
   onPause: () => void = () => undefined;
   protected lookX = 0;
   protected lookY = 0;
@@ -61,7 +60,6 @@ class KeyboardInput extends ClimbInputRouter {
     if (e.code === "ShiftLeft" || e.code === "ShiftRight") { this.slowHeld = down; return; }
     if (!down || e.repeat) { if (e.code === "Space") e.preventDefault(); return; }
     if (e.code === "Space") { this.onJump(); e.preventDefault(); }
-    else if (e.code === "KeyE") this.onGrab();
   }
 }
 
@@ -77,7 +75,7 @@ class TouchInput extends ClimbInputRouter {
   private stickY = 0;
   private readonly lookers = new Map<number, { x: number; y: number }>();
 
-  constructor(zone: HTMLElement, private readonly base: HTMLElement, private readonly knob: HTMLElement, jump: HTMLElement, slow: HTMLElement, grab: HTMLElement, pause: HTMLElement) {
+  constructor(zone: HTMLElement, private readonly base: HTMLElement, private readonly knob: HTMLElement, jump: HTMLElement, slow: HTMLElement, pause: HTMLElement) {
     super();
     zone.addEventListener("pointerdown", (e) => this.down(e));
     zone.addEventListener("pointermove", (e) => this.move(e));
@@ -85,7 +83,6 @@ class TouchInput extends ClimbInputRouter {
     zone.addEventListener("pointerup", up);
     zone.addEventListener("pointercancel", up);
     this.press(jump, () => this.onJump());
-    this.press(grab, () => this.onGrab());
     this.press(pause, () => this.onPause());
     this.press(slow, () => { this.slowHeld = true; slow.classList.add("on"); });
     const slowOff = (): void => { this.slowHeld = false; slow.classList.remove("on"); };

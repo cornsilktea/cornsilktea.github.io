@@ -8,10 +8,10 @@ class ClimbSeededRandom {
 }
 
 class ClimbBot {
-  // skill: { aimNoise(rad), jumpEarly(m), rescue(bool), power(0.6~1), slip(틱당 실수 확률) }
+  // skill: { aimNoise(rad), jumpEarly(m), power(0.6~1), slip(틱당 실수 확률) } — 잡기는 규칙 엔진이 저절로 한다
   constructor(K, rules, route, skill = {}, random = new ClimbSeededRandom(1)) {
     this.K = K; this.rules = rules; this.route = route; this.random = random;
-    this.skill = Object.assign({ aimNoise: 0, jumpEarly: 0.12, rescue: false, power: 1, slip: 0 }, skill);
+    this.skill = Object.assign({ aimNoise: 0, jumpEarly: 0.12, power: 1, slip: 0 }, skill);
     this.index = 1;
     this.hopWait = 0;
     this.wobble = 0;
@@ -68,7 +68,6 @@ class ClimbBot {
     }
     if (body.flight) {
       rules.steer(0, 0);
-      if (this.skill.rescue && body.vy < 0 && rules.grab.find(body.x, body.y, body.z, this.spot)) rules.pressGrab();
       return;
     }
 
@@ -91,7 +90,6 @@ class ClimbBot {
 
     if (!body.grounded) {
       if (overTarget && body.speed > 1.5 && far < 0.5) rules.steer(-body.vx, -body.vz); else rules.steer(dx, dz);
-      if ((needsGrab || this.skill.rescue) && rules.grab.find(body.x, body.y, body.z, this.spot) && this.route.indexOf(this.spot.piece.id) >= this.index) rules.pressGrab();
       return;
     }
     if (far < 0.08 && overTarget) { rules.steer(0, 0); return; }
@@ -99,13 +97,15 @@ class ClimbBot {
     if (this.skill.slip > 0 && this.random.next() < this.skill.slip) { rules.pressJump(); return; }
     const ground = body.ground;
     if (needsGrab) {
-      if (rules.grab.find(body.x, body.y, body.z, this.spot) && this.spot.piece === target) { rules.pressGrab(); return; }
       const reach = target instanceof K.GrabHold ? Math.hypot(target.x - body.x, target.z - body.z) : target.edge(body.x, body.z, this.probe).dist;
       if (reach < 0.95) rules.pressJump();
       return;
     }
     const edge = target.edge(body.x, body.z, this.probe);
     const touching = edge.inside || edge.dist < 0.7;
+    const level = Math.abs(target.topAt(edge.x, edge.z) - body.y) <= B.STEP;
+    if (level && edge.dist < 0.1) return;
+    if (level && edge.dist < 1.2) { rules.steer(edge.x - body.x, edge.z - body.z); return; }
     if (target.topAt(edge.x, edge.z) > body.y + B.STEP) { if (touching || !ground.covers(body.x + dx * this.edgeMargin, body.z + dz * this.edgeMargin)) rules.pressJump(); return; }
     if (ground.covers(body.x + dx * this.edgeMargin, body.z + dz * this.edgeMargin)) return;
     if (target.covers(body.x + dx * 0.6, body.z + dz * 0.6) && target.topAt(edge.x, edge.z) >= body.y - 1.2) return;

@@ -4,7 +4,6 @@ class TowerClimbGame {
         this.libs = libs;
         this.state = "loading";
         this.sfx = new ClimbSfx();
-        this.probe = new ClimbGrabSpot();
         this.lastFrame = 0;
         this.countLeft = 0;
         this.warmed = false;
@@ -51,10 +50,9 @@ class TowerClimbGame {
         this.hud = new ClimbHud(this.level);
         const zone = ClimbDom.el("touchZone");
         this.keyboard = new KeyboardInput();
-        this.touch = new TouchInput(zone, ClimbDom.el("joyBase"), ClimbDom.el("joyKnob"), ClimbDom.el("btnJump"), ClimbDom.el("btnSlow"), ClimbDom.el("btnGrab"), ClimbDom.el("btnPause"));
+        this.touch = new TouchInput(zone, ClimbDom.el("joyBase"), ClimbDom.el("joyKnob"), ClimbDom.el("btnJump"), ClimbDom.el("btnSlow"), ClimbDom.el("btnPause"));
         for (const input of [this.keyboard, this.touch]) {
             input.onJump = () => this.rules.pressJump();
-            input.onGrab = () => this.rules.pressGrab();
             input.onPause = () => this.pause();
         }
         this.keyboard.onPauseKey = () => this.togglePause();
@@ -161,7 +159,7 @@ class TowerClimbGame {
     }
     hints() {
         const body = this.rules.body;
-        this.hud.grabHint(body.mode === "free" && body.grabCooldown <= 0 && this.rules.grab.findFor(body, this.probe), body.hanging && body.spot.ledge);
+        this.hud.hangHint(body.hanging, body.spot.ledge, this.touch.used || document.body.classList.contains("touch"));
         const hint = this.view.portals.hintNear(body.x, body.y, body.z, this.progress);
         if (hint !== this.portalHint) {
             this.portalHint = hint;

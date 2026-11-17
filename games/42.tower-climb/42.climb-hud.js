@@ -182,7 +182,6 @@ class ClimbHud {
         this.bannerBox = ClimbDom.el("banner");
         this.countBox = ClimbDom.el("bigCount");
         this.chargeBox = ClimbDom.el("hudCharge");
-        this.grabButton = ClimbDom.el("btnGrab");
         this.grabTip = ClimbDom.el("grabHint");
         this.mapDot = ClimbDom.el("hudMapDot");
         this.mapCells = [];
@@ -228,12 +227,11 @@ class ClimbHud {
         if (text)
             this.countBox.animate([{ transform: "translate(-50%,-50%) scale(1.6)", opacity: 0 }, { transform: "translate(-50%,-50%) scale(1)", opacity: 1 }], { duration: 380, easing: "ease-out" });
     }
-    grabHint(canGrab, onLedge) {
-        const tip = canGrab ? ClimbHud.GRAB_TIP : onLedge ? ClimbHud.CLIMB_TIP : "";
+    hangHint(hanging, onLedge, touch) {
+        const H = ClimbHud, tip = !hanging ? "" : onLedge ? (touch ? H.LEDGE_TIP_TOUCH : H.LEDGE_TIP) : (touch ? H.HOLD_TIP_TOUCH : H.HOLD_TIP);
         if (tip === this.tipShown)
             return;
         this.tipShown = tip;
-        this.grabButton.classList.toggle("ready", canGrab);
         this.grabTip.hidden = !tip;
         if (tip)
             this.grabTip.textContent = tip;
@@ -272,8 +270,10 @@ class ClimbHud {
 }
 ClimbHud.MAP_CELL = 22;
 ClimbHud.PLAY_IDS = ["hudTop", "hudLeft", "hudMap", "controls", "btnPause"];
-ClimbHud.GRAB_TIP = "E 잡기";
-ClimbHud.CLIMB_TIP = "W · Space 오르기";
+ClimbHud.LEDGE_TIP = "W · Space 오르기   S 놓기";
+ClimbHud.HOLD_TIP = "Space 위로   S 놓기";
+ClimbHud.LEDGE_TIP_TOUCH = "위로 밀면 오르기 · 아래로 놓기";
+ClimbHud.HOLD_TIP_TOUCH = "점프로 위로 · 아래로 놓기";
 class ClimbStartPanel {
     constructor() {
         this.best = ClimbDom.el("recBest");

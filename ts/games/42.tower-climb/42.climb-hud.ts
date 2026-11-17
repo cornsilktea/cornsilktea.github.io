@@ -165,7 +165,6 @@ class ClimbHud {
   private readonly bannerBox = ClimbDom.el("banner");
   private readonly countBox = ClimbDom.el("bigCount");
   private readonly chargeBox = ClimbDom.el("hudCharge");
-  private readonly grabButton = ClimbDom.el("btnGrab");
   private readonly grabTip = ClimbDom.el("grabHint");
   private readonly mapDot = ClimbDom.el("hudMapDot");
   private readonly mapCells: HTMLElement[] = [];
@@ -213,14 +212,15 @@ class ClimbHud {
     if (text) this.countBox.animate([{ transform: "translate(-50%,-50%) scale(1.6)", opacity: 0 }, { transform: "translate(-50%,-50%) scale(1)", opacity: 1 }], { duration: 380, easing: "ease-out" });
   }
 
-  static readonly GRAB_TIP = "E 잡기";
-  static readonly CLIMB_TIP = "W · Space 오르기";
+  static readonly LEDGE_TIP = "W · Space 오르기   S 놓기";
+  static readonly HOLD_TIP = "Space 위로   S 놓기";
+  static readonly LEDGE_TIP_TOUCH = "위로 밀면 오르기 · 아래로 놓기";
+  static readonly HOLD_TIP_TOUCH = "점프로 위로 · 아래로 놓기";
 
-  grabHint(canGrab: boolean, onLedge: boolean): void {
-    const tip = canGrab ? ClimbHud.GRAB_TIP : onLedge ? ClimbHud.CLIMB_TIP : "";
+  hangHint(hanging: boolean, onLedge: boolean, touch: boolean): void {
+    const H = ClimbHud, tip = !hanging ? "" : onLedge ? (touch ? H.LEDGE_TIP_TOUCH : H.LEDGE_TIP) : (touch ? H.HOLD_TIP_TOUCH : H.HOLD_TIP);
     if (tip === this.tipShown) return;
     this.tipShown = tip;
-    this.grabButton.classList.toggle("ready", canGrab);
     this.grabTip.hidden = !tip;
     if (tip) this.grabTip.textContent = tip;
   }

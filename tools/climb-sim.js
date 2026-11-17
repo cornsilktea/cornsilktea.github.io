@@ -7,9 +7,9 @@ const { ClimbRules, TowerLevel, StageProgress, TowerLevelData } = K;
 class ClimbSimulation {
   static get SKILLS() {
     return [
-      { label: "처음 하는 학생", aimNoise: 0.4, jumpEarly: 0.3, slip: 0.0012, rescue: false },
-      { label: "익숙한 학생", aimNoise: 0.22, jumpEarly: 0.2, slip: 0.0004, rescue: true },
-      { label: "숙련자", aimNoise: 0.08, jumpEarly: 0.12, slip: 0, rescue: true },
+      { label: "처음 하는 학생", aimNoise: 0.4, jumpEarly: 0.3, slip: 0.0012 },
+      { label: "익숙한 학생", aimNoise: 0.22, jumpEarly: 0.2, slip: 0.0004 },
+      { label: "숙련자", aimNoise: 0.08, jumpEarly: 0.12, slip: 0 },
     ];
   }
 
