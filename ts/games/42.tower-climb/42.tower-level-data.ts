@@ -11,6 +11,11 @@ class TowerPropShapes {
     turret: { model: "turret", turn: 0, top: 1.4, base: 0, cx: 0, cz: 0.025, span: 0.84, across: 0.84, round: true },
     houseA: { model: "houseA", turn: Math.PI / 2, top: 0.93, base: 0, cx: 0, cz: -0.04, span: 0.86, across: 0.26, round: false },
     houseB: { model: "houseB", turn: 0, top: 1.2, base: 0, cx: 0, cz: -0.07, span: 0.88, across: 0.26, round: false },
+    column: { model: "pillar", turn: 0, top: 4, base: 0, cx: 0, cz: 0, span: 1.5, across: 1.5, round: true },
+    box: { model: "boxLarge", turn: 0, top: 1.5, base: 0, cx: 0, cz: 0, span: 1.5, across: 1.5, round: false },
+    keg: { model: "barrel", turn: 0, top: 2, base: 0, cx: 0, cz: 0, span: 1.8, across: 1.8, round: true },
+    tile: { model: "tile", turn: 0, top: 0.05, base: -0.1, cx: 0, cz: 0, span: 4, across: 4, round: false },
+    dwall: { model: "dungeonWall", turn: 0, top: 4, base: 0, cx: 0, cz: 0, span: 4, across: 1, round: false },
   };
   static readonly ROOFS: Readonly<Record<string, ClimbRoofShape>> = {
     houseA: { eaveHalf: 0.4, eaveY: 0.37, wallHalf: 0.3, wallTop: 0.28 },
@@ -23,7 +28,7 @@ class TowerPropShapes {
 }
 
 class ClimbTrail {
-  constructor(public deg: number, public rho: number, public half: number, private readonly sense = 1) {}
+  constructor(public deg: number, public rho: number, public half: number, readonly sense = 1) {}
 
   next(rho: number, half: number, gap: number): number {
     const reach = this.half + gap + half, cos = (this.rho * this.rho + rho * rho - reach * reach) / (2 * this.rho * rho);
@@ -190,6 +195,72 @@ class TowerStageOneLayout {
   }
 }
 
+class ClimbRingBuilder {
+  trail = new ClimbTrail(0, 0, 0);
+
+  constructor(readonly pen: ClimbLayoutPen, private readonly restRadius: number) {}
+
+  follow(deg: number, rho: number, half: number, sense = 1): void { this.trail = new ClimbTrail(deg, rho, half, sense); }
+
+  spokeRho(look: string, scale: number): number { return this.restRadius - 0.1 + ClimbLayoutPen.halfOf(look, scale); }
+
+  spoke(id: string, look: string, deg: number, top: number, scale: number): number {
+    const rho = this.spokeRho(look, scale);
+    this.pen.prop(id, "static", look, ClimbLayoutPen.ringX(deg, rho), ClimbLayoutPen.ringZ(deg, rho), top, scale, deg - 90);
+    return rho + ClimbLayoutPen.halfOf(look, scale);
+  }
+
+  ring(id: string, look: string, rho: number, top: number, scale: number, gap: number): number {
+    const deg = this.trail.next(rho, ClimbLayoutPen.halfOf(look, scale), gap);
+    this.pen.prop(id, "static", look, ClimbLayoutPen.ringX(deg, rho), ClimbLayoutPen.ringZ(deg, rho), top, scale, deg);
+    return deg;
+  }
+
+  hop(id: string, look: string, deg: number, top: number, scale: number, gap: number): number {
+    const own = ClimbLayoutPen.halfOf(look, scale), rho = this.trail.rho + this.trail.half + gap + own;
+    this.pen.prop(id, "static", look, ClimbLayoutPen.ringX(deg, rho), ClimbLayoutPen.ringZ(deg, rho), top, scale, deg);
+    this.trail = new ClimbTrail(deg, rho, own, this.trail.sense);
+    return rho;
+  }
+
+  along(id: string, look: string, deg: number, rho: number, top: number, scale: number, along: number, out = 0): void {
+    this.pen.prop(id, "static", look, this.trail.alongX(deg, rho, along, out), this.trail.alongZ(deg, rho, along, out), top, scale, deg);
+  }
+
+  pad(id: string, deg: number, rho: number, ground: number, size: number, along: number, out = 0): void {
+    this.pen.boxAt(id, "pad", this.trail.alongX(deg, rho, along, out), this.trail.alongZ(deg, rho, along, out), ground + 0.3, size, size, deg, { depth: 0.6, look: "pad" });
+  }
+
+  house(id: string, look: string, rho: number, ridge: number, scale: number, gap: number, isleScale: number): number {
+    const ground = ridge - TowerPropShapes.SHAPES[look].top * scale, deg = this.trail.next(rho, ClimbLayoutPen.halfOf(look, scale), gap);
+    const x = ClimbLayoutPen.ringX(deg, rho), z = ClimbLayoutPen.ringZ(deg, rho);
+    this.pen.prop(id + ".isle", "static", "hex", x, z, ground, isleScale, deg);
+    this.pen.house(id, look, x, z, ground, scale, deg);
+    return deg;
+  }
+
+  bridge(id: string, look: string, deg: number, outerRho: number, top: number, scale: number): void {
+    const shape = TowerPropShapes.SHAPES[look], middle = (outerRho + this.restRadius) / 2;
+    this.pen.boxAt(id, "static", ClimbLayoutPen.ringX(deg, middle), ClimbLayoutPen.ringZ(deg, middle), top, outerRho - this.restRadius + 0.2, shape.across * scale, deg - 90, { depth: (shape.top - shape.base) * scale, look });
+  }
+
+  arrive(id: string, look: string, rho: number, top: number, scale: number, gap: number, bridgeId: string, bridgeLook: string, bridgeScale: number): void {
+    const deg = this.ring(id, look, rho, top, scale, gap);
+    this.bridge(bridgeId, bridgeLook, deg, rho - ClimbLayoutPen.halfOf(look, scale), top, bridgeScale);
+  }
+
+  cannonAt(id: string, x: number, z: number, top: number, size: number, towardX: number, towardZ: number, lift: number): { x: number; z: number; yaw: number } {
+    const flight = ClimbRingBuilder.cannonFlight(lift), dx = towardX - x, dz = towardZ - z, d = Math.hypot(dx, dz), yaw = Math.atan2(dx, dz) * 180 / Math.PI;
+    this.pen.boxAt(id, "cannon", x, z, top, size, size, yaw, { depth: 0.8, look: "cannon" });
+    return { x: x + dx / d * flight, z: z + dz / d * flight, yaw };
+  }
+
+  static cannonFlight(lift: number): number {
+    const B = ClimbBalance;
+    return (B.CANNON_UP + Math.sqrt(B.CANNON_UP ** 2 - 2 * B.GRAVITY * lift)) / B.GRAVITY * B.CANNON_FORWARD;
+  }
+}
+
 class TowerStageTwoLayout {
   static readonly FLOOR = 30;
   static readonly TOWER_BASE = 34;
@@ -213,87 +284,59 @@ class TowerStageTwoLayout {
   static readonly TARGET_GAP = 1.2;
 
   static pieces(): ClimbPieceSpec[] {
-    const S = TowerStageTwoLayout, pen = new ClimbLayoutPen(2), half = ClimbLayoutPen.halfOf, polarX = ClimbLayoutPen.ringX, polarZ = ClimbLayoutPen.ringZ;
+    const S = TowerStageTwoLayout, pen = new ClimbLayoutPen(2), go = new ClimbRingBuilder(pen, S.REST_RADIUS), polarX = ClimbLayoutPen.ringX, polarZ = ClimbLayoutPen.ringZ;
     pen.round("tower2", "static", 0, 0, S.TOP_Y - 0.5, TowerStageOneLayout.TRUNK_RADIUS, { depth: S.TOP_Y - 0.5 - S.TOWER_BASE, noLedge: true, look: "tower" });
-    const spokeRho = S.REST_RADIUS - 0.1 + half("wall", S.WALL), spokeEnd = spokeRho + half("wall", S.WALL);
-    const spoke = (id: string, deg: number): void => pen.prop(id, "static", "wall", polarX(deg, spokeRho), polarZ(deg, spokeRho), S.FLOOR, S.WALL, deg - 90);
+    const isleOf = (scale: number): number => S.HEX * 0.75 * scale / S.HOUSE_A;
 
-    let trail = new ClimbTrail(0, S.LOOP_RHO, S.HEX);
-    const ring = (id: string, look: string, rho: number, top: number, scale: number, gap: number): number => {
-      const deg = trail.next(rho, half(look, scale), gap);
-      pen.prop(id, "static", look, polarX(deg, rho), polarZ(deg, rho), top, scale, deg);
-      return deg;
-    };
-    const onIsle = (id: string, look: string, deg: number, rho: number, top: number, scale: number, along: number, out = 0): void =>
-      pen.prop(id, "static", look, trail.alongX(deg, rho, along, out), trail.alongZ(deg, rho, along, out), top, scale, deg);
-    const pad = (id: string, deg: number, rho: number, ground: number, along: number, out = 0): void =>
-      pen.boxAt(id, "pad", trail.alongX(deg, rho, along, out), trail.alongZ(deg, rho, along, out), ground + 0.3, S.PAD, S.PAD, deg, { depth: 0.6, look: "pad" });
-    const house = (id: string, look: string, rho: number, ridge: number, scale: number, gap: number): number => {
-      const ground = ridge - TowerPropShapes.SHAPES[look].top * scale, deg = trail.next(rho, half(look, scale), gap);
-      pen.prop(id + ".isle", "static", "hex", polarX(deg, rho), polarZ(deg, rho), ground, S.HEX * 0.75 * scale / S.HOUSE_A, deg);
-      pen.house(id, look, polarX(deg, rho), polarZ(deg, rho), ground, scale, deg);
-      return deg;
-    };
-    const hop = (id: string, look: string, deg: number, top: number, scale: number, gap: number): void => {
-      const own = half(look, scale), rho = trail.rho + trail.half + gap + own;
-      pen.prop(id, "static", look, polarX(deg, rho), polarZ(deg, rho), top, scale, deg);
-      trail = new ClimbTrail(deg, rho, own);
-    };
-
-    spoke("vw1", 0);
+    go.spoke("vw1", "wall", 0, S.FLOOR, S.WALL);
+    go.follow(0, S.LOOP_RHO, ClimbLayoutPen.halfOf("hex", S.HEX));
     pen.prop("vi1", "static", "hex", 0, S.LOOP_RHO, 31, S.HEX, 0);
-    ring("vt1", "turret", 14.5, 34.6, S.TURRET, 1);
-    ring("vc1", "crate", 15.5, 34.2, S.CRATE, 3.4);
-    ring("vb1", "barrel", 16, 35.2, S.BARREL, 2.8);
-    const isle2 = ring("vi2", "hex", 16, 36, 2.8, 2.9);
-    onIsle("vk1", "barrel", isle2, 16, 36 + 0.21 * 6, 6, -1.25, 1.5);
-    onIsle("vk2", "crate", isle2, 16, 36 + 0.21 * 7.5, 7.5, -1.25);
-    pen.house("vhA", "houseA", trail.alongX(isle2, 16, 0.9), trail.alongZ(isle2, 16, 0.9), 36, S.HOUSE_A, isle2);
-    ring("vw2", "wall", 16, 39.4, S.WALL, 2.5);
-    ring("vt2", "turret", 16, 43, S.TURRET, 1);
-    ring("vc2", "crate", 15, 42.6, S.CRATE, 3.5);
-    const isle3 = ring("vi3", "hex", 14.5, 43.6, S.HEX, 2.9);
-    pad("vp1", isle3, 14.5, 43.6, 0.9);
-    ring("vt3", "turret", 14.5, 47.2, S.TURRET, 1.2);
-    ring("vw3", "wall", 15, 46.8, S.WALL, 3.4);
-    ring("vb2", "barrel", 15.5, 47.8, S.BARREL, 2.8);
-    ring("vt4", "turret", 15.5, 51.4, S.TURRET, 1);
-    ring("vc3", "crate", 15, 51, S.CRATE, 3.5);
-    const isle4 = ring("vi4", "hex", 14.5, 52, 2.6, 2.8);
-    pad("vp2", isle4, 14.5, 52, 1);
-    ring("vt5", "turret", 14.5, 55.6, S.TURRET, 1.2);
-    house("vhB", "houseB", 14.5, 56.96, S.HOUSE_B, 2.5);
-    const lastDeg = ring("vt6", "turret", 11.5, 60, S.TURRET, 1);
-    const lastIn = 11.5 - half("turret", S.TURRET), lastWall = (lastIn + S.REST_RADIUS) / 2;
-    pen.boxAt("vw4", "static", polarX(lastDeg, lastWall), polarZ(lastDeg, lastWall), S.TOP_Y, lastIn - S.REST_RADIUS + 0.2, 0.6 * S.WALL, lastDeg - 90, { depth: 0.9 * S.WALL, look: "wall" });
+    go.ring("vt1", "turret", 14.5, 34.6, S.TURRET, 1);
+    go.ring("vc1", "crate", 15.5, 34.2, S.CRATE, 3.4);
+    go.ring("vb1", "barrel", 16, 35.2, S.BARREL, 2.8);
+    const isle2 = go.ring("vi2", "hex", 16, 36, 2.8, 2.9);
+    go.along("vk1", "barrel", isle2, 16, 36 + 0.21 * 6, 6, -1.25, 1.5);
+    go.along("vk2", "crate", isle2, 16, 36 + 0.21 * 7.5, 7.5, -1.25);
+    pen.house("vhA", "houseA", go.trail.alongX(isle2, 16, 0.9), go.trail.alongZ(isle2, 16, 0.9), 36, S.HOUSE_A, isle2);
+    go.ring("vw2", "wall", 16, 39.4, S.WALL, 2.5);
+    go.ring("vt2", "turret", 16, 43, S.TURRET, 1);
+    go.ring("vc2", "crate", 15, 42.6, S.CRATE, 3.5);
+    const isle3 = go.ring("vi3", "hex", 14.5, 43.6, S.HEX, 2.9);
+    go.pad("vp1", isle3, 14.5, 43.6, S.PAD, 0.9);
+    go.ring("vt3", "turret", 14.5, 47.2, S.TURRET, 1.2);
+    go.ring("vw3", "wall", 15, 46.8, S.WALL, 3.4);
+    go.ring("vb2", "barrel", 15.5, 47.8, S.BARREL, 2.8);
+    go.ring("vt4", "turret", 15.5, 51.4, S.TURRET, 1);
+    go.ring("vc3", "crate", 15, 51, S.CRATE, 3.5);
+    const isle4 = go.ring("vi4", "hex", 14.5, 52, 2.6, 2.8);
+    go.pad("vp2", isle4, 14.5, 52, S.PAD, 1);
+    go.ring("vt5", "turret", 14.5, 55.6, S.TURRET, 1.2);
+    go.house("vhB", "houseB", 14.5, 56.96, S.HOUSE_B, 2.5, isleOf(S.HOUSE_B));
+    go.arrive("vt6", "turret", 11.5, S.TOP_Y, S.TURRET, 1, "vw4", "wall", S.WALL);
 
-    spoke("nw1", S.ROOF_SPOKE);
-    trail = new ClimbTrail(S.ROOF_SPOKE, spokeEnd, 0);
-    hop("ni1", "hex", S.ROOF_SPOKE, 31, S.HEX, 2.6);
-    pad("np1", S.ROOF_SPOKE, trail.rho, 31, 0, 1.2);
-    trail = new ClimbTrail(S.ROOF_SPOKE, trail.rho + 1.2, S.PAD / 2);
-    hop("nt1", "turret", S.ROOF_SPOKE, 34.6, S.TURRET, 1.8);
-    house("nhA", "houseA", S.ROOF_RHO, 35.4, S.HOUSE_A, 2.6);
-    house("nhB", "houseB", S.ROOF_RHO, 36.5, S.HOUSE_B, 3);
-    ring("nc1", "crate", S.ROOF_RHO, 37.6, S.CRATE, 3);
-    ring("nt2", "turret", S.ROOF_RHO, 41.2, S.TURRET, 1);
-    house("nhC", "houseA", S.ROOF_RHO, 42, S.HOUSE_A, 2.8);
-    ring("nw2", "wall", S.ROOF_RHO, 42.8, S.WALL, 3.1);
-    ring("nt3", "turret", 19, 46.4, S.TURRET, 1);
+    const roofStart = go.spoke("nw1", "wall", S.ROOF_SPOKE, S.FLOOR, S.WALL);
+    go.follow(S.ROOF_SPOKE, roofStart, 0);
+    go.hop("ni1", "hex", S.ROOF_SPOKE, 31, S.HEX, 2.6);
+    go.pad("np1", S.ROOF_SPOKE, go.trail.rho, 31, S.PAD, 0, 1.2);
+    go.follow(S.ROOF_SPOKE, go.trail.rho + 1.2, S.PAD / 2);
+    go.hop("nt1", "turret", S.ROOF_SPOKE, 34.6, S.TURRET, 1.8);
+    go.house("nhA", "houseA", S.ROOF_RHO, 35.4, S.HOUSE_A, 2.6, isleOf(S.HOUSE_A));
+    go.house("nhB", "houseB", S.ROOF_RHO, 36.5, S.HOUSE_B, 3, isleOf(S.HOUSE_B));
+    go.ring("nc1", "crate", S.ROOF_RHO, 37.6, S.CRATE, 3);
+    go.ring("nt2", "turret", S.ROOF_RHO, 41.2, S.TURRET, 1);
+    go.house("nhC", "houseA", S.ROOF_RHO, 42, S.HOUSE_A, 2.8, isleOf(S.HOUSE_A));
+    go.ring("nw2", "wall", S.ROOF_RHO, 42.8, S.WALL, 3.1);
+    go.ring("nt3", "turret", 19, 46.4, S.TURRET, 1);
 
-    spoke("xw1", S.CANNON_SPOKE);
-    trail = new ClimbTrail(S.CANNON_SPOKE, spokeEnd, 0, -1);
-    ring("xb1", "barrel", S.INNER_RHO, 31.1, S.BARREL, 3);
-    ring("xc1", "crate", S.INNER_RHO, 32.3, S.CRATE, 2.9);
+    const cannonStart = go.spoke("xw1", "wall", S.CANNON_SPOKE, S.FLOOR, S.WALL);
+    go.follow(S.CANNON_SPOKE, cannonStart, 0, -1);
+    go.ring("xb1", "barrel", S.INNER_RHO, 31.1, S.BARREL, 3);
+    go.ring("xc1", "crate", S.INNER_RHO, 32.3, S.CRATE, 2.9);
     const barrel = pen.pieces.find((p) => p.id === "vb2") as ClimbPieceSpec, barrelRho = Math.hypot(barrel.x, barrel.z), barrelDeg = Math.atan2(barrel.x, barrel.z) * 180 / Math.PI;
-    const aimRho = barrelRho - (barrel.radius ?? 0) - S.TARGET_GAP - 1.5, aimX = polarX(barrelDeg, aimRho), aimZ = polarZ(barrelDeg, aimRho);
-    const B = ClimbBalance, flight = (B.CANNON_UP + Math.sqrt(B.CANNON_UP ** 2 - 2 * B.GRAVITY * S.CANNON_LIFT)) / B.GRAVITY * B.CANNON_FORWARD;
-    const swing = Math.acos((S.INNER_RHO ** 2 + aimRho ** 2 - flight ** 2) / (2 * S.INNER_RHO * aimRho)) * 180 / Math.PI;
-    const cannonDeg = barrelDeg - swing, cannonX = polarX(cannonDeg, S.INNER_RHO), cannonZ = polarZ(cannonDeg, S.INNER_RHO);
-    const dirX = (aimX - cannonX) / flight, dirZ = (aimZ - cannonZ) / flight;
-    const cannonYaw = Math.atan2(dirX, dirZ) * 180 / Math.PI;
-    pen.boxAt("xcan", "cannon", cannonX, cannonZ, S.CANNON_TOP, 2.6, 2.6, cannonYaw, { depth: 0.8, look: "cannon" });
-    pen.boxAt("xtarget", "static", cannonX + dirX * flight, cannonZ + dirZ * flight, S.CANNON_TOP + S.CANNON_LIFT, 3, 3, cannonYaw, { depth: 0.6, look: "slab" });
+    const aimRho = barrelRho - (barrel.radius ?? 0) - S.TARGET_GAP - 1.5, flight = ClimbRingBuilder.cannonFlight(S.CANNON_LIFT);
+    const swing = Math.acos((S.INNER_RHO ** 2 + aimRho ** 2 - flight ** 2) / (2 * S.INNER_RHO * aimRho)) * 180 / Math.PI, cannonDeg = barrelDeg - swing;
+    const land = go.cannonAt("xcan", polarX(cannonDeg, S.INNER_RHO), polarZ(cannonDeg, S.INNER_RHO), S.CANNON_TOP, 2.6, polarX(barrelDeg, aimRho), polarZ(barrelDeg, aimRho), S.CANNON_LIFT);
+    pen.boxAt("xtarget", "static", land.x, land.z, S.CANNON_TOP + S.CANNON_LIFT, 3, 3, land.yaw, { depth: 0.6, look: "slab" });
 
     pen.round("rest3", "rest", 0, 0, S.TOP_Y, S.REST_RADIUS, { depth: 0.5, startOf: 3, look: "rest" });
     return pen.pieces;
@@ -306,6 +349,98 @@ class TowerStageTwoLayout {
       { stage: 2, name: "easy2", label: "쉬운 길", ratioLimit: 0.75, steps: easy },
       { stage: 2, name: "normal2", label: "지붕 길", ratioLimit: 0.8, steps: ["rest2", "nw1", "ni1", "np1", "nt1", "nhA", "nhB", "nc1", "nt2", "nhC", "nw2", "nt3", ...tail] },
       { stage: 2, name: "hard2", label: "발사대", ratioLimit: 0.9, steps: ["rest2", "xw1", "xb1", "xc1", "xcan", "xtarget", ...tail] },
+    ];
+  }
+}
+
+class TowerStageThreeLayout {
+  static readonly FLOOR = 60;
+  static readonly TOWER_BASE = 64;
+  static readonly TOP_Y = 90;
+  static readonly REST_RADIUS = 4.2;
+  static readonly SPOKE = 1.5;
+  static readonly PILLAR = 1.68;
+  static readonly BOX = 1.2;
+  static readonly KEG = 1;
+  static readonly TILE = 0.75;
+  static readonly WALL = 1.5;
+  static readonly PAD = 1.8;
+  static readonly ARRIVE_RHO = 11.5;
+  static readonly EASY_SPOKE = 40;
+  static readonly EASY_RHO = 15.5;
+  static readonly WALL_SPOKE = 170;
+  static readonly WALL_RHO = 22;
+  static readonly CANNON_SPOKE = 300;
+  static readonly CANNON_RHO = 11;
+  static readonly CANNON_LIFT = 12;
+  static readonly CANNON_TOP = 62.2;
+  static readonly CANNON_SIZE = 3;
+
+  static pieces(): ClimbPieceSpec[] {
+    const S = TowerStageThreeLayout, pen = new ClimbLayoutPen(3), go = new ClimbRingBuilder(pen, S.REST_RADIUS), polarX = ClimbLayoutPen.ringX, polarZ = ClimbLayoutPen.ringZ;
+    pen.round("tower3", "static", 0, 0, S.TOP_Y - 0.5, TowerStageOneLayout.TRUNK_RADIUS, { depth: S.TOP_Y - 0.5 - S.TOWER_BASE, noLedge: true, look: "tower" });
+
+    go.follow(S.EASY_SPOKE, go.spoke("dw1", "dwall", S.EASY_SPOKE, S.FLOOR, S.SPOKE), 0);
+    go.hop("dt1", "tile", S.EASY_SPOKE, S.FLOOR, S.TILE, 3.9);
+    const R = S.EASY_RHO;
+    go.ring("dp1", "column", R, 63.8, S.PILLAR, 1.4);
+    go.ring("db1", "box", R, 63.4, S.BOX, 4.3);
+    go.ring("dk1", "keg", R, 64.2, S.KEG, 3.5);
+    const tile2 = go.ring("dt2", "tile", R + 0.5, 64.2, S.TILE, 4.1);
+    go.pad("dj1", tile2, R + 0.5, 64.2, S.PAD, 0.6);
+    go.ring("dt3", "tile", R + 0.5, 67.5, S.TILE, 1.8);
+    go.ring("dp2", "column", R, 71.3, S.PILLAR, 1.4);
+    go.ring("db2", "box", R, 70.9, S.BOX, 4.3);
+    go.ring("dt7", "tile", R + 0.5, 71.7, S.TILE, 3.8);
+    go.ring("dp3", "column", R, 75.5, S.PILLAR, 1.4);
+    go.ring("dk2", "keg", R, 75.1, S.KEG, 4.25);
+    const tile4 = go.ring("dt4", "tile", R + 0.5, 75.6, S.TILE, 3.6);
+    go.pad("dj2", tile4, R + 0.5, 75.6, S.PAD, 0.6);
+    go.ring("dt5", "tile", R + 0.5, 78.9, S.TILE, 1.8);
+    go.ring("dp4", "column", R, 82.7, S.PILLAR, 1.4);
+    go.ring("db3", "box", R, 82.3, S.BOX, 4.3);
+    go.ring("dk3", "keg", R, 83.1, S.KEG, 3.5);
+    go.ring("dp5", "column", R, 86.9, S.PILLAR, 1.4);
+    go.ring("dt6", "tile", R - 1.5, 86.5, S.TILE, 4);
+    go.arrive("dp6", "column", S.ARRIVE_RHO, S.TOP_Y, S.PILLAR, 1.4, "dw3", "dwall", S.WALL);
+
+    go.follow(S.WALL_SPOKE, go.spoke("lw1", "dwall", S.WALL_SPOKE, S.FLOOR, S.SPOKE), 0, -1);
+    go.hop("lt1", "tile", S.WALL_SPOKE, S.FLOOR, S.TILE, 4.1);
+    const W = S.WALL_RHO;
+    go.ring("lp1", "column", W - 2.5, 63.8, S.PILLAR, 1.5);
+    go.ring("lp2", "column", W, 67.6, S.PILLAR, 1.5);
+    go.ring("lt2", "tile", W, 67.2, S.TILE, 4.5);
+    go.ring("lb2", "box", W, 68, S.BOX, 3.6);
+    go.ring("lp3", "column", W, 71.8, S.PILLAR, 1.5);
+    go.ring("lp4", "column", W, 75.6, S.PILLAR, 1.5);
+    go.ring("lt3", "tile", W, 75.2, S.TILE, 4.5);
+    go.ring("lb1", "box", W, 76, S.BOX, 3.6);
+    go.ring("lp5", "column", W, 79.8, S.PILLAR, 1.5);
+    go.ring("lp6", "column", W, 83.6, S.PILLAR, 1.5);
+    go.follow(go.ring("lt4", "tile", W, 83.2, S.TILE, 4.5), W, ClimbLayoutPen.halfOf("tile", S.TILE));
+    go.ring("lp7", "column", W - 3.5, 87, S.PILLAR, 1.5);
+
+    go.follow(S.CANNON_SPOKE, go.spoke("cw1", "dwall", S.CANNON_SPOKE, S.FLOOR, S.SPOKE), 0, -1);
+    go.ring("ck1", "keg", S.CANNON_RHO, 60.4, S.KEG, 4);
+    go.ring("cb1", "box", S.CANNON_RHO, 61.2, S.BOX, 3.8);
+    const flight = ClimbRingBuilder.cannonFlight(S.CANNON_LIFT), step = 2 * Math.asin(flight / 2 / S.CANNON_RHO) * 180 / Math.PI;
+    const firstDeg = go.trail.next(S.CANNON_RHO, S.CANNON_SIZE / 2, 3), secondDeg = firstDeg - step, landDeg = secondDeg - step;
+    const at = (deg: number): [number, number] => [polarX(deg, S.CANNON_RHO), polarZ(deg, S.CANNON_RHO)];
+    go.cannonAt("cc1", ...at(firstDeg), S.CANNON_TOP, S.CANNON_SIZE, ...at(secondDeg), S.CANNON_LIFT);
+    const land = go.cannonAt("cc2", ...at(secondDeg), S.CANNON_TOP + S.CANNON_LIFT, S.CANNON_SIZE, ...at(landDeg), S.CANNON_LIFT);
+    pen.boxAt("ctarget", "static", land.x, land.z, S.CANNON_TOP + 2 * S.CANNON_LIFT, 3, 3, land.yaw, { depth: 0.6, look: "slab" });
+    go.follow(landDeg, S.CANNON_RHO, 1.5, -1);
+    go.arrive("cp1", "column", S.ARRIVE_RHO, S.TOP_Y, S.PILLAR, 1.5, "cw2", "dwall", S.WALL);
+
+    pen.round("rest4", "rest", 0, 0, S.TOP_Y, S.REST_RADIUS, { depth: 0.5, startOf: 4, look: "rest" });
+    return pen.pieces;
+  }
+
+  static routes(): ClimbRouteSpec[] {
+    return [
+      { stage: 3, name: "easy3", label: "쉬운 길", ratioLimit: 0.85, steps: ["rest3", "dw1", "dt1", "dp1", "db1", "dk1", "dt2", "dj1", "dt3", "dp2", "db2", "dt7", "dp3", "dk2", "dt4", "dj2", "dt5", "dp4", "db3", "dk3", "dp5", "dt6", "dp6", "dw3", "rest4"] },
+      { stage: 3, name: "normal3", label: "기둥 길", ratioLimit: 0.9, steps: ["rest3", "lw1", "lt1", "lp1", "lp2", "lt2", "lb2", "lp3", "lp4", "lt3", "lb1", "lp5", "lp6", "lt4", "lp7", "dt6", "dp6", "dw3", "rest4"] },
+      { stage: 3, name: "hard3", label: "연쇄 발사대", ratioLimit: 0.93, steps: ["rest3", "cw1", "ck1", "cb1", "cc1", "cc2", "ctarget", "cp1", "cw2", "rest4"] },
     ];
   }
 }
@@ -325,9 +460,9 @@ class TowerLevelData {
   static spec(): ClimbLevelSpec {
     return {
       stages: TowerLevelData.STAGES.map((s) => ({ ...s })),
-      pieces: [...TowerHubLayout.pieces(), ...TowerStageOneLayout.pieces(), ...TowerStageTwoLayout.pieces()],
+      pieces: [...TowerHubLayout.pieces(), ...TowerStageOneLayout.pieces(), ...TowerStageTwoLayout.pieces(), ...TowerStageThreeLayout.pieces()],
       portals: TowerHubLayout.portals(),
-      routes: [...TowerStageOneLayout.routes(), ...TowerStageTwoLayout.routes()],
+      routes: [...TowerStageOneLayout.routes(), ...TowerStageTwoLayout.routes(), ...TowerStageThreeLayout.routes()],
       spawn: TowerHubLayout.spawn(),
     };
   }

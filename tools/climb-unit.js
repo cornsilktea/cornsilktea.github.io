@@ -251,9 +251,12 @@ function box(id, x, z, y, sx, sz, more = {}) { return { id, kind: "static", stag
   check("포탈 3: 스테이지 2 클리어 전에는 잠김", !p.unlocked(3));
   p.clear(2);
   check("포탈 3: 스테이지 2 클리어 → 열림", p.unlocked(3) && p.portalOpen(3, level));
+  check("포탈 4: 스테이지 3 클리어 전에는 잠김", !p.unlocked(4) && !p.portalOpen(4, level));
   p.clear(3);
-  check("포탈 4: 풀렸어도 스테이지가 없으면(공사 중) 안 열림", p.unlocked(4) && !p.portalOpen(4, level));
-  check("이미 깬 스테이지는 다시 세지 않음", !p.clear(1) && p.cleared === 3);
+  check("포탈 4: 스테이지 3 클리어 → 열림", p.unlocked(4) && p.portalOpen(4, level));
+  p.clear(4);
+  check("포탈 5: 풀렸어도 스테이지가 없으면(공사 중) 안 열림", p.unlocked(5) && !p.portalOpen(5, level));
+  check("이미 깬 스테이지는 다시 세지 않음", !p.clear(1) && p.cleared === 4);
   check("포탈은 6개(스테이지 2~7)", level.portals.length === 6 && level.portals.map((x) => x.stage).join("") === "234567");
 }
 {
@@ -297,7 +300,7 @@ function box(id, x, z, y, sx, sz, more = {}) { return { id, kind: "static", stag
   r.steer(1, 0.2);
   const ev = run(r, 6);
   check("실제 탑: 30m 쉼터에서 뛰어내리면 끝까지 떨어져 허브", r.body.grounded && (r.body.ground.id === "hub" || r.body.y < 30), { y: r.body.y, on: r.body.ground && r.body.ground.id });
-  check("실제 탑: 스테이지 2·3 시작 쉼터 있음, 4 는 없음", level.hasStage(2) && level.hasStage(3) && !level.hasStage(4));
+  check("실제 탑: 스테이지 2·3·4 시작 쉼터 있음, 5 는 없음", level.hasStage(2) && level.hasStage(3) && level.hasStage(4) && !level.hasStage(5));
   check("실제 탑: 시작 지점이 포탈 밖", level.portals.every((p) => Math.hypot(p.x - level.spawn.x, p.z - level.spawn.z) > B.PORTAL_RADIUS + 2));
   check("높이별 스테이지", level.stageAt(0).index === 1 && level.stageAt(29.9).index === 1 && level.stageAt(30).index === 2 && level.stageAt(-5).index === 0);
 }

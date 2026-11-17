@@ -100,6 +100,7 @@ ClimbModelLibrary.FILES = {
     ruinHouse: "medieval-hexagon/building_destroyed.gltf", houseA: "medieval-hexagon/building_home_A_blue.gltf", houseB: "medieval-hexagon/building_home_B_blue.gltf",
     watchtower: "medieval-hexagon/building_tower_A_blue.gltf", church: "medieval-hexagon/building_church_blue.gltf", rampart: "medieval-hexagon/wall_straight.gltf",
     turret: "medieval-hexagon/building_tower_base_blue.gltf", hexIsle: "medieval-hexagon/hex_grass.gltf", crate: "medieval-hexagon/crate_A_big.gltf", barrelProp: "medieval-hexagon/barrel.gltf",
+    boxLarge: "dungeon/box_large.gltf", tile: "dungeon/floor_tile_large.gltf", dungeonWall: "dungeon/wall.gltf", pillar: "dungeon/pillar.gltf", torch: "dungeon/torch_lit.gltf", rubble: "dungeon/rubble_large.gltf",
 };
 ClimbModelLibrary.TINTS = { hexIsle: 0x9FB878 };
 class ClimbInstanceBatcher {
@@ -165,6 +166,7 @@ class TowerLevelBuilder {
             this.draw(piece);
         this.decorate();
         this.decorateRuins();
+        this.decorateDungeon();
         this.batchers.forEach((batcher, stage) => batcher.build(this.groupOf(stage), true));
         this.buildMarks();
     }
@@ -294,6 +296,18 @@ class TowerLevelBuilder {
             batcher.add("rampart", this.fit(wall, x + Math.sin(angle) * 2.6, top + wall.sizeY * 2, z + Math.cos(angle) * 2.6, angle + Math.PI / 2, 0, wall.sizeX * 2.4, wall.sizeY * 2, wall.sizeZ * 2));
         }
     }
+    decorateDungeon() {
+        const batcher = this.batcherOf(3), tile = this.library.model("tile"), wall = this.library.model("dungeonWall"), pillar = this.library.model("pillar"), torch = this.library.model("torch"), rubble = this.library.model("rubble");
+        for (const [deg, rho, top] of TowerLevelBuilder.DUNGEON_ISLANDS) {
+            const angle = deg * Math.PI / 180, x = Math.sin(angle) * rho, z = Math.cos(angle) * rho, sideX = Math.cos(angle), sideZ = -Math.sin(angle);
+            batcher.add("tile", this.fit(tile, x, top, z, angle, 0, 8, 0.6, 8));
+            batcher.add("dungeonWall", this.fit(wall, x + Math.sin(angle) * 2.8, top + 4.8, z + Math.cos(angle) * 2.8, angle, 0, 7.2, 4.8, 1.2));
+            for (const side of [-1, 1])
+                batcher.add("pillar", this.fit(pillar, x + sideX * side * 3.2, top + 5.4, z + sideZ * side * 3.2, angle, 0, 1.4, 5.4, 1.4));
+            batcher.add("torch", this.fit(torch, x + Math.sin(angle) * 2.1, top + 3.4, z + Math.cos(angle) * 2.1, angle + Math.PI, 0, torch.sizeX * 2, torch.sizeY * 2, torch.sizeZ * 2));
+            batcher.add("rubble", this.fit(rubble, x - sideX * 1.2, top + 1.2, z - sideZ * 1.2, angle + 0.4, 0, 4, 1.2, 1.6));
+        }
+    }
     decorate() {
         const dice = new ClimbDecorDice(4242), batcher = this.batcherOf(0), hub = this.level.pieces.find((p) => p.hub);
         if (!hub)
@@ -322,6 +336,9 @@ TowerLevelBuilder.RUIN_ISLANDS = [
     [15, 34, 33, "church"], [75, 36, 39, "ruinHouse"], [130, 33, 45, "watchtower"], [195, 35, 50, "ruinHouse"], [285, 34, 42, "watchtower"], [330, 36, 54, "church"],
 ];
 TowerLevelBuilder.HOUSE_SCALE = 4.2;
+TowerLevelBuilder.DUNGEON_ISLANDS = [
+    [20, 34, 64], [80, 36, 72], [140, 33, 80], [200, 35, 68], [260, 34, 84], [320, 36, 76],
+];
 TowerLevelBuilder.TRUNK_SEGMENT = 5.9;
 TowerLevelBuilder.MARK_COLOR = 0xFF9A4A;
 TowerLevelBuilder.PATH_DOTS = 14;

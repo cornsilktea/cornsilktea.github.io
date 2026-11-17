@@ -138,19 +138,21 @@ class CannonInspector {
   }
 
   inspect(route) {
-    const at = route.steps.findIndex((id) => this.level.piece(id) instanceof LaunchCannon);
-    if (at < 0) return;
+    route.steps.forEach((id, at) => { if (this.level.piece(id) instanceof LaunchCannon) this.inspectAt(route, at); });
+  }
+
+  inspectAt(route, at) {
     const cannon = this.level.piece(route.steps[at]), goal = this.level.piece(route.steps[at + 1]);
     for (const power of [0.6, 0.7, 0.8, 0.9, 1]) {
       const shot = this.shoot(cannon, power);
-      this.report.note("  발사대 힘 " + Math.round(power * 100) + "%: " + (shot.hit ? (shot.grabbed ? "모서리를 저절로 잡고 올라 " : "착지 ") + shot.on : shot.home ? "허브까지 추락" : "낮은 곳 " + shot.on + " (" + shot.y.toFixed(1) + "m)"));
-      this.report.check("발사대 " + Math.round(power * 100) + "% 결과가 정해짐", shot.on !== "?");
+      this.report.note("  " + cannon.id + " 힘 " + Math.round(power * 100) + "%: " + (shot.hit ? (shot.grabbed ? "모서리를 저절로 잡고 올라 " : "착지 ") + shot.on : shot.home ? "허브까지 추락" : "낮은 곳 " + shot.on + " (" + shot.y.toFixed(1) + "m)"));
+      this.report.check(cannon.id + " " + Math.round(power * 100) + "% 결과가 정해짐", shot.on !== "?");
       if (power === 1) {
-        this.report.check("발사대 100% 는 목표 발판 안에 착지", shot.hit && shot.on === goal.id && !shot.grabbed, shot);
-        this.report.check("발사대 얻는 높이 +12m 이상", goal.top - cannon.top >= 12 - 1e-9, goal.top - cannon.top);
+        this.report.check(cannon.id + " 100% 는 목표 발판 안에 착지", shot.hit && shot.on === goal.id && !shot.grabbed, shot);
+        this.report.check(cannon.id + " 얻는 높이 +12m 이상", goal.top - cannon.top >= 12 - 1e-9, goal.top - cannon.top);
       }
     }
-    this.report.check("발사대 목표 발판은 3m×3m", !goal.round && Math.abs(goal.halfX * 2 - 3) < 1e-9 && Math.abs(goal.halfZ * 2 - 3) < 1e-9);
+    this.report.check(cannon.id + " 목표 발판은 3m×3m", !goal.round && Math.abs(goal.halfX * 2 - 3) < 1e-9 && Math.abs(goal.halfZ * 2 - 3) < 1e-9);
   }
 }
 
@@ -168,7 +170,7 @@ class TrapInspector {
     const onRoute = new Set();
     this.level.routes.forEach((r) => r.steps.forEach((id) => onRoute.add(id)));
     // 이름에 점이 있는 조각(hB.isle·hA.roofIn 등)은 집·섬에 딸린 몸통이라 길에 넣지 않는다
-    const decor = { has: (id) => id === "trunk" || id === "tower2" || id.includes(".") };
+    const decor = { has: (id) => id === "trunk" || /^tower\d$/.test(id) || id.includes(".") };
     for (const piece of this.level.pieces) {
       if (!decor.has(piece.id)) this.report.check("발판 " + piece.id + " 는 어떤 길에든 속함", onRoute.has(piece.id));
       if (piece.solid && !piece.hub && !decor.has(piece.id)) this.report.check("발판 " + piece.id + " 에 갇히지 않음(내려갈 곳 있음)", this.open(piece));
