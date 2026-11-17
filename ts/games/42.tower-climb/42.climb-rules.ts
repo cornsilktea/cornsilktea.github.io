@@ -28,8 +28,7 @@ type ClimbEvent =
   | { t: "voidReturn" }
   | { t: "stageClear"; stage: number }
   | { t: "portalEnter"; stage: number }
-  | { t: "portalArrive"; stage: number }
-  | { t: "slowEmpty" };
+  | { t: "portalArrive"; stage: number };
 
 class ClimbBalance {
   static readonly TICK = 1 / 120;
@@ -52,7 +51,8 @@ class ClimbBalance {
   static readonly GRAB_HIGH = 2.6;
   static readonly GRAB_SIDE = 1;
   static readonly HANG_DROP = 2;
-  static readonly MANTLE_TIME = 0.4;
+  static readonly MANTLE_MIN_HANG = 0.2;
+  static readonly MANTLE_PUSH = 0.5;
   static readonly MANTLE_INSET = 0.55;
   static readonly CLIMB_UP_TIME = 0.5;
   static readonly CLIMB_UP_RISE_SHARE = 0.6;
@@ -66,9 +66,6 @@ class ClimbBalance {
   static readonly REGRAB = 0.2;
   static readonly SLOW_SCALE = 0.3;
   static readonly SLOW_BLEND = 0.15;
-  static readonly SLOW_GAUGE = 4;
-  static readonly SLOW_RECOVER = 0.5;
-  static readonly SLOW_COOLDOWN = 0.5;
   static readonly CANNON_CHARGE = 0.8;
   static readonly CANNON_MIN = 0.6;
   static readonly CANNON_UP = 27;
@@ -218,7 +215,6 @@ class SlopePlatform extends PlatformPiece {
 class HubIsland extends PlatformPiece {
   get hub(): boolean { return true; }
   get ledge(): boolean { return false; }
-  stand(rules: ClimbRules): void { rules.touchHome(); }
 }
 
 class StageRest extends PlatformPiece {
@@ -356,27 +352,15 @@ class ClimbGrabSystem {
 }
 
 class ClimbTimeScale {
-  gauge = ClimbBalance.SLOW_GAUGE;
   scale = 1;
-  cooldown = 0;
   active = false;
 
-  update(realDt: number, held: boolean): boolean {
+  update(realDt: number, held: boolean): void {
     const B = ClimbBalance;
-    let emptied = false;
-    if (this.cooldown > 0) this.cooldown = Math.max(0, this.cooldown - realDt);
-    this.active = held && this.gauge > 0 && this.cooldown <= 0;
-    if (this.active) {
-      this.gauge -= realDt;
-      if (this.gauge <= 0) { this.gauge = 0; this.cooldown = B.SLOW_COOLDOWN; this.active = false; emptied = true; }
-    } else if (!held) this.gauge = Math.min(B.SLOW_GAUGE, this.gauge + B.SLOW_RECOVER * realDt);
+    this.active = held;
     const target = this.active ? B.SLOW_SCALE : 1, pace = (1 - B.SLOW_SCALE) / B.SLOW_BLEND * realDt;
     this.scale = this.scale < target ? Math.min(target, this.scale + pace) : Math.max(target, this.scale - pace);
-    return emptied;
   }
-
-  refill(): void { this.gauge = ClimbBalance.SLOW_GAUGE; }
-  get fill(): number { return this.gauge / ClimbBalance.SLOW_GAUGE; }
 }
 
 class StageProgress {
@@ -602,7 +586,7 @@ class ClimbRules {
     this.events.length = 0;
     if (!this.started && (this.steering || this.jumpLatch)) this.started = true;
     if (this.started) this.clock += dt;
-    if (this.time.update(dt, this.slowHeld)) this.emit({ t: "slowEmpty" });
+    this.time.update(dt, this.slowHeld);
     this.bank += dt * this.time.scale;
     while (this.bank >= B.TICK - 1e-12) { this.bank -= B.TICK; this.step(); }
     if (this.bank < 0) this.bank = 0;
@@ -622,10 +606,7 @@ class ClimbRules {
     this.watcher.watch();
   }
 
-  touchHome(): void { this.time.refill(); }
-
   touchStageStart(stage: number): void {
-    this.time.refill();
     if (!this.progress.clear(stage - 1)) return;
     if (stage === 2 && this.portalsUsed === 0 && this.stageOneTime === null) this.stageOneTime = this.clock;
     this.emit({ t: "stageClear", stage: stage - 1 });
@@ -802,7 +783,7 @@ class ClimbRules {
     if (grab) { this.release(false); return; }
     if (spot.ledge) {
       body.hangTime += T;
-      if (body.hangTime >= B.MANTLE_TIME) this.mantle();
+      if (body.hangTime >= B.MANTLE_MIN_HANG && (body.jumpBuffer > 0 || this.pushingInto(spot))) { body.jumpBuffer = 0; this.mantle(); }
       return;
     }
     if (body.jumpBuffer > 0) {
@@ -814,6 +795,10 @@ class ClimbRules {
       this.hopTo(this.nextSpot);
       body.shiftCooldown = B.SHIFT_COOLDOWN;
     }
+  }
+
+  private pushingInto(spot: ClimbGrabSpot): boolean {
+    return -(this.moveX * spot.nx + this.moveZ * spot.nz) >= ClimbBalance.MANTLE_PUSH;
   }
 
   private hopTo(next: ClimbGrabSpot): void {

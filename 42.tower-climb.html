@@ -49,11 +49,7 @@
   #hudMapCells i.cleared { background: #D97B4F; }
   #hudMapDot { position: absolute; left: 6px; top: 3px; width: 9px; height: 9px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 2px #10182A; }
   #btnPause { position: fixed; right: 12px; top: 8px; z-index: 7; font: inherit; font-size: 15px; font-weight: 800; color: #fff; cursor: pointer; border-top: 0; border-right: 0; border-bottom: 0; padding: 7px 14px; }
-  #hudSlow { position: fixed; right: 26px; bottom: 16px; z-index: 5; pointer-events: none; width: 150px; padding: 6px 10px; font-size: 12px; font-weight: 800; }
-  #hudSlow .track, #hudCharge .track { height: 8px; margin-top: 4px; border-radius: 4px; background: rgba(255,255,255,.18); overflow: hidden; }
-  #hudSlowFill { height: 100%; background: #6EC8FF; transform-origin: left center; }
-  #hudSlow.empty { animation: tcBlink .3s steps(2) infinite; }
-  @keyframes tcBlink { 50% { opacity: .4; } }
+  #hudCharge .track { height: 8px; margin-top: 4px; border-radius: 4px; background: rgba(255,255,255,.18); overflow: hidden; }
   #hudCharge { position: fixed; left: 50%; bottom: 22%; transform: translateX(-50%); z-index: 5; pointer-events: none; width: 220px; text-align: center; font-size: 14px; font-weight: 800; }
   #hudChargeFill { height: 100%; background: #FFB14A; transform-origin: left center; }
   #banner { position: fixed; left: 50%; top: 104px; transform: translateX(-50%); z-index: 8; padding: 8px 16px; font-size: 17px; font-weight: 800; pointer-events: none; max-width: 92vw; text-align: center; white-space: nowrap; }
@@ -75,7 +71,6 @@
   #btnSlow.on { border-color: #6EC8FF; transform: scale(1.08); }
   #btnGrab { right: 44px; bottom: 186px; width: 74px; height: 74px; font-size: 16px; background: radial-gradient(circle at 50% 32%, rgba(255,190,130,.96), rgba(170,90,50,.96)); opacity: .35; }
   #btnGrab.ready { opacity: 1; }
-  body.touch #hudSlow { right: 150px; bottom: 142px; width: 96px; }
   #pauseBox { position: fixed; inset: 0; z-index: 12; display: flex; align-items: center; justify-content: center; background: rgba(10,22,44,.55); }
   #pauseBox .card { background: rgba(10,22,44,.92); border-radius: 12px; border: 2px solid rgba(110,200,255,.5); padding: 18px; width: min(380px, 92vw); }
   #pauseBox h2 { font-size: 24px; font-weight: 800; text-align: center; color: #FFD7BF; margin-bottom: 4px; }
@@ -98,7 +93,6 @@
 <div id="hudTop" class="hud-box" hidden><div id="hudHeight">0m</div><div id="hudStage"></div><div id="hudBar"><div id="hudBarFill"></div></div></div>
 <div id="hudLeft" class="hud-box" hidden><div id="hudTime">0:00.0</div><div id="hudBest"></div></div>
 <div id="hudMap" class="hud-box" hidden><div id="hudMapCells"><div id="hudMapDot"></div></div></div>
-<div id="hudSlow" class="hud-box" hidden>슬로 모션<div class="track"><div id="hudSlowFill"></div></div></div>
 <div id="hudCharge" class="hud-box" hidden>발사 준비 · 점프를 누르면 지금 발사<div class="track"><div id="hudChargeFill"></div></div></div>
 <button type="button" id="btnPause" class="hud-box" hidden>멈춤</button>
 <div id="banner" class="hud-box" hidden></div>
@@ -134,8 +128,8 @@
         <span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></span><span>이동 (항상 달려요. 놓으면 바로 멈춰요)</span>
         <span><kbd>←</kbd><kbd>→</kbd> <kbd>↑</kbd><kbd>↓</kbd></span><span>시야 돌리기 · 위아래로 보기</span>
         <span><kbd>Esc</kbd></span><span>멈춤 · 다시 누르면 계속</span>
-        <span><kbd>Space</kbd></span><span>점프 · 발사대에서 발사 · 매달려서 위 손잡이로</span>
-        <span><kbd>E</kbd></span><span>모서리·손잡이 잡기(모서리는 잠시 뒤 기어올라요), 다시 누르면 놓기</span>
+        <span><kbd>Space</kbd></span><span>점프 · 발사대에서 발사 · 모서리에 매달려서 기어오르기 · 손잡이에서 위 손잡이로</span>
+        <span><kbd>E</kbd></span><span>모서리·손잡이 잡기, 다시 누르면 놓기 (모서리는 <kbd>W</kbd>·<kbd>Space</kbd> 로 기어올라요)</span>
         <span><kbd>Shift</kbd></span><span>누르는 동안 슬로 모션</span>
       </div>
       <div class="st-keys">
@@ -147,21 +141,21 @@
       <ul class="st-rules">
         <li>탑을 뛰어 올라가요. <b>저장은 없어요.</b> 발판에 서거나 잡지 못하면 <b>맨 처음 지점까지</b> 떨어져요.</li>
         <li>30m 쉼터에 닿으면 <b>스테이지 1 클리어</b>! 처음 지점의 <b>포탈 2</b>가 열려 그곳으로 바로 갈 수 있어요.</li>
-        <li>주황 표시가 있는 <b>손잡이</b>와 발판 <b>모서리</b>는 잡을 수 있어요. 손잡이에 매달려 점프를 누르면 위 손잡이로 올라가요.</li>
+        <li>주황 표시가 있는 <b>손잡이</b>와 발판 <b>모서리</b>는 잡을 수 있어요. 높은 블록은 <b>점프하면서 모서리를 잡고</b>, 매달린 채 앞으로 밀거나 점프를 누르면 기어올라가요. 손잡이에 매달려 점프를 누르면 위 손잡이로 올라가요.</li>
         <li>노란 <b>점프대</b>는 높이 튕겨 줘요. 빨간 <b>발사대</b>는 지름길이지만 놓치면 처음부터예요. 가만히 기다리면 가장 세게 날아가요.</li>
-        <li><b>슬로 모션</b>은 게이지만큼만 쓸 수 있고, 쉼터와 처음 지점에서 가득 차요.</li>
+        <li><b>슬로 모션</b>은 누르고 있는 동안 얼마든지 쓸 수 있어요.</li>
       </ul>
     </div>
   </div>
 </div>
 <script charset="utf-8" src="common/character-kit.js?v=20261116b"></script>
 <script charset="utf-8" src="common/fold-card.js"></script>
-<script charset="utf-8" src="games/42.tower-climb/42.climb-rules.js?v=20261117a"></script>
-<script charset="utf-8" src="games/42.tower-climb/42.tower-level-data.js?v=20261116a"></script>
+<script charset="utf-8" src="games/42.tower-climb/42.climb-rules.js?v=20261117b"></script>
+<script charset="utf-8" src="games/42.tower-climb/42.tower-level-data.js?v=20261117b"></script>
 <script charset="utf-8" src="games/42.tower-climb/42.climb-scene.js?v=20261117a"></script>
 <script charset="utf-8" src="games/42.tower-climb/42.climb-input.js?v=20261117a"></script>
-<script charset="utf-8" src="games/42.tower-climb/42.climb-hud.js?v=20261116a"></script>
-<script charset="utf-8" src="games/42.tower-climb/42.tower-climb.js?v=20261117a"></script>
+<script charset="utf-8" src="games/42.tower-climb/42.climb-hud.js?v=20261117b"></script>
+<script charset="utf-8" src="games/42.tower-climb/42.tower-climb.js?v=20261117b"></script>
 <script type="module">
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";

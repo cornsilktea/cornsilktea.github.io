@@ -51,14 +51,14 @@ class ClimbBot {
     const K = this.K, B = K.ClimbBalance, rules = this.rules, body = rules.body;
     if (this.done || body.mode === "stun" || body.mode === "portal") { rules.steer(0, 0); return; }
     if (body.grounded && body.ground) this.passed(body.ground.id);
-    if (body.hanging && body.spot.piece) this.passed(body.spot.piece.id);
+    if (body.hanging && body.spot.piece instanceof K.GrabHold) this.passed(body.spot.piece.id);
     if (this.done) { rules.steer(0, 0); return; }
     const target = this.target;
 
     if (body.hanging) {
       rules.steer(0, 0);
-      if (body.spot.ledge || body.hopTime > 0) return;
-      if (--this.hopWait <= 0) { rules.pressJump(); this.hopWait = 30; }
+      if (body.hopTime > 0) return;
+      if (--this.hopWait <= 0) { rules.pressJump(); this.hopWait = body.spot.ledge ? 12 : 30; }
       return;
     }
     if (body.grounded && body.ground instanceof K.LaunchCannon) {

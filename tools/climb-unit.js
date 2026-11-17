@@ -105,8 +105,11 @@ function box(id, x, z, y, sx, sz, more = {}) { return { id, kind: "static", stag
   r.pressGrab();
   const ev = run(r, 0.1);
   check("모서리 잡기(2.4m 위)", r.body.hanging && ev.some((e) => e.t === "grab" && e.ledge));
-  const evMid = run(r, 0.6);
-  check("0.4초 뒤 기어오르기 시작(바로 순간이동하지 않음)", evMid.some((e) => e.t === "climbUp") && r.body.mode === "climbUp" && r.body.y > 0.4 && r.body.y < 2.6, { y: r.body.y, mode: r.body.mode });
+  run(r, 1);
+  check("가만히 있으면 계속 매달림(저절로 안 올라감)", r.body.hanging, r.body.mode);
+  r.pressJump();
+  const evMid = run(r, 0.3);
+  check("점프를 누르면 기어오르기 시작(바로 순간이동하지 않음)", evMid.some((e) => e.t === "climbUp") && r.body.mode === "climbUp" && r.body.y > 0.4 && r.body.y < 2.6, { y: r.body.y, mode: r.body.mode });
   const ev2 = run(r, 0.4);
   check("기어오른 뒤 위에 섬", ev2.some((e) => e.t === "mantle") && r.body.grounded && near(r.body.y, 2.4, 1e-6) && r.body.ground.id === "wall", { y: r.body.y });
   const r2 = world([box("wall", 2, 0, 2.8, 2, 4, { depth: 2.8 })], { x: 0.6, y: 0, z: 0, yaw: 0 });
@@ -119,6 +122,9 @@ function box(id, x, z, y, sx, sz, more = {}) { return { id, kind: "static", stag
   r2.pressGrab();
   run(r2, 0.05);
   check("점프 중에는 잡음", r2.body.hanging);
+  r2.steer(1, 0);
+  const evPush = run(r2, 0.9);
+  check("벽 쪽(W)으로 밀면 기어올라 섬", evPush.some((e) => e.t === "mantle") && r2.body.grounded && near(r2.body.y, 2.8, 1e-6), { y: r2.body.y, mode: r2.body.mode });
 }
 {
   const holds = (gaps) => {
@@ -211,16 +217,10 @@ function box(id, x, z, y, sx, sz, more = {}) { return { id, kind: "static", stag
   const r = world([]);
   r.holdSlow(true);
   for (let i = 0; i < 120 * 6; i++) r.advance(B.TICK);
-  check("허브에서는 게이지가 줄지 않음(계속 가득)", r.time.active && near(r.time.scale, 0.3, 1e-9) && r.time.gauge > 3.9, r.time.gauge);
-  const air = world([box("p", 0, 0, 5, 3, 3)], { x: 0, y: 5, z: 0, yaw: 0 });
-  air.holdSlow(true);
-  let slowTicks = 0, minScale = 1;
-  for (let i = 0; i < 120 * 5; i++) { air.advance(B.TICK); if (air.time.active) slowTicks++; minScale = Math.min(minScale, air.time.scale); }
-  check("슬로 게이지 4초치", near(slowTicks * B.TICK, 4, 0.02), slowTicks * B.TICK);
-  check("슬로 최저 배율 0.3", near(minScale, 0.3, 1e-9), minScale);
-  air.holdSlow(false);
-  for (let i = 0; i < 120 * 8; i++) air.advance(B.TICK);
-  check("슬로 게이지 회복 8초", near(air.time.gauge, 4, 0.02), air.time.gauge);
+  check("슬로는 누르는 동안 끝없이 유지(6초)", r.time.active && near(r.time.scale, 0.3, 1e-9), r.time.scale);
+  r.holdSlow(false);
+  for (let i = 0; i < 120; i++) r.advance(B.TICK);
+  check("슬로를 놓으면 원래 속도", !r.time.active && near(r.time.scale, 1, 1e-9), r.time.scale);
 }
 {
   const p = new StageProgress(0);

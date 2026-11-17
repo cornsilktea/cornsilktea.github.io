@@ -27,7 +27,6 @@ class TowerClimbGame {
             stageClear: (e) => this.cleared(e.stage),
             portalEnter: () => this.sfx.play("portal"),
             portalArrive: (e) => { this.view.avatar.playOnce("Spawn_Air", 0.7); this.hud.banner("스테이지 " + e.stage + " 시작점", false, 2); },
-            slowEmpty: () => this.sfx.play("empty"),
         };
         this.boot().catch((error) => { ClimbDom.el("loading").textContent = "불러오기 실패: " + error; });
     }
@@ -163,7 +162,7 @@ class TowerClimbGame {
     }
     hints() {
         const body = this.rules.body;
-        this.hud.grabHint(body.mode === "free" && body.grabCooldown <= 0 && this.rules.grab.find(body.x, body.y, body.z, this.probe));
+        this.hud.grabHint(body.mode === "free" && body.grabCooldown <= 0 && this.rules.grab.find(body.x, body.y, body.z, this.probe), body.hanging && body.spot.ledge);
         const hint = this.view.portals.hintNear(body.x, body.y, body.z, this.progress);
         if (hint !== this.portalHint) {
             this.portalHint = hint;

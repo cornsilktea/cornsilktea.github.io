@@ -21,7 +21,8 @@ ClimbBalance.GRAB_LOW = 1.2;
 ClimbBalance.GRAB_HIGH = 2.6;
 ClimbBalance.GRAB_SIDE = 1;
 ClimbBalance.HANG_DROP = 2;
-ClimbBalance.MANTLE_TIME = 0.4;
+ClimbBalance.MANTLE_MIN_HANG = 0.2;
+ClimbBalance.MANTLE_PUSH = 0.5;
 ClimbBalance.MANTLE_INSET = 0.55;
 ClimbBalance.CLIMB_UP_TIME = 0.5;
 ClimbBalance.CLIMB_UP_RISE_SHARE = 0.6;
@@ -35,9 +36,6 @@ ClimbBalance.SHIFT_COOLDOWN = 0.3;
 ClimbBalance.REGRAB = 0.2;
 ClimbBalance.SLOW_SCALE = 0.3;
 ClimbBalance.SLOW_BLEND = 0.15;
-ClimbBalance.SLOW_GAUGE = 4;
-ClimbBalance.SLOW_RECOVER = 0.5;
-ClimbBalance.SLOW_COOLDOWN = 0.5;
 ClimbBalance.CANNON_CHARGE = 0.8;
 ClimbBalance.CANNON_MIN = 0.6;
 ClimbBalance.CANNON_UP = 27;
@@ -187,7 +185,6 @@ class SlopePlatform extends PlatformPiece {
 class HubIsland extends PlatformPiece {
     get hub() { return true; }
     get ledge() { return false; }
-    stand(rules) { rules.touchHome(); }
 }
 class StageRest extends PlatformPiece {
     stand(rules) { rules.touchStageStart(this.startOf); }
@@ -340,34 +337,15 @@ class ClimbGrabSystem {
 }
 class ClimbTimeScale {
     constructor() {
-        this.gauge = ClimbBalance.SLOW_GAUGE;
         this.scale = 1;
-        this.cooldown = 0;
         this.active = false;
     }
     update(realDt, held) {
         const B = ClimbBalance;
-        let emptied = false;
-        if (this.cooldown > 0)
-            this.cooldown = Math.max(0, this.cooldown - realDt);
-        this.active = held && this.gauge > 0 && this.cooldown <= 0;
-        if (this.active) {
-            this.gauge -= realDt;
-            if (this.gauge <= 0) {
-                this.gauge = 0;
-                this.cooldown = B.SLOW_COOLDOWN;
-                this.active = false;
-                emptied = true;
-            }
-        }
-        else if (!held)
-            this.gauge = Math.min(B.SLOW_GAUGE, this.gauge + B.SLOW_RECOVER * realDt);
+        this.active = held;
         const target = this.active ? B.SLOW_SCALE : 1, pace = (1 - B.SLOW_SCALE) / B.SLOW_BLEND * realDt;
         this.scale = this.scale < target ? Math.min(target, this.scale + pace) : Math.max(target, this.scale - pace);
-        return emptied;
     }
-    refill() { this.gauge = ClimbBalance.SLOW_GAUGE; }
-    get fill() { return this.gauge / ClimbBalance.SLOW_GAUGE; }
 }
 class StageProgress {
     constructor(cleared = 0) {
@@ -605,8 +583,7 @@ class ClimbRules {
             this.started = true;
         if (this.started)
             this.clock += dt;
-        if (this.time.update(dt, this.slowHeld))
-            this.emit({ t: "slowEmpty" });
+        this.time.update(dt, this.slowHeld);
         this.bank += dt * this.time.scale;
         while (this.bank >= B.TICK - 1e-12) {
             this.bank -= B.TICK;
@@ -631,9 +608,7 @@ class ClimbRules {
         this.modeSteps[body.mode](grab);
         this.watcher.watch();
     }
-    touchHome() { this.time.refill(); }
     touchStageStart(stage) {
-        this.time.refill();
         if (!this.progress.clear(stage - 1))
             return;
         if (stage === 2 && this.portalsUsed === 0 && this.stageOneTime === null)
@@ -868,8 +843,10 @@ class ClimbRules {
         }
         if (spot.ledge) {
             body.hangTime += T;
-            if (body.hangTime >= B.MANTLE_TIME)
+            if (body.hangTime >= B.MANTLE_MIN_HANG && (body.jumpBuffer > 0 || this.pushingInto(spot))) {
+                body.jumpBuffer = 0;
                 this.mantle();
+            }
             return;
         }
         if (body.jumpBuffer > 0) {
@@ -884,6 +861,9 @@ class ClimbRules {
             this.hopTo(this.nextSpot);
             body.shiftCooldown = B.SHIFT_COOLDOWN;
         }
+    }
+    pushingInto(spot) {
+        return -(this.moveX * spot.nx + this.moveZ * spot.nz) >= ClimbBalance.MANTLE_PUSH;
     }
     hopTo(next) {
         const body = this.body;

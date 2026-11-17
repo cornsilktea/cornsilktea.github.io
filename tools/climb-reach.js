@@ -131,6 +131,7 @@ class CannonInspector {
     for (let i = 0; i < 120 * 12; i++) {
       if (!fired && power < 1 && rules.chargeFill >= power - 1e-9) rules.pressJump();
       if (rescue && body.flight && body.vy < 0 && rules.grab.find(body.x, body.y, body.z, spot)) rules.pressGrab();
+      if (body.hanging && body.spot.ledge && i % 12 === 0) rules.pressJump();
       for (const e of rules.advance(B.TICK)) { if (e.t === "launch") fired = true; if (e.t === "grab") grabbed = true; }
       if (fired && !body.flight && body.grounded) break;
     }

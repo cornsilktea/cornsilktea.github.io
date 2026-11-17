@@ -94,7 +94,7 @@ class ClimbRecords {
 class ClimbSfx {
   static readonly SOUNDS: Readonly<Record<string, readonly [number, number, number, OscillatorType]>> = {
     jump: [420, 640, 0.12, "square"], land: [180, 110, 0.09, "triangle"], pad: [300, 900, 0.25, "square"], grab: [520, 560, 0.07, "triangle"],
-    launch: [160, 1100, 0.5, "sawtooth"], portal: [700, 240, 0.9, "sine"], clear: [520, 1040, 0.6, "square"], fall: [300, 90, 0.5, "sawtooth"], empty: [240, 200, 0.15, "square"],
+    launch: [160, 1100, 0.5, "sawtooth"], portal: [700, 240, 0.9, "sine"], clear: [520, 1040, 0.6, "square"], fall: [300, 90, 0.5, "sawtooth"],
   };
   static readonly VOLUME = 0.07;
   muted = false;
@@ -152,30 +152,27 @@ class ClimbHudFade {
 
 class ClimbHud {
   static readonly MAP_CELL = 22;
-  static readonly PLAY_IDS: readonly string[] = ["hudTop", "hudLeft", "hudMap", "hudSlow", "controls", "btnPause"];
+  static readonly PLAY_IDS: readonly string[] = ["hudTop", "hudLeft", "hudMap", "controls", "btnPause"];
 
   private readonly height = new ClimbHudField(ClimbDom.el("hudHeight"));
   private readonly stage = new ClimbHudField(ClimbDom.el("hudStage"));
   private readonly time = new ClimbHudField(ClimbDom.el("hudTime"));
   private readonly best = new ClimbHudField(ClimbDom.el("hudBest"));
   private readonly bar = new ClimbHudMeter(ClimbDom.el("hudBarFill"));
-  private readonly slow = new ClimbHudMeter(ClimbDom.el("hudSlowFill"));
   private readonly charge = new ClimbHudMeter(ClimbDom.el("hudChargeFill"));
   private readonly veil = new ClimbHudFade(ClimbDom.el("slowVeil"));
   private readonly white = new ClimbHudFade(ClimbDom.el("whiteFade"));
   private readonly bannerBox = ClimbDom.el("banner");
   private readonly countBox = ClimbDom.el("bigCount");
   private readonly chargeBox = ClimbDom.el("hudCharge");
-  private readonly slowBox = ClimbDom.el("hudSlow");
   private readonly grabButton = ClimbDom.el("btnGrab");
   private readonly grabTip = ClimbDom.el("grabHint");
   private readonly mapDot = ClimbDom.el("hudMapDot");
   private readonly mapCells: HTMLElement[] = [];
   private bannerLeft = 0;
   private dotAt = -1;
-  private grabShown = false;
+  private tipShown = "";
   private chargeShown = false;
-  private slowEmpty = false;
   private clearedShown = -1;
   private countShown = "";
 
@@ -216,11 +213,16 @@ class ClimbHud {
     if (text) this.countBox.animate([{ transform: "translate(-50%,-50%) scale(1.6)", opacity: 0 }, { transform: "translate(-50%,-50%) scale(1)", opacity: 1 }], { duration: 380, easing: "ease-out" });
   }
 
-  grabHint(visible: boolean): void {
-    if (visible === this.grabShown) return;
-    this.grabShown = visible;
-    this.grabButton.classList.toggle("ready", visible);
-    this.grabTip.hidden = !visible;
+  static readonly GRAB_TIP = "E 잡기";
+  static readonly CLIMB_TIP = "W · Space 오르기";
+
+  grabHint(canGrab: boolean, onLedge: boolean): void {
+    const tip = canGrab ? ClimbHud.GRAB_TIP : onLedge ? ClimbHud.CLIMB_TIP : "";
+    if (tip === this.tipShown) return;
+    this.tipShown = tip;
+    this.grabButton.classList.toggle("ready", canGrab);
+    this.grabTip.hidden = !tip;
+    if (tip) this.grabTip.textContent = tip;
   }
 
   update(rules: ClimbRules, records: ClimbRecords, fresh: boolean, dt: number): void {
@@ -230,9 +232,6 @@ class ClimbHud {
     this.bar.set(height / B.TOP);
     this.time.set(ClimbText.clock(rules.clock));
     this.best.set("최고 " + records.best.h + "m" + (fresh ? " NEW" : ""));
-    this.slow.set(rules.time.fill);
-    const empty = rules.time.gauge <= 0 || rules.time.cooldown > 0;
-    if (empty !== this.slowEmpty) { this.slowEmpty = empty; this.slowBox.classList.toggle("empty", empty); }
     this.veil.set((1 - rules.time.scale) / (1 - B.SLOW_SCALE));
     this.white.set(rules.body.mode === "portal" ? 1 - rules.body.portalTime / B.PORTAL_TIME : 0);
     const charging = rules.chargeFill > 0;
