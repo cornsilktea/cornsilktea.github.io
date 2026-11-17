@@ -21,7 +21,10 @@ class ClimbModelLibrary {
     foundation: "dungeon/floor_foundation_allsides.gltf", column: "dungeon/column.gltf",
     ruinHouse: "medieval-hexagon/building_destroyed.gltf", houseA: "medieval-hexagon/building_home_A_blue.gltf", houseB: "medieval-hexagon/building_home_B_blue.gltf",
     watchtower: "medieval-hexagon/building_tower_A_blue.gltf", church: "medieval-hexagon/building_church_blue.gltf", rampart: "medieval-hexagon/wall_straight.gltf",
+    turret: "medieval-hexagon/building_tower_base_blue.gltf", hexIsle: "medieval-hexagon/hex_grass.gltf", crate: "medieval-hexagon/crate_A_big.gltf", barrelProp: "medieval-hexagon/barrel.gltf",
   };
+
+  static readonly TINTS: Readonly<Record<string, number>> = { hexIsle: 0x9FB878 };
 
   readonly clips = new Map<string, Three<"AnimationClip">>();
   private readonly models = new Map<string, ClimbModel>();
@@ -36,6 +39,15 @@ class ClimbModelLibrary {
     const [extra, ...scenes] = await Promise.all([loader.loadAsync(D + ClimbModelLibrary.EXTRA_CLIPS), ...names.map((name) => loader.loadAsync(D + ClimbModelLibrary.FILES[name]))]);
     extra.animations.forEach((clip) => { if (!this.clips.has(clip.name)) this.clips.set(clip.name, clip); });
     scenes.forEach((gltf, index) => this.models.set(names[index], this.flatten(gltf.scene)));
+    Object.entries(ClimbModelLibrary.TINTS).forEach(([name, color]) => this.tint(name, color));
+  }
+
+  private tint(name: string, color: number): void {
+    for (const part of this.model(name).parts) {
+      const material = (part.material as Three<"MeshLambertMaterial">).clone();
+      material.color.setHex(color);
+      part.material = material;
+    }
   }
 
   model(name: string): ClimbModel {
@@ -136,7 +148,7 @@ class TowerLevelBuilder {
   };
   static readonly COLUMN_SEGMENT = 4;
   static readonly RUIN_ISLANDS: readonly (readonly [number, number, number, string])[] = [
-    [15, 28, 33, "houseA"], [75, 30, 39, "ruinHouse"], [130, 27, 45, "church"], [175, 29, 50, "houseB"], [285, 28, 42, "watchtower"], [330, 30, 54, "ruinHouse"],
+    [15, 34, 33, "church"], [75, 36, 39, "ruinHouse"], [130, 33, 45, "watchtower"], [195, 35, 50, "ruinHouse"], [285, 34, 42, "watchtower"], [330, 36, 54, "church"],
   ];
   static readonly HOUSE_SCALE = 4.2;
   static readonly TRUNK_SEGMENT = 5.9;
@@ -160,7 +172,7 @@ class TowerLevelBuilder {
       rest: (piece) => this.rest(piece),
       cannon: (piece) => { this.block(piece); this.cannonExtras(piece as LaunchCannon); },
     };
-    for (const piece of level.pieces) (this.specials[piece.look] ?? ((p: PlatformPiece) => this.block(p)))(piece);
+    for (const piece of level.pieces) this.draw(piece);
     this.decorate();
     this.decorateRuins();
     this.batchers.forEach((batcher, stage) => batcher.build(this.groupOf(stage), true));
@@ -191,6 +203,22 @@ class TowerLevelBuilder {
     matrix.multiply(new THREE.Matrix4().makeScale(sx / model.sizeX, sy / model.sizeY, sz / model.sizeZ));
     matrix.multiply(new THREE.Matrix4().makeTranslation(-model.centerX, -model.max.y, -model.centerZ));
     return matrix;
+  }
+
+  private draw(piece: PlatformPiece): void {
+    if (piece.look === TowerPropShapes.HIDDEN) return;
+    const shape = TowerPropShapes.of(piece.look), special = this.specials[piece.look];
+    if (shape) this.prop(piece, shape); else if (special) special(piece); else this.block(piece);
+  }
+
+  private prop(piece: PlatformPiece, shape: ClimbPropShape): void {
+    const THREE = this.libs.THREE;
+    const wide = (piece.round ? piece.radius * 2 : piece.halfX * 2) / shape.span, tall = piece.depth / (shape.top - shape.base);
+    const matrix = new THREE.Matrix4().makeTranslation(piece.x, piece.top, piece.z);
+    matrix.multiply(new THREE.Matrix4().makeRotationY(piece.yaw + shape.turn));
+    matrix.multiply(new THREE.Matrix4().makeScale(wide, tall, wide));
+    matrix.multiply(new THREE.Matrix4().makeTranslation(-shape.cx, -shape.top, -shape.cz));
+    this.batcherOf(piece.stage).add(shape.model, matrix);
   }
 
   private block(piece: PlatformPiece): void {

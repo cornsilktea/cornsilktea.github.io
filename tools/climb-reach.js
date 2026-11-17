@@ -167,7 +167,8 @@ class TrapInspector {
   inspect() {
     const onRoute = new Set();
     this.level.routes.forEach((r) => r.steps.forEach((id) => onRoute.add(id)));
-    const decor = new Set(["trunk", "tower2"]);
+    // 이름에 점이 있는 조각(hB.isle·hA.roofIn 등)은 집·섬에 딸린 몸통이라 길에 넣지 않는다
+    const decor = { has: (id) => id === "trunk" || id === "tower2" || id.includes(".") };
     for (const piece of this.level.pieces) {
       if (!decor.has(piece.id)) this.report.check("발판 " + piece.id + " 는 어떤 길에든 속함", onRoute.has(piece.id));
       if (piece.solid && !piece.hub && !decor.has(piece.id)) this.report.check("발판 " + piece.id + " 에 갇히지 않음(내려갈 곳 있음)", this.open(piece));
@@ -196,7 +197,7 @@ for (const route of level.routes) {
   cannons.inspect(route);
 }
 for (const stage of new Set(level.routes.map((r) => r.stage))) {
-  const time = (kind) => times[level.routes.find((r) => r.stage === stage && r.name.startsWith(kind)).name];
+  const time = (kind) => { const route = level.routes.find((r) => r.stage === stage && r.name.startsWith(kind)); return route ? times[route.name] : NaN; };
   report.check("스테이지 " + stage + " 쉬운 길이 있음", level.routes.some((r) => r.stage === stage && r.name.startsWith("easy")));
   report.note("스테이지 " + stage + " 발사대 길이 쉬운 길보다 " + (time("easy") - time("hard")).toFixed(1) + "초 빠름");
   report.check("스테이지 " + stage + " 발사대 길이 가장 빠름", time("hard") < time("easy") && time("hard") < time("normal"), { easy: time("easy"), normal: time("normal"), hard: time("hard") });

@@ -26,6 +26,14 @@ class ClimbModelLibrary {
         extra.animations.forEach((clip) => { if (!this.clips.has(clip.name))
             this.clips.set(clip.name, clip); });
         scenes.forEach((gltf, index) => this.models.set(names[index], this.flatten(gltf.scene)));
+        Object.entries(ClimbModelLibrary.TINTS).forEach(([name, color]) => this.tint(name, color));
+    }
+    tint(name, color) {
+        for (const part of this.model(name).parts) {
+            const material = part.material.clone();
+            material.color.setHex(color);
+            part.material = material;
+        }
     }
     model(name) {
         const found = this.models.get(name);
@@ -91,7 +99,9 @@ ClimbModelLibrary.FILES = {
     foundation: "dungeon/floor_foundation_allsides.gltf", column: "dungeon/column.gltf",
     ruinHouse: "medieval-hexagon/building_destroyed.gltf", houseA: "medieval-hexagon/building_home_A_blue.gltf", houseB: "medieval-hexagon/building_home_B_blue.gltf",
     watchtower: "medieval-hexagon/building_tower_A_blue.gltf", church: "medieval-hexagon/building_church_blue.gltf", rampart: "medieval-hexagon/wall_straight.gltf",
+    turret: "medieval-hexagon/building_tower_base_blue.gltf", hexIsle: "medieval-hexagon/hex_grass.gltf", crate: "medieval-hexagon/crate_A_big.gltf", barrelProp: "medieval-hexagon/barrel.gltf",
 };
+ClimbModelLibrary.TINTS = { hexIsle: 0x9FB878 };
 class ClimbInstanceBatcher {
     constructor(libs, library) {
         this.libs = libs;
@@ -152,7 +162,7 @@ class TowerLevelBuilder {
             cannon: (piece) => { this.block(piece); this.cannonExtras(piece); },
         };
         for (const piece of level.pieces)
-            (this.specials[piece.look] ?? ((p) => this.block(p)))(piece);
+            this.draw(piece);
         this.decorate();
         this.decorateRuins();
         this.batchers.forEach((batcher, stage) => batcher.build(this.groupOf(stage), true));
@@ -187,6 +197,26 @@ class TowerLevelBuilder {
         matrix.multiply(new THREE.Matrix4().makeScale(sx / model.sizeX, sy / model.sizeY, sz / model.sizeZ));
         matrix.multiply(new THREE.Matrix4().makeTranslation(-model.centerX, -model.max.y, -model.centerZ));
         return matrix;
+    }
+    draw(piece) {
+        if (piece.look === TowerPropShapes.HIDDEN)
+            return;
+        const shape = TowerPropShapes.of(piece.look), special = this.specials[piece.look];
+        if (shape)
+            this.prop(piece, shape);
+        else if (special)
+            special(piece);
+        else
+            this.block(piece);
+    }
+    prop(piece, shape) {
+        const THREE = this.libs.THREE;
+        const wide = (piece.round ? piece.radius * 2 : piece.halfX * 2) / shape.span, tall = piece.depth / (shape.top - shape.base);
+        const matrix = new THREE.Matrix4().makeTranslation(piece.x, piece.top, piece.z);
+        matrix.multiply(new THREE.Matrix4().makeRotationY(piece.yaw + shape.turn));
+        matrix.multiply(new THREE.Matrix4().makeScale(wide, tall, wide));
+        matrix.multiply(new THREE.Matrix4().makeTranslation(-shape.cx, -shape.top, -shape.cz));
+        this.batcherOf(piece.stage).add(shape.model, matrix);
     }
     block(piece) {
         const name = TowerLevelBuilder.BLOCK_OF_LOOK[piece.look] ?? "grass", model = this.library.model(name);
@@ -289,7 +319,7 @@ TowerLevelBuilder.BLOCK_OF_LOOK = {
 };
 TowerLevelBuilder.COLUMN_SEGMENT = 4;
 TowerLevelBuilder.RUIN_ISLANDS = [
-    [15, 28, 33, "houseA"], [75, 30, 39, "ruinHouse"], [130, 27, 45, "church"], [175, 29, 50, "houseB"], [285, 28, 42, "watchtower"], [330, 30, 54, "ruinHouse"],
+    [15, 34, 33, "church"], [75, 36, 39, "ruinHouse"], [130, 33, 45, "watchtower"], [195, 35, 50, "ruinHouse"], [285, 34, 42, "watchtower"], [330, 36, 54, "church"],
 ];
 TowerLevelBuilder.HOUSE_SCALE = 4.2;
 TowerLevelBuilder.TRUNK_SEGMENT = 5.9;
