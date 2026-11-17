@@ -16,7 +16,7 @@ class ClimbSimulation {
   constructor(games, limit) { this.games = games; this.limit = limit; this.level = new TowerLevel(TowerLevelData.spec()); }
 
   play(route, skill, seed) {
-    const rules = new ClimbRules(this.level, new StageProgress(0));
+    const rules = ClimbBot.startRules(K, this.level, route);
     const bot = new ClimbBot(K, rules, route.steps, skill, new ClimbSeededRandom(seed));
     const result = bot.run(this.limit);
     return { done: result.done, seconds: result.seconds, falls: result.falls, peak: rules.peak, hits: rules.cannonHits, misses: rules.cannonMisses };
@@ -37,8 +37,8 @@ class ClimbSimulation {
         if (r.done) { done++; seconds += r.seconds; }
         falls += r.falls; peak += r.peak; hits += r.hits; misses += r.misses;
       }
-      console.log(skill.label.padEnd(10) + route.label.padEnd(9) + (Math.round(done / each * 100) + "%").padStart(7) + (done ? (seconds / done).toFixed(1) + "초" : "-").padStart(9)
-        + (falls / each).toFixed(2).padStart(7) + ((peak / each).toFixed(1) + "m").padStart(9) + "  " + (route.name === "hard" ? hits + "/" + misses : ""));
+      console.log(skill.label.padEnd(10) + (route.stage + " " + route.label).padEnd(11) + (Math.round(done / each * 100) + "%").padStart(7) + (done ? (seconds / done).toFixed(1) + "초" : "-").padStart(9)
+        + (falls / each).toFixed(2).padStart(7) + ((peak / each).toFixed(1) + "m").padStart(9) + "  " + (route.name.startsWith("hard") ? hits + "/" + misses : ""));
     }
     console.log("모두 " + total + "판");
   }

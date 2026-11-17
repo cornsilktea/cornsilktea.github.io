@@ -79,7 +79,7 @@ class LinkMeter {
       const ratio = gap / (B.RUN * LinkMeter.airTime(B.JUMP, rise));
       return { type: "점프", ok: true, rise, gap, ratio };
     }
-    if (b.ledge && rise <= B.GRAB_HIGH + jumpHeight * 0.8 && gap <= 0.5) return { type: "모서리 잡기", ok: true, rise, gap, jump: rise > B.GRAB_HIGH };
+    if (b.ledge && rise <= B.GRAB_HIGH_AIR + jumpHeight * 0.8 && gap <= 1.6) return { type: "모서리 잡기", ok: true, rise, gap, jump: rise > B.GRAB_HIGH };
     return { type: "불가", ok: false, rise, gap };
   }
 }
@@ -111,7 +111,7 @@ class RouteInspector {
   }
 
   play(route) {
-    const rules = new ClimbRules(this.level, new StageProgress(0));
+    const rules = ClimbBot.startRules(K, this.level, route);
     const bot = new ClimbBot(K, rules, route.steps);
     const result = bot.run(300);
     this.report.check(route.name + " 봇이 슬로 없이 끝까지 감", result.done && rules.progress.cleared === route.stage, { at: route.steps[bot.index], seconds: result.seconds, y: rules.body.y });
@@ -167,7 +167,7 @@ class TrapInspector {
   inspect() {
     const onRoute = new Set();
     this.level.routes.forEach((r) => r.steps.forEach((id) => onRoute.add(id)));
-    const decor = new Set(["trunk"]);
+    const decor = new Set(["trunk", "tower2"]);
     for (const piece of this.level.pieces) {
       if (!decor.has(piece.id)) this.report.check("발판 " + piece.id + " 는 어떤 길에든 속함", onRoute.has(piece.id));
       if (piece.solid && !piece.hub && !decor.has(piece.id)) this.report.check("발판 " + piece.id + " 에 갇히지 않음(내려갈 곳 있음)", this.open(piece));
@@ -181,6 +181,7 @@ class TrapInspector {
     for (const stage of this.level.stages) {
       const start = this.level.stageStart(stage.index);
       if (start) this.report.check("스테이지 " + stage.index + " 시작 쉼터는 한 변 3m 이상·높이 " + stage.floor, start.rest && Math.abs(start.top - stage.floor) < 1e-9, start.top);
+      if (start) this.report.check("스테이지 " + stage.index + " 시작 쉼터 가운데 위가 비어 있음(포탈로 와서 설 자리)", !this.level.pieces.some((p) => p !== start && p.solid && p.covers(start.x, start.z) && p.bottom < start.top + B.HEIGHT + 1 && p.top > start.top));
     }
   }
 }
@@ -194,10 +195,11 @@ for (const route of level.routes) {
   times[route.name] = routes.play(route);
   cannons.inspect(route);
 }
-report.check("쉬운 길이 있음", level.routes.some((r) => r.name === "easy"));
-if (times.easy && times.hard) {
-  report.note("발사대 길이 쉬운 길보다 " + (times.easy - times.hard).toFixed(1) + "초 빠름");
-  report.check("발사대 길이 가장 빠름", times.hard < times.easy && times.hard < times.normal, times);
+for (const stage of new Set(level.routes.map((r) => r.stage))) {
+  const time = (kind) => times[level.routes.find((r) => r.stage === stage && r.name.startsWith(kind)).name];
+  report.check("스테이지 " + stage + " 쉬운 길이 있음", level.routes.some((r) => r.stage === stage && r.name.startsWith("easy")));
+  report.note("스테이지 " + stage + " 발사대 길이 쉬운 길보다 " + (time("easy") - time("hard")).toFixed(1) + "초 빠름");
+  report.check("스테이지 " + stage + " 발사대 길이 가장 빠름", time("hard") < time("easy") && time("hard") < time("normal"), { easy: time("easy"), normal: time("normal"), hard: time("hard") });
 }
 new TrapInspector(level, report).inspect();
 report.finish();

@@ -30,6 +30,7 @@ ClimbBalance.HANG_DROP = 2;
 ClimbBalance.MANTLE_MIN_HANG = 0.2;
 ClimbBalance.MANTLE_PUSH = 0.5;
 ClimbBalance.MANTLE_INSET = 0.55;
+ClimbBalance.MANTLE_INSETS = [ClimbBalance.MANTLE_INSET, 0.35, 0.2];
 ClimbBalance.CLIMB_UP_TIME = 0.5;
 ClimbBalance.CLIMB_UP_RISE_SHARE = 0.6;
 ClimbBalance.CLIMB_UP_LIFT = 0.15;
@@ -907,9 +908,9 @@ class ClimbRules {
             this.release(false);
             return;
         }
-        const x = spot.x - spot.nx * B.MANTLE_INSET, z = spot.z - spot.nz * B.MANTLE_INSET;
-        const inside = piece.covers(x, z);
-        body.climbPath.start(body.x, body.y, body.z, inside ? x : piece.x, piece.top, inside ? z : piece.z, piece);
+        const inset = ClimbBalance.MANTLE_INSETS.find((d) => piece.covers(spot.x - spot.nx * d, spot.z - spot.nz * d));
+        const x = inset === undefined ? piece.x : spot.x - spot.nx * inset, z = inset === undefined ? piece.z : spot.z - spot.nz * inset;
+        body.climbPath.start(body.x, body.y, body.z, x, piece.top, z, piece);
         body.mode = "climbUp";
         this.emit({ t: "climbUp" });
     }

@@ -212,17 +212,17 @@ class ClimbHud {
     if (text) this.countBox.animate([{ transform: "translate(-50%,-50%) scale(1.6)", opacity: 0 }, { transform: "translate(-50%,-50%) scale(1)", opacity: 1 }], { duration: 380, easing: "ease-out" });
   }
 
-  static readonly LEDGE_TIP = "W · Space 오르기   S 놓기";
-  static readonly HOLD_TIP = "Space 위로   S 놓기";
-  static readonly LEDGE_TIP_TOUCH = "위로 밀면 오르기 · 아래로 놓기";
-  static readonly HOLD_TIP_TOUCH = "점프로 위로 · 아래로 놓기";
+  static readonly LEDGE_TIP = "<b>W / Space</b><span>올라가기</span><b>S</b><span>놓기</span>";
+  static readonly HOLD_TIP = "<b>Space</b><span>위로</span><b>S</b><span>놓기</span>";
+  static readonly LEDGE_TIP_TOUCH = "<b>위로 밀기 · 점프</b><span>올라가기</span><b>아래로 당기기</b><span>놓기</span>";
+  static readonly HOLD_TIP_TOUCH = "<b>점프</b><span>위로</span><b>아래로 당기기</b><span>놓기</span>";
 
   hangHint(hanging: boolean, onLedge: boolean, touch: boolean): void {
     const H = ClimbHud, tip = !hanging ? "" : onLedge ? (touch ? H.LEDGE_TIP_TOUCH : H.LEDGE_TIP) : (touch ? H.HOLD_TIP_TOUCH : H.HOLD_TIP);
     if (tip === this.tipShown) return;
     this.tipShown = tip;
     this.grabTip.hidden = !tip;
-    if (tip) this.grabTip.textContent = tip;
+    if (tip) this.grabTip.innerHTML = tip;
   }
 
   update(rules: ClimbRules, records: ClimbRecords, fresh: boolean, dt: number): void {

@@ -55,7 +55,9 @@
   #banner { position: fixed; left: 50%; top: 104px; transform: translateX(-50%); z-index: 8; padding: 8px 16px; font-size: 17px; font-weight: 800; pointer-events: none; max-width: 92vw; text-align: center; white-space: nowrap; }
   #banner.strong { font-size: 22px; background: rgba(217,123,79,.92); border-left-color: #fff; }
   #bigCount { position: fixed; left: 50%; top: 40%; transform: translate(-50%, -50%); z-index: 8; font-size: 96px; font-weight: 800; pointer-events: none; color: #fff; text-shadow: 0 4px 0 #1A5C99, 0 0 24px rgba(110,200,255,.8); }
-  #grabHint { position: fixed; left: 50%; top: 62%; transform: translateX(-50%); z-index: 6; pointer-events: none; padding: 5px 12px; font-size: 15px; font-weight: 800; }
+  #grabHint { position: fixed; left: 50%; top: 62%; transform: translateX(-50%); z-index: 6; pointer-events: none; padding: 6px 14px; font-size: 15px; font-weight: 800; display: grid; grid-template-columns: auto auto; column-gap: 14px; row-gap: 3px; align-items: center; }
+  #grabHint[hidden] { display: none; }
+  #grabHint b { color: #D97B4F; }
   #slowVeil { position: fixed; inset: 0; z-index: 3; pointer-events: none; opacity: 0; background: radial-gradient(ellipse at center, rgba(110,200,255,0) 50%, rgba(110,200,255,.3) 82%, rgba(150,215,255,.6) 100%); }
   #whiteFade { position: fixed; inset: 0; z-index: 9; pointer-events: none; opacity: 0; background: #fff; }
   #controls { position: fixed; inset: 0; z-index: 4; pointer-events: none; }
@@ -136,7 +138,7 @@
       <h2>규칙</h2>
       <ul class="st-rules">
         <li>탑을 뛰어 올라가요. <b>저장은 없어요.</b> 발판에 서거나 잡지 못하면 <b>맨 처음 지점까지</b> 떨어져요.</li>
-        <li>30m 쉼터에 닿으면 <b>스테이지 1 클리어</b>! 처음 지점의 <b>포탈 2</b>가 열려 그곳으로 바로 갈 수 있어요.</li>
+        <li>깃발 쉼터(30m, 60m…)에 닿을 때마다 <b>스테이지 클리어</b>! 처음 지점의 다음 <b>포탈</b>이 열려 그곳으로 바로 갈 수 있어요. 지금은 <b>스테이지 2(폐허 마을)</b>까지 있어요.</li>
         <li>주황 표시가 있는 <b>손잡이</b>와 발판 <b>모서리</b>는 잡을 수 있어요. 높은 블록으로 점프하면 <b>모서리를 저절로 잡아요</b>. 매달린 채 앞으로 밀거나 점프를 누르면 기어올라가고, 뒤로 당기면 손을 놓아요. 손잡이에 매달려 점프를 누르면 위 손잡이로 올라가요.</li>
         <li>노란 <b>점프대</b>는 높이 튕겨 줘요. 빨간 <b>발사대</b>는 지름길이지만 놓치면 처음부터예요. 가만히 기다리면 가장 세게 날아가요.</li>
         <li><b>슬로 모션</b>은 누르고 있는 동안 얼마든지 쓸 수 있어요.</li>
@@ -146,11 +148,11 @@
 </div>
 <script charset="utf-8" src="common/character-kit.js?v=20261116b"></script>
 <script charset="utf-8" src="common/fold-card.js"></script>
-<script charset="utf-8" src="games/42.tower-climb/42.climb-rules.js?v=20261117e"></script>
-<script charset="utf-8" src="games/42.tower-climb/42.tower-level-data.js?v=20261117b"></script>
-<script charset="utf-8" src="games/42.tower-climb/42.climb-scene.js?v=20261117c"></script>
+<script charset="utf-8" src="games/42.tower-climb/42.climb-rules.js?v=20261117g"></script>
+<script charset="utf-8" src="games/42.tower-climb/42.tower-level-data.js?v=20261117g"></script>
+<script charset="utf-8" src="games/42.tower-climb/42.climb-scene.js?v=20261117g"></script>
 <script charset="utf-8" src="games/42.tower-climb/42.climb-input.js?v=20261117e"></script>
-<script charset="utf-8" src="games/42.tower-climb/42.climb-hud.js?v=20261117e"></script>
+<script charset="utf-8" src="games/42.tower-climb/42.climb-hud.js?v=20261117g"></script>
 <script charset="utf-8" src="games/42.tower-climb/42.tower-climb.js?v=20261117e"></script>
 <script type="module">
 import * as THREE from "three";

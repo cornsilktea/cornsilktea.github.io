@@ -21,6 +21,13 @@ class ClimbBot {
     this.probe = { x: 0, z: 0, nx: 0, nz: 0, dist: 0, inside: false };
   }
 
+  // 길의 첫 발판에 선 채로 시작하는 한 판(스테이지 2부터는 앞 스테이지를 깬 것으로 친다)
+  static startRules(K, level, route) {
+    const rules = new K.ClimbRules(level, new K.StageProgress(route.stage - 1)), first = level.piece(route.steps[0]);
+    if (route.stage > 1) { rules.body.place(first.x, first.top, first.z); rules.body.airPeak = first.top; }
+    return rules;
+  }
+
   get done() { return this.index >= this.route.length; }
   get target() { return this.rules.level.piece(this.route[Math.min(this.index, this.route.length - 1)]); }
 
@@ -98,12 +105,13 @@ class ClimbBot {
     const ground = body.ground;
     if (needsGrab) {
       const reach = target instanceof K.GrabHold ? Math.hypot(target.x - body.x, target.z - body.z) : target.edge(body.x, body.z, this.probe).dist;
-      if (reach < 0.95) rules.pressJump();
+      if (reach < 0.95 || !ground.covers(body.x + dx * this.edgeMargin, body.z + dz * this.edgeMargin)) rules.pressJump();
       return;
     }
     const edge = target.edge(body.x, body.z, this.probe);
     const touching = edge.inside || edge.dist < 0.7;
-    const level = Math.abs(target.topAt(edge.x, edge.z) - body.y) <= B.STEP;
+    const touchingGround = ground.covers(edge.x, edge.z) || ground.edge(edge.x, edge.z, { x: 0, z: 0, nx: 0, nz: 0, dist: 0, inside: false }).dist < 0.15;
+    const level = touchingGround && Math.abs(target.topAt(edge.x, edge.z) - body.y) <= B.STEP;
     if (level && edge.dist < 0.1) return;
     if (level && edge.dist < 1.2) { rules.steer(edge.x - body.x, edge.z - body.z); return; }
     if (target.topAt(edge.x, edge.z) > body.y + B.STEP) { if (touching || !ground.covers(body.x + dx * this.edgeMargin, body.z + dz * this.edgeMargin)) rules.pressJump(); return; }

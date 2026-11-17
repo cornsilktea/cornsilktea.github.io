@@ -113,13 +113,80 @@ TowerStageOneLayout.HARD_DEG = 291;
 TowerStageOneLayout.HARD_RING = 16;
 TowerStageOneLayout.CANNON_GAP = 3.5;
 TowerStageOneLayout.CANNON_RADIUS = 1.3;
+class TowerStageTwoLayout {
+    static pieces() {
+        const S = TowerStageTwoLayout, pen = new ClimbLayoutPen(2), B = ClimbBalance;
+        pen.round("tower2", "static", 0, 0, S.TOP_Y - 0.5, TowerStageOneLayout.TRUNK_RADIUS, { depth: S.TOP_Y - 0.5 - S.TOWER_BASE, noLedge: true, look: "tower" });
+        let below = S.FLOOR;
+        S.PATH.forEach(([angle, top], i) => {
+            const wall = top - below > S.WALL;
+            pen.box("r" + (i + 1), "static", angle, S.RING, top, S.SIDE, S.SIDE, angle, { depth: wall ? top - below : 0.8, look: wall ? "ruin" : "slab" });
+            below = top;
+        });
+        pen.box("join2", "static", S.JOIN_DEG, S.JOIN_RING, S.JOIN_Y, 3.6, 3.6, S.JOIN_DEG, { depth: 1.2, look: "slab" });
+        const [, n0Base] = S.PATH[1];
+        pen.box("m0", "static", S.HOLD_DEG_LOW, 4.3, n0Base + 0.2, 2.4, 2, S.HOLD_DEG_LOW, { depth: 0.6, noLedge: true, look: "slab" });
+        S.HOLDS_LOW.forEach((y, i) => pen.round("g" + (i + 1), "hold", S.HOLD_DEG_LOW, TowerStageOneLayout.TRUNK_RADIUS, y, 0.25, { depth: 0.3, look: "hold" }));
+        const lowLast = S.HOLDS_LOW[S.HOLDS_LOW.length - 1];
+        pen.box("m1", "static", S.HOLD_DEG_HIGH - 3, 4.3, lowLast + 1.1, 2.4, 2, S.HOLD_DEG_HIGH - 3, { depth: 0.5, look: "slab" });
+        S.HOLDS_HIGH.forEach((y, i) => pen.round("g" + (i + 6), "hold", S.HOLD_DEG_HIGH, TowerStageOneLayout.TRUNK_RADIUS, y, 0.25, { depth: 0.3, look: "hold" }));
+        const highLast = S.HOLDS_HIGH[S.HOLDS_HIGH.length - 1];
+        pen.box("m2", "static", S.HOLD_DEG_HIGH + 22, 4.3, highLast + 1.1, 2.4, 2, S.HOLD_DEG_HIGH + 22, { depth: 0.5, look: "slab" });
+        pen.box("x1", "narrow", S.BEAM_DEG, 11.3, S.CANNON_Y - 0.5, 4.6, 0.7, S.BEAM_DEG - 90, { depth: 0.6, noLedge: true, look: "beam" });
+        const fromX = ClimbLayoutPen.ringX(S.BEAM_DEG, 13.6), fromZ = ClimbLayoutPen.ringZ(S.BEAM_DEG, 13.6);
+        const toX = ClimbLayoutPen.ringX(S.CANNON_DEG, S.CANNON_RHO), toZ = ClimbLayoutPen.ringZ(S.CANNON_DEG, S.CANNON_RHO);
+        const span = Math.hypot(toX - fromX, toZ - fromZ), ux = (toX - fromX) / span, uz = (toZ - fromZ) / span;
+        const beamStart = S.BEAM_GAP, beamEnd = span - 1.3 - S.CANNON_GAP2, beamMid = (beamStart + beamEnd) / 2;
+        pen.boxAt("x2", "narrow", fromX + ux * beamMid, fromZ + uz * beamMid, S.CANNON_Y - 0.3, beamEnd - beamStart, 0.7, Math.atan2(-uz, ux) * 180 / Math.PI, { depth: 0.6, look: "beam" });
+        pen.box("cannon2", "cannon", S.CANNON_DEG, S.CANNON_RHO, S.CANNON_Y, 2.6, 2.6, S.CANNON_DEG + 180, { depth: 0.8, look: "cannon" });
+        const flightTime = (B.CANNON_UP + Math.sqrt(B.CANNON_UP ** 2 - 2 * B.GRAVITY * 12)) / B.GRAVITY;
+        pen.box("target2", "static", S.CANNON_DEG, S.CANNON_RHO - B.CANNON_FORWARD * flightTime, S.CANNON_Y + 12, 3, 3, S.CANNON_DEG, { depth: 0.6, look: "slab" });
+        pen.round("rest3", "rest", 0, 0, S.TOP_Y, 4.2, { depth: 0.5, startOf: 3, look: "rest" });
+        return pen.pieces;
+    }
+    static routes() {
+        const S = TowerStageTwoLayout;
+        const path = S.PATH.map((_, i) => "r" + (i + 1)), ending = ["join2", "rest3"];
+        const low = S.HOLDS_LOW.map((_, i) => "g" + (i + 1)), high = S.HOLDS_HIGH.map((_, i) => "g" + (i + 6));
+        return [
+            { stage: 2, name: "easy2", label: "쉬운 길", ratioLimit: 0.65, steps: ["rest2", ...path, ...ending] },
+            { stage: 2, name: "normal2", label: "긴 손잡이 오르막", ratioLimit: 0.65, steps: ["rest2", "r1", "r2", "m0", ...low, "m1", ...high, "m2", ...path.slice(S.NORMAL_JOIN - 1), ...ending] },
+            { stage: 2, name: "hard2", label: "발사대", ratioLimit: 0.9, steps: ["rest2", "r1", "r2", "r3", "r4", "r5", "x1", "x2", "cannon2", "target2", ...path.slice(S.HARD_JOIN - 1), ...ending] },
+        ];
+    }
+}
+TowerStageTwoLayout.FLOOR = 30;
+TowerStageTwoLayout.TOWER_BASE = 34;
+TowerStageTwoLayout.TOP_Y = 60;
+TowerStageTwoLayout.RING = 7;
+TowerStageTwoLayout.SIDE = 3.4;
+TowerStageTwoLayout.WALL = 1.5;
+TowerStageTwoLayout.PATH = [
+    [0, 32.8], [55, 32.8], [100, 36], [155, 36], [200, 39.2], [255, 39.4], [300, 42.4], [355, 42.4],
+    [400, 45.6], [455, 45.6], [500, 48.8], [555, 49], [600, 52.2], [655, 52.2], [700, 55.4],
+];
+TowerStageTwoLayout.JOIN_DEG = 740;
+TowerStageTwoLayout.JOIN_RING = 6.3;
+TowerStageTwoLayout.JOIN_Y = 56.6;
+TowerStageTwoLayout.HOLD_DEG_LOW = 55;
+TowerStageTwoLayout.HOLD_DEG_HIGH = 75;
+TowerStageTwoLayout.HOLDS_LOW = [35.15, 36.65, 38.15, 39.65, 41.15];
+TowerStageTwoLayout.HOLDS_HIGH = [43.55, 45.05, 46.55, 48.05];
+TowerStageTwoLayout.NORMAL_JOIN = 11;
+TowerStageTwoLayout.BEAM_DEG = 200;
+TowerStageTwoLayout.BEAM_GAP = 1.8;
+TowerStageTwoLayout.CANNON_GAP2 = 1.2;
+TowerStageTwoLayout.CANNON_DEG = 222;
+TowerStageTwoLayout.CANNON_RHO = 17.6;
+TowerStageTwoLayout.CANNON_Y = 40;
+TowerStageTwoLayout.HARD_JOIN = 13;
 class TowerLevelData {
     static spec() {
         return {
             stages: TowerLevelData.STAGES.map((s) => ({ ...s })),
-            pieces: [...TowerHubLayout.pieces(), ...TowerStageOneLayout.pieces()],
+            pieces: [...TowerHubLayout.pieces(), ...TowerStageOneLayout.pieces(), ...TowerStageTwoLayout.pieces()],
             portals: TowerHubLayout.portals(),
-            routes: TowerStageOneLayout.routes(),
+            routes: [...TowerStageOneLayout.routes(), ...TowerStageTwoLayout.routes()],
             spawn: TowerHubLayout.spawn(),
         };
     }

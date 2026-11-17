@@ -88,6 +88,9 @@ ClimbModelLibrary.FILES = {
     barrel: "dungeon/barrel_large.gltf", door: "dungeon/wall_doorway.gltf",
     pebble: "forest/Rock_1_A_Color1.gltf", boulder: "forest/Rock_3_C_Color1.gltf", bush: "forest/Bush_1_C_Color1.gltf",
     tuft: "forest/Grass_1_A_Singlesided_Color1.gltf", treeA: "forest/Tree_1_B_Color1.gltf", treeB: "forest/Tree_2_B_Color1.gltf", treeC: "forest/Tree_4_B_Color1.gltf",
+    foundation: "dungeon/floor_foundation_allsides.gltf", column: "dungeon/column.gltf",
+    ruinHouse: "medieval-hexagon/building_destroyed.gltf", houseA: "medieval-hexagon/building_home_A_blue.gltf", houseB: "medieval-hexagon/building_home_B_blue.gltf",
+    watchtower: "medieval-hexagon/building_tower_A_blue.gltf", church: "medieval-hexagon/building_church_blue.gltf", rampart: "medieval-hexagon/wall_straight.gltf",
 };
 class ClimbInstanceBatcher {
     constructor(libs, library) {
@@ -138,11 +141,12 @@ class TowerLevelBuilder {
         this.level = level;
         this.stageGroups = new Map();
         this.batchers = new Map();
-        this.marks = [];
+        this.marks = new Map();
         this.root = new libs.THREE.Group();
         this.specials = {
             island: (piece) => this.island(piece),
             trunk: (piece) => this.trunk(piece),
+            tower: (piece) => this.tower(piece),
             hold: (piece) => this.hold(piece),
             rest: (piece) => this.rest(piece),
             cannon: (piece) => { this.block(piece); this.cannonExtras(piece); },
@@ -150,6 +154,7 @@ class TowerLevelBuilder {
         for (const piece of level.pieces)
             (this.specials[piece.look] ?? ((p) => this.block(p)))(piece);
         this.decorate();
+        this.decorateRuins();
         this.batchers.forEach((batcher, stage) => batcher.build(this.groupOf(stage), true));
         this.buildMarks();
     }
@@ -193,6 +198,19 @@ class TowerLevelBuilder {
         for (let i = 0; i < count; i++)
             this.batcherOf(piece.stage).add("barrel", this.fit(model, piece.x, piece.top - each * i, piece.z, i * 0.7, 0, piece.radius * 2, each, piece.radius * 2));
     }
+    tower(piece) {
+        const model = this.library.model("column"), T = TowerLevelBuilder, height = piece.top - piece.bottom, count = Math.ceil(height / T.COLUMN_SEGMENT), each = height / count;
+        for (let i = 0; i < count; i++)
+            this.batcherOf(piece.stage).add("column", this.fit(model, piece.x, piece.top - each * i, piece.z, i * 0.4, 0, piece.radius * 2, each, piece.radius * 2));
+    }
+    marksOf(stage) {
+        let list = this.marks.get(stage);
+        if (!list) {
+            list = [];
+            this.marks.set(stage, list);
+        }
+        return list;
+    }
     rest(piece) {
         const THREE = this.libs.THREE, group = this.groupOf(piece.stage);
         this.batcherOf(piece.stage).add("barrel", this.fit(this.library.model("barrel"), piece.x, piece.top, piece.z, 0, 0, piece.radius * 2, piece.depth, piece.radius * 2));
@@ -204,7 +222,7 @@ class TowerLevelBuilder {
     hold(piece) {
         const THREE = this.libs.THREE, model = this.library.model("pebble");
         this.batcherOf(piece.stage).add("pebble", this.fit(model, piece.x - piece.nx * 0.1, piece.top + 0.05, piece.z - piece.nz * 0.1, piece.yaw, 0, 0.8, 0.55, 0.7));
-        this.marks.push(new THREE.Matrix4().makeTranslation(piece.x + piece.nx * 0.28, piece.top + 0.12, piece.z + piece.nz * 0.28));
+        this.marksOf(piece.stage).push(new THREE.Matrix4().makeTranslation(piece.x + piece.nx * 0.28, piece.top + 0.12, piece.z + piece.nz * 0.28));
     }
     island(piece) {
         const THREE = this.libs.THREE;
@@ -224,15 +242,27 @@ class TowerLevelBuilder {
         const up = LaunchCannon.launchUp(1), forward = LaunchCannon.launchForward(1), span = (up + Math.sqrt(up * up - 2 * B.GRAVITY * 12)) / B.GRAVITY;
         for (let i = 1; i <= T.PATH_DOTS; i++) {
             const t = span * i / (T.PATH_DOTS + 1);
-            this.marks.push(new THREE.Matrix4().makeTranslation(cannon.x + cannon.dirX * forward * t, cannon.top + 1 + up * t - B.GRAVITY * t * t / 2, cannon.z + cannon.dirZ * forward * t));
+            this.marksOf(cannon.stage).push(new THREE.Matrix4().makeTranslation(cannon.x + cannon.dirX * forward * t, cannon.top + 1 + up * t - B.GRAVITY * t * t / 2, cannon.z + cannon.dirZ * forward * t));
         }
     }
     buildMarks() {
-        const THREE = this.libs.THREE, T = TowerLevelBuilder;
-        const mesh = new THREE.InstancedMesh(new THREE.BoxGeometry(0.2, 0.2, 0.2), new THREE.MeshBasicMaterial({ color: T.MARK_COLOR }), this.marks.length);
-        this.marks.forEach((matrix, index) => mesh.setMatrixAt(index, matrix));
-        mesh.computeBoundingSphere();
-        this.groupOf(1).add(mesh);
+        const THREE = this.libs.THREE, T = TowerLevelBuilder, geometry = new THREE.BoxGeometry(0.2, 0.2, 0.2), material = new THREE.MeshBasicMaterial({ color: T.MARK_COLOR });
+        this.marks.forEach((list, stage) => {
+            const mesh = new THREE.InstancedMesh(geometry, material, list.length);
+            list.forEach((matrix, index) => mesh.setMatrixAt(index, matrix));
+            mesh.computeBoundingSphere();
+            this.groupOf(stage).add(mesh);
+        });
+    }
+    decorateRuins() {
+        const T = TowerLevelBuilder, batcher = this.batcherOf(2), base = this.library.model("foundation");
+        for (const [deg, rho, top, house] of T.RUIN_ISLANDS) {
+            const angle = deg * Math.PI / 180, x = Math.sin(angle) * rho, z = Math.cos(angle) * rho, model = this.library.model(house), scale = T.HOUSE_SCALE;
+            batcher.add("foundation", this.fit(base, x, top, z, angle, 0, 6, 3, 6));
+            batcher.add(house, this.fit(model, x, top + model.sizeY * scale, z, angle + Math.PI, 0, model.sizeX * scale, model.sizeY * scale, model.sizeZ * scale));
+            const wall = this.library.model("rampart");
+            batcher.add("rampart", this.fit(wall, x + Math.sin(angle) * 2.6, top + wall.sizeY * 2, z + Math.cos(angle) * 2.6, angle + Math.PI / 2, 0, wall.sizeX * 2.4, wall.sizeY * 2, wall.sizeZ * 2));
+        }
     }
     decorate() {
         const dice = new ClimbDecorDice(4242), batcher = this.batcherOf(0), hub = this.level.pieces.find((p) => p.hub);
@@ -255,7 +285,13 @@ class TowerLevelBuilder {
 }
 TowerLevelBuilder.BLOCK_OF_LOOK = {
     deck: "grass", block: "dirt", root: "dirt", rock: "stone", stump: "dirt", log: "wood", ramp: "wood", pad: "yellow", cannon: "red",
+    ruin: "foundation", slab: "stone", beam: "wood",
 };
+TowerLevelBuilder.COLUMN_SEGMENT = 4;
+TowerLevelBuilder.RUIN_ISLANDS = [
+    [15, 28, 33, "houseA"], [75, 30, 39, "ruinHouse"], [130, 27, 45, "church"], [175, 29, 50, "houseB"], [285, 28, 42, "watchtower"], [330, 30, 54, "ruinHouse"],
+];
+TowerLevelBuilder.HOUSE_SCALE = 4.2;
 TowerLevelBuilder.TRUNK_SEGMENT = 5.9;
 TowerLevelBuilder.MARK_COLOR = 0xFF9A4A;
 TowerLevelBuilder.PATH_DOTS = 14;

@@ -234,7 +234,7 @@ class ClimbHud {
         this.tipShown = tip;
         this.grabTip.hidden = !tip;
         if (tip)
-            this.grabTip.textContent = tip;
+            this.grabTip.innerHTML = tip;
     }
     update(rules, records, fresh, dt) {
         const B = ClimbBalance, height = rules.height, stage = this.level.stageAt(height);
@@ -270,10 +270,10 @@ class ClimbHud {
 }
 ClimbHud.MAP_CELL = 22;
 ClimbHud.PLAY_IDS = ["hudTop", "hudLeft", "hudMap", "controls", "btnPause"];
-ClimbHud.LEDGE_TIP = "W · Space 오르기   S 놓기";
-ClimbHud.HOLD_TIP = "Space 위로   S 놓기";
-ClimbHud.LEDGE_TIP_TOUCH = "위로 밀면 오르기 · 아래로 놓기";
-ClimbHud.HOLD_TIP_TOUCH = "점프로 위로 · 아래로 놓기";
+ClimbHud.LEDGE_TIP = "<b>W / Space</b><span>올라가기</span><b>S</b><span>놓기</span>";
+ClimbHud.HOLD_TIP = "<b>Space</b><span>위로</span><b>S</b><span>놓기</span>";
+ClimbHud.LEDGE_TIP_TOUCH = "<b>위로 밀기 · 점프</b><span>올라가기</span><b>아래로 당기기</b><span>놓기</span>";
+ClimbHud.HOLD_TIP_TOUCH = "<b>점프</b><span>위로</span><b>아래로 당기기</b><span>놓기</span>";
 class ClimbStartPanel {
     constructor() {
         this.best = ClimbDom.el("recBest");
