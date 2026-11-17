@@ -244,7 +244,7 @@ function box(id, x, z, y, sx, sz, more = {}) { return { id, kind: "static", stag
   p.clear(5);
   check("포탈 6: 스테이지 5 클리어 → 열림", p.unlocked(6) && p.portalOpen(6, level));
   p.clear(6);
-  check("포탈 7: 풀렸어도 스테이지가 없으면(공사 중) 안 열림", p.unlocked(7) && !p.portalOpen(7, level));
+  check("포탈 7: 스테이지 6 클리어 → 열림", p.unlocked(7) && p.portalOpen(7, level));
   check("이미 깬 스테이지는 다시 세지 않음", !p.clear(1) && p.cleared === 6);
   check("포탈은 6개(스테이지 2~7)", level.portals.length === 6 && level.portals.map((x) => x.stage).join("") === "234567");
 }
@@ -289,9 +289,69 @@ function box(id, x, z, y, sx, sz, more = {}) { return { id, kind: "static", stag
   r.steer(1, 0.2);
   const ev = run(r, 6);
   check("실제 탑: 30m 쉼터에서 뛰어내리면 끝까지 떨어져 허브", r.body.grounded && (r.body.ground.id === "hub" || r.body.y < 30), { y: r.body.y, on: r.body.ground && r.body.ground.id });
-  check("실제 탑: 스테이지 2~6 시작 쉼터 있음, 7 은 없음", [2, 3, 4, 5, 6].every((n) => level.hasStage(n)) && !level.hasStage(7));
+  check("실제 탑: 스테이지 2~7 시작 쉼터 있음", [2, 3, 4, 5, 6, 7].every((n) => level.hasStage(n)));
   check("실제 탑: 시작 지점이 포탈 밖", level.portals.every((p) => Math.hypot(p.x - level.spawn.x, p.z - level.spawn.z) > B.PORTAL_RADIUS + 2));
   check("높이별 스테이지", level.stageAt(0).index === 1 && level.stageAt(29.9).index === 1 && level.stageAt(30).index === 2 && level.stageAt(-5).index === 0);
+}
+
+{
+  const car = { id: "car", kind: "moving", stage: 6, x: 0, y: 5, z: 0, sx: 3.5, sz: 1.6, depth: 1, move: { track: "orbit", group: "t", rho: 10, speed: 3.5, startDeg: 0 } };
+  const r = world([car], { x: 0, y: 5.5, z: 10, yaw: 0 });
+  settle(r);
+  check("움직이는 칸 위에 서면 같이 감", r.body.grounded && r.body.ground.id === "car", r.body.ground && r.body.ground.id);
+  const p = r.level.piece("car"), localX = p.localX(r.body.x, r.body.z), localZ = p.localZ(r.body.x, r.body.z);
+  run(r, 3);
+  const driftX = p.localX(r.body.x, r.body.z) - localX, driftZ = p.localZ(r.body.x, r.body.z) - localZ;
+  check("3초 뒤에도 칸 위 같은 자리(칸과 같이 돌아감)", r.body.grounded && r.body.ground === p && Math.hypot(driftX, driftZ) < 0.02, { driftX, driftZ });
+  const vx = p.vx, vz = p.vz;
+  r.pressJump();
+  run(r, B.TICK * 2);
+  const fromX = r.body.x, fromZ = r.body.z;
+  run(r, 0.3);
+  const moved = Math.hypot(r.body.x - fromX, r.body.z - fromZ), expect = Math.hypot(vx, vz) * 0.3;
+  check("움직이는 칸에서 뛰면 칸 속도(관성)를 싣고 날아감", !r.body.grounded && near(moved, expect, 0.05), { moved, expect });
+  run(r, 1);
+  check("제자리 점프는 같은 칸에 다시 내려앉음", r.body.grounded && r.body.ground === p, r.body.ground && r.body.ground.id);
+}
+{
+  const lift = { id: "lift", kind: "moving", stage: 6, x: 0, y: 2, z: 0, sx: 2, sz: 2, depth: 3, move: { track: "lift", group: "l", low: 2, high: 6, period: 4, phase: 0 } };
+  const r = world([lift], { x: 0, y: 2.5, z: 0, yaw: 0 });
+  settle(r);
+  run(r, 2 - 0.2);
+  check("승강 상자 위에 서면 같이 올라감(꼭대기 6m)", r.body.grounded && near(r.body.y, 6, 0.05), r.body.y);
+  run(r, 2);
+  check("내려올 때도 같이 내려옴(바닥 2m)", r.body.grounded && near(r.body.y, 2, 0.05), r.body.y);
+}
+{
+  const lift = { id: "lift", kind: "moving", stage: 6, x: 0, y: 2.2, z: 0, sx: 2, sz: 2, depth: 4, move: { track: "lift", group: "l", low: 2.2, high: 5.6, period: 6, phase: 0 } };
+  const r = world([lift], { x: 0, y: 0, z: 2.2, yaw: Math.PI });
+  settle(r);
+  const p = r.level.piece("lift");
+  r.steer(0, -1);
+  run(r, B.TICK);
+  r.pressJump();
+  run(r, B.TICK * 3);
+  r.steer(0, 0);
+  let hangTicks = 0, worst = 0, rose = 0, lastTop = p.top;
+  run(r, 0.8, () => {
+    if (!r.body.hanging) return;
+    hangTicks++;
+    rose += p.top - lastTop;
+    worst = Math.max(worst, Math.abs(r.body.spot.y - p.top), Math.abs(r.body.y - (p.top - B.HANG_DROP)));
+    lastTop = p.top;
+  });
+  check("승강 상자 모서리를 저절로 잡음", hangTicks > 0, hangTicks);
+  check("매달린 채 같이 올라감(잡은 곳·몸 높이가 상자를 따라감)", worst < 0.06 && rose > 0.1, { worst, rose });
+  r.pressJump();
+  run(r, 1);
+  check("기어오르면 움직이는 상자 위에 섬", r.body.grounded && r.body.ground === p && near(r.body.y, p.top, 1e-6), { mode: r.body.mode, y: r.body.y, top: p.top });
+}
+{
+  const pad = { id: "mp", kind: "movingPad", stage: 6, x: 0, y: 0.3, z: 0, sx: 1.8, sz: 1.8, depth: 0.6, move: { track: "shuttle", group: "s", dirDeg: 90, stroke: 3, speed: 3.5, phase: 0 } };
+  const r = world([pad], { x: 0, y: 0.32, z: 0, yaw: 0 });
+  let bounced = null;
+  run(r, 0.5).forEach((e) => { if (e.t === "pad" && bounced === null) bounced = r.body.driftX; });
+  check("움직이는 점프대: 튕기면서 점프대 속도를 실음", bounced !== null && near(bounced, 3.5, 1e-6), bounced);
 }
 
 console.log("climb-unit: 통과 " + passed + ", 실패 " + failures.length);

@@ -28,6 +28,14 @@ TowerPropShapes.SHAPES = {
     slab: { model: "plaque", turn: 0, top: 0.4, base: 0, cx: 0, cz: 0, span: 2, across: 2, round: false },
     dirt: { model: "dirtPlot", turn: 0, top: 0.03, base: -0.5, cx: 0, cz: 0, span: 4, across: 4, round: false },
     pumpkin: { model: "pumpkin", turn: 0, top: 0.6, base: 0, cx: 0, cz: 0, span: 1, across: 1, round: true },
+    wagon: { model: "wagon", turn: Math.PI / 2, top: 0.55, base: 0, cx: 0, cz: 0, span: 0.984, across: 0.432, round: false },
+    giftRed: { model: "giftRed", turn: 0, top: 1, base: 0, cx: 0, cz: 0, span: 0.964, across: 0.964, round: false },
+    giftGreen: { model: "giftGreen", turn: 0, top: 1, base: 0, cx: 0, cz: 0, span: 0.964, across: 0.964, round: false },
+    giftBlue: { model: "giftBlue", turn: 0, top: 1, base: 0, cx: 0, cz: 0, span: 0.964, across: 0.964, round: false },
+    giftTallRed: { model: "giftTallRed", turn: 0, top: 1, base: 0, cx: 0, cz: 0, span: 0.522, across: 0.504, round: false },
+    giftTallGreen: { model: "giftTallGreen", turn: 0, top: 1, base: 0, cx: 0, cz: 0, span: 0.522, across: 0.504, round: false },
+    giftLongGreen: { model: "giftLongGreen", turn: 0, top: 0.44, base: 0, cx: 0, cz: 0, span: 2.164, across: 0.964, round: false },
+    giftLongBlue: { model: "giftLongBlue", turn: 0, top: 0.44, base: 0, cx: 0, cz: 0, span: 2.164, across: 0.964, round: false },
 };
 TowerPropShapes.ROOFS = {
     houseA: { eaveHalf: 0.4, eaveY: 0.37, wallHalf: 0.3, wallTop: 0.28 },
@@ -183,9 +191,9 @@ class ClimbRingBuilder {
         this.pen.prop(id, "static", look, ClimbLayoutPen.ringX(deg, rho), ClimbLayoutPen.ringZ(deg, rho), top, scale, deg - 90);
         return rho + ClimbLayoutPen.halfOf(look, scale);
     }
-    ring(id, look, rho, top, scale, gap) {
+    ring(id, look, rho, top, scale, gap, kind = "static", extras = {}) {
         const deg = this.trail.next(rho, ClimbLayoutPen.halfOf(look, scale), gap);
-        this.pen.prop(id, "static", look, ClimbLayoutPen.ringX(deg, rho), ClimbLayoutPen.ringZ(deg, rho), top, scale, deg);
+        this.pen.prop(id, kind, look, ClimbLayoutPen.ringX(deg, rho), ClimbLayoutPen.ringZ(deg, rho), top, scale, deg, extras);
         return deg;
     }
     hop(id, look, deg, top, scale, gap) {
@@ -503,13 +511,110 @@ TowerStageFiveLayout.JOIN_GAP = 1.2;
 TowerStageFiveLayout.LAUNCH_TOP = 145.5;
 TowerStageFiveLayout.LONG_GAP = 4.4;
 TowerStageFiveLayout.LONG_RISE = 2;
+class TowerStageSixLayout {
+    static get stationTop() { return TowerStageSixLayout.OUTER_TOP + TowerStageSixLayout.STATION_RISE; }
+    static get gain() {
+        const S = TowerStageSixLayout;
+        return (S.TOP_Y - S.stationTop - 0.3 - S.LONG_RISE) / S.LIFT_COUNT;
+    }
+    static pieces() {
+        const S = TowerStageSixLayout, pen = new ClimbLayoutPen(6), go = new ClimbRingBuilder(pen, S.REST_RADIUS), P = ClimbLayoutPen;
+        const firstEnd = go.spoke("xs1", "giftLongGreen", S.SPOKE_DEG, S.FLOOR, S.SPOKE), stepRho = firstEnd + P.halfOf("giftLongBlue", S.SPOKE);
+        pen.prop("xs2", "static", "giftLongBlue", P.ringX(S.SPOKE_DEG, stepRho), P.ringZ(S.SPOKE_DEG, stepRho), S.STEP_TOP, S.SPOKE, S.SPOKE_DEG - 90);
+        S.train(pen, "xa", "trainIn", S.INNER_RHO, S.INNER_TOP, S.TRAIN_SPEED, S.INNER_START_DEG);
+        S.train(pen, "xb", "trainOut", S.OUTER_RHO, S.OUTER_TOP, -S.TRAIN_SPEED, S.OUTER_START_DEG);
+        const wagonHalf = TowerPropShapes.SHAPES.wagon.across * S.WAGON / 2, stationHalf = P.halfOf("giftRed", S.REST_BOX);
+        const stationRho = S.OUTER_RHO + wagonHalf + S.STATION_GAP + stationHalf;
+        let floor = S.stationTop;
+        pen.prop("xt1", "static", "giftRed", P.ringX(S.STATION_DEG, stationRho), P.ringZ(S.STATION_DEG, stationRho), floor, S.REST_BOX, S.STATION_DEG);
+        go.follow(S.STATION_DEG, stationRho, stationHalf);
+        const lift = (id, look, rho, upper, index, gap = S.LIFT_GAP) => {
+            const low = floor + S.LIFT_UNDER, move = { track: "lift", group: id, low, high: upper + S.LIFT_OVER, period: S.LIFT_PERIOD, phase: S.LIFT_PHASES[index] };
+            go.ring(id, look, rho, low, S.LIFT, gap, "moving", { move });
+            floor = upper;
+        };
+        lift("xe1", "giftTallGreen", 24.8, floor + S.gain, 0);
+        go.ring("xp2", "giftGreen", 24.4, floor, S.BOX, S.LIFT_GAP);
+        lift("xe2", "giftTallRed", 24, floor + S.gain, 1);
+        go.ring("xp3", "giftBlue", 23.6, floor, S.REST_BOX, S.LIFT_GAP);
+        lift("xe3", "giftTallGreen", 23.2, floor + S.gain, 2);
+        const launchRho = 22.8, launchHalf = P.halfOf("giftLongGreen", S.LAUNCH), launchDeg = go.trail.next(launchRho, launchHalf, S.LIFT_GAP);
+        const lineYaw = launchDeg + S.LINE_TURN, dirDeg = lineYaw + 90, dirX = Math.sin(P.rad(dirDeg)), dirZ = Math.cos(P.rad(dirDeg));
+        const launchX = P.ringX(launchDeg, launchRho), launchZ = P.ringZ(launchDeg, launchRho);
+        pen.prop("xl1", "static", "giftLongGreen", launchX, launchZ, floor, S.LAUNCH, lineYaw);
+        const padAt = launchHalf + S.SHUTTLE_GAP + S.PAD / 2, padTop = floor + 0.3;
+        pen.boxAt("xj1", "movingPad", launchX + dirX * padAt, launchZ + dirZ * padAt, padTop, S.PAD, S.PAD, lineYaw, {
+            depth: 0.6, look: "pad", move: { track: "shuttle", group: "xj1", dirDeg, stroke: S.SHUTTLE_STROKE, speed: S.SHUTTLE_SPEED, phase: 0 },
+        });
+        const goalHalf = P.halfOf("giftLongBlue", S.GOAL), goalAt = S.GOAL_AT + goalHalf, goalX = launchX + dirX * goalAt, goalZ = launchZ + dirZ * goalAt;
+        floor = padTop + S.LONG_RISE;
+        pen.prop("xg1", "static", "giftLongBlue", goalX, goalZ, floor, S.GOAL, lineYaw);
+        go.follow(Math.atan2(goalX, goalZ) * 180 / Math.PI, Math.hypot(goalX, goalZ), goalHalf);
+        lift("xe4", "giftTallRed", 17, floor + S.gain, 3, S.INWARD_GAP);
+        go.ring("xp5", "giftGreen", 15.2, floor, S.BOX, S.INWARD_GAP);
+        lift("xe5", "giftTallGreen", 13.6, S.TOP_Y, 4, S.INWARD_GAP);
+        go.arrive("xq1", "giftRed", S.ARRIVE_RHO, S.TOP_Y, S.REST_BOX, S.INWARD_GAP, "xw1", "giftLongGreen", S.SPOKE);
+        pen.round("rest7", "rest", 0, 0, S.TOP_Y, S.REST_RADIUS, { depth: 0.5, startOf: 7, look: "rest" });
+        return pen.pieces;
+    }
+    static train(pen, prefix, group, rho, top, speed, startDeg) {
+        const S = TowerStageSixLayout;
+        for (let k = 0; k < S.WAGONS; k++) {
+            const move = { track: "orbit", group, rho, speed, startDeg: startDeg + k * 360 / S.WAGONS };
+            pen.prop(prefix + (k + 1), "moving", "wagon", 0, rho, top, S.WAGON, 0, { move });
+        }
+    }
+    static routes() {
+        return [
+            { stage: 6, name: "hard6", label: "기차·승강기 길", ratioLimit: 0.9, steps: ["rest6", "xs1", "xs2", "xa1", "xb1", "xt1", "xe1", "xp2", "xe2", "xp3", "xe3", "xl1", "xj1", "xg1", "xe4", "xp5", "xe5", "xq1", "xw1", "rest7"] },
+        ];
+    }
+}
+TowerStageSixLayout.FLOOR = 150;
+TowerStageSixLayout.TOP_Y = 180;
+TowerStageSixLayout.REST_RADIUS = 4.2;
+TowerStageSixLayout.SPOKE_DEG = 100;
+TowerStageSixLayout.SPOKE = 2.6;
+TowerStageSixLayout.STEP_TOP = 150.8;
+TowerStageSixLayout.WAGON = 3.6;
+TowerStageSixLayout.WAGONS = 6;
+TowerStageSixLayout.TRAIN_SPEED = 3.5;
+TowerStageSixLayout.INNER_RHO = 17;
+TowerStageSixLayout.INNER_TOP = 152;
+TowerStageSixLayout.INNER_START_DEG = 130;
+TowerStageSixLayout.OUTER_RHO = 20.6;
+TowerStageSixLayout.OUTER_TOP = 153;
+TowerStageSixLayout.OUTER_START_DEG = 160;
+TowerStageSixLayout.STATION_DEG = 10;
+TowerStageSixLayout.STATION_GAP = 2;
+TowerStageSixLayout.STATION_RISE = 1.2;
+TowerStageSixLayout.REST_BOX = 3.2;
+TowerStageSixLayout.BOX = 2.6;
+TowerStageSixLayout.LIFT = 3.8;
+TowerStageSixLayout.LIFT_GAP = 1;
+TowerStageSixLayout.INWARD_GAP = 1.4;
+TowerStageSixLayout.LIFT_PERIOD = 5;
+TowerStageSixLayout.LIFT_UNDER = 2.2;
+TowerStageSixLayout.LIFT_OVER = 1;
+TowerStageSixLayout.LIFT_PHASES = [0, 1.3, 2.6, 3.9, 0.7];
+TowerStageSixLayout.LIFT_COUNT = 5;
+TowerStageSixLayout.LAUNCH = 2.6;
+TowerStageSixLayout.LINE_TURN = 40;
+TowerStageSixLayout.PAD = 1.8;
+TowerStageSixLayout.SHUTTLE_GAP = 0.9;
+TowerStageSixLayout.SHUTTLE_STROKE = 3;
+TowerStageSixLayout.SHUTTLE_SPEED = 3.5;
+TowerStageSixLayout.GOAL_AT = 13.5;
+TowerStageSixLayout.GOAL = 3.2;
+TowerStageSixLayout.LONG_RISE = 2;
+TowerStageSixLayout.ARRIVE_RHO = 12;
 class TowerLevelData {
     static spec() {
         return {
             stages: TowerLevelData.STAGES.map((s) => ({ ...s })),
-            pieces: [...TowerHubLayout.pieces(), ...TowerStageOneLayout.pieces(), ...TowerStageTwoLayout.pieces(), ...TowerStageThreeLayout.pieces(), ...TowerStageFourLayout.pieces(), ...TowerStageFiveLayout.pieces()],
+            pieces: [...TowerHubLayout.pieces(), ...TowerStageOneLayout.pieces(), ...TowerStageTwoLayout.pieces(), ...TowerStageThreeLayout.pieces(), ...TowerStageFourLayout.pieces(), ...TowerStageFiveLayout.pieces(), ...TowerStageSixLayout.pieces()],
             portals: TowerHubLayout.portals(),
-            routes: [...TowerStageOneLayout.routes(), ...TowerStageTwoLayout.routes(), ...TowerStageThreeLayout.routes(), ...TowerStageFourLayout.routes(), ...TowerStageFiveLayout.routes()],
+            routes: [...TowerStageOneLayout.routes(), ...TowerStageTwoLayout.routes(), ...TowerStageThreeLayout.routes(), ...TowerStageFourLayout.routes(), ...TowerStageFiveLayout.routes(), ...TowerStageSixLayout.routes()],
             spawn: TowerHubLayout.spawn(),
         };
     }

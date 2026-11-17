@@ -1,4 +1,4 @@
-// 42번 타워 클라임: 시뮬레이션. 실행: node tools/climb-sim.js [판 수=5000] [제한 초=240]
+// 42번 타워 클라임: 시뮬레이션. 실행: node tools/climb-sim.js [판 수=5000] [제한 초=240] [스테이지(없으면 모두)]
 // 조준이 흔들리고 점프 시점이 들쭉날쭉한 봇으로 길마다 도착 비율·평균 시간·추락 횟수를 본다.
 const K = require("./climb-load.js")();
 const { ClimbBot, ClimbSeededRandom } = require("./climb-bot.js");
@@ -13,7 +13,7 @@ class ClimbSimulation {
     ];
   }
 
-  constructor(games, limit) { this.games = games; this.limit = limit; this.level = new TowerLevel(TowerLevelData.spec()); }
+  constructor(games, limit, stage) { this.games = games; this.limit = limit; this.stage = stage; this.level = new TowerLevel(TowerLevelData.spec()); }
 
   play(route, skill, seed) {
     const rules = ClimbBot.startRules(K, this.level, route);
@@ -24,7 +24,8 @@ class ClimbSimulation {
 
   report() {
     const cells = [];
-    for (const skill of ClimbSimulation.SKILLS) for (const route of this.level.routes) cells.push({ skill, route });
+    const routes = this.level.routes.filter((r) => !this.stage || r.stage === this.stage);
+    for (const skill of ClimbSimulation.SKILLS) for (const route of routes) cells.push({ skill, route });
     const each = Math.max(1, Math.floor(this.games / cells.length));
     let seed = 1000, total = 0;
     console.log("climb-sim: 칸마다 " + each + "판, 제한 " + this.limit + "초");
@@ -44,4 +45,4 @@ class ClimbSimulation {
   }
 }
 
-new ClimbSimulation(Number(process.argv[2]) || 5000, Number(process.argv[3]) || 240).report();
+new ClimbSimulation(Number(process.argv[2]) || 5000, Number(process.argv[3]) || 240, Number(process.argv[4]) || 0).report();

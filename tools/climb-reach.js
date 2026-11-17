@@ -4,7 +4,7 @@
 // 3) 발사대는 힘 단계별 결과를 모두 적음   4) 갇히는 발판·길에 없는 발판 확인
 const K = require("./climb-load.js")();
 const { ClimbBot } = require("./climb-bot.js");
-const { ClimbBalance: B, ClimbRules, TowerLevel, StageProgress, TowerLevelData, GrabHold, JumpPad } = K;
+const { ClimbBalance: B, ClimbRules, TowerLevel, StageProgress, TowerLevelData, GrabHold, JumpPad, MovingJumpPad } = K;
 const verbose = process.argv.includes("-v");
 
 class ReachReport {
@@ -60,6 +60,40 @@ class LinkMeter {
     return link.type === "걷기" || link.type === "모서리 잡기" || link.type === "손잡이→모서리" || (link.type === "점프" && link.ratio <= 1);
   }
 
+  // 움직이는 발판이 끼면 한 주기를 나눠 보며 이어지는 순간이 있는지 본다(open = 이어지는 시간 비율)
+  timedLink(a, b) {
+    if (!a.moving && !b.moving) return this.link(a, b);
+    const period = Math.max(a.moving ? a.track.period : 0, b.moving ? b.track.period : 0), samples = 360;
+    let best = null, open = 0;
+    for (let i = 0; i < samples; i++) {
+      const t = period * i / samples;
+      if (a.moving) a.moveTo(t);
+      if (b.moving) b.moveTo(t);
+      const link = a instanceof MovingJumpPad ? this.movingPadLink(a, b) : this.link(a, b);
+      if (!link.ok || link.ratio !== undefined && link.ratio > 0.95) continue;
+      open++;
+      if (!best || LinkMeter.effort(link) < LinkMeter.effort(best)) best = link;
+    }
+    if (a.moving) a.moveTo(0);
+    if (b.moving) b.moveTo(0);
+    return Object.assign(best ? { ...best } : { type: "불가", ok: false, rise: 0, gap: 0 }, { open: open / samples });
+  }
+
+  // 가장 쉬운 순간을 고르는 점수: 걷기 < 점프(비율 순) < 모서리 잡기(높이 순)
+  static effort(link) {
+    if (link.type === "걷기") return 0;
+    if (link.type === "모서리 잡기") return 2 + link.rise;
+    return link.ratio ?? 1;
+  }
+
+  // 움직이는 점프대: 튕기는 순간 발판 속도가 몸에 실려(관성) 그만큼 더 멀리 난다
+  movingPadLink(a, b) {
+    const { gap, rise } = this.gap(a, b), edge = b.edge(a.x, a.z, this.probe), dx = edge.x - a.x, dz = edge.z - a.z, d = Math.hypot(dx, dz) || 1;
+    const toward = (a.vx * dx + a.vz * dz) / d, time = LinkMeter.airTime(B.PAD_SPEED, rise), high = rise <= B.PAD_SPEED ** 2 / (2 * B.GRAVITY) * 0.92;
+    const span = gap + Math.min(a.halfX, a.halfZ) * 2, flight = time > 0 ? span / ((B.RUN + toward) * time) : Infinity, still = time > 0 ? span / (B.RUN * time) : Infinity;
+    return { type: "움직이는 점프대 멀리뛰기", ok: high && toward > 0 && flight <= 0.9, rise, gap, ratio: flight, still };
+  }
+
   link(a, b) {
     const jumpHeight = B.JUMP * B.JUMP / (2 * B.GRAVITY);
     if (a instanceof GrabHold && b instanceof GrabHold) {
@@ -99,15 +133,16 @@ class RouteInspector {
     const pieces = route.steps.map((id) => this.level.piece(id));
     let chain = 0, worstChain = 0, holds = 0, worstRatio = 0, worstAt = "", longJumps = 0;
     for (let i = 1; i < pieces.length; i++) {
-      const a = pieces[i - 1], b = pieces[i], link = this.meter.link(a, b), tag = route.name + " " + a.id + "→" + b.id;
-      if (verbose) this.report.note("  " + tag.padEnd(26) + link.type.padEnd(9) + " 간격 " + link.gap.toFixed(2) + " 높이 " + link.rise.toFixed(2) + (link.ratio !== undefined ? " 비율 " + link.ratio.toFixed(2) : ""));
+      const a = pieces[i - 1], b = pieces[i], link = this.meter.timedLink(a, b), tag = route.name + " " + a.id + "→" + b.id;
+      if (verbose) this.report.note("  " + tag.padEnd(26) + link.type.padEnd(9) + " 간격 " + link.gap.toFixed(2) + " 높이 " + link.rise.toFixed(2) + (link.ratio !== undefined ? " 비율 " + link.ratio.toFixed(2) : "") + (link.open !== undefined ? " 열린 시간 " + Math.round(link.open * 100) + "%" : "") + (link.still !== undefined ? " (멈춘 점프대였다면 " + link.still.toFixed(2) + ")" : ""));
       this.report.check(tag + " 이어짐(" + link.type + ")", link.ok, link);
+      if (link.open !== undefined) this.report.check(tag + " 움직이는 발판과 이어지는 시간이 주기의 5% 이상", link.open >= 0.05, link.open);
       if (link.type === "점프") {
         this.report.check(tag + " 점프 비율 ≤ " + route.ratioLimit, link.ratio <= route.ratioLimit + 1e-9, link.ratio);
         this.report.check(tag + " 점프 비율 ≤ 0.95", link.ratio <= 0.95, link.ratio);
         if (link.ratio > worstRatio) { worstRatio = link.ratio; worstAt = a.id + "→" + b.id; }
       }
-      if (link.type === "점프대 멀리뛰기") {
+      if (link.type === "점프대 멀리뛰기" || link.type === "움직이는 점프대 멀리뛰기") {
         longJumps++;
         const later = new Set(route.steps.slice(i + 1));
         const others = this.level.pieces.filter((p) => p.stage === b.stage && p !== a && p !== b && p.solid && !p.id.includes(".") && !/^towerd$/.test(p.id) && !later.has(p.id));
@@ -148,8 +183,10 @@ class TrapInspector {
   }
 
   inspect() {
-    const onRoute = new Set();
-    this.level.routes.forEach((r) => r.steps.forEach((id) => onRoute.add(id)));
+    const onRoute = new Set(), groups = new Set();
+    this.level.routes.forEach((r) => r.steps.forEach((id) => { onRoute.add(id); const p = this.level.piece(id); if (p.moving) groups.add(p.group); }));
+    // 기차 칸처럼 같은 무리(group)의 움직이는 발판은 길에 하나만 적어도 모두 길에 속한다
+    this.level.pieces.forEach((p) => { if (p.moving && groups.has(p.group)) onRoute.add(p.id); });
     // 이름에 점이 있는 조각(hB.isle·hA.roofIn 등)은 집·섬에 딸린 몸통이라 길에 넣지 않는다
     const decor = { has: (id) => id === "trunk" || /^tower\d$/.test(id) || id.includes(".") };
     for (const piece of this.level.pieces) {
@@ -180,6 +217,9 @@ for (const route of level.routes) {
 }
 for (const stage of new Set(level.routes.map((r) => r.stage))) {
   const time = (kind) => { const route = level.routes.find((r) => r.stage === stage && r.name.startsWith(kind)); return route ? times[route.name] : NaN; };
+  // 스테이지 6 은 선생님 요청(2026-11-17)으로 어려운 길(hard) 하나만 둔다
+  const only = level.routes.filter((r) => r.stage === stage);
+  if (only.length === 1 && only[0].name.startsWith("hard")) { report.note("스테이지 " + stage + " 은 어려운 길 하나: 봇 " + times[only[0].name].toFixed(1) + "초"); continue; }
   report.check("스테이지 " + stage + " 쉬운 길이 있음", level.routes.some((r) => r.stage === stage && r.name.startsWith("easy")));
   report.note("스테이지 " + stage + " 둘째 길이 쉬운 길보다 " + (time("easy") - time("normal")).toFixed(1) + "초 빠름");
   report.check("스테이지 " + stage + " 둘째 길이 쉬운 길보다 빠름", time("normal") < time("easy"), { easy: time("easy"), normal: time("normal") });

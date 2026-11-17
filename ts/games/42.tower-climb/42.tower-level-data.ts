@@ -1,4 +1,4 @@
-interface ClimbPieceExtras { depth?: number; rise?: number; noLedge?: boolean; startOf?: number; look?: string }
+interface ClimbPieceExtras { depth?: number; rise?: number; noLedge?: boolean; startOf?: number; look?: string; move?: ClimbMoveSpec }
 interface ClimbPropShape { model: string; turn: number; top: number; base: number; cx: number; cz: number; span: number; across: number; round: boolean; cap?: string }
 interface ClimbLongJumpSpec {
   launch: string; pad: string; goal: string;
@@ -33,6 +33,14 @@ class TowerPropShapes {
     slab: { model: "plaque", turn: 0, top: 0.4, base: 0, cx: 0, cz: 0, span: 2, across: 2, round: false },
     dirt: { model: "dirtPlot", turn: 0, top: 0.03, base: -0.5, cx: 0, cz: 0, span: 4, across: 4, round: false },
     pumpkin: { model: "pumpkin", turn: 0, top: 0.6, base: 0, cx: 0, cz: 0, span: 1, across: 1, round: true },
+    wagon: { model: "wagon", turn: Math.PI / 2, top: 0.55, base: 0, cx: 0, cz: 0, span: 0.984, across: 0.432, round: false },
+    giftRed: { model: "giftRed", turn: 0, top: 1, base: 0, cx: 0, cz: 0, span: 0.964, across: 0.964, round: false },
+    giftGreen: { model: "giftGreen", turn: 0, top: 1, base: 0, cx: 0, cz: 0, span: 0.964, across: 0.964, round: false },
+    giftBlue: { model: "giftBlue", turn: 0, top: 1, base: 0, cx: 0, cz: 0, span: 0.964, across: 0.964, round: false },
+    giftTallRed: { model: "giftTallRed", turn: 0, top: 1, base: 0, cx: 0, cz: 0, span: 0.522, across: 0.504, round: false },
+    giftTallGreen: { model: "giftTallGreen", turn: 0, top: 1, base: 0, cx: 0, cz: 0, span: 0.522, across: 0.504, round: false },
+    giftLongGreen: { model: "giftLongGreen", turn: 0, top: 0.44, base: 0, cx: 0, cz: 0, span: 2.164, across: 0.964, round: false },
+    giftLongBlue: { model: "giftLongBlue", turn: 0, top: 0.44, base: 0, cx: 0, cz: 0, span: 2.164, across: 0.964, round: false },
   };
   static readonly ROOFS: Readonly<Record<string, ClimbRoofShape>> = {
     houseA: { eaveHalf: 0.4, eaveY: 0.37, wallHalf: 0.3, wallTop: 0.28 },
@@ -210,9 +218,9 @@ class ClimbRingBuilder {
     return rho + ClimbLayoutPen.halfOf(look, scale);
   }
 
-  ring(id: string, look: string, rho: number, top: number, scale: number, gap: number): number {
+  ring(id: string, look: string, rho: number, top: number, scale: number, gap: number, kind = "static", extras: ClimbPieceExtras = {}): number {
     const deg = this.trail.next(rho, ClimbLayoutPen.halfOf(look, scale), gap);
-    this.pen.prop(id, "static", look, ClimbLayoutPen.ringX(deg, rho), ClimbLayoutPen.ringZ(deg, rho), top, scale, deg);
+    this.pen.prop(id, kind, look, ClimbLayoutPen.ringX(deg, rho), ClimbLayoutPen.ringZ(deg, rho), top, scale, deg, extras);
     return deg;
   }
 
@@ -564,6 +572,114 @@ class TowerStageFiveLayout {
   }
 }
 
+class TowerStageSixLayout {
+  static readonly FLOOR = 150;
+  static readonly TOP_Y = 180;
+  static readonly REST_RADIUS = 4.2;
+  static readonly SPOKE_DEG = 100;
+  static readonly SPOKE = 2.6;
+  static readonly STEP_TOP = 150.8;
+  static readonly WAGON = 3.6;
+  static readonly WAGONS = 6;
+  static readonly TRAIN_SPEED = 3.5;
+  static readonly INNER_RHO = 17;
+  static readonly INNER_TOP = 152;
+  static readonly INNER_START_DEG = 130;
+  static readonly OUTER_RHO = 20.6;
+  static readonly OUTER_TOP = 153;
+  static readonly OUTER_START_DEG = 160;
+  static readonly STATION_DEG = 10;
+  static readonly STATION_GAP = 2;
+  static readonly STATION_RISE = 1.2;
+  static readonly REST_BOX = 3.2;
+  static readonly BOX = 2.6;
+  static readonly LIFT = 3.8;
+  static readonly LIFT_GAP = 1;
+  static readonly INWARD_GAP = 1.4;
+  static readonly LIFT_PERIOD = 5;
+  static readonly LIFT_UNDER = 2.2;
+  static readonly LIFT_OVER = 1;
+  static readonly LIFT_PHASES: readonly number[] = [0, 1.3, 2.6, 3.9, 0.7];
+  static readonly LIFT_COUNT = 5;
+  static readonly LAUNCH = 2.6;
+  static readonly LINE_TURN = 40;
+  static readonly PAD = 1.8;
+  static readonly SHUTTLE_GAP = 0.9;
+  static readonly SHUTTLE_STROKE = 3;
+  static readonly SHUTTLE_SPEED = 3.5;
+  static readonly GOAL_AT = 13.5;
+  static readonly GOAL = 3.2;
+  static readonly LONG_RISE = 2;
+  static readonly ARRIVE_RHO = 12;
+
+  static get stationTop(): number { return TowerStageSixLayout.OUTER_TOP + TowerStageSixLayout.STATION_RISE; }
+  static get gain(): number {
+    const S = TowerStageSixLayout;
+    return (S.TOP_Y - S.stationTop - 0.3 - S.LONG_RISE) / S.LIFT_COUNT;
+  }
+
+  static pieces(): ClimbPieceSpec[] {
+    const S = TowerStageSixLayout, pen = new ClimbLayoutPen(6), go = new ClimbRingBuilder(pen, S.REST_RADIUS), P = ClimbLayoutPen;
+
+    const firstEnd = go.spoke("xs1", "giftLongGreen", S.SPOKE_DEG, S.FLOOR, S.SPOKE), stepRho = firstEnd + P.halfOf("giftLongBlue", S.SPOKE);
+    pen.prop("xs2", "static", "giftLongBlue", P.ringX(S.SPOKE_DEG, stepRho), P.ringZ(S.SPOKE_DEG, stepRho), S.STEP_TOP, S.SPOKE, S.SPOKE_DEG - 90);
+    S.train(pen, "xa", "trainIn", S.INNER_RHO, S.INNER_TOP, S.TRAIN_SPEED, S.INNER_START_DEG);
+    S.train(pen, "xb", "trainOut", S.OUTER_RHO, S.OUTER_TOP, -S.TRAIN_SPEED, S.OUTER_START_DEG);
+
+    const wagonHalf = TowerPropShapes.SHAPES.wagon.across * S.WAGON / 2, stationHalf = P.halfOf("giftRed", S.REST_BOX);
+    const stationRho = S.OUTER_RHO + wagonHalf + S.STATION_GAP + stationHalf;
+    let floor = S.stationTop;
+    pen.prop("xt1", "static", "giftRed", P.ringX(S.STATION_DEG, stationRho), P.ringZ(S.STATION_DEG, stationRho), floor, S.REST_BOX, S.STATION_DEG);
+    go.follow(S.STATION_DEG, stationRho, stationHalf);
+
+    const lift = (id: string, look: string, rho: number, upper: number, index: number, gap = S.LIFT_GAP): void => {
+      const low = floor + S.LIFT_UNDER, move: ClimbMoveSpec = { track: "lift", group: id, low, high: upper + S.LIFT_OVER, period: S.LIFT_PERIOD, phase: S.LIFT_PHASES[index] };
+      go.ring(id, look, rho, low, S.LIFT, gap, "moving", { move });
+      floor = upper;
+    };
+    lift("xe1", "giftTallGreen", 24.8, floor + S.gain, 0);
+    go.ring("xp2", "giftGreen", 24.4, floor, S.BOX, S.LIFT_GAP);
+    lift("xe2", "giftTallRed", 24, floor + S.gain, 1);
+    go.ring("xp3", "giftBlue", 23.6, floor, S.REST_BOX, S.LIFT_GAP);
+    lift("xe3", "giftTallGreen", 23.2, floor + S.gain, 2);
+
+    const launchRho = 22.8, launchHalf = P.halfOf("giftLongGreen", S.LAUNCH), launchDeg = go.trail.next(launchRho, launchHalf, S.LIFT_GAP);
+    const lineYaw = launchDeg + S.LINE_TURN, dirDeg = lineYaw + 90, dirX = Math.sin(P.rad(dirDeg)), dirZ = Math.cos(P.rad(dirDeg));
+    const launchX = P.ringX(launchDeg, launchRho), launchZ = P.ringZ(launchDeg, launchRho);
+    pen.prop("xl1", "static", "giftLongGreen", launchX, launchZ, floor, S.LAUNCH, lineYaw);
+    const padAt = launchHalf + S.SHUTTLE_GAP + S.PAD / 2, padTop = floor + 0.3;
+    pen.boxAt("xj1", "movingPad", launchX + dirX * padAt, launchZ + dirZ * padAt, padTop, S.PAD, S.PAD, lineYaw, {
+      depth: 0.6, look: "pad", move: { track: "shuttle", group: "xj1", dirDeg, stroke: S.SHUTTLE_STROKE, speed: S.SHUTTLE_SPEED, phase: 0 },
+    });
+    const goalHalf = P.halfOf("giftLongBlue", S.GOAL), goalAt = S.GOAL_AT + goalHalf, goalX = launchX + dirX * goalAt, goalZ = launchZ + dirZ * goalAt;
+    floor = padTop + S.LONG_RISE;
+    pen.prop("xg1", "static", "giftLongBlue", goalX, goalZ, floor, S.GOAL, lineYaw);
+    go.follow(Math.atan2(goalX, goalZ) * 180 / Math.PI, Math.hypot(goalX, goalZ), goalHalf);
+
+    lift("xe4", "giftTallRed", 17, floor + S.gain, 3, S.INWARD_GAP);
+    go.ring("xp5", "giftGreen", 15.2, floor, S.BOX, S.INWARD_GAP);
+    lift("xe5", "giftTallGreen", 13.6, S.TOP_Y, 4, S.INWARD_GAP);
+    go.arrive("xq1", "giftRed", S.ARRIVE_RHO, S.TOP_Y, S.REST_BOX, S.INWARD_GAP, "xw1", "giftLongGreen", S.SPOKE);
+
+    pen.round("rest7", "rest", 0, 0, S.TOP_Y, S.REST_RADIUS, { depth: 0.5, startOf: 7, look: "rest" });
+    return pen.pieces;
+  }
+
+  private static train(pen: ClimbLayoutPen, prefix: string, group: string, rho: number, top: number, speed: number, startDeg: number): void {
+    const S = TowerStageSixLayout;
+    for (let k = 0; k < S.WAGONS; k++) {
+      const move: ClimbMoveSpec = { track: "orbit", group, rho, speed, startDeg: startDeg + k * 360 / S.WAGONS };
+      pen.prop(prefix + (k + 1), "moving", "wagon", 0, rho, top, S.WAGON, 0, { move });
+    }
+  }
+
+  static routes(): ClimbRouteSpec[] {
+    return [
+      { stage: 6, name: "hard6", label: "기차·승강기 길", ratioLimit: 0.9, steps: ["rest6", "xs1", "xs2", "xa1", "xb1", "xt1", "xe1", "xp2", "xe2", "xp3", "xe3", "xl1", "xj1", "xg1", "xe4", "xp5", "xe5", "xq1", "xw1", "rest7"] },
+    ];
+  }
+}
+
 class TowerLevelData {
   static readonly STAGES: readonly ClimbStageSpec[] = [
     { index: 0, name: "시작 지점", floor: -100, ceiling: 0 },
@@ -579,9 +695,9 @@ class TowerLevelData {
   static spec(): ClimbLevelSpec {
     return {
       stages: TowerLevelData.STAGES.map((s) => ({ ...s })),
-      pieces: [...TowerHubLayout.pieces(), ...TowerStageOneLayout.pieces(), ...TowerStageTwoLayout.pieces(), ...TowerStageThreeLayout.pieces(), ...TowerStageFourLayout.pieces(), ...TowerStageFiveLayout.pieces()],
+      pieces: [...TowerHubLayout.pieces(), ...TowerStageOneLayout.pieces(), ...TowerStageTwoLayout.pieces(), ...TowerStageThreeLayout.pieces(), ...TowerStageFourLayout.pieces(), ...TowerStageFiveLayout.pieces(), ...TowerStageSixLayout.pieces()],
       portals: TowerHubLayout.portals(),
-      routes: [...TowerStageOneLayout.routes(), ...TowerStageTwoLayout.routes(), ...TowerStageThreeLayout.routes(), ...TowerStageFourLayout.routes(), ...TowerStageFiveLayout.routes()],
+      routes: [...TowerStageOneLayout.routes(), ...TowerStageTwoLayout.routes(), ...TowerStageThreeLayout.routes(), ...TowerStageFourLayout.routes(), ...TowerStageFiveLayout.routes(), ...TowerStageSixLayout.routes()],
       spawn: TowerHubLayout.spawn(),
     };
   }

@@ -1,10 +1,15 @@
 type ClimbMode = "free" | "hang" | "climbUp" | "portal" | "stun";
 
+type ClimbMoveSpec =
+  | { track: "orbit"; group: string; rho: number; speed: number; startDeg: number }
+  | { track: "lift"; group: string; low: number; high: number; period: number; phase: number }
+  | { track: "shuttle"; group: string; dirDeg: number; stroke: number; speed: number; phase: number };
+
 interface ClimbPieceSpec {
   id: string; kind: string; stage: number;
   x: number; y: number; z: number;
   sx?: number; sz?: number; radius?: number; depth?: number; yaw?: number; rise?: number;
-  noLedge?: boolean; startOf?: number; look?: string;
+  noLedge?: boolean; startOf?: number; look?: string; move?: ClimbMoveSpec;
 }
 interface ClimbPortalSpec { stage: number; x: number; y: number; z: number; yaw: number }
 interface ClimbRouteSpec { stage: number; name: string; label: string; ratioLimit: number; steps: string[] }
@@ -86,19 +91,19 @@ class ClimbBalance {
 class PlatformPiece {
   readonly id: string;
   readonly stage: number;
-  readonly x: number;
-  readonly z: number;
-  readonly top: number;
+  x: number;
+  z: number;
+  top: number;
   readonly depth: number;
-  readonly yaw: number;
+  yaw: number;
   readonly halfX: number;
   readonly halfZ: number;
   readonly radius: number;
   readonly rise: number;
   readonly look: string;
   readonly startOf: number;
-  readonly cos: number;
-  readonly sin: number;
+  cos: number;
+  sin: number;
   index = 0;
   protected readonly ledgeAllowed: boolean;
 
@@ -122,6 +127,7 @@ class PlatformPiece {
   }
 
   get solid(): boolean { return true; }
+  get moving(): boolean { return false; }
   get ledge(): boolean { return this.ledgeAllowed && this.rise === 0; }
   get hub(): boolean { return false; }
   get round(): boolean { return this.radius > 0; }
@@ -228,6 +234,103 @@ class GrabHold extends PlatformPiece {
   get nz(): number { return this.cos; }
 }
 
+class ClimbPose {
+  x = 0; top = 0; z = 0; yaw = 0;
+  set(x: number, top: number, z: number, yaw: number): void { this.x = x; this.top = top; this.z = z; this.yaw = yaw; }
+}
+
+abstract class ClimbTrack {
+  constructor(protected readonly base: ClimbPieceSpec) {}
+  abstract get period(): number;
+  abstract pose(seconds: number, out: ClimbPose): void;
+}
+
+class ClimbOrbitTrack extends ClimbTrack {
+  constructor(private readonly move: Extract<ClimbMoveSpec, { track: "orbit" }>, base: ClimbPieceSpec) { super(base); }
+  get period(): number { return 2 * Math.PI * this.move.rho / Math.abs(this.move.speed); }
+  pose(seconds: number, out: ClimbPose): void {
+    const angle = this.move.startDeg * Math.PI / 180 + this.move.speed / this.move.rho * seconds;
+    out.set(this.move.rho * Math.sin(angle), this.base.y, this.move.rho * Math.cos(angle), angle);
+  }
+}
+
+class ClimbLiftTrack extends ClimbTrack {
+  constructor(private readonly move: Extract<ClimbMoveSpec, { track: "lift" }>, base: ClimbPieceSpec) { super(base); }
+  get period(): number { return this.move.period; }
+  pose(seconds: number, out: ClimbPose): void {
+    const wave = (1 - Math.cos(2 * Math.PI * (seconds + this.move.phase) / this.move.period)) / 2;
+    out.set(this.base.x, this.move.low + (this.move.high - this.move.low) * wave, this.base.z, this.base.yaw ?? 0);
+  }
+}
+
+class ClimbShuttleTrack extends ClimbTrack {
+  constructor(private readonly move: Extract<ClimbMoveSpec, { track: "shuttle" }>, base: ClimbPieceSpec) { super(base); }
+  get period(): number { return 2 * this.move.stroke / this.move.speed; }
+  pose(seconds: number, out: ClimbPose): void {
+    const period = this.period, cycle = (((seconds + this.move.phase) % period) + period) % period;
+    const along = cycle < period / 2 ? cycle * this.move.speed : (period - cycle) * this.move.speed, dir = this.move.dirDeg * Math.PI / 180;
+    out.set(this.base.x + Math.sin(dir) * along, this.base.y, this.base.z + Math.cos(dir) * along, this.base.yaw ?? 0);
+  }
+}
+
+class ClimbTrackFactory {
+  static readonly KINDS: { [K in ClimbMoveSpec["track"]]: (move: Extract<ClimbMoveSpec, { track: K }>, base: ClimbPieceSpec) => ClimbTrack } = {
+    orbit: (move, base) => new ClimbOrbitTrack(move, base),
+    lift: (move, base) => new ClimbLiftTrack(move, base),
+    shuttle: (move, base) => new ClimbShuttleTrack(move, base),
+  };
+
+  static of(move: ClimbMoveSpec, base: ClimbPieceSpec): ClimbTrack {
+    return (ClimbTrackFactory.KINDS[move.track] as (m: ClimbMoveSpec, b: ClimbPieceSpec) => ClimbTrack)(move, base);
+  }
+}
+
+class MovingPlatform extends PlatformPiece {
+  readonly track: ClimbTrack;
+  readonly group: string;
+  prevX = 0; prevTop = 0; prevZ = 0; prevYaw = 0;
+  private prevCos = 1;
+  private prevSin = 0;
+  private readonly pose = new ClimbPose();
+
+  constructor(spec: ClimbPieceSpec) {
+    super(spec);
+    if (!spec.move) throw new Error("moving piece without track " + spec.id);
+    this.track = ClimbTrackFactory.of(spec.move, spec);
+    this.group = spec.move.group;
+    this.moveTo(0);
+  }
+
+  get moving(): boolean { return true; }
+  get lift(): number { return this.top - this.prevTop; }
+  get turn(): number { return this.yaw - this.prevYaw; }
+  get vx(): number { return (this.x - this.prevX) / ClimbBalance.TICK; }
+  get vz(): number { return (this.z - this.prevZ) / ClimbBalance.TICK; }
+  get vy(): number { return this.lift / ClimbBalance.TICK; }
+
+  moveTo(seconds: number): void {
+    const pose = this.pose;
+    this.track.pose(seconds - ClimbBalance.TICK, pose);
+    this.prevX = pose.x; this.prevTop = pose.top; this.prevZ = pose.z; this.prevYaw = pose.yaw;
+    this.prevCos = Math.cos(pose.yaw); this.prevSin = Math.sin(pose.yaw);
+    this.track.pose(seconds, pose);
+    this.x = pose.x; this.top = pose.top; this.z = pose.z; this.yaw = pose.yaw;
+    this.cos = Math.cos(pose.yaw); this.sin = Math.sin(pose.yaw);
+  }
+
+  private fromX(px: number, pz: number): number { return (px - this.prevX) * this.prevCos - (pz - this.prevZ) * this.prevSin; }
+  private fromZ(px: number, pz: number): number { return (px - this.prevX) * this.prevSin + (pz - this.prevZ) * this.prevCos; }
+  carryX(px: number, pz: number): number { return this.worldX(this.fromX(px, pz), this.fromZ(px, pz)); }
+  carryZ(px: number, pz: number): number { return this.worldZ(this.fromX(px, pz), this.fromZ(px, pz)); }
+  turnX(vx: number, vz: number): number { const t = this.turn; return vx * Math.cos(t) + vz * Math.sin(t); }
+  turnZ(vx: number, vz: number): number { const t = this.turn; return -vx * Math.sin(t) + vz * Math.cos(t); }
+}
+
+class MovingJumpPad extends MovingPlatform {
+  get ledge(): boolean { return false; }
+  stand(rules: ClimbRules): void { rules.bounce(this); }
+}
+
 class ClimbGrabSpot {
   x = 0; y = 0; z = 0; nx = 0; nz = 1;
   piece: PlatformPiece | null = null;
@@ -237,6 +340,10 @@ class ClimbGrabSpot {
     this.x = x; this.y = y; this.z = z; this.nx = nx; this.nz = nz; this.piece = piece; this.ledge = ledge;
   }
   copy(other: ClimbGrabSpot): void { if (other.piece) this.set(other.x, other.y, other.z, other.nx, other.nz, other.piece, other.ledge); }
+  ride(piece: MovingPlatform): void {
+    const x = piece.carryX(this.x, this.z), z = piece.carryZ(this.x, this.z), nx = piece.turnX(this.nx, this.nz), nz = piece.turnZ(this.nx, this.nz);
+    this.x = x; this.z = z; this.y += piece.lift; this.nx = nx; this.nz = nz;
+  }
   get bodyX(): number { return this.x + this.nx * ClimbBalance.RADIUS; }
   get bodyZ(): number { return this.z + this.nz * ClimbBalance.RADIUS; }
   get bodyY(): number { return this.y - ClimbBalance.HANG_DROP; }
@@ -244,6 +351,7 @@ class ClimbGrabSpot {
 
 class ClimbCollisionWorld {
   readonly pieces: PlatformPiece[];
+  private readonly movers: PlatformPiece[];
   private readonly cells = new Map<number, PlatformPiece[]>();
   private readonly marks: Int32Array;
   private stamp = 0;
@@ -251,7 +359,8 @@ class ClimbCollisionWorld {
   constructor(pieces: PlatformPiece[]) {
     this.pieces = pieces;
     this.marks = new Int32Array(pieces.length);
-    pieces.forEach((piece, index) => { piece.index = index; this.insert(piece); });
+    this.movers = pieces.filter((piece) => piece.moving);
+    pieces.forEach((piece, index) => { piece.index = index; if (!piece.moving) this.insert(piece); });
   }
 
   private static cell(value: number): number { return Math.floor(value / ClimbBalance.GRID_CELL) + 512; }
@@ -278,6 +387,10 @@ class ClimbCollisionWorld {
           if (!list) continue;
           for (const piece of list) if (this.marks[piece.index] !== this.stamp) { this.marks[piece.index] = this.stamp; out.push(piece); }
         }
+    for (const piece of this.movers) {
+      const room = reach + piece.span + ClimbBalance.GRID_CELL;
+      if (Math.abs(piece.x - x) <= room && Math.abs(piece.z - z) <= room && piece.peak >= low - ClimbBalance.GRID_CELL && piece.bottom <= high + ClimbBalance.GRID_CELL) out.push(piece);
+    }
     return out;
   }
 
@@ -379,7 +492,7 @@ class TowerStage {
 class TowerLevel {
   static readonly PIECE_KINDS: Readonly<Record<string, new (spec: ClimbPieceSpec) => PlatformPiece>> = {
     static: StaticPlatform, narrow: NarrowPlatform, slope: SlopePlatform, hub: HubIsland,
-    rest: StageRest, pad: JumpPad, hold: GrabHold,
+    rest: StageRest, pad: JumpPad, hold: GrabHold, moving: MovingPlatform, movingPad: MovingJumpPad,
   };
 
   readonly pieces: PlatformPiece[];
@@ -437,6 +550,12 @@ class ClimbUpPath {
     this.elapsed = 0;
   }
 
+  ride(piece: MovingPlatform): void {
+    const fromX = piece.carryX(this.fromX, this.fromZ), fromZ = piece.carryZ(this.fromX, this.fromZ), toX = piece.carryX(this.toX, this.toZ), toZ = piece.carryZ(this.toX, this.toZ);
+    this.fromX = fromX; this.fromZ = fromZ; this.fromY += piece.lift;
+    this.toX = toX; this.toZ = toZ; this.toY += piece.lift;
+  }
+
   get progress(): number { return Math.min(1, this.elapsed / ClimbBalance.CLIMB_UP_TIME); }
   get done(): boolean { return this.elapsed >= ClimbBalance.CLIMB_UP_TIME - 1e-9; }
   get rising(): boolean { return this.progress < ClimbBalance.CLIMB_UP_RISE_SHARE; }
@@ -459,6 +578,7 @@ class ClimbCharacterBody {
   x = 0; y = 0; z = 0;
   prevX = 0; prevY = 0; prevZ = 0;
   vx = 0; vy = 0; vz = 0;
+  driftX = 0; driftZ = 0;
   yaw = 0;
   mode: ClimbMode = "free";
   grounded = false;
@@ -481,7 +601,9 @@ class ClimbCharacterBody {
   place(x: number, y: number, z: number): void {
     this.x = this.prevX = x; this.y = this.prevY = y; this.z = this.prevZ = z;
     this.vx = this.vy = this.vz = 0;
+    this.stopDrift();
   }
+  stopDrift(): void { this.driftX = this.driftZ = 0; }
   remember(): void { this.prevX = this.x; this.prevY = this.y; this.prevZ = this.z; }
   get speed(): number { return Math.hypot(this.vx, this.vz); }
   get hanging(): boolean { return this.mode === "hang"; }
@@ -521,7 +643,9 @@ class ClimbRules {
   readonly body = new ClimbCharacterBody();
   readonly watcher: FallReturnWatcher;
   readonly events: ClimbEvent[] = [];
+  readonly movers: MovingPlatform[];
   clock = 0;
+  ticks = 0;
   started = false;
   peak = 0;
   portalsUsed = 0;
@@ -540,6 +664,8 @@ class ClimbRules {
     this.world = new ClimbCollisionWorld(level.pieces);
     this.grab = new ClimbGrabSystem(this.world);
     this.watcher = new FallReturnWatcher(this);
+    this.movers = level.pieces.filter((piece): piece is MovingPlatform => piece instanceof MovingPlatform);
+    this.moveMovers();
     this.modeSteps = {
       free: () => this.stepFree(),
       hang: () => this.stepHang(),
@@ -581,12 +707,35 @@ class ClimbRules {
   step(): void {
     const B = ClimbBalance, body = this.body;
     body.remember();
+    this.ticks++;
+    this.moveMovers();
+    this.carry();
     body.grabCooldown = Math.max(0, body.grabCooldown - B.TICK);
     body.shiftCooldown = Math.max(0, body.shiftCooldown - B.TICK);
     if (!(body.hanging && body.hopTime > 0)) body.jumpBuffer = Math.max(0, body.jumpBuffer - B.TICK);
     if (this.jumpLatch) { body.jumpBuffer = B.JUMP_BUFFER; this.jumpLatch = false; }
     this.modeSteps[body.mode]();
     this.watcher.watch();
+  }
+
+  get worldTime(): number { return this.ticks * ClimbBalance.TICK; }
+
+  private moveMovers(): void { for (const mover of this.movers) mover.moveTo(this.worldTime); }
+
+  private carrier(): MovingPlatform | null {
+    const body = this.body;
+    const piece = body.mode === "hang" ? body.spot.piece : body.mode === "climbUp" ? body.climbPath.piece : body.grounded ? body.ground : null;
+    return piece instanceof MovingPlatform ? piece : null;
+  }
+
+  private carry(): void {
+    const body = this.body, piece = this.carrier();
+    if (!piece) return;
+    const x = piece.carryX(body.x, body.z), z = piece.carryZ(body.x, body.z);
+    body.x = x; body.z = z; body.y += piece.lift;
+    body.yaw += piece.turn;
+    if (body.mode === "hang") body.spot.ride(piece);
+    if (body.mode === "climbUp") body.climbPath.ride(piece);
   }
 
   touchStageStart(stage: number): void {
@@ -603,7 +752,8 @@ class ClimbRules {
   }
 
   private leaveGround(): void {
-    const body = this.body;
+    const body = this.body, ground = body.ground;
+    if (ground instanceof MovingPlatform) { body.driftX = ground.vx; body.driftZ = ground.vz; }
     body.grounded = false;
     body.ground = null;
     body.sliding = false;
@@ -639,7 +789,7 @@ class ClimbRules {
     }
     if (!body.grounded) body.vy = Math.max(body.vy - B.GRAVITY * T, -B.FALL_MAX);
 
-    let nextX = body.x + body.vx * T, nextZ = body.z + body.vz * T;
+    let nextX = body.x + (body.vx + body.driftX) * T, nextZ = body.z + (body.vz + body.driftZ) * T;
     const near = this.world.near(nextX, nextZ, body.y - 1.5, body.y + B.HEIGHT + 1.5, B.RADIUS + 0.5, this.found);
     for (let pass = 0; pass < 2; pass++)
       for (const piece of near) {
@@ -650,6 +800,8 @@ class ClimbRules {
         nextX = edge.x + edge.nx * B.RADIUS; nextZ = edge.z + edge.nz * B.RADIUS;
         const into = body.vx * edge.nx + body.vz * edge.nz;
         if (into < 0) { body.vx -= into * edge.nx; body.vz -= into * edge.nz; }
+        const driftInto = body.driftX * edge.nx + body.driftZ * edge.nz;
+        if (driftInto < 0) { body.driftX -= driftInto * edge.nx; body.driftZ -= driftInto * edge.nz; }
       }
 
     const wasGrounded = body.grounded;
@@ -680,6 +832,7 @@ class ClimbRules {
     body.vy = 0;
     body.grounded = true;
     body.ground = piece;
+    body.stopDrift();
     if (wasGrounded) return;
     body.letGo = null;
     const drop = body.airPeak - top;
@@ -718,6 +871,7 @@ class ClimbRules {
     const body = this.body, spot = body.spot;
     body.x = spot.bodyX; body.y = spot.bodyY; body.z = spot.bodyZ;
     body.vx = body.vy = body.vz = 0;
+    body.stopDrift();
     body.yaw = Math.atan2(-spot.nx, -spot.nz);
     body.airPeak = body.y;
     this.peak = Math.max(this.peak, body.y);
@@ -787,6 +941,7 @@ class ClimbRules {
     if (!piece) { body.mode = "free"; return; }
     body.x = path.toX; body.y = path.toY; body.z = path.toZ;
     body.vx = body.vy = body.vz = 0;
+    body.stopDrift();
     body.mode = "free";
     body.grounded = true;
     body.ground = piece;
@@ -805,6 +960,7 @@ class ClimbRules {
     body.ground = null;
     body.coyote = 0;
     body.airPeak = body.y;
+    body.stopDrift();
     if (jump) { body.vy = B.JUMP; body.vx = this.moveX * B.RUN; body.vz = this.moveZ * B.RUN; this.emit({ t: "jump" }); }
     else this.emit({ t: "release" });
   }

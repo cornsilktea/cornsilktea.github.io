@@ -29,6 +29,9 @@ class ClimbModelLibrary {
     gravePillar: "graveyard/pillar.gltf", coffin: "graveyard/coffin.gltf", plaque: "graveyard/plaque.gltf", dirtPlot: "graveyard/floor_dirt.gltf", pumpkin: "graveyard/pumpkin_orange.gltf",
     crypt: "graveyard/crypt.gltf", grave: "graveyard/grave_A.gltf", gravestone: "graveyard/gravestone.gltf", fence: "graveyard/fence.gltf", lantern: "graveyard/pumpkin_orange_jackolantern.gltf",
     deadTree: "graveyard/tree_dead_large.gltf",
+    wagon: "holiday/train_wagon.gltf", giftRed: "holiday/present_D_red.gltf", giftGreen: "holiday/present_D_green.gltf", giftBlue: "holiday/present_D_blue.gltf",
+    giftTallRed: "holiday/present_B_red.gltf", giftTallGreen: "holiday/present_B_green.gltf", giftLongGreen: "holiday/present_F_green.gltf", giftLongBlue: "holiday/present_F_blue.gltf",
+    gingerHouse: "holiday/gingerbread_house_decorated.gltf", holidayLantern: "holiday/lantern.gltf", snowBlock: "blocks/snow.gltf", snowman: "snow/snowman_A.gltf",
   };
 
   static readonly TINTS: Readonly<Record<string, number>> = { hexIsle: 0x9FB878 };
@@ -142,6 +145,40 @@ class ClimbInstanceBatcher {
   }
 }
 
+interface ClimbRiderEntry { piece: MovingPlatform; local: Three<"Matrix4"> }
+
+class ClimbRiderBatch {
+  private readonly meshes: Three<"InstancedMesh">[] = [];
+  private readonly pose: Three<"Matrix4">;
+  private readonly world: Three<"Matrix4">;
+
+  constructor(libs: ThreeLibs, model: ClimbModel, private readonly entries: ClimbRiderEntry[], readonly stage: number, parent: Three<"Object3D">) {
+    const THREE = libs.THREE;
+    this.pose = new THREE.Matrix4();
+    this.world = new THREE.Matrix4();
+    for (const part of model.parts) {
+      const mesh = new THREE.InstancedMesh(part.geometry, part.material, entries.length);
+      mesh.frustumCulled = false;
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      this.meshes.push(mesh);
+      parent.add(mesh);
+    }
+    this.follow(1);
+  }
+
+  follow(blend: number): void {
+    this.entries.forEach((entry, index) => {
+      const p = entry.piece;
+      this.pose.makeRotationY(p.prevYaw + (p.yaw - p.prevYaw) * blend);
+      this.pose.setPosition(p.prevX + (p.x - p.prevX) * blend, p.prevTop + (p.top - p.prevTop) * blend, p.prevZ + (p.z - p.prevZ) * blend);
+      this.world.multiplyMatrices(this.pose, entry.local);
+      for (const mesh of this.meshes) mesh.setMatrixAt(index, this.world);
+    });
+    for (const mesh of this.meshes) mesh.instanceMatrix.needsUpdate = true;
+  }
+}
+
 class ClimbDecorDice {
   private state: number;
   constructor(seed: number) { this.state = seed >>> 0 || 1; }
@@ -176,14 +213,23 @@ class TowerLevelBuilder {
   static readonly MARK_COLOR = 0xFF9A4A;
   static readonly TREES: readonly string[] = ["treeA", "treeB", "treeC"];
 
+  static readonly SNOW_ISLANDS: readonly (readonly [number, number, number])[] = [
+    [30, 34, 156], [90, 36, 164], [150, 33, 172], [210, 35, 160], [270, 34, 168], [330, 36, 176],
+  ];
+
   readonly root: Three<"Group">;
   readonly stageGroups = new Map<number, Three<"Group">>();
   private readonly batchers = new Map<number, ClimbInstanceBatcher>();
+  private readonly riderLists = new Map<string, { stage: number; model: string; entries: ClimbRiderEntry[] }>();
+  private readonly riders: ClimbRiderBatch[] = [];
+  private riding: MovingPlatform | null = null;
+  private readonly ridingInverse: Three<"Matrix4">;
   private readonly marks = new Map<number, Three<"Matrix4">[]>();
   private readonly specials: Record<string, (piece: PlatformPiece) => void>;
 
   constructor(private readonly libs: ThreeLibs, private readonly library: ClimbModelLibrary, private readonly level: TowerLevel) {
     this.root = new libs.THREE.Group();
+    this.ridingInverse = new libs.THREE.Matrix4();
     this.specials = {
       island: (piece) => this.island(piece),
       trunk: (piece) => this.trunk(piece),
@@ -196,12 +242,34 @@ class TowerLevelBuilder {
     this.decorateDungeon();
     this.decorateKitchen();
     this.decorateGraveyard();
+    this.decorateSnow();
     this.batchers.forEach((batcher, stage) => batcher.build(this.groupOf(stage), true));
+    this.riderLists.forEach((list) => this.riders.push(new ClimbRiderBatch(libs, library.model(list.model), list.entries, list.stage, this.groupOf(list.stage))));
     this.buildMarks();
   }
 
   showAround(stage: number): void {
     this.stageGroups.forEach((group, index) => { group.visible = index === 0 || Math.abs(index - stage) <= 1; });
+  }
+
+  followRiders(blend: number): void {
+    for (const rider of this.riders) if (this.groupOf(rider.stage).visible) rider.follow(blend);
+  }
+
+  private addModel(stage: number, name: string, matrix: Three<"Matrix4">): void {
+    if (!this.riding) { this.batcherOf(stage).add(name, matrix); return; }
+    const key = stage + "|" + name, local = matrix.clone().premultiply(this.ridingInverse);
+    const list = this.riderLists.get(key);
+    if (list) list.entries.push({ piece: this.riding, local });
+    else this.riderLists.set(key, { stage, model: name, entries: [{ piece: this.riding, local }] });
+  }
+
+  private drawRider(piece: MovingPlatform): void {
+    const THREE = this.libs.THREE;
+    this.ridingInverse.copy(new THREE.Matrix4().makeRotationY(piece.yaw).setPosition(piece.x, piece.top, piece.z)).invert();
+    this.riding = piece;
+    this.drawShape(piece);
+    this.riding = null;
   }
 
   private groupOf(stage: number): Three<"Group"> {
@@ -228,6 +296,10 @@ class TowerLevelBuilder {
 
   private draw(piece: PlatformPiece): void {
     if (piece.look === TowerPropShapes.HIDDEN) return;
+    if (piece instanceof MovingPlatform) this.drawRider(piece); else this.drawShape(piece);
+  }
+
+  private drawShape(piece: PlatformPiece): void {
     const shape = TowerPropShapes.of(piece.look), special = this.specials[piece.look];
     if (shape) this.prop(piece, shape); else if (special) special(piece); else this.block(piece);
   }
@@ -239,7 +311,7 @@ class TowerLevelBuilder {
     matrix.multiply(new THREE.Matrix4().makeRotationY(piece.yaw + shape.turn));
     matrix.multiply(new THREE.Matrix4().makeScale(wide, tall, wide));
     matrix.multiply(new THREE.Matrix4().makeTranslation(-shape.cx, -shape.top, -shape.cz));
-    this.batcherOf(piece.stage).add(shape.model, matrix);
+    this.addModel(piece.stage, shape.model, matrix);
     if (shape.cap) this.capOn(piece, shape.cap, wide, tall);
   }
 
@@ -249,13 +321,13 @@ class TowerLevelBuilder {
     matrix.multiply(new THREE.Matrix4().makeRotationY(piece.yaw));
     matrix.multiply(new THREE.Matrix4().makeScale(wide, tall, wide));
     matrix.multiply(new THREE.Matrix4().makeTranslation(-model.centerX, -model.max.y, -model.centerZ));
-    this.batcherOf(piece.stage).add(name, matrix);
+    this.addModel(piece.stage, name, matrix);
   }
 
   private block(piece: PlatformPiece): void {
     const name = TowerLevelBuilder.BLOCK_OF_LOOK[piece.look] ?? "grass", model = this.library.model(name);
     const tilt = Math.atan2(piece.rise, piece.halfX * 2), length = piece.halfX * 2 / Math.cos(tilt);
-    this.batcherOf(piece.stage).add(name, this.fit(model, piece.x, piece.top, piece.z, piece.yaw, tilt, length, piece.depth, piece.halfZ * 2));
+    this.addModel(piece.stage, name, this.fit(model, piece.x, piece.top, piece.z, piece.yaw, tilt, length, piece.depth, piece.halfZ * 2));
   }
 
   private trunk(piece: PlatformPiece): void {
@@ -358,6 +430,19 @@ class TowerLevelBuilder {
       add("gravestone", x + sideX * 0.6 - outX * 2.6, top, z + sideZ * 0.6 - outZ * 2.6, angle + Math.PI + 0.2, 0.9);
       add("lantern", x - sideX * 1 - outX * 2.8, top, z - sideZ * 1 - outZ * 2.8, angle + Math.PI, 1);
       add("fence", x - outX * 3.7, top, z - outZ * 3.7, angle, 1);
+    }
+  }
+
+  private decorateSnow(): void {
+    const add = this.placer(6), ground = this.library.model("snowBlock"), batcher = this.batcherOf(6);
+    for (const [deg, rho, top] of TowerLevelBuilder.SNOW_ISLANDS) {
+      const angle = deg * Math.PI / 180, x = Math.sin(angle) * rho, z = Math.cos(angle) * rho, sideX = Math.cos(angle), sideZ = -Math.sin(angle), outX = Math.sin(angle), outZ = Math.cos(angle);
+      batcher.add("snowBlock", this.fit(ground, x, top, z, angle, 0, 8, 1.4, 8));
+      add("gingerHouse", x + outX * 1.4, top, z + outZ * 1.4, angle + Math.PI, 2.4);
+      add("snowman", x - sideX * 2.4 - outX * 1.6, top, z - sideZ * 2.4 - outZ * 1.6, angle + Math.PI + 0.3, 1.1);
+      add("holidayLantern", x + sideX * 2.9 - outX * 2.2, top, z + sideZ * 2.9 - outZ * 2.2, angle, 0.9);
+      add("giftRed", x + sideX * 1.6 - outX * 2.8, top, z + sideZ * 1.6 - outZ * 2.8, angle + 0.5, 1.2);
+      add("giftTallGreen", x + sideX * 0.6 - outX * 3, top, z + sideZ * 0.6 - outZ * 3, angle - 0.3, 1.3);
     }
   }
 

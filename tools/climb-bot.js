@@ -19,6 +19,9 @@ class ClimbBot {
     this.edgeMargin = this.skill.jumpEarly;
     this.spot = new K.ClimbGrabSpot();
     this.probe = { x: 0, z: 0, nx: 0, nz: 0, dist: 0, inside: false };
+    this.pose = new K.ClimbPose();
+    this.chosen = null;
+    this.launch = 0;
   }
 
   // 길의 첫 발판에 선 채로 시작하는 한 판(스테이지 2부터는 앞 스테이지를 깬 것으로 친다)
@@ -29,7 +32,8 @@ class ClimbBot {
   }
 
   get done() { return this.index >= this.route.length; }
-  get target() { return this.rules.level.piece(this.route[Math.min(this.index, this.route.length - 1)]); }
+  get target() { return this.pickMember(this.rules.level.piece(this.route[Math.min(this.index, this.route.length - 1)])); }
+  get after() { const id = this.route[this.index + 1]; return id ? this.rules.level.piece(id) : null; }
 
   observe(events) {
     for (const e of events) {
@@ -37,7 +41,31 @@ class ClimbBot {
     }
   }
 
-  passed(id) { const at = this.route.indexOf(id); if (at >= 0) this.index = at + 1; }
+  // 같은 무리(기차 칸)의 움직이는 발판은 길에 적힌 칸 대신 지금 가장 가까워질 칸을 노린다
+  pickMember(piece) {
+    if (!piece.moving) return piece;
+    const members = this.rules.level.pieces.filter((p) => p.moving && p.group === piece.group);
+    if (members.length < 2) return piece;
+    const body = this.rules.body, later = this.rules.worldTime + 0.8;
+    let best = piece, bestD = Infinity;
+    for (const member of members) {
+      member.track.pose(later, this.pose);
+      const d = Math.hypot(this.pose.x - body.x, this.pose.z - body.z);
+      if (d < bestD) { bestD = d; best = member; }
+    }
+    if (this.chosen && this.chosen.group === piece.group && Math.hypot(this.chosen.x - body.x, this.chosen.z - body.z) < bestD + 3) return this.chosen;
+    this.chosen = best;
+    return best;
+  }
+
+  passed(id) {
+    let at = this.route.indexOf(id);
+    if (at < 0) {
+      const piece = this.rules.level.piece(id);
+      if (piece.moving) at = this.route.findIndex((step) => { const p = this.rules.level.piece(step); return p.moving && p.group === piece.group; });
+    }
+    if (at >= 0) this.index = at + 1;
+  }
 
   aim(target, body) {
     const K = this.K;
@@ -67,6 +95,10 @@ class ClimbBot {
       if (--this.hopWait <= 0) { rules.pressJump(); this.hopWait = body.spot.ledge ? 12 : 30; }
       return;
     }
+
+    const footing = body.grounded ? body.ground : null;
+    if (target.moving || footing && footing.moving || !footing && (body.driftX !== 0 || body.driftZ !== 0)) { this.driveTimed(target); return; }
+    this.launch = 0;
 
     let [aimX, aimZ] = this.aim(target, body);
     const slope = body.grounded && body.ground.rise !== 0 ? body.ground : null;
@@ -108,6 +140,90 @@ class ClimbBot {
     if (ground.covers(body.x + dx * this.edgeMargin, body.z + dz * this.edgeMargin)) return;
     if (target.covers(body.x + dx * 0.6, body.z + dz * 0.6) && target.topAt(edge.x, edge.z) >= body.y - 1.2) return;
     rules.pressJump();
+  }
+
+  // 움직이는 발판: 발판이 앞으로 있을 곳을 내다보고, 관성(drift)을 빼서 조준하고, 때가 될 때까지 가장자리에서 기다린다
+  poseOf(piece, seconds) {
+    if (piece.moving) piece.track.pose(seconds, this.pose);
+    else this.pose.set(piece.x, piece.top, piece.z, piece.yaw);
+    return this.pose;
+  }
+
+  velocityOf(piece, seconds) {
+    if (!piece.moving) return [0, 0];
+    const tick = this.K.ClimbBalance.TICK, before = this.poseOf(piece, seconds - tick), bx = before.x, bz = before.z, after = this.poseOf(piece, seconds);
+    return [(after.x - bx) / tick, (after.z - bz) / tick];
+  }
+
+  static airTime(up, rise, gravity) {
+    const inside = up * up - 2 * gravity * rise;
+    return inside < 0 ? 0 : (up + Math.sqrt(inside)) / gravity;
+  }
+
+  exitPoint(ground, body, dx, dz) {
+    let along = 0;
+    while (along < 8 && ground.covers(body.x + dx * (along + 0.05), body.z + dz * (along + 0.05))) along += 0.05;
+    return [body.x + dx * along, body.z + dz * along];
+  }
+
+  landingIn(target) {
+    const B = this.K.ClimbBalance, body = this.rules.body, inside = body.vy * body.vy + 2 * B.GRAVITY * (body.y - target.top);
+    return inside < 0 ? body.vy / B.GRAVITY + 0.1 : Math.max(0.02, (body.vy + Math.sqrt(inside)) / B.GRAVITY);
+  }
+
+  padReady(target, seconds) {
+    const next = this.after;
+    if (!(target instanceof this.K.MovingJumpPad) || !next) return true;
+    return [-0.15, 0, 0.15, 0.25].every((extra) => {
+      const [vx, vz] = this.velocityOf(target, seconds + extra), pose = this.poseOf(target, seconds + extra);
+      return vx * (next.x - pose.x) + vz * (next.z - pose.z) > 0;
+    });
+  }
+
+  // 실수하는 봇: 조준 방향을 흔들고(aimNoise) 내다보는 시간을 들쭉날쭉하게(jumpEarly) 한다
+  steerNoisy(dx, dz) {
+    if (this.skill.aimNoise > 0) {
+      if (--this.wobbleLeft <= 0) { this.wobble = this.random.spread(this.skill.aimNoise); this.wobbleLeft = 20 + Math.floor(this.random.next() * 40); this.timing = this.random.spread(this.skill.jumpEarly * 0.5); }
+      const c = Math.cos(this.wobble), s = Math.sin(this.wobble);
+      this.rules.steer(dx * c - dz * s, dx * s + dz * c);
+    } else this.rules.steer(dx, dz);
+  }
+
+  driveTimed(target) {
+    const K = this.K, B = K.ClimbBalance, rules = this.rules, body = rules.body, now = rules.worldTime + (this.timing || 0), ground = body.grounded ? body.ground : null;
+    if (!ground) {
+      const rem = this.landingIn(target), pose = this.poseOf(target, now + rem);
+      const missX = pose.x - body.x - (body.vx + body.driftX) * rem, missZ = pose.z - body.z - (body.vz + body.driftZ) * rem;
+      if (Math.hypot(missX, missZ) > 0.3) this.steerNoisy(missX, missZ); else rules.steer(0, 0);
+      return;
+    }
+    const nowPose = this.poseOf(target, now), edge = ground.edge(nowPose.x, nowPose.z, this.probe), inset = Math.min(0.75, Math.min(ground.halfX, ground.halfZ) * 0.9);
+    const waitX = ground.moving ? ground.x : edge.x - edge.nx * inset, waitZ = ground.moving ? ground.z : edge.z - edge.nz * inset;
+    const driftX = ground.moving ? ground.vx : 0, driftZ = ground.moving ? ground.vz : 0;
+    let run = 0.1, flight = 0.5, grab = false, pose = nowPose, takeX = body.x, takeZ = body.z;
+    for (let pass = 0; pass < 3; pass++) {
+      const guess = this.poseOf(target, now + run + flight), rise = guess.top - body.y;
+      grab = rise > 1.45;
+      flight = grab ? 0.4 : ClimbBot.airTime(B.JUMP, Math.min(rise, 1.5), B.GRAVITY);
+      pose = this.poseOf(target, now + run + flight);
+      const aimX = pose.x - driftX * flight, aimZ = pose.z - driftZ * flight, d = Math.hypot(aimX - body.x, aimZ - body.z) || 1;
+      [takeX, takeZ] = this.exitPoint(ground, body, (aimX - body.x) / d, (aimZ - body.z) / d);
+      run = Math.hypot(takeX - body.x, takeZ - body.z) / B.RUN + 0.06;
+    }
+    const lead = run + flight, top = pose.top, px = pose.x, pz = pose.z;
+    const needX = px - takeX - driftX * flight, needZ = pz - takeZ - driftZ * flight, tolerance = Math.min(target.halfX, target.halfZ) * 0.6;
+    const range = top - body.y, high = grab ? range >= 1.9 && range <= 3.9 : range <= 1.45;
+    const ready = high && Math.hypot(needX, needZ) - tolerance <= B.RUN * flight * 0.92 && this.padReady(target, now + lead);
+    if (this.trace) this.trace({ t: now, target: target.id, high, range, need: Math.hypot(needX, needZ) - tolerance, reach: B.RUN * flight * 0.92, run, ready });
+    if (ready && this.launch <= 0) this.launch = Math.round((run + 0.3) / B.TICK);
+    if (this.launch > 0) {
+      this.launch--;
+      const d = Math.hypot(needX, needZ) || 1, dx = needX / d, dz = needZ / d;
+      this.steerNoisy(dx, dz);
+      if (!ground.covers(body.x + dx * 0.25, body.z + dz * 0.25) || grab && edge.dist < 0.3) { rules.pressJump(); this.launch = 0; }
+      return;
+    }
+    if (Math.hypot(waitX - body.x, waitZ - body.z) > 0.15) rules.steer(waitX - body.x, waitZ - body.z); else rules.steer(0, 0);
   }
 
   // 한 판을 돌린다. 반환: { done, seconds, falls, ticks }

@@ -205,6 +205,7 @@ class TowerClimbGame {
     if (this.state === "countdown") this.countdownFrame(dt);
     else if (this.state === "play") this.playFrame(dt);
     const still = this.state === "pause" ? 0 : dt;
+    view.builder.followRiders(this.rules.blend);
     view.avatar.follow(this.rules, still);
     view.rig.follow(this.rules, view.avatar.root.position, still);
     view.portals.update(still * this.rules.time.scale);
