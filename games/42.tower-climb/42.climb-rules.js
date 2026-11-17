@@ -20,6 +20,12 @@ ClimbBalance.STEP = 0.35;
 ClimbBalance.GRAB_LOW = 1.2;
 ClimbBalance.GRAB_HIGH = 2.6;
 ClimbBalance.GRAB_SIDE = 1;
+ClimbBalance.GRAB_SIDE_AIR = 1.4;
+ClimbBalance.GRAB_LOW_AIR = 0.9;
+ClimbBalance.GRAB_HIGH_AIR = 2.8;
+ClimbBalance.GRAB_FACE_COS = 0.4;
+ClimbBalance.GRAB_BUFFER = 0.2;
+ClimbBalance.GRAB_SWING = 0.2;
 ClimbBalance.HANG_DROP = 2;
 ClimbBalance.MANTLE_MIN_HANG = 0.2;
 ClimbBalance.MANTLE_PUSH = 0.5;
@@ -291,31 +297,46 @@ class ClimbGrabSystem {
         this.world = world;
         this.found = [];
         this.probe = { x: 0, z: 0, nx: 0, nz: 0, dist: 0, inside: false };
+        this.facingSpot = new ClimbGrabSpot();
     }
-    scan(x, z, low, high, side, out) {
-        let best = Infinity;
+    scan(x, z, low, high, side, out, faceX = 0, faceZ = 0) {
+        let best = Infinity, bestFacing = Infinity;
+        const facing = this.facingSpot, judgeFacing = faceX !== 0 || faceZ !== 0;
+        const offer = (d, sx, sz, top, nx, nz, piece, ledge) => {
+            if (d < best) {
+                best = d;
+                out.set(sx, top, sz, nx, nz, piece, ledge);
+            }
+            if (judgeFacing && d < bestFacing && -(nx * faceX + nz * faceZ) >= ClimbBalance.GRAB_FACE_COS) {
+                bestFacing = d;
+                facing.set(sx, top, sz, nx, nz, piece, ledge);
+            }
+        };
         for (const piece of this.world.near(x, z, low, high, side + 0.5, this.found)) {
             if (piece.top < low || piece.top > high)
                 continue;
             if (piece instanceof GrabHold) {
                 const d = Math.hypot(piece.x - x, piece.z - z);
-                if (d <= side && d < best) {
-                    best = d;
-                    out.set(piece.x, piece.top, piece.z, piece.nx, piece.nz, piece, false);
-                }
+                if (d <= side)
+                    offer(d, piece.x, piece.z, piece.top, piece.nx, piece.nz, piece, false);
             }
             else if (piece.ledge && !piece.covers(x, z)) {
                 const edge = piece.edge(x, z, this.probe);
-                if (edge.dist <= side && edge.dist < best) {
-                    best = edge.dist;
-                    out.set(edge.x, piece.top, edge.z, edge.nx, edge.nz, piece, true);
-                }
+                if (edge.dist <= side)
+                    offer(edge.dist, edge.x, edge.z, piece.top, edge.nx, edge.nz, piece, true);
             }
         }
+        if (bestFacing < Infinity)
+            out.copy(facing);
         return best < Infinity;
     }
     find(x, y, z, out) {
         return this.scan(x, z, y + ClimbBalance.GRAB_LOW, y + ClimbBalance.GRAB_HIGH, ClimbBalance.GRAB_SIDE, out);
+    }
+    findFor(body, out) {
+        const B = ClimbBalance, air = !body.grounded, faceX = Math.sin(body.yaw), faceZ = Math.cos(body.yaw);
+        const low = air ? B.GRAB_LOW_AIR : B.GRAB_LOW, high = air ? B.GRAB_HIGH_AIR : B.GRAB_HIGH, side = air ? B.GRAB_SIDE_AIR : B.GRAB_SIDE;
+        return this.scan(body.x, body.z, body.y + low, body.y + high, side, out, faceX, faceZ);
     }
     above(from, out) {
         return this.scan(from.bodyX, from.bodyZ, from.y + ClimbBalance.HOP_MIN, from.y + ClimbBalance.HOP_UP + 1e-6, ClimbBalance.HOP_SIDE, out);
@@ -482,6 +503,7 @@ class ClimbCharacterBody {
         this.hopTime = 0;
         this.shiftCooldown = 0;
         this.grabCooldown = 0;
+        this.grabBuffer = 0;
         this.stunTime = 0;
         this.portalTime = 0;
         this.portalTo = 0;
@@ -598,7 +620,9 @@ class ClimbRules {
         body.remember();
         body.grabCooldown = Math.max(0, body.grabCooldown - B.TICK);
         body.shiftCooldown = Math.max(0, body.shiftCooldown - B.TICK);
-        body.jumpBuffer = Math.max(0, body.jumpBuffer - B.TICK);
+        if (!(body.hanging && body.hopTime > 0))
+            body.jumpBuffer = Math.max(0, body.jumpBuffer - B.TICK);
+        body.grabBuffer = Math.max(0, body.grabBuffer - B.TICK);
         if (this.jumpLatch) {
             body.jumpBuffer = B.JUMP_BUFFER;
             this.jumpLatch = false;
@@ -678,7 +702,10 @@ class ClimbRules {
     }
     stepFree(grab) {
         const B = ClimbBalance, T = B.TICK, body = this.body;
-        if (grab && body.grabCooldown <= 0 && this.grab.find(body.x, body.y, body.z, body.spot)) {
+        if (grab)
+            body.grabBuffer = B.GRAB_BUFFER;
+        if (body.grabBuffer > 0 && body.grabCooldown <= 0 && this.grab.findFor(body, body.spot)) {
+            body.grabBuffer = 0;
             this.startHang();
             return;
         }
@@ -812,7 +839,7 @@ class ClimbRules {
         this.endFlight(body.spot.y);
         body.mode = "hang";
         body.hangTime = 0;
-        body.hopTime = 0;
+        body.hopTime = ClimbBalance.GRAB_SWING;
         body.grounded = false;
         body.ground = null;
         body.sliding = false;
@@ -913,6 +940,7 @@ class ClimbRules {
         const B = ClimbBalance, body = this.body;
         body.mode = "free";
         body.grabCooldown = B.REGRAB;
+        body.grabBuffer = 0;
         body.grounded = false;
         body.ground = null;
         body.coyote = 0;

@@ -127,6 +127,24 @@ function box(id, x, z, y, sx, sz, more = {}) { return { id, kind: "static", stag
   check("벽 쪽(W)으로 밀면 기어올라 섬", evPush.some((e) => e.t === "mantle") && r2.body.grounded && near(r2.body.y, 2.8, 1e-6), { y: r2.body.y, mode: r2.body.mode });
 }
 {
+  const airAt = (pieces, yaw) => { const r = world(pieces); r.body.place(0, 3, 0); r.body.grounded = false; r.body.yaw = yaw; return r; };
+  const front = box("front", 1.9, 0, 5, 2, 2, { depth: 5 }), back = box("back", -1.6, 0, 5, 2, 2, { depth: 5 });
+  const both = airAt([front, back], Math.PI / 2);
+  both.pressGrab(); run(both, B.TICK);
+  check("공중 잡기: 보는 방향 지형을 먼저(뒤가 더 가까워도)", both.body.hanging && both.body.spot.piece.id === "front", both.body.spot.piece && both.body.spot.piece.id);
+  const onlyBack = airAt([back], Math.PI / 2);
+  onlyBack.pressGrab(); run(onlyBack, B.TICK);
+  check("공중 잡기: 보는 방향에 없으면 뒤쪽을 잡고 그쪽으로 몸을 돌림", onlyBack.body.hanging && onlyBack.body.spot.piece.id === "back" && near(Math.sin(onlyBack.body.yaw), -1, 1e-6), onlyBack.body.yaw);
+  const far = airAt([box("far", 2.3, 0, 5, 2, 2, { depth: 5 })], Math.PI / 2);
+  far.pressGrab(); run(far, B.TICK);
+  check("공중 잡기는 1.3m 떨어진 모서리도 잡음", far.body.hanging);
+  const early = world([box("wall", 1.5, 0, 4, 2, 4, { depth: 4 })], { x: 0, y: 0, z: 0, yaw: Math.PI / 2 });
+  settle(early);
+  early.pressJump(); run(early, 0.08);
+  early.pressGrab(); run(early, 0.2);
+  check("조금 일찍 누른 잡기도 닿는 순간 잡음(0.2초)", early.body.hanging, early.body.y);
+}
+{
   const holds = (gaps) => {
     let y = 2.2;
     const list = [{ id: "trunk", kind: "static", stage: 1, x: 0, y: 30, z: 0, radius: 2, depth: 30, noLedge: true }, { id: "h0", kind: "hold", stage: 1, x: 2, y, z: 0, radius: 0.2, yaw: Math.PI / 2 }];

@@ -441,7 +441,8 @@ class ClimbAvatar {
             position.set(x, y, z);
         let turn = body.yaw - this.yaw;
         turn = Math.atan2(Math.sin(turn), Math.cos(turn));
-        this.yaw += turn * Math.min(1, A.TURN_RATE * dt);
+        const swinging = body.hanging && body.hopTime > 0;
+        this.yaw += turn * Math.min(1, (swinging ? A.SWING_TURN_RATE : A.TURN_RATE) * dt);
         this.root.rotation.y = this.yaw;
         this.leanForClimb(body, dt);
         this.root.visible = body.mode !== "portal" || body.portalTime > ClimbBalance.PORTAL_TIME * 0.45;
@@ -492,6 +493,7 @@ class ClimbAvatar {
 }
 ClimbAvatar.MODEL_SCALE = 0.9;
 ClimbAvatar.TURN_RATE = 14;
+ClimbAvatar.SWING_TURN_RATE = 9;
 ClimbAvatar.HANG_FOLLOW = 16;
 ClimbAvatar.SHADOW_REACH = 45;
 ClimbAvatar.CLIMB_LEAN = 0.45;

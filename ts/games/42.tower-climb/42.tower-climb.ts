@@ -176,7 +176,7 @@ class TowerClimbGame {
 
   private hints(): void {
     const body = this.rules.body;
-    this.hud.grabHint(body.mode === "free" && body.grabCooldown <= 0 && this.rules.grab.find(body.x, body.y, body.z, this.probe), body.hanging && body.spot.ledge);
+    this.hud.grabHint(body.mode === "free" && body.grabCooldown <= 0 && this.rules.grab.findFor(body, this.probe), body.hanging && body.spot.ledge);
     const hint = this.view.portals.hintNear(body.x, body.y, body.z, this.progress);
     if (hint !== this.portalHint) { this.portalHint = hint; if (hint) this.hud.banner(hint, false, 3); }
     const stage = Math.max(1, this.level.stageAt(body.y).index);
