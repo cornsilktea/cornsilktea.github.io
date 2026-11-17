@@ -34,7 +34,6 @@ class ClimbBot {
   observe(events) {
     for (const e of events) {
       if (e.t === "pad") this.passed(e.piece);
-      if (e.t === "launch") this.passed("cannon");
     }
   }
 
@@ -43,7 +42,7 @@ class ClimbBot {
   aim(target, body) {
     const K = this.K;
     if (target instanceof K.GrabHold) return [target.x + target.nx * 0.45, target.z + target.nz * 0.45];
-    if (target instanceof K.JumpPad || target instanceof K.LaunchCannon) return [target.x, target.z];
+    if (target instanceof K.JumpPad) return [target.x, target.z];
     if (target.round) {
       const dx = body.x - target.x, dz = body.z - target.z, d = Math.hypot(dx, dz) || 1, keep = Math.min(d, target.radius * 0.45);
       return [target.x + dx / d * keep, target.z + dz / d * keep];
@@ -66,15 +65,6 @@ class ClimbBot {
       rules.steer(0, 0);
       if (body.hopTime > 0) return;
       if (--this.hopWait <= 0) { rules.pressJump(); this.hopWait = body.spot.ledge ? 12 : 30; }
-      return;
-    }
-    if (body.grounded && body.ground instanceof K.LaunchCannon) {
-      rules.steer(0, 0);
-      if (this.skill.power < 1 && rules.chargeFill >= this.skill.power - 1e-9) rules.pressJump();
-      return;
-    }
-    if (body.flight) {
-      rules.steer(0, 0);
       return;
     }
 

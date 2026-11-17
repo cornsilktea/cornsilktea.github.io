@@ -94,7 +94,7 @@ class ClimbRecords {
 class ClimbSfx {
   static readonly SOUNDS: Readonly<Record<string, readonly [number, number, number, OscillatorType]>> = {
     jump: [420, 640, 0.12, "square"], land: [180, 110, 0.09, "triangle"], pad: [300, 900, 0.25, "square"], grab: [520, 560, 0.07, "triangle"],
-    launch: [160, 1100, 0.5, "sawtooth"], portal: [700, 240, 0.9, "sine"], clear: [520, 1040, 0.6, "square"], fall: [300, 90, 0.5, "sawtooth"],
+    portal: [700, 240, 0.9, "sine"], clear: [520, 1040, 0.6, "square"], fall: [300, 90, 0.5, "sawtooth"],
   };
   static readonly VOLUME = 0.07;
   muted = false;
@@ -159,19 +159,16 @@ class ClimbHud {
   private readonly time = new ClimbHudField(ClimbDom.el("hudTime"));
   private readonly best = new ClimbHudField(ClimbDom.el("hudBest"));
   private readonly bar = new ClimbHudMeter(ClimbDom.el("hudBarFill"));
-  private readonly charge = new ClimbHudMeter(ClimbDom.el("hudChargeFill"));
   private readonly veil = new ClimbHudFade(ClimbDom.el("slowVeil"));
   private readonly white = new ClimbHudFade(ClimbDom.el("whiteFade"));
   private readonly bannerBox = ClimbDom.el("banner");
   private readonly countBox = ClimbDom.el("bigCount");
-  private readonly chargeBox = ClimbDom.el("hudCharge");
   private readonly grabTip = ClimbDom.el("grabHint");
   private readonly mapDot = ClimbDom.el("hudMapDot");
   private readonly mapCells: HTMLElement[] = [];
   private bannerLeft = 0;
   private dotAt = -1;
   private tipShown = "";
-  private chargeShown = false;
   private clearedShown = -1;
   private countShown = "";
 
@@ -191,7 +188,6 @@ class ClimbHud {
     if (visible) return;
     this.bannerBox.hidden = true;
     this.countBox.hidden = true;
-    this.chargeBox.hidden = true;
     this.grabTip.hidden = true;
     this.veil.set(0);
     this.white.set(0);
@@ -234,9 +230,6 @@ class ClimbHud {
     this.best.set("최고 " + records.best.h + "m" + (fresh ? " NEW" : ""));
     this.veil.set((1 - rules.time.scale) / (1 - B.SLOW_SCALE));
     this.white.set(rules.body.mode === "portal" ? 1 - rules.body.portalTime / B.PORTAL_TIME : 0);
-    const charging = rules.chargeFill > 0;
-    if (charging !== this.chargeShown) { this.chargeShown = charging; this.chargeBox.hidden = !charging; }
-    if (charging) this.charge.set(rules.chargeFill);
     const dot = Math.round((1 - Math.min(1, height / B.TOP)) * B.STAGE_COUNT * ClimbHud.MAP_CELL);
     if (dot !== this.dotAt) { this.dotAt = dot; this.mapDot.style.transform = "translateY(" + dot + "px)"; }
     if (rules.progress.cleared !== this.clearedShown) {

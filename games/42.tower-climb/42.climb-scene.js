@@ -59,15 +59,20 @@ class ClimbModelLibrary {
         const key = source.map ? source.map.uuid : "#" + source.color.getHexString();
         let material = this.lambert.get(key);
         if (!material) {
-            material = new this.libs.THREE.MeshLambertMaterial({ map: source.map, color: source.map ? 0xffffff : source.color });
+            material = this.closedBelow(new this.libs.THREE.MeshLambertMaterial({ map: source.map, color: source.map ? 0xffffff : source.color }));
             this.lambert.set(key, material);
         }
+        return material;
+    }
+    closedBelow(material) {
+        material.side = this.libs.THREE.DoubleSide;
+        material.shadowSide = this.libs.THREE.BackSide;
         return material;
     }
     grayOf(material) {
         const THREE = this.libs.THREE, source = material;
         if (!source.map)
-            return new THREE.MeshLambertMaterial({ color: 0x8A8A8A });
+            return this.closedBelow(new THREE.MeshLambertMaterial({ color: 0x8A8A8A }));
         const image = source.map.image, canvas = document.createElement("canvas");
         canvas.width = image.width;
         canvas.height = image.height;
@@ -85,7 +90,7 @@ class ClimbModelLibrary {
         texture.magFilter = source.map.magFilter;
         texture.minFilter = THREE.LinearFilter;
         texture.generateMipmaps = false;
-        return new THREE.MeshLambertMaterial({ map: texture });
+        return this.closedBelow(new THREE.MeshLambertMaterial({ map: texture }));
     }
 }
 ClimbModelLibrary.DIRECTORY = "assets/kaykit/";
@@ -160,7 +165,6 @@ class TowerLevelBuilder {
             tower: (piece) => this.tower(piece),
             hold: (piece) => this.hold(piece),
             rest: (piece) => this.rest(piece),
-            cannon: (piece) => { this.block(piece); this.cannonExtras(piece); },
         };
         for (const piece of level.pieces)
             this.draw(piece);
@@ -263,20 +267,6 @@ class TowerLevelBuilder {
         ground.receiveShadow = true;
         this.groupOf(piece.stage).add(ground);
     }
-    cannonExtras(cannon) {
-        const THREE = this.libs.THREE, B = ClimbBalance, T = TowerLevelBuilder, model = this.library.model("barrel");
-        const matrix = new THREE.Matrix4().makeTranslation(cannon.x - cannon.dirX * 1.9, cannon.top + 0.7, cannon.z - cannon.dirZ * 1.9);
-        matrix.multiply(new THREE.Matrix4().makeRotationY(cannon.yaw));
-        matrix.multiply(new THREE.Matrix4().makeRotationX(0.6));
-        matrix.multiply(new THREE.Matrix4().makeScale(0.8, 0.8, 0.8));
-        matrix.multiply(new THREE.Matrix4().makeTranslation(-model.centerX, -(model.max.y + model.min.y) / 2, -model.centerZ));
-        this.batcherOf(cannon.stage).add("barrel", matrix);
-        const up = LaunchCannon.launchUp(1), forward = LaunchCannon.launchForward(1), span = (up + Math.sqrt(up * up - 2 * B.GRAVITY * 12)) / B.GRAVITY;
-        for (let i = 1; i <= T.PATH_DOTS; i++) {
-            const t = span * i / (T.PATH_DOTS + 1);
-            this.marksOf(cannon.stage).push(new THREE.Matrix4().makeTranslation(cannon.x + cannon.dirX * forward * t, cannon.top + 1 + up * t - B.GRAVITY * t * t / 2, cannon.z + cannon.dirZ * forward * t));
-        }
-    }
     buildMarks() {
         const THREE = this.libs.THREE, T = TowerLevelBuilder, geometry = new THREE.BoxGeometry(0.2, 0.2, 0.2), material = new THREE.MeshBasicMaterial({ color: T.MARK_COLOR });
         this.marks.forEach((list, stage) => {
@@ -328,7 +318,7 @@ class TowerLevelBuilder {
     }
 }
 TowerLevelBuilder.BLOCK_OF_LOOK = {
-    deck: "grass", block: "dirt", root: "dirt", rock: "stone", stump: "dirt", log: "wood", ramp: "wood", pad: "yellow", cannon: "red",
+    deck: "grass", block: "dirt", root: "dirt", rock: "stone", stump: "dirt", log: "wood", ramp: "wood", pad: "yellow",
     ruin: "foundation", slab: "stone", beam: "wood",
 };
 TowerLevelBuilder.COLUMN_SEGMENT = 4;
@@ -341,7 +331,6 @@ TowerLevelBuilder.DUNGEON_ISLANDS = [
 ];
 TowerLevelBuilder.TRUNK_SEGMENT = 5.9;
 TowerLevelBuilder.MARK_COLOR = 0xFF9A4A;
-TowerLevelBuilder.PATH_DOTS = 14;
 TowerLevelBuilder.TREES = ["treeA", "treeB", "treeC"];
 class PortalLooks {
     constructor(libs, library) {

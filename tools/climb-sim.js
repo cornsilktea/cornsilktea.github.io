@@ -19,7 +19,7 @@ class ClimbSimulation {
     const rules = ClimbBot.startRules(K, this.level, route);
     const bot = new ClimbBot(K, rules, route.steps, skill, new ClimbSeededRandom(seed));
     const result = bot.run(this.limit);
-    return { done: result.done, seconds: result.seconds, falls: result.falls, peak: rules.peak, hits: rules.cannonHits, misses: rules.cannonMisses };
+    return { done: result.done, seconds: result.seconds, falls: result.falls, peak: rules.peak };
   }
 
   report() {
@@ -28,17 +28,17 @@ class ClimbSimulation {
     const each = Math.max(1, Math.floor(this.games / cells.length));
     let seed = 1000, total = 0;
     console.log("climb-sim: 칸마다 " + each + "판, 제한 " + this.limit + "초");
-    console.log("실력".padEnd(10) + "길".padEnd(9) + "도착".padStart(7) + "평균 시간".padStart(9) + "추락".padStart(7) + "평균 최고".padStart(9) + "  발사대 성공/실패");
+    console.log("실력".padEnd(10) + "길".padEnd(9) + "도착".padStart(7) + "평균 시간".padStart(9) + "추락".padStart(7) + "평균 최고".padStart(9));
     for (const { skill, route } of cells) {
-      let done = 0, seconds = 0, falls = 0, peak = 0, hits = 0, misses = 0;
+      let done = 0, seconds = 0, falls = 0, peak = 0;
       for (let i = 0; i < each; i++) {
         const r = this.play(route, skill, seed++);
         total++;
         if (r.done) { done++; seconds += r.seconds; }
-        falls += r.falls; peak += r.peak; hits += r.hits; misses += r.misses;
+        falls += r.falls; peak += r.peak;
       }
       console.log(skill.label.padEnd(10) + (route.stage + " " + route.label).padEnd(11) + (Math.round(done / each * 100) + "%").padStart(7) + (done ? (seconds / done).toFixed(1) + "초" : "-").padStart(9)
-        + (falls / each).toFixed(2).padStart(7) + ((peak / each).toFixed(1) + "m").padStart(9) + "  " + (route.name.startsWith("hard") ? hits + "/" + misses : ""));
+        + (falls / each).toFixed(2).padStart(7) + ((peak / each).toFixed(1) + "m").padStart(9));
     }
     console.log("모두 " + total + "판");
   }

@@ -129,7 +129,7 @@ class ClimbSfx {
 }
 ClimbSfx.SOUNDS = {
     jump: [420, 640, 0.12, "square"], land: [180, 110, 0.09, "triangle"], pad: [300, 900, 0.25, "square"], grab: [520, 560, 0.07, "triangle"],
-    launch: [160, 1100, 0.5, "sawtooth"], portal: [700, 240, 0.9, "sine"], clear: [520, 1040, 0.6, "square"], fall: [300, 90, 0.5, "sawtooth"],
+    portal: [700, 240, 0.9, "sine"], clear: [520, 1040, 0.6, "square"], fall: [300, 90, 0.5, "sawtooth"],
 };
 ClimbSfx.VOLUME = 0.07;
 class ClimbHudField {
@@ -176,19 +176,16 @@ class ClimbHud {
         this.time = new ClimbHudField(ClimbDom.el("hudTime"));
         this.best = new ClimbHudField(ClimbDom.el("hudBest"));
         this.bar = new ClimbHudMeter(ClimbDom.el("hudBarFill"));
-        this.charge = new ClimbHudMeter(ClimbDom.el("hudChargeFill"));
         this.veil = new ClimbHudFade(ClimbDom.el("slowVeil"));
         this.white = new ClimbHudFade(ClimbDom.el("whiteFade"));
         this.bannerBox = ClimbDom.el("banner");
         this.countBox = ClimbDom.el("bigCount");
-        this.chargeBox = ClimbDom.el("hudCharge");
         this.grabTip = ClimbDom.el("grabHint");
         this.mapDot = ClimbDom.el("hudMapDot");
         this.mapCells = [];
         this.bannerLeft = 0;
         this.dotAt = -1;
         this.tipShown = "";
-        this.chargeShown = false;
         this.clearedShown = -1;
         this.countShown = "";
         const map = ClimbDom.el("hudMapCells");
@@ -207,7 +204,6 @@ class ClimbHud {
             return;
         this.bannerBox.hidden = true;
         this.countBox.hidden = true;
-        this.chargeBox.hidden = true;
         this.grabTip.hidden = true;
         this.veil.set(0);
         this.white.set(0);
@@ -245,13 +241,6 @@ class ClimbHud {
         this.best.set("최고 " + records.best.h + "m" + (fresh ? " NEW" : ""));
         this.veil.set((1 - rules.time.scale) / (1 - B.SLOW_SCALE));
         this.white.set(rules.body.mode === "portal" ? 1 - rules.body.portalTime / B.PORTAL_TIME : 0);
-        const charging = rules.chargeFill > 0;
-        if (charging !== this.chargeShown) {
-            this.chargeShown = charging;
-            this.chargeBox.hidden = !charging;
-        }
-        if (charging)
-            this.charge.set(rules.chargeFill);
         const dot = Math.round((1 - Math.min(1, height / B.TOP)) * B.STAGE_COUNT * ClimbHud.MAP_CELL);
         if (dot !== this.dotAt) {
             this.dotAt = dot;

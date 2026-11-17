@@ -127,18 +127,6 @@ class TowerStageOneLayout {
         pen.box("n0", "static", S.EASY_START_DEG, 3.9, S.MID_Y + 0.15, 2.4, 1.6, S.EASY_START_DEG, { depth: 0.8, noLedge: true, look: "root" });
         S.HOLD_YS.forEach((y, i) => pen.round("h" + (i + 1), "hold", S.EASY_START_DEG, S.TRUNK_RADIUS, y, 0.25, { depth: 0.3, look: "hold" }));
         pen.box("n1", "static", S.EASY_START_DEG, 4.8, S.HOLD_YS[S.HOLD_YS.length - 1] + 1.1, 2.4, 1.8, S.EASY_START_DEG, { depth: 0.5, look: "deck" });
-        const hardLogDeg = S.EASY_START_DEG;
-        pen.box("hard1", "narrow", hardLogDeg, 11.8, S.MID_Y + 0.3, 5.6, 0.7, hardLogDeg - 90, { depth: 0.6, noLedge: true, look: "log" });
-        pen.box("hard2", "narrow", S.HARD_DEG, S.HARD_RING, 13.2, 5, 0.7, S.HARD_DEG, { depth: 0.6, look: "log" });
-        const along = 2.5 + S.CANNON_GAP + S.CANNON_RADIUS, tangentDeg = S.HARD_DEG;
-        const cannonX = ClimbLayoutPen.ringX(S.HARD_DEG, S.HARD_RING) + along * Math.cos(ClimbLayoutPen.rad(tangentDeg));
-        const cannonZ = ClimbLayoutPen.ringZ(S.HARD_DEG, S.HARD_RING) - along * Math.sin(ClimbLayoutPen.rad(tangentDeg));
-        const cannonRho = Math.hypot(cannonX, cannonZ), cannonDeg = Math.atan2(cannonX, cannonZ) * 180 / Math.PI;
-        pen.boxAt("cannon", "cannon", cannonX, cannonZ, 14, S.CANNON_RADIUS * 2, S.CANNON_RADIUS * 2, cannonDeg + 180, { depth: 0.8, look: "cannon" });
-        const flightTime = (ClimbBalance.CANNON_UP + Math.sqrt(ClimbBalance.CANNON_UP ** 2 - 2 * ClimbBalance.GRAVITY * 12)) / ClimbBalance.GRAVITY;
-        const targetRho = cannonRho - ClimbBalance.CANNON_FORWARD * flightTime;
-        pen.box("target", "static", cannonDeg, targetRho, 26, 3, 3, cannonDeg, { depth: 0.6, look: "deck" });
-        pen.box("hard3", "static", cannonDeg, S.JOIN_RING - 0.3, S.JOIN_Y, 3, 3, cannonDeg, { depth: 0.6, look: "deck" });
         pen.round("rest2", "rest", 0, 0, S.TOP_Y, 4.2, { depth: 0.5, startOf: 2, look: "rest" });
         return pen.pieces;
     }
@@ -151,7 +139,6 @@ class TowerStageOneLayout {
         return [
             { stage: 1, name: "easy", label: "쉬운 길", ratioLimit: 0.6, steps: [...opening, ...easy, ...ending] },
             { stage: 1, name: "normal", label: "잡기 오르막", ratioLimit: 0.6, steps: [...opening, "n0", ...holds, "n1", ...easy.slice(S.NORMAL_JOIN - 1), ...ending] },
-            { stage: 1, name: "hard", label: "발사대", ratioLimit: 0.9, steps: [...opening, "hard1", "hard2", "cannon", "target", "hard3", "rest2"] },
         ];
     }
 }
@@ -171,10 +158,6 @@ TowerStageOneLayout.MID_Y = 12;
 TowerStageOneLayout.HOLD_YS = [14.3, 15.3, 16.3, 17.3];
 TowerStageOneLayout.TOP_Y = 30;
 TowerStageOneLayout.TRUNK_RADIUS = 3;
-TowerStageOneLayout.HARD_DEG = 291;
-TowerStageOneLayout.HARD_RING = 16;
-TowerStageOneLayout.CANNON_GAP = 3.5;
-TowerStageOneLayout.CANNON_RADIUS = 1.3;
 class ClimbRingBuilder {
     constructor(pen, restRadius) {
         this.pen = pen;
@@ -220,19 +203,10 @@ class ClimbRingBuilder {
         const deg = this.ring(id, look, rho, top, scale, gap);
         this.bridge(bridgeId, bridgeLook, deg, rho - ClimbLayoutPen.halfOf(look, scale), top, bridgeScale);
     }
-    cannonAt(id, x, z, top, size, towardX, towardZ, lift) {
-        const flight = ClimbRingBuilder.cannonFlight(lift), dx = towardX - x, dz = towardZ - z, d = Math.hypot(dx, dz), yaw = Math.atan2(dx, dz) * 180 / Math.PI;
-        this.pen.boxAt(id, "cannon", x, z, top, size, size, yaw, { depth: 0.8, look: "cannon" });
-        return { x: x + dx / d * flight, z: z + dz / d * flight, yaw };
-    }
-    static cannonFlight(lift) {
-        const B = ClimbBalance;
-        return (B.CANNON_UP + Math.sqrt(B.CANNON_UP ** 2 - 2 * B.GRAVITY * lift)) / B.GRAVITY * B.CANNON_FORWARD;
-    }
 }
 class TowerStageTwoLayout {
     static pieces() {
-        const S = TowerStageTwoLayout, pen = new ClimbLayoutPen(2), go = new ClimbRingBuilder(pen, S.REST_RADIUS), polarX = ClimbLayoutPen.ringX, polarZ = ClimbLayoutPen.ringZ;
+        const S = TowerStageTwoLayout, pen = new ClimbLayoutPen(2), go = new ClimbRingBuilder(pen, S.REST_RADIUS);
         pen.round("tower2", "static", 0, 0, S.TOP_Y - 0.5, TowerStageOneLayout.TRUNK_RADIUS, { depth: S.TOP_Y - 0.5 - S.TOWER_BASE, noLedge: true, look: "tower" });
         const isleOf = (scale) => S.HEX * 0.75 * scale / S.HOUSE_A;
         go.spoke("vw1", "wall", 0, S.FLOOR, S.WALL);
@@ -273,15 +247,6 @@ class TowerStageTwoLayout {
         go.house("nhC", "houseA", S.ROOF_RHO, 42, S.HOUSE_A, 2.8, isleOf(S.HOUSE_A));
         go.ring("nw2", "wall", S.ROOF_RHO, 42.8, S.WALL, 3.1);
         go.ring("nt3", "turret", 19, 46.4, S.TURRET, 1);
-        const cannonStart = go.spoke("xw1", "wall", S.CANNON_SPOKE, S.FLOOR, S.WALL);
-        go.follow(S.CANNON_SPOKE, cannonStart, 0, -1);
-        go.ring("xb1", "barrel", S.INNER_RHO, 31.1, S.BARREL, 3);
-        go.ring("xc1", "crate", S.INNER_RHO, 32.3, S.CRATE, 2.9);
-        const barrel = pen.pieces.find((p) => p.id === "vb2"), barrelRho = Math.hypot(barrel.x, barrel.z), barrelDeg = Math.atan2(barrel.x, barrel.z) * 180 / Math.PI;
-        const aimRho = barrelRho - (barrel.radius ?? 0) - S.TARGET_GAP - 1.5, flight = ClimbRingBuilder.cannonFlight(S.CANNON_LIFT);
-        const swing = Math.acos((S.INNER_RHO ** 2 + aimRho ** 2 - flight ** 2) / (2 * S.INNER_RHO * aimRho)) * 180 / Math.PI, cannonDeg = barrelDeg - swing;
-        const land = go.cannonAt("xcan", polarX(cannonDeg, S.INNER_RHO), polarZ(cannonDeg, S.INNER_RHO), S.CANNON_TOP, 2.6, polarX(barrelDeg, aimRho), polarZ(barrelDeg, aimRho), S.CANNON_LIFT);
-        pen.boxAt("xtarget", "static", land.x, land.z, S.CANNON_TOP + S.CANNON_LIFT, 3, 3, land.yaw, { depth: 0.6, look: "slab" });
         pen.round("rest3", "rest", 0, 0, S.TOP_Y, S.REST_RADIUS, { depth: 0.5, startOf: 3, look: "rest" });
         return pen.pieces;
     }
@@ -291,7 +256,6 @@ class TowerStageTwoLayout {
         return [
             { stage: 2, name: "easy2", label: "쉬운 길", ratioLimit: 0.75, steps: easy },
             { stage: 2, name: "normal2", label: "지붕 길", ratioLimit: 0.8, steps: ["rest2", "nw1", "ni1", "np1", "nt1", "nhA", "nhB", "nc1", "nt2", "nhC", "nw2", "nt3", ...tail] },
-            { stage: 2, name: "hard2", label: "발사대", ratioLimit: 0.9, steps: ["rest2", "xw1", "xb1", "xc1", "xcan", "xtarget", ...tail] },
         ];
     }
 }
@@ -310,14 +274,9 @@ TowerStageTwoLayout.HOUSE_B = 2.8;
 TowerStageTwoLayout.PAD = 1.8;
 TowerStageTwoLayout.ROOF_SPOKE = 140;
 TowerStageTwoLayout.ROOF_RHO = 20;
-TowerStageTwoLayout.CANNON_SPOKE = -88;
-TowerStageTwoLayout.INNER_RHO = 11.4;
-TowerStageTwoLayout.CANNON_LIFT = 12;
-TowerStageTwoLayout.CANNON_TOP = 33.5;
-TowerStageTwoLayout.TARGET_GAP = 1.2;
 class TowerStageThreeLayout {
     static pieces() {
-        const S = TowerStageThreeLayout, pen = new ClimbLayoutPen(3), go = new ClimbRingBuilder(pen, S.REST_RADIUS), polarX = ClimbLayoutPen.ringX, polarZ = ClimbLayoutPen.ringZ;
+        const S = TowerStageThreeLayout, pen = new ClimbLayoutPen(3), go = new ClimbRingBuilder(pen, S.REST_RADIUS);
         pen.round("tower3", "static", 0, 0, S.TOP_Y - 0.5, TowerStageOneLayout.TRUNK_RADIUS, { depth: S.TOP_Y - 0.5 - S.TOWER_BASE, noLedge: true, look: "tower" });
         go.follow(S.EASY_SPOKE, go.spoke("dw1", "dwall", S.EASY_SPOKE, S.FLOOR, S.SPOKE), 0);
         go.hop("dt1", "tile", S.EASY_SPOKE, S.FLOOR, S.TILE, 3.9);
@@ -357,17 +316,6 @@ class TowerStageThreeLayout {
         go.ring("lp6", "column", W, 83.6, S.PILLAR, 1.5);
         go.follow(go.ring("lt4", "tile", W, 83.2, S.TILE, 4.5), W, ClimbLayoutPen.halfOf("tile", S.TILE));
         go.ring("lp7", "column", W - 3.5, 87, S.PILLAR, 1.5);
-        go.follow(S.CANNON_SPOKE, go.spoke("cw1", "dwall", S.CANNON_SPOKE, S.FLOOR, S.SPOKE), 0, -1);
-        go.ring("ck1", "keg", S.CANNON_RHO, 60.4, S.KEG, 4);
-        go.ring("cb1", "box", S.CANNON_RHO, 61.2, S.BOX, 3.8);
-        const flight = ClimbRingBuilder.cannonFlight(S.CANNON_LIFT), step = 2 * Math.asin(flight / 2 / S.CANNON_RHO) * 180 / Math.PI;
-        const firstDeg = go.trail.next(S.CANNON_RHO, S.CANNON_SIZE / 2, 3), secondDeg = firstDeg - step, landDeg = secondDeg - step;
-        const at = (deg) => [polarX(deg, S.CANNON_RHO), polarZ(deg, S.CANNON_RHO)];
-        go.cannonAt("cc1", ...at(firstDeg), S.CANNON_TOP, S.CANNON_SIZE, ...at(secondDeg), S.CANNON_LIFT);
-        const land = go.cannonAt("cc2", ...at(secondDeg), S.CANNON_TOP + S.CANNON_LIFT, S.CANNON_SIZE, ...at(landDeg), S.CANNON_LIFT);
-        pen.boxAt("ctarget", "static", land.x, land.z, S.CANNON_TOP + 2 * S.CANNON_LIFT, 3, 3, land.yaw, { depth: 0.6, look: "slab" });
-        go.follow(landDeg, S.CANNON_RHO, 1.5, -1);
-        go.arrive("cp1", "column", S.ARRIVE_RHO, S.TOP_Y, S.PILLAR, 1.5, "cw2", "dwall", S.WALL);
         pen.round("rest4", "rest", 0, 0, S.TOP_Y, S.REST_RADIUS, { depth: 0.5, startOf: 4, look: "rest" });
         return pen.pieces;
     }
@@ -375,7 +323,6 @@ class TowerStageThreeLayout {
         return [
             { stage: 3, name: "easy3", label: "쉬운 길", ratioLimit: 0.85, steps: ["rest3", "dw1", "dt1", "dp1", "db1", "dk1", "dt2", "dj1", "dt3", "dp2", "db2", "dt7", "dp3", "dk2", "dt4", "dj2", "dt5", "dp4", "db3", "dk3", "dp5", "dt6", "dp6", "dw3", "rest4"] },
             { stage: 3, name: "normal3", label: "기둥 길", ratioLimit: 0.9, steps: ["rest3", "lw1", "lt1", "lp1", "lp2", "lt2", "lb2", "lp3", "lp4", "lt3", "lb1", "lp5", "lp6", "lt4", "lp7", "dt6", "dp6", "dw3", "rest4"] },
-            { stage: 3, name: "hard3", label: "연쇄 발사대", ratioLimit: 0.93, steps: ["rest3", "cw1", "ck1", "cb1", "cc1", "cc2", "ctarget", "cp1", "cw2", "rest4"] },
         ];
     }
 }
@@ -395,11 +342,6 @@ TowerStageThreeLayout.EASY_SPOKE = 40;
 TowerStageThreeLayout.EASY_RHO = 15.5;
 TowerStageThreeLayout.WALL_SPOKE = 170;
 TowerStageThreeLayout.WALL_RHO = 22;
-TowerStageThreeLayout.CANNON_SPOKE = 300;
-TowerStageThreeLayout.CANNON_RHO = 11;
-TowerStageThreeLayout.CANNON_LIFT = 12;
-TowerStageThreeLayout.CANNON_TOP = 62.2;
-TowerStageThreeLayout.CANNON_SIZE = 3;
 class TowerLevelData {
     static spec() {
         return {

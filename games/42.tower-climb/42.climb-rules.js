@@ -43,15 +43,6 @@ ClimbBalance.SHIFT_COOLDOWN = 0.3;
 ClimbBalance.REGRAB = 0.2;
 ClimbBalance.SLOW_SCALE = 0.3;
 ClimbBalance.SLOW_BLEND = 0.15;
-ClimbBalance.CANNON_CHARGE = 0.8;
-ClimbBalance.CANNON_MIN = 0.6;
-ClimbBalance.CANNON_UP = 27;
-ClimbBalance.CANNON_UP_FLOOR = 0.7;
-ClimbBalance.CANNON_FORWARD = 6.5;
-ClimbBalance.CANNON_FORWARD_WEAK = 9;
-ClimbBalance.CANNON_GAIN = 8;
-ClimbBalance.FLIGHT_STEER = 6;
-ClimbBalance.FLIGHT_MAX = 9.5;
 ClimbBalance.PORTAL_RADIUS = 1.2;
 ClimbBalance.PORTAL_TIME = 1.5;
 ClimbBalance.PORTAL_DROP = 1.5;
@@ -180,7 +171,6 @@ class PlatformPiece {
         return near;
     }
     stand(_rules) { }
-    takeJump(_rules) { return false; }
 }
 class StaticPlatform extends PlatformPiece {
 }
@@ -199,19 +189,6 @@ class StageRest extends PlatformPiece {
 class JumpPad extends PlatformPiece {
     get ledge() { return false; }
     stand(rules) { rules.bounce(this); }
-}
-class LaunchCannon extends PlatformPiece {
-    get dirX() { return this.sin; }
-    get dirZ() { return this.cos; }
-    stand(rules) { rules.charge(this); }
-    takeJump(rules) {
-        rules.fire(this, Math.max(ClimbBalance.CANNON_MIN, rules.body.charge / ClimbBalance.CANNON_CHARGE));
-        return true;
-    }
-    static launchUp(power) { return ClimbBalance.CANNON_UP * (ClimbBalance.CANNON_UP_FLOOR + (1 - ClimbBalance.CANNON_UP_FLOOR) * power); }
-    static launchForward(power) {
-        return ClimbBalance.CANNON_FORWARD + (1 - power) * (ClimbBalance.CANNON_FORWARD_WEAK - ClimbBalance.CANNON_FORWARD) / (1 - ClimbBalance.CANNON_MIN);
-    }
 }
 class GrabHold extends PlatformPiece {
     get solid() { return false; }
@@ -437,7 +414,7 @@ class TowerLevel {
 }
 TowerLevel.PIECE_KINDS = {
     static: StaticPlatform, narrow: NarrowPlatform, slope: SlopePlatform, hub: HubIsland,
-    rest: StageRest, pad: JumpPad, cannon: LaunchCannon, hold: GrabHold,
+    rest: StageRest, pad: JumpPad, hold: GrabHold,
 };
 class ClimbUpPath {
     constructor() {
@@ -494,10 +471,6 @@ class ClimbCharacterBody {
         this.coyote = 0;
         this.jumpBuffer = 0;
         this.airPeak = 0;
-        this.flight = false;
-        this.flightFrom = 0;
-        this.charge = 0;
-        this.chargeOn = null;
         this.spot = new ClimbGrabSpot();
         this.climbPath = new ClimbUpPath();
         this.hangTime = 0;
@@ -543,7 +516,6 @@ class FallReturnWatcher {
         body.mode = "free";
         body.grounded = false;
         body.ground = null;
-        body.flight = false;
         body.airPeak = body.y;
         this.rules.emit({ t: "voidReturn" });
     }
@@ -559,8 +531,6 @@ class ClimbRules {
         this.started = false;
         this.peak = 0;
         this.portalsUsed = 0;
-        this.cannonHits = 0;
-        this.cannonMisses = 0;
         this.stageOneTime = null;
         this.moveX = 0;
         this.moveZ = 0;
@@ -596,7 +566,6 @@ class ClimbRules {
     get height() { return Math.max(0, this.body.y); }
     get blend() { return this.bank / ClimbBalance.TICK; }
     get steering() { return this.moveX !== 0 || this.moveZ !== 0; }
-    get chargeFill() { return this.body.chargeOn ? Math.min(1, this.body.charge / ClimbBalance.CANNON_CHARGE) : 0; }
     advance(realDt) {
         const B = ClimbBalance, dt = Math.min(Math.max(realDt, 0), B.FRAME_CAP);
         this.events.length = 0;
@@ -641,32 +610,6 @@ class ClimbRules {
         this.body.coyote = 0;
         this.emit({ t: "pad", piece: pad.id });
     }
-    charge(cannon) {
-        const body = this.body;
-        if (body.chargeOn !== cannon) {
-            body.chargeOn = cannon;
-            body.charge = 0;
-        }
-        body.charge += ClimbBalance.TICK;
-        if (body.charge >= ClimbBalance.CANNON_CHARGE)
-            this.fire(cannon, 1);
-    }
-    fire(cannon, power) {
-        const body = this.body, forward = LaunchCannon.launchForward(power);
-        body.x = cannon.x;
-        body.z = cannon.z;
-        body.vx = cannon.dirX * forward;
-        body.vz = cannon.dirZ * forward;
-        body.vy = LaunchCannon.launchUp(power);
-        this.leaveGround();
-        body.coyote = 0;
-        body.jumpBuffer = 0;
-        body.flight = true;
-        body.flightFrom = body.y;
-        body.charge = 0;
-        body.chargeOn = null;
-        this.emit({ t: "launch", power });
-    }
     leaveGround() {
         const body = this.body;
         body.grounded = false;
@@ -684,18 +627,6 @@ class ClimbRules {
         body.vx += dx / d * maxDelta;
         body.vz += dz / d * maxDelta;
     }
-    endFlight(height) {
-        const body = this.body;
-        if (!body.flight)
-            return;
-        const hit = height >= body.flightFrom + ClimbBalance.CANNON_GAIN;
-        body.flight = false;
-        if (hit)
-            this.cannonHits++;
-        else
-            this.cannonMisses++;
-        this.emit({ t: "cannonLand", hit });
-    }
     stepFree() {
         const B = ClimbBalance, T = B.TICK, body = this.body;
         const ground = body.grounded ? body.ground : null;
@@ -711,26 +642,15 @@ class ClimbRules {
             else
                 this.approach(0, 0, B.RUN / B.STOP_TIME * T);
         }
-        else if (body.flight) {
-            body.vx += this.moveX * B.FLIGHT_STEER * T;
-            body.vz += this.moveZ * B.FLIGHT_STEER * T;
-            const speed = body.speed;
-            if (speed > B.FLIGHT_MAX) {
-                body.vx *= B.FLIGHT_MAX / speed;
-                body.vz *= B.FLIGHT_MAX / speed;
-            }
-        }
         else if (this.steering)
             this.approach(this.moveX * B.RUN, this.moveZ * B.RUN, B.AIR_ACCEL * T);
         body.coyote = body.grounded ? B.COYOTE : Math.max(0, body.coyote - T);
         if (body.jumpBuffer > 0 && body.coyote > 0 && !body.sliding) {
             body.jumpBuffer = 0;
             body.coyote = 0;
-            if (!(ground && ground.takeJump(this))) {
-                body.vy = B.JUMP;
-                this.leaveGround();
-                this.emit({ t: "jump" });
-            }
+            body.vy = B.JUMP;
+            this.leaveGround();
+            this.emit({ t: "jump" });
         }
         if (!body.grounded)
             body.vy = Math.max(body.vy - B.GRAVITY * T, -B.FALL_MAX);
@@ -782,10 +702,6 @@ class ClimbRules {
         }
         if (body.grounded && body.ground)
             body.ground.stand(this);
-        if (body.chargeOn && (!body.grounded || body.ground !== body.chargeOn)) {
-            body.charge = 0;
-            body.chargeOn = null;
-        }
         if (body.speed > 0.5)
             body.yaw = Math.atan2(body.vx, body.vz);
         if (body.grounded) {
@@ -806,7 +722,6 @@ class ClimbRules {
         body.letGo = null;
         const drop = body.airPeak - top;
         this.emit({ t: "land", piece: piece.id, drop });
-        this.endFlight(top);
         this.watcher.landed(piece, drop);
     }
     enterPortalIfInside() {
@@ -828,15 +743,12 @@ class ClimbRules {
     }
     startHang() {
         const body = this.body;
-        this.endFlight(body.spot.y);
         body.mode = "hang";
         body.hangTime = 0;
         body.hopTime = ClimbBalance.GRAB_SWING;
         body.grounded = false;
         body.ground = null;
         body.sliding = false;
-        body.charge = 0;
-        body.chargeOn = null;
         this.settleOnSpot();
         this.emit({ t: "grab", ledge: body.spot.ledge });
     }

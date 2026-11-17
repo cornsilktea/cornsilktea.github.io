@@ -33,8 +33,6 @@ class TowerClimbGame {
       pad: () => this.sfx.play("pad"),
       grab: () => this.sfx.play("grab"),
       hop: () => this.sfx.play("grab"),
-      launch: (e) => { this.sfx.play("launch"); this.hud.banner("발사! 힘 " + Math.round(e.power * 100) + "%", false, 1.2); },
-      cannonLand: (e) => { if (e.hit) this.hud.banner("발사대 성공!", true, 2); },
       fellHome: () => this.fell(),
       voidReturn: () => this.fell(),
       stageClear: (e) => this.cleared(e.stage),

@@ -75,15 +75,21 @@ class ClimbModelLibrary {
     const key = source.map ? source.map.uuid : "#" + source.color.getHexString();
     let material = this.lambert.get(key);
     if (!material) {
-      material = new this.libs.THREE.MeshLambertMaterial({ map: source.map, color: source.map ? 0xffffff : source.color });
+      material = this.closedBelow(new this.libs.THREE.MeshLambertMaterial({ map: source.map, color: source.map ? 0xffffff : source.color }));
       this.lambert.set(key, material);
     }
     return material;
   }
 
+  private closedBelow(material: Three<"MeshLambertMaterial">): Three<"MeshLambertMaterial"> {
+    material.side = this.libs.THREE.DoubleSide;
+    material.shadowSide = this.libs.THREE.BackSide;
+    return material;
+  }
+
   grayOf(material: Three<"Material">): Three<"MeshLambertMaterial"> {
     const THREE = this.libs.THREE, source = material as Three<"MeshLambertMaterial">;
-    if (!source.map) return new THREE.MeshLambertMaterial({ color: 0x8A8A8A });
+    if (!source.map) return this.closedBelow(new THREE.MeshLambertMaterial({ color: 0x8A8A8A }));
     const image = source.map.image as HTMLImageElement, canvas = document.createElement("canvas");
     canvas.width = image.width; canvas.height = image.height;
     const context = canvas.getContext("2d", { willReadFrequently: true }) as CanvasRenderingContext2D;
@@ -100,7 +106,7 @@ class ClimbModelLibrary {
     texture.magFilter = source.map.magFilter;
     texture.minFilter = THREE.LinearFilter;
     texture.generateMipmaps = false;
-    return new THREE.MeshLambertMaterial({ map: texture });
+    return this.closedBelow(new THREE.MeshLambertMaterial({ map: texture }));
   }
 }
 
@@ -144,7 +150,7 @@ class ClimbDecorDice {
 
 class TowerLevelBuilder {
   static readonly BLOCK_OF_LOOK: Readonly<Record<string, string>> = {
-    deck: "grass", block: "dirt", root: "dirt", rock: "stone", stump: "dirt", log: "wood", ramp: "wood", pad: "yellow", cannon: "red",
+    deck: "grass", block: "dirt", root: "dirt", rock: "stone", stump: "dirt", log: "wood", ramp: "wood", pad: "yellow",
     ruin: "foundation", slab: "stone", beam: "wood",
   };
   static readonly COLUMN_SEGMENT = 4;
@@ -157,7 +163,6 @@ class TowerLevelBuilder {
   ];
   static readonly TRUNK_SEGMENT = 5.9;
   static readonly MARK_COLOR = 0xFF9A4A;
-  static readonly PATH_DOTS = 14;
   static readonly TREES: readonly string[] = ["treeA", "treeB", "treeC"];
 
   readonly root: Three<"Group">;
@@ -174,7 +179,6 @@ class TowerLevelBuilder {
       tower: (piece) => this.tower(piece),
       hold: (piece) => this.hold(piece as GrabHold),
       rest: (piece) => this.rest(piece),
-      cannon: (piece) => { this.block(piece); this.cannonExtras(piece as LaunchCannon); },
     };
     for (const piece of level.pieces) this.draw(piece);
     this.decorate();
@@ -271,21 +275,6 @@ class TowerLevelBuilder {
     ground.position.set(piece.x, piece.top - piece.depth / 2, piece.z);
     ground.receiveShadow = true;
     this.groupOf(piece.stage).add(ground);
-  }
-
-  private cannonExtras(cannon: LaunchCannon): void {
-    const THREE = this.libs.THREE, B = ClimbBalance, T = TowerLevelBuilder, model = this.library.model("barrel");
-    const matrix = new THREE.Matrix4().makeTranslation(cannon.x - cannon.dirX * 1.9, cannon.top + 0.7, cannon.z - cannon.dirZ * 1.9);
-    matrix.multiply(new THREE.Matrix4().makeRotationY(cannon.yaw));
-    matrix.multiply(new THREE.Matrix4().makeRotationX(0.6));
-    matrix.multiply(new THREE.Matrix4().makeScale(0.8, 0.8, 0.8));
-    matrix.multiply(new THREE.Matrix4().makeTranslation(-model.centerX, -(model.max.y + model.min.y) / 2, -model.centerZ));
-    this.batcherOf(cannon.stage).add("barrel", matrix);
-    const up = LaunchCannon.launchUp(1), forward = LaunchCannon.launchForward(1), span = (up + Math.sqrt(up * up - 2 * B.GRAVITY * 12)) / B.GRAVITY;
-    for (let i = 1; i <= T.PATH_DOTS; i++) {
-      const t = span * i / (T.PATH_DOTS + 1);
-      this.marksOf(cannon.stage).push(new THREE.Matrix4().makeTranslation(cannon.x + cannon.dirX * forward * t, cannon.top + 1 + up * t - B.GRAVITY * t * t / 2, cannon.z + cannon.dirZ * forward * t));
-    }
   }
 
   private buildMarks(): void {

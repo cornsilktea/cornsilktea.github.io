@@ -4,7 +4,7 @@
 // 3) 발사대는 힘 단계별 결과를 모두 적음   4) 갇히는 발판·길에 없는 발판 확인
 const K = require("./climb-load.js")();
 const { ClimbBot } = require("./climb-bot.js");
-const { ClimbBalance: B, ClimbRules, TowerLevel, StageProgress, TowerLevelData, GrabHold, JumpPad, LaunchCannon } = K;
+const { ClimbBalance: B, ClimbRules, TowerLevel, StageProgress, TowerLevelData, GrabHold, JumpPad } = K;
 const verbose = process.argv.includes("-v");
 
 class ReachReport {
@@ -69,7 +69,6 @@ class LinkMeter {
       return { type: "손잡이→모서리", ok: b.ledge && !b.covers(bx, bz) && rise > B.HOP_MIN && rise <= B.HOP_UP && edge.dist <= B.HOP_SIDE, rise, gap: edge.dist };
     }
     const { gap, rise } = this.gap(a, b);
-    if (a instanceof LaunchCannon) return { type: "발사대", ok: true, rise, gap };
     if (a instanceof JumpPad) {
       const time = LinkMeter.airTime(B.PAD_SPEED, rise), ratio = time > 0 ? gap / (B.RUN * time * 0.7) : Infinity;
       return { type: "점프대", ok: rise <= B.PAD_SPEED ** 2 / (2 * B.GRAVITY) * 0.92 && ratio <= 0.6, rise, gap, ratio };
@@ -116,43 +115,8 @@ class RouteInspector {
     const result = bot.run(300);
     this.report.check(route.name + " 봇이 슬로 없이 끝까지 감", result.done && rules.progress.cleared === route.stage, { at: route.steps[bot.index], seconds: result.seconds, y: rules.body.y });
     this.report.check(route.name + " 한 번도 안 떨어지고 감", result.falls === 0, result.falls);
-    this.report.note(route.label + ": 봇 완주 " + result.seconds.toFixed(1) + "초" + (rules.cannonHits ? " (발사대 성공)" : ""));
+    this.report.note(route.label + ": 봇 완주 " + result.seconds.toFixed(1) + "초");
     return result.seconds;
-  }
-}
-
-class CannonInspector {
-  constructor(level, report) { this.level = level; this.report = report; }
-
-  shoot(cannon, power) {
-    const rules = new ClimbRules(this.level, new StageProgress(0)), body = rules.body;
-    body.place(cannon.x, cannon.top, cannon.z);
-    let fired = false, grabbed = false;
-    for (let i = 0; i < 120 * 12; i++) {
-      if (!fired && power < 1 && rules.chargeFill >= power - 1e-9) rules.pressJump();
-      if (body.hanging && body.spot.ledge && i % 12 === 0) rules.pressJump();
-      for (const e of rules.advance(B.TICK)) { if (e.t === "launch") fired = true; if (e.t === "grab") grabbed = true; }
-      if (fired && !body.flight && body.grounded) break;
-    }
-    return { on: body.ground ? body.ground.id : "?", y: body.y, hit: rules.cannonHits === 1, grabbed, home: body.ground ? body.ground.hub : false };
-  }
-
-  inspect(route) {
-    route.steps.forEach((id, at) => { if (this.level.piece(id) instanceof LaunchCannon) this.inspectAt(route, at); });
-  }
-
-  inspectAt(route, at) {
-    const cannon = this.level.piece(route.steps[at]), goal = this.level.piece(route.steps[at + 1]);
-    for (const power of [0.6, 0.7, 0.8, 0.9, 1]) {
-      const shot = this.shoot(cannon, power);
-      this.report.note("  " + cannon.id + " 힘 " + Math.round(power * 100) + "%: " + (shot.hit ? (shot.grabbed ? "모서리를 저절로 잡고 올라 " : "착지 ") + shot.on : shot.home ? "허브까지 추락" : "낮은 곳 " + shot.on + " (" + shot.y.toFixed(1) + "m)"));
-      this.report.check(cannon.id + " " + Math.round(power * 100) + "% 결과가 정해짐", shot.on !== "?");
-      if (power === 1) {
-        this.report.check(cannon.id + " 100% 는 목표 발판 안에 착지", shot.hit && shot.on === goal.id && !shot.grabbed, shot);
-        this.report.check(cannon.id + " 얻는 높이 +12m 이상", goal.top - cannon.top >= 12 - 1e-9, goal.top - cannon.top);
-      }
-    }
-    this.report.check(cannon.id + " 목표 발판은 3m×3m", !goal.round && Math.abs(goal.halfX * 2 - 3) < 1e-9 && Math.abs(goal.halfZ * 2 - 3) < 1e-9);
   }
 }
 
@@ -191,18 +155,18 @@ class TrapInspector {
 
 const level = new TowerLevel(TowerLevelData.spec());
 const report = new ReachReport();
-const routes = new RouteInspector(level, report), cannons = new CannonInspector(level, report);
+const routes = new RouteInspector(level, report);
 const times = {};
 for (const route of level.routes) {
   routes.analyse(route);
   times[route.name] = routes.play(route);
-  cannons.inspect(route);
 }
 for (const stage of new Set(level.routes.map((r) => r.stage))) {
   const time = (kind) => { const route = level.routes.find((r) => r.stage === stage && r.name.startsWith(kind)); return route ? times[route.name] : NaN; };
   report.check("스테이지 " + stage + " 쉬운 길이 있음", level.routes.some((r) => r.stage === stage && r.name.startsWith("easy")));
-  report.note("스테이지 " + stage + " 발사대 길이 쉬운 길보다 " + (time("easy") - time("hard")).toFixed(1) + "초 빠름");
-  report.check("스테이지 " + stage + " 발사대 길이 가장 빠름", time("hard") < time("easy") && time("hard") < time("normal"), { easy: time("easy"), normal: time("normal"), hard: time("hard") });
+  report.note("스테이지 " + stage + " 둘째 길이 쉬운 길보다 " + (time("easy") - time("normal")).toFixed(1) + "초 빠름");
+  report.check("스테이지 " + stage + " 둘째 길이 쉬운 길보다 빠름", time("normal") < time("easy"), { easy: time("easy"), normal: time("normal") });
 }
+report.check("발사대가 없음", !level.pieces.some((p) => p.look === "cannon"));
 new TrapInspector(level, report).inspect();
 report.finish();

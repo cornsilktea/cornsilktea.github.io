@@ -1,6 +1,6 @@
 // 42번 타워 클라임: 규칙 엔진 단위 검사. 실행: node tools/climb-unit.js
 const K = require("./climb-load.js")();
-const { ClimbBalance: B, ClimbRules, TowerLevel, StageProgress, TowerLevelData, LaunchCannon } = K;
+const { ClimbBalance: B, ClimbRules, TowerLevel, StageProgress, TowerLevelData } = K;
 
 let passed = 0;
 const failures = [];
@@ -196,39 +196,9 @@ function box(id, x, z, y, sx, sz, more = {}) { return { id, kind: "static", stag
   check("작은 점프대 높이 약 4m", ev.some((e) => e.t === "pad") && near(top - 0.2, 4.02, 0.1), top);
 }
 {
-  const fire = (power) => {
-    const r = world([{ id: "c", kind: "cannon", stage: 1, x: 0, y: 1, z: 0, radius: 1.3, depth: 1, yaw: 0 }], { x: 0, y: 1, z: 0, yaw: 0 });
-    let top = 0, launched = null, atTwelve = null;
-    run(r, 4, (i) => {
-      if (power < 1 && launched === null && r.chargeFill >= power - 1e-9) r.pressJump();
-      top = Math.max(top, r.body.y);
-      if (r.body.flight && atTwelve === null && r.body.vy < 0 && r.body.y <= 13) atTwelve = r.body.z;
-    }).forEach((e) => { if (e.t === "launch" && launched === null) launched = e.power; });
-    const ev = r.cannonMisses;
-    return { top: top - 1, launched, atTwelve, misses: ev };
-  };
-  const full = fire(1);
-  check("발사대: 기다리면 0.8초 뒤 100% 자동 발사", full.launched === 1, full.launched);
-  check("발사대 100%: 정점 약 13m", near(full.top, 27 * 27 / 56, 0.15), full.top);
-  check("발사대 100%: +12m 지점이 앞쪽 약 8m", near(full.atTwelve, 8.02, 0.15), full.atTwelve);
-  const weak = fire(0.6), early = fire(0.2);
-  check("발사대 60%: 정점이 낮아 +12m 에 못 미침", weak.top < 12 && near(weak.top, LaunchCannon.launchUp(0.6) ** 2 / 56, 0.15), weak.top);
-  check("발사대: 너무 일찍 눌러도 최소 60% 힘", near(early.launched, 0.6, 1e-9), early.launched);
-  check("발사대: 낮은 곳에 내리면 실패로 셈", weak.misses === 1, weak.misses);
-}
-{
-  const r = world([{ id: "c", kind: "cannon", stage: 1, x: 2.6, y: 2.4, z: 0, radius: 1.3, depth: 2.4, yaw: 0 }], { x: 0.5, y: 0, z: 0, yaw: 0 });
-  settle(r);
-  r.steer(1, 0);
-  run(r, 0.2);
-  r.pressJump();
-  const grab = run(r, 0.3);
-  check("발사대 모서리도 점프하면 저절로 잡음", r.body.hanging && grab.some((e) => e.t === "grab" && e.ledge), r.body.mode);
-  r.steer(0, 0);
-  run(r, 0.3);
-  r.pressJump();
-  const up = run(r, 2.5);
-  check("발사대 모서리에서 기어오르면 발사대가 저절로 쏨", up.some((e) => e.t === "launch"), up.map((e) => e.t));
+  const spec = TowerLevelData.spec();
+  check("발사대가 없음(종류·발판 모두)", !spec.pieces.some((p) => p.kind === "cannon" || p.look === "cannon"));
+  check("스테이지 1~3 은 길이 두 개씩", [1, 2, 3].every((stage) => spec.routes.filter((r) => r.stage === stage).length === 2));
 }
 {
   const path = (slow) => {
