@@ -14,44 +14,46 @@ abstract class ClimbInputRouter {
   release(): void { this.moveX = this.moveY = 0; this.slowHeld = false; this.lookX = this.lookY = 0; }
 }
 
-class KeyboardMouseInput extends ClimbInputRouter {
-  static readonly MOUSE_TURN = 0.0026;
-  static readonly DIRECTION_OF_KEY: Readonly<Record<string, string>> = { ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right" };
-  static readonly DIRECTION_OF_CODE: Readonly<Record<string, string>> = { KeyW: "up", KeyS: "down", KeyA: "left", KeyD: "right" };
+class KeyboardInput extends ClimbInputRouter {
+  static readonly TURN_SPEED = 2.4;
+  static readonly PITCH_SPEED = 1.4;
+  static readonly MOVE_OF_CODE: Readonly<Record<string, string>> = { KeyW: "up", KeyS: "down", KeyA: "left", KeyD: "right" };
+  static readonly LOOK_OF_KEY: Readonly<Record<string, string>> = { ArrowUp: "lookUp", ArrowDown: "lookDown", ArrowLeft: "lookLeft", ArrowRight: "lookRight" };
 
+  onPauseKey: () => void = () => undefined;
   private readonly held = new Set<string>();
-  private dragging = false;
 
-  constructor(private readonly surface: HTMLElement) {
+  constructor() {
     super();
     window.addEventListener("keydown", (e) => this.key(e, true));
     window.addEventListener("keyup", (e) => this.key(e, false));
     window.addEventListener("blur", () => { this.held.clear(); this.refresh(); this.slowHeld = false; });
-    surface.addEventListener("mousedown", (e) => this.mouseDown(e));
-    window.addEventListener("mouseup", () => { this.dragging = false; });
-    window.addEventListener("mousemove", (e) => this.mouseMove(e));
-    document.addEventListener("pointerlockchange", () => { if (!document.pointerLockElement && this.enabled) this.onPause(); });
   }
-
-  get locked(): boolean { return document.pointerLockElement === this.surface; }
-  unlock(): void { if (document.pointerLockElement) document.exitPointerLock(); }
 
   release(): void { super.release(); this.held.clear(); }
 
-  private direction(e: KeyboardEvent): string {
-    return KeyboardMouseInput.DIRECTION_OF_KEY[e.key] ?? KeyboardMouseInput.DIRECTION_OF_CODE[e.code] ?? "";
+  advance(seconds: number): void {
+    const K = KeyboardInput, h = this.held;
+    this.lookX += ((h.has("lookRight") ? 1 : 0) - (h.has("lookLeft") ? 1 : 0)) * K.TURN_SPEED * seconds;
+    this.lookY += ((h.has("lookDown") ? 1 : 0) - (h.has("lookUp") ? 1 : 0)) * K.PITCH_SPEED * seconds;
+  }
+
+  private control(e: KeyboardEvent): string {
+    return KeyboardInput.LOOK_OF_KEY[e.key] ?? KeyboardInput.MOVE_OF_CODE[e.code] ?? "";
   }
 
   private refresh(): void {
-    this.moveX = (this.held.has("right") ? 1 : 0) - (this.held.has("left") ? 1 : 0);
-    this.moveY = (this.held.has("up") ? 1 : 0) - (this.held.has("down") ? 1 : 0);
+    const h = this.held;
+    this.moveX = (h.has("right") ? 1 : 0) - (h.has("left") ? 1 : 0);
+    this.moveY = (h.has("up") ? 1 : 0) - (h.has("down") ? 1 : 0);
   }
 
   private key(e: KeyboardEvent, down: boolean): void {
+    if (e.code === "Escape") { if (down && !e.repeat) this.onPauseKey(); return; }
     if (!this.enabled) return;
-    const direction = this.direction(e);
-    if (direction) {
-      if (down) this.held.add(direction); else this.held.delete(direction);
+    const control = this.control(e);
+    if (control) {
+      if (down) this.held.add(control); else this.held.delete(control);
       this.refresh();
       e.preventDefault();
       return;
@@ -60,22 +62,6 @@ class KeyboardMouseInput extends ClimbInputRouter {
     if (!down || e.repeat) { if (e.code === "Space") e.preventDefault(); return; }
     if (e.code === "Space") { this.onJump(); e.preventDefault(); }
     else if (e.code === "KeyE") this.onGrab();
-    else if (e.code === "Escape" && !this.locked) this.onPause();
-  }
-
-  private mouseDown(e: MouseEvent): void {
-    if (!this.enabled) return;
-    this.dragging = true;
-    if (!this.locked && this.surface.requestPointerLock) {
-      try { const asked = this.surface.requestPointerLock() as unknown; if (asked instanceof Promise) asked.catch(() => undefined); } catch (error) { this.dragging = true; }
-    }
-    e.preventDefault();
-  }
-
-  private mouseMove(e: MouseEvent): void {
-    if (!this.enabled || (!this.locked && !this.dragging)) return;
-    this.lookX += e.movementX * KeyboardMouseInput.MOUSE_TURN;
-    this.lookY += e.movementY * KeyboardMouseInput.MOUSE_TURN;
   }
 }
 

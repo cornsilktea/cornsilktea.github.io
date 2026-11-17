@@ -409,6 +409,8 @@ class ClimbAvatar {
   static readonly TURN_RATE = 14;
   static readonly HANG_FOLLOW = 16;
   static readonly SHADOW_REACH = 45;
+  static readonly CLIMB_LEAN = 0.45;
+  static readonly LEAN_RATE = 12;
 
   readonly root: Three<"Group">;
   private model: Three<"Object3D"> | null = null;
@@ -419,6 +421,7 @@ class ClimbAvatar {
   private yaw = Math.PI;
   private onceClip = "";
   private onceLeft = 0;
+  private lean = 0;
 
   constructor(private readonly libs: ThreeLibs, private readonly factory: CharacterModelFactory, private readonly clips: Map<string, Three<"AnimationClip">>, scene: Three<"Scene">) {
     const THREE = libs.THREE;
@@ -443,6 +446,7 @@ class ClimbAvatar {
 
   private clipFor(body: ClimbCharacterBody): string {
     if (body.mode === "stun") return "Hit_A";
+    if (body.mode === "climbUp") return body.climbPath.rising ? "Jump_Idle" : "Jump_Land";
     if (body.mode === "hang" || !body.grounded) return "Jump_Idle";
     return body.speed > 0.6 ? "Running_A" : "Idle_A";
   }
@@ -456,12 +460,20 @@ class ClimbAvatar {
     turn = Math.atan2(Math.sin(turn), Math.cos(turn));
     this.yaw += turn * Math.min(1, A.TURN_RATE * dt);
     this.root.rotation.y = this.yaw;
+    this.leanForClimb(body, dt);
     this.root.visible = body.mode !== "portal" || body.portalTime > ClimbBalance.PORTAL_TIME * 0.45;
     const scaled = dt * rules.time.scale;
     if (this.onceLeft > 0) this.onceLeft -= scaled;
-    else if (this.animator) this.animator.play(this.clipFor(body), body.mode === "stun" ? { once: true } : {});
+    else if (this.animator) this.animator.play(this.clipFor(body), body.mode === "stun" || body.mode === "climbUp" ? { once: true } : {});
     if (this.animator) this.animator.update(scaled);
     this.dropShadow(rules, position.x, position.y, position.z);
+  }
+
+  private leanForClimb(body: ClimbCharacterBody, dt: number): void {
+    const A = ClimbAvatar, path = body.climbPath;
+    const goal = body.mode === "climbUp" ? A.CLIMB_LEAN * Math.sin(Math.PI * path.progress) : 0;
+    this.lean += (goal - this.lean) * Math.min(1, A.LEAN_RATE * dt);
+    if (this.model) this.model.rotation.x = this.lean;
   }
 
   private dropShadow(rules: ClimbRules, x: number, y: number, z: number): void {

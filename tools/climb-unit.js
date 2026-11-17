@@ -1,4 +1,4 @@
-// 42번 동마 타워 클라임: 규칙 엔진 단위 검사. 실행: node tools/climb-unit.js
+// 42번 타워 클라임: 규칙 엔진 단위 검사. 실행: node tools/climb-unit.js
 const K = require("./climb-load.js")();
 const { ClimbBalance: B, ClimbRules, TowerLevel, StageProgress, TowerLevelData, LaunchCannon } = K;
 
@@ -105,8 +105,10 @@ function box(id, x, z, y, sx, sz, more = {}) { return { id, kind: "static", stag
   r.pressGrab();
   const ev = run(r, 0.1);
   check("모서리 잡기(2.4m 위)", r.body.hanging && ev.some((e) => e.t === "grab" && e.ledge));
-  const ev2 = run(r, 0.5);
-  check("0.4초 뒤 자동으로 올라탐", ev2.some((e) => e.t === "mantle") && r.body.grounded && near(r.body.y, 2.4, 1e-6) && r.body.ground.id === "wall", { y: r.body.y });
+  const evMid = run(r, 0.6);
+  check("0.4초 뒤 기어오르기 시작(바로 순간이동하지 않음)", evMid.some((e) => e.t === "climbUp") && r.body.mode === "climbUp" && r.body.y > 0.4 && r.body.y < 2.6, { y: r.body.y, mode: r.body.mode });
+  const ev2 = run(r, 0.4);
+  check("기어오른 뒤 위에 섬", ev2.some((e) => e.t === "mantle") && r.body.grounded && near(r.body.y, 2.4, 1e-6) && r.body.ground.id === "wall", { y: r.body.y });
   const r2 = world([box("wall", 2, 0, 2.8, 2, 4, { depth: 2.8 })], { x: 0.6, y: 0, z: 0, yaw: 0 });
   settle(r2);
   r2.pressGrab();

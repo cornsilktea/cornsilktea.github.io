@@ -1,4 +1,4 @@
-type ClimbMode = "free" | "hang" | "portal" | "stun";
+type ClimbMode = "free" | "hang" | "climbUp" | "portal" | "stun";
 
 interface ClimbPieceSpec {
   id: string; kind: string; stage: number;
@@ -19,6 +19,7 @@ type ClimbEvent =
   | { t: "pad"; piece: string }
   | { t: "grab"; ledge: boolean }
   | { t: "hop" }
+  | { t: "climbUp" }
   | { t: "mantle" }
   | { t: "release" }
   | { t: "launch"; power: number }
@@ -53,6 +54,9 @@ class ClimbBalance {
   static readonly HANG_DROP = 2;
   static readonly MANTLE_TIME = 0.4;
   static readonly MANTLE_INSET = 0.55;
+  static readonly CLIMB_UP_TIME = 0.5;
+  static readonly CLIMB_UP_RISE_SHARE = 0.6;
+  static readonly CLIMB_UP_LIFT = 0.15;
   static readonly HOP_TIME = 0.2;
   static readonly HOP_UP = 1.6;
   static readonly HOP_MIN = 0.2;
@@ -442,6 +446,37 @@ class TowerLevel {
   hasStage(index: number): boolean { return this.starts.has(index); }
 }
 
+class ClimbUpPath {
+  fromX = 0; fromY = 0; fromZ = 0;
+  toX = 0; toY = 0; toZ = 0;
+  elapsed = 0;
+  piece: PlatformPiece | null = null;
+
+  start(fromX: number, fromY: number, fromZ: number, toX: number, toY: number, toZ: number, piece: PlatformPiece): void {
+    this.fromX = fromX; this.fromY = fromY; this.fromZ = fromZ;
+    this.toX = toX; this.toY = toY; this.toZ = toZ;
+    this.piece = piece;
+    this.elapsed = 0;
+  }
+
+  get progress(): number { return Math.min(1, this.elapsed / ClimbBalance.CLIMB_UP_TIME); }
+  get done(): boolean { return this.elapsed >= ClimbBalance.CLIMB_UP_TIME - 1e-9; }
+  get rising(): boolean { return this.progress < ClimbBalance.CLIMB_UP_RISE_SHARE; }
+
+  private static ease(t: number): number { return t * t * (3 - 2 * t); }
+
+  advance(seconds: number, body: ClimbCharacterBody): void {
+    const B = ClimbBalance, P = ClimbUpPath;
+    this.elapsed += seconds;
+    const t = this.progress, share = B.CLIMB_UP_RISE_SHARE;
+    const rise = P.ease(Math.min(1, t / share)), over = P.ease(Math.max(0, (t - share) / (1 - share)));
+    const peak = this.toY + B.CLIMB_UP_LIFT;
+    body.y = t < share ? this.fromY + (peak - this.fromY) * rise : peak + (this.toY - peak) * over;
+    body.x = this.fromX + (this.toX - this.fromX) * over;
+    body.z = this.fromZ + (this.toZ - this.fromZ) * over;
+  }
+}
+
 class ClimbCharacterBody {
   x = 0; y = 0; z = 0;
   prevX = 0; prevY = 0; prevZ = 0;
@@ -459,6 +494,7 @@ class ClimbCharacterBody {
   charge = 0;
   chargeOn: PlatformPiece | null = null;
   readonly spot = new ClimbGrabSpot();
+  readonly climbPath = new ClimbUpPath();
   hangTime = 0;
   hopTime = 0;
   shiftCooldown = 0;
@@ -536,6 +572,7 @@ class ClimbRules {
     this.modeSteps = {
       free: (grab) => this.stepFree(grab),
       hang: (grab) => this.stepHang(grab),
+      climbUp: () => this.stepClimbUp(),
       portal: () => this.stepPortal(),
       stun: () => this.stepStun(),
     };
@@ -792,9 +829,23 @@ class ClimbRules {
     const B = ClimbBalance, body = this.body, spot = body.spot, piece = spot.piece;
     if (!piece) { this.release(false); return; }
     const x = spot.x - spot.nx * B.MANTLE_INSET, z = spot.z - spot.nz * B.MANTLE_INSET;
-    body.x = piece.covers(x, z) ? x : piece.x;
-    body.z = piece.covers(x, z) ? z : piece.z;
-    body.y = piece.top;
+    const inside = piece.covers(x, z);
+    body.climbPath.start(body.x, body.y, body.z, inside ? x : piece.x, piece.top, inside ? z : piece.z, piece);
+    body.mode = "climbUp";
+    this.emit({ t: "climbUp" });
+  }
+
+  private stepClimbUp(): void {
+    const body = this.body, path = body.climbPath;
+    path.advance(ClimbBalance.TICK, body);
+    if (path.done) this.finishMantle();
+  }
+
+  private finishMantle(): void {
+    const B = ClimbBalance, body = this.body, path = body.climbPath, piece = path.piece;
+    if (!piece) { body.mode = "free"; return; }
+    body.x = path.toX; body.y = path.toY; body.z = path.toZ;
+    body.vx = body.vy = body.vz = 0;
     body.mode = "free";
     body.grounded = true;
     body.ground = piece;

@@ -51,13 +51,14 @@ class TowerClimbGame {
         FoldCard.bindAll(document);
         this.hud = new ClimbHud(this.level);
         const zone = ClimbDom.el("touchZone");
-        this.keyboard = new KeyboardMouseInput(zone);
+        this.keyboard = new KeyboardInput();
         this.touch = new TouchInput(zone, ClimbDom.el("joyBase"), ClimbDom.el("joyKnob"), ClimbDom.el("btnJump"), ClimbDom.el("btnSlow"), ClimbDom.el("btnGrab"), ClimbDom.el("btnPause"));
         for (const input of [this.keyboard, this.touch]) {
             input.onJump = () => this.rules.pressJump();
             input.onGrab = () => this.rules.pressGrab();
             input.onPause = () => this.pause();
         }
+        this.keyboard.onPauseKey = () => this.togglePause();
         if (touchDevice)
             document.body.classList.add("touch");
         ClimbDom.el("btnStart").addEventListener("click", () => this.startRun());
@@ -89,7 +90,6 @@ class TowerClimbGame {
             this.records.submitWorld(Math.floor(this.rules.peak + 1e-6));
         this.state = "menu";
         this.setInputs(false);
-        this.keyboard.unlock();
         this.hud.showPlay(false);
         ClimbDom.el("pauseBox").hidden = true;
         ClimbDom.el("startScreen").hidden = false;
@@ -115,8 +115,13 @@ class TowerClimbGame {
             return;
         this.state = "pause";
         this.setInputs(false);
-        this.keyboard.unlock();
         ClimbDom.el("pauseBox").hidden = false;
+    }
+    togglePause() {
+        if (this.state === "play")
+            this.pause();
+        else if (this.state === "pause")
+            this.resume();
     }
     resume() {
         if (this.state !== "pause")
@@ -148,8 +153,9 @@ class TowerClimbGame {
                 handler(event);
         }
     }
-    steer() {
+    steer(dt) {
         const rig = this.view.rig;
+        this.keyboard.advance(dt);
         const moveX = Math.max(-1, Math.min(1, this.keyboard.moveX + this.touch.moveX)), moveY = Math.max(-1, Math.min(1, this.keyboard.moveY + this.touch.moveY));
         this.rules.steer(rig.rightX * moveX + rig.forwardX * moveY, rig.rightZ * moveX + rig.forwardZ * moveY);
         this.rules.holdSlow(this.keyboard.slowHeld || this.touch.slowHeld);
@@ -171,7 +177,7 @@ class TowerClimbGame {
         }
     }
     playFrame(dt) {
-        this.steer();
+        this.steer(dt);
         this.dispatch(this.rules.advance(dt));
         this.sfx.rate = this.rules.time.active ? 0.6 : 1;
         if (this.records.offerHeight(Math.floor(this.rules.peak + 1e-6)))

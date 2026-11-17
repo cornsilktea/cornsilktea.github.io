@@ -401,6 +401,7 @@ class ClimbAvatar {
         this.yaw = Math.PI;
         this.onceClip = "";
         this.onceLeft = 0;
+        this.lean = 0;
         const THREE = libs.THREE;
         this.root = new THREE.Group();
         this.aim = new THREE.Vector3();
@@ -425,6 +426,8 @@ class ClimbAvatar {
     clipFor(body) {
         if (body.mode === "stun")
             return "Hit_A";
+        if (body.mode === "climbUp")
+            return body.climbPath.rising ? "Jump_Idle" : "Jump_Land";
         if (body.mode === "hang" || !body.grounded)
             return "Jump_Idle";
         return body.speed > 0.6 ? "Running_A" : "Idle_A";
@@ -440,15 +443,23 @@ class ClimbAvatar {
         turn = Math.atan2(Math.sin(turn), Math.cos(turn));
         this.yaw += turn * Math.min(1, A.TURN_RATE * dt);
         this.root.rotation.y = this.yaw;
+        this.leanForClimb(body, dt);
         this.root.visible = body.mode !== "portal" || body.portalTime > ClimbBalance.PORTAL_TIME * 0.45;
         const scaled = dt * rules.time.scale;
         if (this.onceLeft > 0)
             this.onceLeft -= scaled;
         else if (this.animator)
-            this.animator.play(this.clipFor(body), body.mode === "stun" ? { once: true } : {});
+            this.animator.play(this.clipFor(body), body.mode === "stun" || body.mode === "climbUp" ? { once: true } : {});
         if (this.animator)
             this.animator.update(scaled);
         this.dropShadow(rules, position.x, position.y, position.z);
+    }
+    leanForClimb(body, dt) {
+        const A = ClimbAvatar, path = body.climbPath;
+        const goal = body.mode === "climbUp" ? A.CLIMB_LEAN * Math.sin(Math.PI * path.progress) : 0;
+        this.lean += (goal - this.lean) * Math.min(1, A.LEAN_RATE * dt);
+        if (this.model)
+            this.model.rotation.x = this.lean;
     }
     dropShadow(rules, x, y, z) {
         let floor = -Infinity;
@@ -483,6 +494,8 @@ ClimbAvatar.MODEL_SCALE = 0.9;
 ClimbAvatar.TURN_RATE = 14;
 ClimbAvatar.HANG_FOLLOW = 16;
 ClimbAvatar.SHADOW_REACH = 45;
+ClimbAvatar.CLIMB_LEAN = 0.45;
+ClimbAvatar.LEAN_RATE = 12;
 class ClimbCameraRig {
     constructor(camera) {
         this.camera = camera;

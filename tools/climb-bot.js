@@ -1,4 +1,4 @@
-// 42번 동마 타워 클라임: 길(route)을 따라 실제 규칙 엔진을 조작하는 검사용 봇.
+// 42번 타워 클라임: 길(route)을 따라 실제 규칙 엔진을 조작하는 검사용 봇.
 // climb-reach.js(도달 검사)와 climb-sim.js(시뮬레이션)가 같이 쓴다.
 
 class ClimbSeededRandom {

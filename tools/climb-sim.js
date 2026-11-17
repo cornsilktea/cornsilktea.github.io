@@ -1,4 +1,4 @@
-// 42번 동마 타워 클라임: 시뮬레이션. 실행: node tools/climb-sim.js [판 수=5000] [제한 초=240]
+// 42번 타워 클라임: 시뮬레이션. 실행: node tools/climb-sim.js [판 수=5000] [제한 초=240]
 // 조준이 흔들리고 점프 시점이 들쭉날쭉한 봇으로 길마다 도착 비율·평균 시간·추락 횟수를 본다.
 const K = require("./climb-load.js")();
 const { ClimbBot, ClimbSeededRandom } = require("./climb-bot.js");

@@ -15,41 +15,43 @@ class ClimbInputRouter {
     takeLookY() { const value = this.lookY; this.lookY = 0; return value; }
     release() { this.moveX = this.moveY = 0; this.slowHeld = false; this.lookX = this.lookY = 0; }
 }
-class KeyboardMouseInput extends ClimbInputRouter {
-    constructor(surface) {
+class KeyboardInput extends ClimbInputRouter {
+    constructor() {
         super();
-        this.surface = surface;
+        this.onPauseKey = () => undefined;
         this.held = new Set();
-        this.dragging = false;
         window.addEventListener("keydown", (e) => this.key(e, true));
         window.addEventListener("keyup", (e) => this.key(e, false));
         window.addEventListener("blur", () => { this.held.clear(); this.refresh(); this.slowHeld = false; });
-        surface.addEventListener("mousedown", (e) => this.mouseDown(e));
-        window.addEventListener("mouseup", () => { this.dragging = false; });
-        window.addEventListener("mousemove", (e) => this.mouseMove(e));
-        document.addEventListener("pointerlockchange", () => { if (!document.pointerLockElement && this.enabled)
-            this.onPause(); });
     }
-    get locked() { return document.pointerLockElement === this.surface; }
-    unlock() { if (document.pointerLockElement)
-        document.exitPointerLock(); }
     release() { super.release(); this.held.clear(); }
-    direction(e) {
-        return KeyboardMouseInput.DIRECTION_OF_KEY[e.key] ?? KeyboardMouseInput.DIRECTION_OF_CODE[e.code] ?? "";
+    advance(seconds) {
+        const K = KeyboardInput, h = this.held;
+        this.lookX += ((h.has("lookRight") ? 1 : 0) - (h.has("lookLeft") ? 1 : 0)) * K.TURN_SPEED * seconds;
+        this.lookY += ((h.has("lookDown") ? 1 : 0) - (h.has("lookUp") ? 1 : 0)) * K.PITCH_SPEED * seconds;
+    }
+    control(e) {
+        return KeyboardInput.LOOK_OF_KEY[e.key] ?? KeyboardInput.MOVE_OF_CODE[e.code] ?? "";
     }
     refresh() {
-        this.moveX = (this.held.has("right") ? 1 : 0) - (this.held.has("left") ? 1 : 0);
-        this.moveY = (this.held.has("up") ? 1 : 0) - (this.held.has("down") ? 1 : 0);
+        const h = this.held;
+        this.moveX = (h.has("right") ? 1 : 0) - (h.has("left") ? 1 : 0);
+        this.moveY = (h.has("up") ? 1 : 0) - (h.has("down") ? 1 : 0);
     }
     key(e, down) {
+        if (e.code === "Escape") {
+            if (down && !e.repeat)
+                this.onPauseKey();
+            return;
+        }
         if (!this.enabled)
             return;
-        const direction = this.direction(e);
-        if (direction) {
+        const control = this.control(e);
+        if (control) {
             if (down)
-                this.held.add(direction);
+                this.held.add(control);
             else
-                this.held.delete(direction);
+                this.held.delete(control);
             this.refresh();
             e.preventDefault();
             return;
@@ -69,35 +71,12 @@ class KeyboardMouseInput extends ClimbInputRouter {
         }
         else if (e.code === "KeyE")
             this.onGrab();
-        else if (e.code === "Escape" && !this.locked)
-            this.onPause();
-    }
-    mouseDown(e) {
-        if (!this.enabled)
-            return;
-        this.dragging = true;
-        if (!this.locked && this.surface.requestPointerLock) {
-            try {
-                const asked = this.surface.requestPointerLock();
-                if (asked instanceof Promise)
-                    asked.catch(() => undefined);
-            }
-            catch (error) {
-                this.dragging = true;
-            }
-        }
-        e.preventDefault();
-    }
-    mouseMove(e) {
-        if (!this.enabled || (!this.locked && !this.dragging))
-            return;
-        this.lookX += e.movementX * KeyboardMouseInput.MOUSE_TURN;
-        this.lookY += e.movementY * KeyboardMouseInput.MOUSE_TURN;
     }
 }
-KeyboardMouseInput.MOUSE_TURN = 0.0026;
-KeyboardMouseInput.DIRECTION_OF_KEY = { ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right" };
-KeyboardMouseInput.DIRECTION_OF_CODE = { KeyW: "up", KeyS: "down", KeyA: "left", KeyD: "right" };
+KeyboardInput.TURN_SPEED = 2.4;
+KeyboardInput.PITCH_SPEED = 1.4;
+KeyboardInput.MOVE_OF_CODE = { KeyW: "up", KeyS: "down", KeyA: "left", KeyD: "right" };
+KeyboardInput.LOOK_OF_KEY = { ArrowUp: "lookUp", ArrowDown: "lookDown", ArrowLeft: "lookLeft", ArrowRight: "lookRight" };
 class TouchInput extends ClimbInputRouter {
     constructor(zone, base, knob, jump, slow, grab, pause) {
         super();
