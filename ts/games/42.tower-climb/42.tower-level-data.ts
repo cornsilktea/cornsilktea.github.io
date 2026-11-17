@@ -16,6 +16,13 @@ class TowerPropShapes {
     keg: { model: "barrel", turn: 0, top: 2, base: 0, cx: 0, cz: 0, span: 1.8, across: 1.8, round: true },
     tile: { model: "tile", turn: 0, top: 0.05, base: -0.1, cx: 0, cz: 0, span: 4, across: 4, round: false },
     dwall: { model: "dungeonWall", turn: 0, top: 4, base: 0, cx: 0, cz: 0, span: 4, across: 1, round: false },
+    ktable: { model: "kitchenTable", turn: 0, top: 1, base: 0, cx: 0, cz: 0, span: 2, across: 2, round: false },
+    rtable: { model: "roundTable", turn: 0, top: 1, base: 0, cx: 0, cz: 0, span: 3, across: 3, round: true },
+    counter: { model: "counter", turn: 0, top: 1, base: 0, cx: 0, cz: 0.021, span: 2, across: 2.04, round: false },
+    stove: { model: "stove", turn: 0, top: 1.2, base: 0, cx: 0, cz: 0.114, span: 2, across: 2.29, round: false },
+    fridge: { model: "fridge", turn: 0, top: 2.5, base: 0, cx: 0, cz: 0.12, span: 2, across: 2.24, round: false },
+    board: { model: "board", turn: 0, top: 0.15, base: 0, cx: 0, cz: 0, span: 1.5, across: 1, round: false },
+    plate: { model: "plate", turn: 0, top: 0.1, base: 0, cx: 0, cz: 0, span: 0.95, across: 0.95, round: true },
   };
   static readonly ROOFS: Readonly<Record<string, ClimbRoofShape>> = {
     houseA: { eaveHalf: 0.4, eaveY: 0.37, wallHalf: 0.3, wallTop: 0.28 },
@@ -385,6 +392,95 @@ class TowerStageThreeLayout {
   }
 }
 
+class TowerStageFourLayout {
+  static readonly FLOOR = 90;
+  static readonly TOWER_BASE = 94;
+  static readonly TOP_Y = 120;
+  static readonly REST_RADIUS = 4.2;
+  static readonly SPOKE = 2;
+  static readonly KTABLE = 1.6;
+  static readonly RTABLE = 1.2;
+  static readonly COUNTER = 1.6;
+  static readonly STOVE = 1.5;
+  static readonly FRIDGE = 1.6;
+  static readonly BOARD = 2.2;
+  static readonly PLATE = 3.2;
+  static readonly PAD = 1.8;
+  static readonly ARRIVE_RHO = 11.5;
+  static readonly EASY_SPOKE = 120;
+  static readonly EASY_RHO = 15.5;
+  static readonly SHELF_SPOKE = 277;
+  static readonly SHELF_RHO = 22;
+  static readonly JOIN_GAP = 1.2;
+  static readonly LAUNCH_TOP = 115.5;
+  static readonly LONG_GAP = 4.2;
+  static readonly LONG_RISE = 2;
+
+  static pieces(): ClimbPieceSpec[] {
+    const S = TowerStageFourLayout, pen = new ClimbLayoutPen(4), go = new ClimbRingBuilder(pen, S.REST_RADIUS);
+    pen.round("tower4", "static", 0, 0, S.TOP_Y - 0.5, TowerStageOneLayout.TRUNK_RADIUS, { depth: S.TOP_Y - 0.5 - S.TOWER_BASE, noLedge: true, look: "tower" });
+
+    go.follow(S.EASY_SPOKE, go.spoke("ks1", "counter", S.EASY_SPOKE, S.FLOOR, S.SPOKE), 0);
+    go.hop("kr1", "rtable", S.EASY_SPOKE, S.FLOOR, S.RTABLE, 3.9);
+    const R = S.EASY_RHO;
+    go.ring("kf1", "fridge", R, 93.8, S.FRIDGE, 1.4);
+    go.ring("kt1", "ktable", R, 93.4, S.KTABLE, 4.3);
+    go.ring("kv1", "stove", R, 94.2, S.STOVE, 3.5);
+    const board1 = go.ring("kb1", "board", R + 0.5, 94.2, S.BOARD, 4.1);
+    go.pad("kj1", board1, R + 0.5, 94.2, S.PAD, 0.6);
+    go.ring("kb2", "board", R + 0.5, 97.5, S.BOARD, 1.8);
+    go.ring("kf2", "fridge", R, 101.3, S.FRIDGE, 1.4);
+    go.ring("kt2", "ktable", R, 100.9, S.KTABLE, 4.3);
+    go.ring("kb3", "board", R + 0.5, 101.7, S.BOARD, 3.8);
+    go.ring("kf3", "fridge", R, 105.5, S.FRIDGE, 1.4);
+    go.ring("kp1", "plate", R, 105.1, S.PLATE, 4.25);
+    const board4 = go.ring("kb4", "board", R + 0.5, 105.6, S.BOARD, 3.6);
+    go.pad("kj2", board4, R + 0.5, 105.6, S.PAD, 0.6);
+    go.ring("kb5", "board", R + 0.5, 108.9, S.BOARD, 1.8);
+    go.ring("kf4", "fridge", R, 112.7, S.FRIDGE, 1.4);
+    go.ring("kt3", "ktable", R, 112.3, S.KTABLE, 4.3);
+    go.ring("kv2", "stove", R, 113.1, S.STOVE, 3.5);
+    const lastFridge = go.ring("kf5", "fridge", R, 116.9, S.FRIDGE, 1.4);
+    S.longJump(go, R - 1.5);
+    go.arrive("kf6", "fridge", S.ARRIVE_RHO, S.TOP_Y, S.FRIDGE, 1.4, "kw1", "counter", S.SPOKE);
+
+    go.follow(S.SHELF_SPOKE, go.spoke("gs1", "counter", S.SHELF_SPOKE, S.FLOOR, S.SPOKE), 0, -1);
+    go.hop("gr1", "rtable", S.SHELF_SPOKE, S.FLOOR, S.RTABLE, 4.1);
+    const W = S.SHELF_RHO;
+    go.ring("gf1", "fridge", W - 3, 93.8, S.FRIDGE, 1.5);
+    go.ring("gf2", "fridge", W, 97.6, S.FRIDGE, 1.5);
+    go.ring("gb1", "board", W, 97.2, S.BOARD, 4.5);
+    go.ring("gt1", "ktable", W, 98, S.KTABLE, 3.6);
+    go.ring("gf3", "fridge", W, 101.8, S.FRIDGE, 1.5);
+    go.ring("gf4", "fridge", W, 105.6, S.FRIDGE, 1.5);
+    go.ring("gb2", "board", W, 105.2, S.BOARD, 4.5);
+    go.ring("gt2", "ktable", W, 106, S.KTABLE, 3.6);
+    go.ring("gf5", "fridge", W, 109.8, S.FRIDGE, 1.5);
+    go.ring("gf6", "fridge", W, 113.6, S.FRIDGE, 1.5);
+    const joinRho = R + TowerPropShapes.SHAPES.fridge.across * S.FRIDGE / 2 + S.JOIN_GAP + TowerPropShapes.SHAPES.board.across * S.BOARD / 2;
+    pen.prop("gb3", "static", "board", ClimbLayoutPen.ringX(lastFridge, joinRho), ClimbLayoutPen.ringZ(lastFridge, joinRho), 113.2, S.BOARD, lastFridge);
+
+    pen.round("rest5", "rest", 0, 0, S.TOP_Y, S.REST_RADIUS, { depth: 0.5, startOf: 5, look: "rest" });
+    return pen.pieces;
+  }
+
+  static longJump(go: ClimbRingBuilder, rho: number): void {
+    const S = TowerStageFourLayout, along = ClimbLayoutPen.halfOf("board", S.BOARD) - S.PAD / 2;
+    const deg = go.ring("kb6", "board", rho, S.LAUNCH_TOP, S.BOARD, 4);
+    go.pad("kj3", deg, rho, S.LAUNCH_TOP, S.PAD, along);
+    go.follow(deg + Math.atan2(along, rho) * 180 / Math.PI, rho, S.PAD / 2);
+    go.ring("kc1", "counter", rho, S.LAUNCH_TOP + 0.3 + S.LONG_RISE, S.COUNTER, S.LONG_GAP);
+  }
+
+  static routes(): ClimbRouteSpec[] {
+    const tail = ["kb6", "kj3", "kc1", "kf6", "kw1", "rest5"];
+    return [
+      { stage: 4, name: "easy4", label: "쉬운 길", ratioLimit: 0.85, steps: ["rest4", "ks1", "kr1", "kf1", "kt1", "kv1", "kb1", "kj1", "kb2", "kf2", "kt2", "kb3", "kf3", "kp1", "kb4", "kj2", "kb5", "kf4", "kt3", "kv2", "kf5", ...tail] },
+      { stage: 4, name: "normal4", label: "냉장고 길", ratioLimit: 0.9, steps: ["rest4", "gs1", "gr1", "gf1", "gf2", "gb1", "gt1", "gf3", "gf4", "gb2", "gt2", "gf5", "gf6", "gb3", "kf5", ...tail] },
+    ];
+  }
+}
+
 class TowerLevelData {
   static readonly STAGES: readonly ClimbStageSpec[] = [
     { index: 0, name: "시작 지점", floor: -100, ceiling: 0 },
@@ -400,9 +496,9 @@ class TowerLevelData {
   static spec(): ClimbLevelSpec {
     return {
       stages: TowerLevelData.STAGES.map((s) => ({ ...s })),
-      pieces: [...TowerHubLayout.pieces(), ...TowerStageOneLayout.pieces(), ...TowerStageTwoLayout.pieces(), ...TowerStageThreeLayout.pieces()],
+      pieces: [...TowerHubLayout.pieces(), ...TowerStageOneLayout.pieces(), ...TowerStageTwoLayout.pieces(), ...TowerStageThreeLayout.pieces(), ...TowerStageFourLayout.pieces()],
       portals: TowerHubLayout.portals(),
-      routes: [...TowerStageOneLayout.routes(), ...TowerStageTwoLayout.routes(), ...TowerStageThreeLayout.routes()],
+      routes: [...TowerStageOneLayout.routes(), ...TowerStageTwoLayout.routes(), ...TowerStageThreeLayout.routes(), ...TowerStageFourLayout.routes()],
       spawn: TowerHubLayout.spawn(),
     };
   }

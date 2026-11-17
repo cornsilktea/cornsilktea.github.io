@@ -54,6 +54,12 @@ class LinkMeter {
     return inside < 0 ? 0 : (up + Math.sqrt(inside)) / B.GRAVITY;
   }
 
+  // 점프대 없이 이 발판으로 갈 수 있는가(걷기·모서리 잡기·최대 거리 안의 점프)
+  reachable(a, b) {
+    const link = this.link(a, b);
+    return link.type === "걷기" || link.type === "모서리 잡기" || link.type === "손잡이→모서리" || (link.type === "점프" && link.ratio <= 1);
+  }
+
   link(a, b) {
     const jumpHeight = B.JUMP * B.JUMP / (2 * B.GRAVITY);
     if (a instanceof GrabHold && b instanceof GrabHold) {
@@ -70,8 +76,11 @@ class LinkMeter {
     }
     const { gap, rise } = this.gap(a, b);
     if (a instanceof JumpPad) {
-      const time = LinkMeter.airTime(B.PAD_SPEED, rise), ratio = time > 0 ? gap / (B.RUN * time * 0.7) : Infinity;
-      return { type: "점프대", ok: rise <= B.PAD_SPEED ** 2 / (2 * B.GRAVITY) * 0.92 && ratio <= 0.6, rise, gap, ratio };
+      const time = LinkMeter.airTime(B.PAD_SPEED, rise), high = rise <= B.PAD_SPEED ** 2 / (2 * B.GRAVITY) * 0.92, ratio = time > 0 ? gap / (B.RUN * time * 0.7) : Infinity;
+      if (ratio <= 0.6) return { type: "점프대", ok: high, rise, gap, ratio };
+      // 멀리뛰기: 점프대에 올라서는 순간(가까운 쪽 가장자리) 튕기므로 점프대 폭만큼 더 날아야 한다
+      const flight = time > 0 ? (gap + Math.min(a.halfX, a.halfZ) * 2) / (B.RUN * time) : Infinity;
+      return { type: "점프대 멀리뛰기", ok: high && flight <= 0.9, rise, gap, ratio: flight };
     }
     if (gap <= 0.05 && rise <= B.STEP) return { type: "걷기", ok: true, rise, gap };
     if (rise <= jumpHeight * 0.9) {
@@ -88,7 +97,7 @@ class RouteInspector {
 
   analyse(route) {
     const pieces = route.steps.map((id) => this.level.piece(id));
-    let chain = 0, worstChain = 0, holds = 0, worstRatio = 0, worstAt = "";
+    let chain = 0, worstChain = 0, holds = 0, worstRatio = 0, worstAt = "", longJumps = 0;
     for (let i = 1; i < pieces.length; i++) {
       const a = pieces[i - 1], b = pieces[i], link = this.meter.link(a, b), tag = route.name + " " + a.id + "→" + b.id;
       if (verbose) this.report.note("  " + tag.padEnd(26) + link.type.padEnd(9) + " 간격 " + link.gap.toFixed(2) + " 높이 " + link.rise.toFixed(2) + (link.ratio !== undefined ? " 비율 " + link.ratio.toFixed(2) : ""));
@@ -98,6 +107,13 @@ class RouteInspector {
         this.report.check(tag + " 점프 비율 ≤ 0.95", link.ratio <= 0.95, link.ratio);
         if (link.ratio > worstRatio) { worstRatio = link.ratio; worstAt = a.id + "→" + b.id; }
       }
+      if (link.type === "점프대 멀리뛰기") {
+        longJumps++;
+        const later = new Set(route.steps.slice(i + 1));
+        const others = this.level.pieces.filter((p) => p.stage === b.stage && p !== a && p !== b && p.solid && !p.id.includes(".") && !/^towerd$/.test(p.id) && !later.has(p.id));
+        const shortcut = others.find((p) => this.meter.reachable(p, b));
+        this.report.check(tag + " 점프대 없이는 못 감", !shortcut, shortcut && shortcut.id);
+      }
       if (b instanceof GrabHold) holds++;
       else { if (holds > 0) this.report.check(route.name + " 손잡이 오르막 4~6개", holds >= 4 && holds <= 6, holds); holds = 0; }
       if (link.type === "점프" || link.type === "모서리 잡기") chain++;
@@ -105,6 +121,7 @@ class RouteInspector {
       worstChain = Math.max(worstChain, chain);
     }
     this.report.check(route.name + " 연속 점프 5회 이하", worstChain <= 5, worstChain);
+    if (route.stage >= 4) this.report.check(route.name + " 점프대 멀리뛰기 구간이 있음(스테이지 4부터)", longJumps >= 1, longJumps);
     this.report.check(route.name + " 끝이 다음 스테이지 시작 쉼터", pieces[pieces.length - 1].startOf === route.stage + 1);
     this.report.note(route.label + ": 발판 " + pieces.length + "개, 가장 먼 점프 " + worstAt + " (최대 거리의 " + Math.round(worstRatio * 100) + "%), 연속 점프 최대 " + worstChain + "회");
   }
