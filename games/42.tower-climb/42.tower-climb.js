@@ -131,7 +131,6 @@ class TowerClimbGame {
     }
     fell() {
         this.sfx.play("fall");
-        this.hud.banner("떨어졌어요! 처음으로", false, 2.5);
         this.records.submitWorld(Math.floor(this.rules.peak + 1e-6));
     }
     cleared(stage) {
