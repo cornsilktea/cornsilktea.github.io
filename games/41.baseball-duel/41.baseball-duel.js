@@ -237,7 +237,7 @@ class BbDuelGame {
             await this.stage.load(BbDuelGame.ASSET_DIRECTORY, BbBallparkRegistry.MAIN, { batsLeft: false, throwsLeft: false }, this.gauge);
         }
         catch (error) {
-            this.gauge.fail(BbLoadGauge.describe(error), () => { void this.loadStage(); });
+            this.gauge.fail(LoadGauge.describe(error), () => { void this.loadStage(); });
             return;
         }
         this.gauge.finish();

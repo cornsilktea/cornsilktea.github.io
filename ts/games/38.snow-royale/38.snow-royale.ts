@@ -597,16 +597,18 @@ class SnGame {
   private lastMs = 0;
   private seed: number;
 
-  constructor(private readonly libs: ThreeLibs) {
+  constructor(private readonly libs: ThreeLibs, private readonly gauge: LoadGauge<SnLoadStep>) {
     this.seed = this.options.seed;
-    this.start().catch((error) => { SnDom.text(SnDom.el("loading"), "불러오기 실패: " + error); });
+    this.start().catch((error) => this.gauge.fail("불러오지 못했어요: " + LoadGauge.describe(error)));
   }
 
   private async start(): Promise<void> {
     const assets = new CharacterAssets(this.libs);
+    assets.onProgress = (progress) => this.gauge.count("characters", progress);
     await assets.load();
     const library = new SnModelLibrary(this.libs);
-    await library.load(assets.clips);
+    await library.load(assets.clips, new LoadCounter((counter) => this.gauge.count("models", counter)));
+    await this.gauge.phase("village");
     const factory = new CharacterModelFactory(this.libs, assets);
     const canvas = SnDom.el<HTMLCanvasElement>("view");
     const scene = new SnSceneView(this.libs, canvas, this.touch, library, factory, SnMap.shared());
@@ -624,7 +626,7 @@ class SnGame {
     ui.specPanel.onOverview(() => { if (this.view) this.view.toggleOverview(); });
     document.body.classList.toggle("touch", this.touch);
     this.bindMenus();
-    SnDom.show(SnDom.el("loading"), false);
+    this.gauge.finish();
     window.addEventListener("pagehide", () => { if (this.session) this.session.removeMineOnUnload(); });
     if (this.options.offline) this.startOffline();
     else {
@@ -1077,4 +1079,30 @@ class SnRandomSetup {
       mount: SnDom.el(solo ? "partyMountSolo" : "partyMountDuos")
     });
   }
+}
+
+type SnLoadStep = "library" | "characters" | "models" | "village";
+
+class SnLoading {
+  static readonly PHASES: Readonly<Record<SnLoadStep, LoadGaugePhase>> = {
+    library: { at: 0.06, text: "그래픽 라이브러리 받는 중…" },
+    characters: { at: 0.1, span: 0.35, text: "캐릭터 파일 받는 중…" },
+    models: { at: 0.45, span: 0.4, text: "눈 덮인 마을 건물 받는 중…" },
+    village: { at: 0.9, text: "눈싸움 마을 만드는 중…" },
+  };
+
+  static gauge(): LoadGauge<SnLoadStep> {
+    return new LoadGauge({ title: "눈싸움장 준비 중", phases: SnLoading.PHASES });
+  }
+}
+
+class SnBoot {
+  private readonly three: ThreeBoot<string, SnGame>;
+
+  constructor(importer: () => Promise<ThreeLibs>) {
+    const gauge = SnLoading.gauge();
+    this.three = new ThreeBoot(gauge, "library", importer, (libs) => new SnGame(libs, gauge));
+  }
+
+  get game(): SnGame | null { return this.three.started; }
 }

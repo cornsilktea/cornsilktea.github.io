@@ -634,8 +634,9 @@ SnVersusCurtain.MIN_MS = 2000;
 SnVersusCurtain.FADE_MS = 350;
 SnVersusCurtain.RELOAD_MS = 6000;
 class SnGame {
-    constructor(libs) {
+    constructor(libs, gauge) {
         this.libs = libs;
+        this.gauge = gauge;
         this.options = new SnPlayOptions(location.search);
         this.backend = new RkBackend();
         this.directory = new RkDirectory(this.backend, SnRoomRules.RULES);
@@ -659,13 +660,15 @@ class SnGame {
         this.lastMs = 0;
         this.leaveAskedAt = -1;
         this.seed = this.options.seed;
-        this.start().catch((error) => { SnDom.text(SnDom.el("loading"), "불러오기 실패: " + error); });
+        this.start().catch((error) => this.gauge.fail("불러오지 못했어요: " + LoadGauge.describe(error)));
     }
     async start() {
         const assets = new CharacterAssets(this.libs);
+        assets.onProgress = (progress) => this.gauge.count("characters", progress);
         await assets.load();
         const library = new SnModelLibrary(this.libs);
-        await library.load(assets.clips);
+        await library.load(assets.clips, new LoadCounter((counter) => this.gauge.count("models", counter)));
+        await this.gauge.phase("village");
         const factory = new CharacterModelFactory(this.libs, assets);
         const canvas = SnDom.el("view");
         const scene = new SnSceneView(this.libs, canvas, this.touch, library, factory, SnMap.shared());
@@ -689,7 +692,7 @@ class SnGame {
             this.view.toggleOverview(); });
         document.body.classList.toggle("touch", this.touch);
         this.bindMenus();
-        SnDom.show(SnDom.el("loading"), false);
+        this.gauge.finish();
         window.addEventListener("pagehide", () => { if (this.session)
             this.session.removeMineOnUnload(); });
         if (this.options.offline)
@@ -1210,3 +1213,21 @@ class SnRandomSetup {
 }
 SnRandomSetup.CAPACITY = 6;
 SnRandomSetup.DUOS_TEAMS = 3;
+class SnLoading {
+    static gauge() {
+        return new LoadGauge({ title: "눈싸움장 준비 중", phases: SnLoading.PHASES });
+    }
+}
+SnLoading.PHASES = {
+    library: { at: 0.06, text: "그래픽 라이브러리 받는 중…" },
+    characters: { at: 0.1, span: 0.35, text: "캐릭터 파일 받는 중…" },
+    models: { at: 0.45, span: 0.4, text: "눈 덮인 마을 건물 받는 중…" },
+    village: { at: 0.9, text: "눈싸움 마을 만드는 중…" },
+};
+class SnBoot {
+    constructor(importer) {
+        const gauge = SnLoading.gauge();
+        this.three = new ThreeBoot(gauge, "library", importer, (libs) => new SnGame(libs, gauge));
+    }
+    get game() { return this.three.started; }
+}

@@ -104,7 +104,6 @@
   table.res th.num { text-align: left; }
   .myRec { text-align: center; margin-top: 10px; font-size: 16px; font-weight: 700; color: var(--sg-ink-mid); }
 
-  #loading { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; padding: 10px 16px; text-align: center; font-size: 15px; font-weight: 700; background: var(--sg-primary); color: #fff; }
 
   #vignette { position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 15; pointer-events: none; box-shadow: inset 0 0 16vmin 2vmin rgba(0, 0, 0, .28); transition: box-shadow .8s ease; }
   #vignette.zombie { box-shadow: inset 0 0 18vmin 3vmin rgba(200, 24, 36, .5); }
@@ -435,6 +434,7 @@
   </div>
 </section>
 
+<script charset="utf-8" src="common/load-gauge.js?v=20261118b"></script>
 <script charset="utf-8" src="common/character-kit.js?v=20261116b"></script>
 <script charset="utf-8" src="common/character-maker.js?v=20261116a"></script>
 <div id="versusCurtain" class="zv-curtain" hidden>
@@ -453,7 +453,6 @@
 <script charset="utf-8" src="games/31.zombie-outbreak/31.zombie-missions.js?v=20261106b"></script>
 <script charset="utf-8" src="games/31.zombie-outbreak/31.zombie-hud.js?v=20261106a"></script>
 <script>new CharacterMakerDialog(undefined, false);</script>
-<div id="loading">3D 학교를 준비하는 중입니다…</div>
 
 <script>
 (async () => {
@@ -488,7 +487,15 @@ const MAX_PIXEL_RATIO = IS_TOUCH_DEVICE ? 1.25 : 1.5, MIN_PIXEL_RATIO = 1.0;
 const QUALITY_KEY = "zombieoutbreak_quality_v1";
 const MOTION = { idle: 0, run: 1, back: 2, dash: 5, injure: 6, fall: 7, standup: 8 };
 
-const loadingEl = $("loading");
+class ZombieLoading {
+  static PHASES = {
+    library: { at: 0.08, text: "그래픽 라이브러리 받는 중…" },
+    models: { at: 0.3, span: 0.65, text: "학생·좀비 모델 받는 중…" }
+  };
+  static gauge = new LoadGauge({ title: "3D 학교 준비 중", phases: ZombieLoading.PHASES, place: "bottom" });
+  static counter = new LoadCounter((counter) => ZombieLoading.gauge.count("models", counter));
+}
+ZombieLoading.gauge.phase("library");
 let THREE, GLTFLoader, SkeletonUtils;
 const MODULE_SHIM_URL = "https://cdn.jsdelivr.net/npm/es-module-shims@1.10.1/dist/es-module-shims.js";
 const hasNativeImportMap = !!(window.HTMLScriptElement && HTMLScriptElement.supports && HTMLScriptElement.supports("importmap"));
@@ -507,10 +514,10 @@ try {
   SkeletonUtils = await importThree("three/addons/utils/SkeletonUtils.js");
 } catch (e) {
   const oldBrowser = (e && e.name === "SyntaxError") || (browserEngineVersion > 0 && browserEngineVersion < 80);
-  setText(loadingEl, oldBrowser
+  ZombieLoading.gauge.fail((oldBrowser
     ? "이 기기의 인터넷 앱이 오래되어 3D 화면을 열 수 없습니다. 크롬(Chrome) 앱으로 열어 주세요."
-    : "3D 화면을 불러오지 못했습니다. 인터넷 연결을 확인한 뒤 새로고침해 주세요.");
-  if (browserEngineVersion) setText(loadingEl, loadingEl.textContent + " (브라우저 엔진 " + browserEngineVersion + " · 80 이상 필요)");
+    : "3D 화면을 불러오지 못했습니다. 인터넷 연결을 확인한 뒤 새로고침해 주세요.")
+    + (browserEngineVersion ? " (브라우저 엔진 " + browserEngineVersion + " · 80 이상 필요)" : ""));
   return;
 }
 
@@ -2987,7 +2994,7 @@ function findClip(clips, patterns) {
   return null;
 }
 async function loadCharacterModels() {
-  const load = file => new Promise((ok, fail) => gltfLoader.load(MODEL_DIR + file, ok, undefined, fail));
+  const load = file => ZombieLoading.counter.track(new Promise((ok, fail) => gltfLoader.load(MODEL_DIR + file, ok, undefined, fail)), file);
   const [human, zombie, extraZombieMotions] = await Promise.all([load("student.glb"), load("zombie.glb"), load("zombie_1.glb").catch(() => null)]);
   if (extraZombieMotions) {
     const own = new Set(zombie.animations.map(c => c.name));
@@ -3010,8 +3017,8 @@ async function loadCharacterModels() {
   } };
 }
 let modelsReady = false;
-loadCharacterModels().then(() => { modelsReady = true; show(loadingEl, false); }).catch(() => {
-  setText(loadingEl, "캐릭터 모델(img/zombie/student.glb, zombie.glb)을 불러오지 못했습니다. 새로고침해 주세요.");
+loadCharacterModels().then(() => { modelsReady = true; ZombieLoading.gauge.finish(); }).catch(() => {
+  ZombieLoading.gauge.fail("캐릭터 모델(img/zombie/student.glb, zombie.glb)을 불러오지 못했습니다. 다시 불러와 주세요.");
 });
 
 const blobTexture = (() => {

@@ -6,7 +6,6 @@ class StartView {
         this.joinButton = page.byId("btnJoin");
         this.codeInput = page.byId("joinCode");
         this.message = page.byId("startMsg");
-        this.loadNote = page.byId("loadNote");
     }
     onCreate(handler) { this.createButton.onclick = handler; }
     onJoin(handler) { this.joinButton.onclick = handler; }
@@ -19,9 +18,6 @@ class StartView {
     }
     showMessage(text) {
         this.page.setText(this.message, text);
-    }
-    showLoadNote(text) {
-        this.page.setText(this.loadNote, text);
     }
     setCreateEnabled(enabled) { this.createButton.disabled = !enabled; }
     setJoinEnabled(enabled) { this.joinButton.disabled = !enabled; }

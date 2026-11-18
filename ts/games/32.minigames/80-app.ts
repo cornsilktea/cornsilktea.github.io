@@ -30,7 +30,7 @@ class MiniGamesApp {
   private lastTickMs = 0;
   private assetsReady = false;
 
-  constructor(private readonly libs: ThreeLibs) {
+  constructor(private readonly libs: ThreeLibs, private readonly gauge: LoadGauge<MiniGamesLoadStep>) {
     this.assets = new CharacterAssets(libs);
     this.factory = new CharacterModelFactory(libs, this.assets);
     this.catalog = new GameCatalog([new LastTileDefinition(libs), new BombPassDefinition(), new NunchiCardDefinition(), new TerritoryDefinition(), new FreezeDefinition(libs, this.assets, this.factory), new MoleDefinition(libs, this.assets, this.factory), new GlassBridgeDefinition(libs, this.assets, this.factory)]);
@@ -93,15 +93,18 @@ class MiniGamesApp {
   private async loadAssets(): Promise<void> {
     this.phases.goTo(this.startPhase);
     try {
-      await Promise.all([this.assets.load(), this.catalog.preloadAll()]);
+      this.assets.onProgress = (progress) => this.gauge.count("characters", progress);
+      await this.assets.load();
+      await this.catalog.preloadAll(new LoadCounter((counter) => this.gauge.count("games", counter)));
+      await this.gauge.phase("ready");
       this.assetsReady = true;
       this.backdrops.markReady();
-      this.startView.showLoadNote("");
+      this.gauge.finish();
       this.profilePanel.markReady();
       this.updateStartButtons();
       this.flow.resumeAfterReload();
     } catch (error) {
-      this.startView.showLoadNote("캐릭터를 불러오지 못했어요. 새로고침해 주세요.");
+      this.gauge.fail("캐릭터와 경기장을 불러오지 못했어요: " + LoadGauge.describe(error), () => this.loadAssets());
     }
   }
 
@@ -132,4 +135,34 @@ class MiniGamesApp {
     this.phases.update(dt, draw);
     this.flow.tickVersus();
   }
+}
+
+type MiniGamesLoadStep = "library" | "characters" | "games" | "ready";
+
+class MiniGamesLoading {
+  static readonly PHASES: Readonly<Record<MiniGamesLoadStep, LoadGaugePhase>> = {
+    library: { at: 0.06, text: "그래픽 라이브러리 받는 중…" },
+    characters: { at: 0.1, span: 0.45, text: "캐릭터 파일 받는 중…" },
+    games: { at: 0.55, span: 0.37, text: "미니게임 경기장 준비 중…" },
+    ready: { at: 0.96, text: "대기실 꾸미는 중…" },
+  };
+
+  static gauge(): LoadGauge<MiniGamesLoadStep> {
+    return new LoadGauge({ title: "미니게임 모음 준비 중", phases: MiniGamesLoading.PHASES, place: "bottom" });
+  }
+}
+
+class MiniGamesBoot {
+  private readonly three: ThreeBoot<string, MiniGamesApp>;
+
+  constructor(importer: () => Promise<ThreeLibs>) {
+    const gauge = MiniGamesLoading.gauge();
+    this.three = new ThreeBoot(gauge, "library", importer, (libs) => {
+      const app = new MiniGamesApp(libs, gauge);
+      app.start();
+      return app;
+    });
+  }
+
+  get game(): MiniGamesApp | null { return this.three.started; }
 }

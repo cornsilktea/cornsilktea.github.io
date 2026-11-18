@@ -88,10 +88,6 @@
     background: linear-gradient(90deg, rgba(14, 16, 26, .88) 0%, rgba(14, 16, 26, .6) 46%, rgba(14, 16, 26, .08) 80%); }
   @media (max-width: 760px) { #overlay.st-screen { background: rgba(14, 16, 26, .74); } }
   #overlay.st-screen .st-title { font-style: italic; letter-spacing: -.5px; }
-  #cardStart #loadNote { color: #A9AFC2; text-align: center; margin-top: 10px; }
-  #cardStart #loadNote:empty { display: none; }
-  #cardStart #btnLoadRetry { display: block; margin: 8px auto 0; }
-  #cardStart #btnLoadRetry[hidden] { display: none; }
   #cardStart .credits { color: #7F8698; margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, .1); }
   #cardStart .credits a { color: #A9AFC2; }
 
@@ -281,7 +277,6 @@
     .rtab small { max-width: 100px; }
   }
   .credits { font-size: 11px; line-height: 1.55; color: var(--sg-ink-faint); margin-top: 10px; }
-  #loadNote { font-size: 12px; font-weight: 700; color: var(--sg-ink-soft); min-height: 16px; margin-top: 6px; }
   [hidden]{display:none !important;}
 
   .modeBtns { display: flex; flex-direction: column; gap: 12px; margin: 18px 0 8px; }
@@ -430,8 +425,6 @@
       <button type="button" class="st-btn" data-account-open="stats">📊 내 통계 · 최근 20매치</button>
       <div class="hello">내 닉네임: <b id="helloNick"></b> <button type="button" class="mini" data-maker-open data-nick-setting>✏️ 닉네임 설정</button></div>
       <div class="st-msg msg" id="bStartMsg"></div>
-      <div id="loadNote"></div>
-      <button id="btnLoadRetry" type="button" class="mini" hidden>다시 불러오기</button>
     </div>
     <div class="st-card">
       <h2>조작 방법</h2>
@@ -553,6 +546,7 @@
 <div id="rankBox" hidden><div class="hud-box" id="rkTime">0:00.00</div><div id="rkList"></div></div>
 <div id="viewBtns" hidden></div>
 
+<script charset="utf-8" src="common/load-gauge.js?v=20261118b"></script>
 <script charset="utf-8" src="common/character-kit.js?v=20261116b"></script>
 <script charset="utf-8" src="common/character-maker.js?v=20261116a"></script>
 <script charset="utf-8" src="common/room-drop-recovery.js?v=20261106b"></script>
@@ -879,6 +873,25 @@ function canvasTex(w, h, draw, repeat) {
 function rnd(a, b) { return a + Math.random() * (b - a); }
 const HQ_DIR = "img/turbo/hq/";
 const HQ_LOAD = { ready: false, everReady: false, loaded: 0, total: 0, slow: false };
+class TurboLapLoading {
+  static PHASES = {
+    files: { at: 0.04, span: 0.76, text: "서킷 그래픽 받는 중…" },
+    car: { at: 0.84, text: "자동차 모델 받는 중…" },
+    course: { at: 0.92, text: "코스 준비 중…" }
+  };
+  static gauge = new LoadGauge({ title: "서킷 준비 중", phases: TurboLapLoading.PHASES, place: "bottom" });
+  static onMenu() { return $("overlay").style.display !== "none"; }
+  static paint(myModel, warm) {
+    const gauge = TurboLapLoading.gauge;
+    if (!TurboLapLoading.onMenu()) gauge.finish();
+    else if (!HQ_LOAD.ready) gauge.count("files", { done: HQ_LOAD.loaded, total: HQ_LOAD.total });
+    else if (myModel.state === "failed") gauge.fail("자동차 모델을 불러오지 못했어요. 다시 불러오기를 눌러 주세요.", () => LoadRetry.retryAll());
+    else if (!warm) gauge.phase("course");
+    else if (!myModel.tpl) gauge.phase("car");
+    else if (LoadRetry.gaveUp.length) gauge.fail("일부 그래픽 자료를 불러오지 못했어요(" + LoadRetry.names().join(", ") + "). 그대로 탈 수 있고, 다시 불러오기를 눌러 볼 수 있어요.", () => LoadRetry.retryAll());
+    else gauge.finish();
+  }
+}
 const HQ_MANAGER = new THREE.LoadingManager(
   () => { HQ_LOAD.ready = HQ_LOAD.everReady = true; courseWarmup.kick(); renderLoadGate(); realTextures.prefetchRestLater(); },
   (url, loaded, total) => { HQ_LOAD.loaded = loaded; HQ_LOAD.total = total; renderLoadGate(); },
@@ -941,14 +954,7 @@ function renderLoadGate() {
   ["btnModeTA", "btnCreate", "btnRandom", "btnJoin", "btnHongkong", "btnSingapore", "btnSeoul"].forEach(id => { $(id).disabled = !ok; });
   $("btnGo").disabled = !ok || !warm;
   carPicker.mark();
-  const note = $("loadNote");
-  if (!HQ_LOAD.ready) note.textContent = "그래픽 자료 불러오는 중… " + HQ_LOAD.loaded + " / " + (HQ_LOAD.total || "?") + (HQ_LOAD.slow ? " — 인터넷이 느리면 조금 더 기다려 주세요" : "");
-  else if (myModel.state === "failed") note.textContent = "자동차 모델을 불러오지 못했습니다. 아래 다시 불러오기를 눌러 주세요.";
-  else if (!warm) note.textContent = "코스 준비 중…";
-  else if (!myModel.tpl) note.textContent = "자동차 모델 불러오는 중…";
-  else if (LoadRetry.gaveUp.length) note.textContent = "일부 그래픽 자료를 불러오지 못했습니다(" + LoadRetry.names().join(", ") + "). 그대로 탈 수 있고, 다시 불러오기를 눌러 볼 수 있어요.";
-  else note.textContent = "";
-  $("btnLoadRetry").hidden = !HQ_LOAD.ready || !LoadRetry.gaveUp.length;
+  TurboLapLoading.paint(myModel, warm);
 }
 setTimeout(() => { HQ_LOAD.slow = true; renderLoadGate(); }, 15000);
 const HQ_EXPOSURE = 0.95;
@@ -3918,6 +3924,7 @@ function showCard(which) {
   VersusCurtain.main.follow(which);
   cardNow = which;
   overlay.style.display = which ? "block" : "none";
+  renderLoadGate();
   overlay.scrollTop = 0;
   Object.keys(CARDS).forEach(k => { $(CARDS[k]).style.display = which === k ? "" : "none"; });
   MenuCornerButtons.follow(!!which);
@@ -4540,7 +4547,6 @@ window.addEventListener("keydown", e => onKey(e, true));
 window.addEventListener("keyup", e => onKey(e, false));
 window.addEventListener("blur", () => { keys.up = keys.down = keys.left = keys.right = false; });
 $("btnModeTA").onclick = e => { e.currentTarget.blur(); timeAttackSetup.open(); };
-$("btnLoadRetry").onclick = e => { e.currentTarget.blur(); LoadRetry.retryAll(); };
 $("btnCourseBack").onclick = e => { e.currentTarget.blur(); showCard("start"); };
 document.querySelectorAll(".ghostbtn").forEach(b => b.onclick = e => {
   e.currentTarget.blur(); ghostPick = b.getAttribute("data-ghost");

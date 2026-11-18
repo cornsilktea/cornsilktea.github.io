@@ -260,7 +260,7 @@ class BbDuelGame {
   private readonly sound: BbSoundDirector;
   private quality: QualityGovernorHandle | null = null;
 
-  constructor(libs: ThreeLibs, private readonly gauge: BbLoadGauge) {
+  constructor(libs: ThreeLibs, private readonly gauge: LoadGauge<BbLoadStep>) {
     const controls = document.getElementById("bbControls") as HTMLElement, dialogs = document.getElementById("bbDialogs") as HTMLElement;
     this.stage = new BbStage(libs, document.getElementById("bbView") as HTMLCanvasElement);
     this.stage.onContextChange = (lost) => this.gauge.contextLost(lost);
@@ -309,7 +309,7 @@ class BbDuelGame {
     try {
       await this.stage.load(BbDuelGame.ASSET_DIRECTORY, BbBallparkRegistry.MAIN, { batsLeft: false, throwsLeft: false }, this.gauge);
     } catch (error) {
-      this.gauge.fail(BbLoadGauge.describe(error), () => { void this.loadStage(); });
+      this.gauge.fail(LoadGauge.describe(error), () => { void this.loadStage(); });
       return;
     }
     this.gauge.finish();

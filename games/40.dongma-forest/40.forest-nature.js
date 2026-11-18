@@ -6,9 +6,9 @@ class FrNatureModels {
         this.heights = new Map();
         this.materials = new Map();
     }
-    async load() {
+    async load(counter = new LoadCounter()) {
         const loader = new this.libs.GLTFLoader();
-        await Promise.all(FrNatureModels.FILES.map((name) => loader.loadAsync(FrNatureModels.FOLDER + name + ".gltf").then((gltf) => this.store(name, gltf.scene)).catch(() => undefined)));
+        await Promise.all(FrNatureModels.FILES.map((name) => counter.track(loader.loadAsync(FrNatureModels.FOLDER + name + ".gltf"), name).then((gltf) => this.store(name, gltf.scene)).catch(() => undefined)));
     }
     has(name) { return this.parts.has(name); }
     partsOf(name) { return this.parts.get(name) || []; }

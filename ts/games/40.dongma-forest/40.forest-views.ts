@@ -4,8 +4,8 @@ class FrToolClips {
   static readonly FILE = "assets/kaykit/animations/rig_medium_tools.glb";
   readonly clips = new Map<string, Three<"AnimationClip">>();
   constructor(private readonly libs: ThreeLibs) {}
-  async load(): Promise<void> {
-    const gltf = await new this.libs.GLTFLoader().loadAsync(FrToolClips.FILE);
+  async load(counter = new LoadCounter()): Promise<void> {
+    const gltf = await counter.track(new this.libs.GLTFLoader().loadAsync(FrToolClips.FILE), "rig_medium_tools");
     gltf.animations.forEach((clip) => this.clips.set(clip.name, clip));
   }
 }

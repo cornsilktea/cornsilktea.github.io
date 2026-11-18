@@ -26,12 +26,11 @@
   "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
 } }
 </script>
-<link rel="stylesheet" href="games/30.team-battle/30.team-battle-arena.css?v=20261106c">
+<link rel="stylesheet" href="games/30.team-battle/30.team-battle-arena.css?v=20261118a">
 </head>
 <body>
 <canvas id="cv"></canvas>
 <canvas id="ov"></canvas>
-<div id="kitNote" hidden><span id="kitNoteText"></span><button id="btnKitRetry" class="mini" type="button" hidden>다시 불러오기</button></div>
 <div id="glLostNote" hidden>화면을 다시 그리지 못했어요. 새로고침하면 같은 캐릭터로 이어서 할 수 있어요.</div>
 <div id="tourFade" hidden></div>
 <div id="versusCurtain" class="tbv-curtain" hidden>
@@ -317,6 +316,7 @@
   </div>
 </div>
 
+<script charset="utf-8" src="common/load-gauge.js?v=20261118b"></script>
 <script charset="utf-8" src="common/character-kit.js?v=20261116b"></script>
 <script charset="utf-8" src="common/character-maker.js?v=20261116a"></script>
 <script>new CharacterMakerDialog(undefined, false);</script>
@@ -13025,29 +13025,23 @@ SinglePassMaterials.enable(THREE);
     }
   }
   class KitLoadNote {
-    static SLOW_MS = 15000;
-    constructor(services) { this.services = services; this.files = null; this.slowTimer = 0; }
-    bind() { var services = this.services;
-      Dom.$("btnKitRetry").onclick = function () { services.models.loadKit(); };
-    }
+    static PHASES = { files: { at: 0.04, span: 0.92, text: "캐릭터·무기·아레나 장식 받는 중…" } };
+    constructor(services) { this.services = services; this.files = null; this.slowTimer = 0; this.gauge = null; }
+    bind() { if (!this.gauge && !Environment.SILENT_RUN) this.gauge = new LoadGauge({ title: "아레나 준비 중", phases: KitLoadNote.PHASES, place: "bottom" }); }
     track(files) { var note = this;
       this.files = files;
-      clearTimeout(this.slowTimer); this.slowTimer = setTimeout(function () { note.render(); }, KitLoadNote.SLOW_MS + 50);
+      clearTimeout(this.slowTimer); this.slowTimer = setTimeout(function () { note.render(); }, LoadGauge.SLOW_MS + 50);
       this.render();
     }
     busy() { return !!this.files && this.files.pending() > 0; }
     allReady() { var kit = this.services.models.kit; return kit.ready && kit.propsReady; }
-    message() { var files = this.files, kit = this.services.models.kit;
-      if (files.pending() > 0) return "그래픽 자료 불러오는 중… " + files.done + " / " + files.total + (performance.now() - files.startedAt > KitLoadNote.SLOW_MS ? " — 인터넷이 느리면 조금 더 기다려 주세요" : "");
-      if (!kit.ready) return "캐릭터 그림을 불러오지 못해 단순한 모양으로 보여요. 경기는 그대로 할 수 있어요.";
-      return "맵 장식을 불러오지 못해 단순한 바닥으로 보여요. 경기는 그대로 할 수 있어요.";
-    }
+    failText() { return this.services.models.kit.ready ? "맵 장식을 불러오지 못해 단순한 바닥으로 보여요. 경기는 그대로 할 수 있어요." : "캐릭터 그림을 불러오지 못해 단순한 모양으로 보여요. 경기는 그대로 할 수 있어요."; }
     render() { var services = this.services;
-      var on = !!this.files && !Environment.SILENT_RUN && !this.allReady() && services.screens.now !== "game";
-      Dom.show(Dom.$("kitNote"), on);
-      if (!on) return;
-      Dom.setText(Dom.$("kitNoteText"), this.message());
-      Dom.show(Dom.$("btnKitRetry"), !this.busy());
+      if (!this.gauge) return;
+      var on = !!this.files && !this.allReady() && services.screens.now !== "game";
+      if (!on) { this.gauge.finish(); return; }
+      if (this.busy() || (!this.files.failed.length && !services.models.kit.failed)) this.gauge.count("files", this.files);
+      else this.gauge.fail(this.failText(), function () { services.models.loadKit(); });
     }
   }
   class ShaderWarmup {

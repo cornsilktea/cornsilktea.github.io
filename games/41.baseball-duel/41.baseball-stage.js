@@ -62,8 +62,8 @@ BbSparkBurst.COUNT = 48;
 BbSparkBurst.SECONDS = 0.7;
 BbSparkBurst.GRAVITY = 7;
 class BbQuietLoadReport {
-    files() { return; }
-    step() { return Promise.resolve(); }
+    count() { return; }
+    phase() { return Promise.resolve(); }
 }
 class BbStage {
     constructor(libs, canvas) {
@@ -109,12 +109,12 @@ class BbStage {
     }
     async load(assetDirectory, park, cast, report = new BbQuietLoadReport()) {
         const assets = this.assets || (this.assets = new CharacterAssets(this.libs, assetDirectory));
-        assets.onProgress = (progress) => report.files(progress);
+        assets.onProgress = (progress) => report.count("files", progress);
         await assets.load();
         if (this.built)
             return;
         this.built = true;
-        await report.step("park");
+        await report.phase("park");
         const touch = BbStage.TOUCH_DEVICE, factory = new CharacterModelFactory(this.libs, assets, touch ? BbStage.TOUCH_CHARACTER_TEXTURE : undefined);
         const gear = new BbGearFactory(this.libs), builder = new BbBallparkBuilder(this.libs, park, touch ? BbStage.TOUCH_GROUND_SCALE : 1);
         this.scene.add(builder.build());
@@ -124,7 +124,7 @@ class BbStage {
         this.wardrobe = new BbWardrobe(this.libs, factory, assets, gear);
         this.studio = new BbPortraitStudio(this.libs, this.wardrobe, this.renderer);
         this.tailor = { factory, assets };
-        await report.step("players");
+        await report.phase("players");
         this.createActors(0, cast);
         this.createActors(1, cast);
         this.field(1);

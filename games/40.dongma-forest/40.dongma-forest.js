@@ -66,8 +66,9 @@ class FrStatusSummary {
     }
 }
 class FrGame {
-    constructor(libs) {
+    constructor(libs, gauge) {
         this.libs = libs;
+        this.gauge = gauge;
         this.touch = "ontouchstart" in window || navigator.maxTouchPoints > 0;
         this.random = new FrRandom(Date.now() >>> 0);
         this.mini = new FrMiniGameView();
@@ -154,9 +155,14 @@ class FrGame {
             release: () => this.release(),
             key: (code) => this.key(code),
         });
-        this.boot().catch((error) => { FrDom.el("loading").textContent = "불러오기 실패: " + error; });
+        this.boot().catch((error) => this.gauge.fail("불러오지 못했어요: " + LoadGauge.describe(error)));
+    }
+    showFiles(others) {
+        const characters = this.assets.progress;
+        this.gauge.count("files", { done: characters.done + others.done, total: characters.total + others.total });
     }
     async boot() {
+        await this.gauge.phase("island");
         this.terrainFile = (await (await fetch("assets/forest/island-terrain.json?v=1")).json());
         this.mineData = (await (await fetch("assets/forest/mine-cave.json?v=1")).json());
         for (const kind of ["moss", "crystal", "lava"])
@@ -164,7 +170,10 @@ class FrGame {
         this.assets = new CharacterAssets(this.libs);
         const tools = new FrToolClips(this.libs);
         this.nature = new FrNatureModels(this.libs);
-        await Promise.all([this.assets.load(), tools.load(), this.nature.load()]);
+        const others = new LoadCounter(() => this.showFiles(others));
+        this.assets.onProgress = () => this.showFiles(others);
+        await Promise.all([this.assets.load(), tools.load(others), this.nature.load(others)]);
+        await this.gauge.phase("world");
         this.assets.clips.forEach((clip, name) => this.clips.set(name, clip));
         tools.clips.forEach((clip, name) => this.clips.set(name, clip));
         this.factory = new CharacterModelFactory(this.libs, this.assets);
@@ -184,9 +193,10 @@ class FrGame {
         this.backdrop = new FrMenuBackdrop(this.libs, this.view, this.factory, this.clips, preview.terrain.anchors.campfire);
         this.backdrop.start();
         this.view.applyClock(FrBalance.DAWN_MINUTE + 240);
+        await this.gauge.phase("account");
         const user = await FrIdentity.ready(location.search);
         if (!user && FrIdentity.required(location.search)) {
-            FrDom.el("loading").hidden = true;
+            this.gauge.finish();
             this.start.show();
             this.start.enter(false, "로그인이 필요해요. 새로 고침해 주세요.");
             return;
@@ -203,7 +213,7 @@ class FrGame {
         this.join = new FrIslandJoin(this.backend, this.uid, location.search);
         this.start.onCode = (code) => void this.submitCode(code);
         this.start.onEnter = () => this.enterGame();
-        FrDom.el("loading").hidden = true;
+        this.gauge.finish();
         this.start.show();
         this.start.enter(false, "섬을 찾는 중…");
         requestAnimationFrame((t) => this.loop(t));
@@ -1447,3 +1457,22 @@ class FrGame {
 }
 FrGame.CODE_PATTERN_HINT = "섬 코드를 입력해 주세요.";
 FrGame.SLEEP_DIM = 0.84;
+class FrLoading {
+    static gauge() {
+        return new LoadGauge({ title: "동마의 숲 준비 중", phases: FrLoading.PHASES });
+    }
+}
+FrLoading.PHASES = {
+    library: { at: 0.05, text: "그래픽 라이브러리 받는 중…" },
+    island: { at: 0.08, text: "섬 지도 받는 중…" },
+    files: { at: 0.12, span: 0.73, text: "캐릭터·나무·가구 받는 중…" },
+    world: { at: 0.88, text: "숲과 마을 꾸미는 중…" },
+    account: { at: 0.96, text: "계정 확인하는 중…" },
+};
+class FrBoot {
+    constructor(importer) {
+        const gauge = FrLoading.gauge();
+        this.three = new ThreeBoot(gauge, "library", importer, (libs) => new FrGame(libs, gauge));
+    }
+    get game() { return this.three.started; }
+}

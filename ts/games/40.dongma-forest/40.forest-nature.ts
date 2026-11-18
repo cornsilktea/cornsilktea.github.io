@@ -14,9 +14,9 @@ class FrNatureModels {
 
   constructor(private readonly libs: ThreeLibs) {}
 
-  async load(): Promise<void> {
+  async load(counter = new LoadCounter()): Promise<void> {
     const loader = new this.libs.GLTFLoader();
-    await Promise.all(FrNatureModels.FILES.map((name) => loader.loadAsync(FrNatureModels.FOLDER + name + ".gltf").then((gltf) => this.store(name, gltf.scene)).catch(() => undefined)));
+    await Promise.all(FrNatureModels.FILES.map((name) => counter.track(loader.loadAsync(FrNatureModels.FOLDER + name + ".gltf"), name).then((gltf) => this.store(name, gltf.scene)).catch(() => undefined)));
   }
 
   has(name: string): boolean { return this.parts.has(name); }

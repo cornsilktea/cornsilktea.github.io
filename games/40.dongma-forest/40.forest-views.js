@@ -4,8 +4,8 @@ class FrToolClips {
         this.libs = libs;
         this.clips = new Map();
     }
-    async load() {
-        const gltf = await new this.libs.GLTFLoader().loadAsync(FrToolClips.FILE);
+    async load(counter = new LoadCounter()) {
+        const gltf = await counter.track(new this.libs.GLTFLoader().loadAsync(FrToolClips.FILE), "rig_medium_tools");
         gltf.animations.forEach((clip) => this.clips.set(clip.name, clip));
     }
 }

@@ -38,8 +38,8 @@ class GameCatalog {
             return null;
         return this.definitions[Math.min(this.definitions.length - 1, Math.floor(random.next() * this.definitions.length))];
     }
-    preloadAll() {
-        return Promise.all(this.definitions.map((definition) => definition.preload())).then(() => undefined);
+    preloadAll(counter = new LoadCounter()) {
+        return Promise.all(this.definitions.map((definition) => counter.track(definition.preload(), definition.title))).then(() => undefined);
     }
 }
 class CollectionRules {

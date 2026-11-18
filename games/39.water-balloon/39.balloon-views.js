@@ -67,10 +67,10 @@ class WbModelLibrary {
         }
         return Array.from(names);
     }
-    async load(characterClips) {
+    async load(characterClips, counter = new LoadCounter()) {
         characterClips.forEach((clip, name) => this.clips.set(name, clip));
         const THREE = this.libs.THREE, loader = new this.libs.GLTFLoader();
-        const models = WbModelLibrary.modelNames().map((name) => loader.loadAsync(WbModelLibrary.DIRECTORY + name + ".gltf").then((gltf) => {
+        const models = WbModelLibrary.modelNames().map((name) => counter.track(loader.loadAsync(WbModelLibrary.DIRECTORY + name + ".gltf"), name).then((gltf) => {
             gltf.scene.traverse((node) => {
                 const mesh = node;
                 if (!mesh.isMesh || Array.isArray(mesh.material))
@@ -81,7 +81,7 @@ class WbModelLibrary {
             this.templates.set(name, gltf.scene);
             this.bounds.set(name, new THREE.Box3().setFromObject(gltf.scene));
         }));
-        const clips = loader.loadAsync(WbModelLibrary.ANIMATION_FILE).then((gltf) => gltf.animations.forEach((clip) => this.clips.set(clip.name, clip)));
+        const clips = counter.track(loader.loadAsync(WbModelLibrary.ANIMATION_FILE), "animations").then((gltf) => gltf.animations.forEach((clip) => this.clips.set(clip.name, clip)));
         await Promise.all([...models, clips]);
     }
     part(spec) {

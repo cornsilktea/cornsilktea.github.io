@@ -5,6 +5,7 @@ const fs = require("fs"), path = require("path");
 const root = path.join(__dirname, "..");
 let html = fs.readFileSync(path.join(root, "42.tower-climb.html"), "utf8");
 html = html.replace(/<script[^>]*common\/firebase-config\.js[^>]*><\/script>\r?\n/, "").replace(/<script[^>]*common\/access-guard\.js[^>]*><\/script>\r?\n/, "");
-html = html.replace("<head>", '<head>\n<base href="/">').replace("new TowerClimbGame(", "window.__game = new TowerClimbGame(");
+html = html.replace("<head>", '<head>\n<base href="/">').replace("new ClimbBoot(", "window.__boot = new ClimbBoot(")
+  .replace("</head>", '<script>Object.defineProperty(window, "__game", { get: function () { return window.__boot ? window.__boot.game : null; } });</script>\n</head>');
 fs.writeFileSync(path.join(root, ".claude", "climb-test.html"), html, "utf8");
 console.log("만듦: .claude/climb-test.html");

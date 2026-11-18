@@ -70,7 +70,8 @@ class ForestTestPages {
   }
 
   build() {
-    const fixed = this.withoutGuard().replace("new FrGame(", "window.__game = new FrGame(");
+    const fixed = this.withoutGuard().replace("new FrBoot(", "window.__boot = new FrBoot(")
+      .replace("</head>", '<script>Object.defineProperty(window, "__game", { get: function () { return window.__boot ? window.__boot.game : null; } });</script>\n</head>');
     this.write("forest-test.html", fixed.replace("<head>", '<head><base href="../">'));
     this.write("forest-live.html", fixed.replace("<head>", '<head><base href="../">' + this.liveScript()));
     this.write("forest-rest.html", fixed.replace("<head>", '<head><base href="../">' + this.restMockScript()));

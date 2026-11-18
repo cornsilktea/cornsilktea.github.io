@@ -174,8 +174,8 @@ class GameCatalog {
     return this.definitions[Math.min(this.definitions.length - 1, Math.floor(random.next() * this.definitions.length))];
   }
 
-  preloadAll(): Promise<void> {
-    return Promise.all(this.definitions.map((definition) => definition.preload())).then(() => undefined);
+  preloadAll(counter = new LoadCounter()): Promise<void> {
+    return Promise.all(this.definitions.map((definition) => counter.track(definition.preload(), definition.title))).then(() => undefined);
   }
 }
 

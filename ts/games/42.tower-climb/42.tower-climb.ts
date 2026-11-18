@@ -26,7 +26,7 @@ class TowerClimbGame {
   private portalHint = "";
   private shownStage = -1;
 
-  constructor(private readonly libs: ThreeLibs, private readonly gauge: ClimbLoadGauge) {
+  constructor(private readonly libs: ThreeLibs, private readonly gauge: LoadGauge<ClimbLoadStep>) {
     this.handlers = {
       jump: () => this.sfx.play("jump"),
       land: (e) => { if (e.drop > 1.2) this.sfx.play("land"); },
@@ -39,17 +39,17 @@ class TowerClimbGame {
       portalEnter: () => this.sfx.play("portal"),
       portalArrive: (e) => { this.view.avatar.playOnce("Spawn_Air", 0.7); this.hud.banner("스테이지 " + e.stage + " 시작점", false, 2); },
     };
-    this.boot().catch((error) => this.gauge.fail("불러오지 못했어요: " + ClimbLoadGauge.describe(error)));
+    this.boot().catch((error) => this.gauge.fail("불러오지 못했어요: " + LoadGauge.describe(error)));
   }
 
   private async boot(): Promise<void> {
     const assets = new CharacterAssets(this.libs);
-    assets.onProgress = (progress) => this.gauge.characters(progress);
+    assets.onProgress = (progress) => this.gauge.count("characters", progress);
     await assets.load();
     const library = new ClimbModelLibrary(this.libs);
-    library.onProgress = (progress) => this.gauge.models(progress);
+    library.onProgress = (progress) => this.gauge.count("models", progress);
     await library.load(assets.clips);
-    await this.gauge.step("tower");
+    await this.gauge.phase("tower");
     const factory = new CharacterModelFactory(this.libs, assets);
     this.level = new TowerLevel(TowerLevelData.spec());
     this.startPanel = new ClimbStartPanel();
@@ -58,7 +58,7 @@ class TowerClimbGame {
     this.rules = new ClimbRules(this.level, this.progress);
     const touchDevice = "ontouchstart" in window || navigator.maxTouchPoints > 0;
     this.view = new ClimbWorldView(this.libs, ClimbDom.el<HTMLCanvasElement>("view"), library, factory, this.level, touchDevice, () => this.state === "play");
-    await this.gauge.step("ready");
+    await this.gauge.phase("ready");
     const profile = new PlayerProfile();
     this.view.avatar.wear(profile.look);
     profile.onChange(() => this.view.avatar.wear(profile.look));

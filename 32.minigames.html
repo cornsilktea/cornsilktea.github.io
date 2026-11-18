@@ -254,7 +254,6 @@
       </div>
       <button type="button" class="st-btn" data-account-open="stats">📊 내 통계 · 최근 20매치</button>
       <div class="st-msg" id="startMsg"></div>
-      <div class="st-hint" id="loadNote">캐릭터를 불러오는 중…</div>
     </div>
     <div class="st-card st-fold">
       <h2>캐릭터 만들기</h2>
@@ -341,6 +340,7 @@
   </div>
 </div>
 
+<script charset="utf-8" src="common/load-gauge.js?v=20261118b"></script>
 <script charset="utf-8" src="common/character-kit.js?v=20261116b"></script>
 <script charset="utf-8" src="common/fold-card.js"></script>
 <script charset="utf-8" src="games/32.minigames/last-tile/10-foundation.js"></script>
@@ -361,11 +361,11 @@
 <script charset="utf-8" src="games/32.minigames/last-tile/95-world-view.js"></script>
 <script charset="utf-8" src="games/32.minigames/last-tile/98-scores.js"></script>
 <script charset="utf-8" src="games/32.minigames/last-tile/100-hud-views.js"></script>
-<script charset="utf-8" src="games/32.minigames/last-tile/105-screen-views.js"></script>
+<script charset="utf-8" src="games/32.minigames/last-tile/105-screen-views.js?v=20261118a"></script>
 <script charset="utf-8" src="games/32.minigames/last-tile/110-network.js"></script>
 <script charset="utf-8" src="games/32.minigames/last-tile/125-match-runtime.js"></script>
 <script charset="utf-8" src="games/32.minigames/last-tile/130-phases.js"></script>
-<script charset="utf-8" src="games/32.minigames/10-contracts.js"></script>
+<script charset="utf-8" src="games/32.minigames/10-contracts.js?v=20261118a"></script>
 <script charset="utf-8" src="games/32.minigames/20-render-host.js"></script>
 <script charset="utf-8" src="games/32.minigames/30-input.js"></script>
 <script charset="utf-8" src="common/room-drop-recovery.js?v=20261106b"></script>
@@ -398,12 +398,12 @@
 <script charset="utf-8" src="games/32.minigames/78-mole-game.js"></script>
 <script charset="utf-8" src="games/32.minigames/60-views.js?v=20261021"></script>
 <script charset="utf-8" src="games/32.minigames/70-flow.js?v=20261106b"></script>
-<script charset="utf-8" src="games/32.minigames/80-app.js?v=20261106b"></script>
+<script charset="utf-8" src="games/32.minigames/80-app.js?v=20261118a"></script>
 <script type="module">
-import * as THREE from "three";
-import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
-import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
-new MiniGamesApp({ THREE, GLTFLoader, SkeletonUtils }).start();
+new MiniGamesBoot(async () => {
+  const [THREE, loaders, SkeletonUtils] = await Promise.all([import("three"), import("three/addons/loaders/GLTFLoader.js"), import("three/addons/utils/SkeletonUtils.js")]);
+  return { THREE, GLTFLoader: loaders.GLTFLoader, SkeletonUtils };
+});
 </script>
 </body>
 </html>

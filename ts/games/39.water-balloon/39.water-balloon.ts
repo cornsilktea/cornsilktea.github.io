@@ -641,15 +641,17 @@ class WbGame {
   private randomMode: WbMode = "team";
   private readonly randoms = new Map<WbMode, MkRandomFlow>();
 
-  constructor(private readonly libs: ThreeLibs) {
-    this.start().catch((error) => { WbDom.text(WbDom.el("loading"), "불러오기 실패: " + error); });
+  constructor(private readonly libs: ThreeLibs, private readonly gauge: LoadGauge<WbLoadStep>) {
+    this.start().catch((error) => this.gauge.fail("불러오지 못했어요: " + LoadGauge.describe(error)));
   }
 
   private async start(): Promise<void> {
     const assets = new CharacterAssets(this.libs);
+    assets.onProgress = (progress) => this.gauge.count("characters", progress);
     await assets.load();
     const library = new WbModelLibrary(this.libs);
-    await library.load(assets.clips);
+    await library.load(assets.clips, new LoadCounter((counter) => this.gauge.count("models", counter)));
+    await this.gauge.phase("arena");
     const factory = new CharacterModelFactory(this.libs, assets);
     this.world = new WbWorldView(this.libs, WbDom.el<HTMLCanvasElement>("view"), this.touch, library, factory);
     this.backdrop = new WbMenuBackdrop(this.world);
@@ -667,7 +669,7 @@ class WbGame {
     new WbKeyboard({ dir: (dir, down) => this.direction(dir, down), action: () => this.action(), other: (code) => this.otherKey(code) });
     this.bindMenus();
     document.body.classList.toggle("touch", this.touch);
-    WbDom.show(WbDom.el("loading"), false);
+    this.gauge.finish();
     window.addEventListener("pagehide", () => { if (this.session) this.session.removeMineOnUnload(); });
     this.fillSoloForm();
     if (this.options.autoSolo) this.startSolo();
@@ -1234,4 +1236,30 @@ class WbRandomSetup {
       mount: WbDom.el(solo ? "partyMountSolo" : "partyMountTeam")
     });
   }
+}
+
+type WbLoadStep = "library" | "characters" | "models" | "arena";
+
+class WbLoading {
+  static readonly PHASES: Readonly<Record<WbLoadStep, LoadGaugePhase>> = {
+    library: { at: 0.06, text: "그래픽 라이브러리 받는 중…" },
+    characters: { at: 0.1, span: 0.35, text: "캐릭터 파일 받는 중…" },
+    models: { at: 0.45, span: 0.4, text: "물풍선 놀이터 블록 받는 중…" },
+    arena: { at: 0.9, text: "물풍선 놀이터 만드는 중…" },
+  };
+
+  static gauge(): LoadGauge<WbLoadStep> {
+    return new LoadGauge({ title: "물풍선 놀이터 준비 중", phases: WbLoading.PHASES });
+  }
+}
+
+class WbBoot {
+  private readonly three: ThreeBoot<string, WbGame>;
+
+  constructor(importer: () => Promise<ThreeLibs>) {
+    const gauge = WbLoading.gauge();
+    this.three = new ThreeBoot(gauge, "library", importer, (libs) => new WbGame(libs, gauge));
+  }
+
+  get game(): WbGame | null { return this.three.started; }
 }

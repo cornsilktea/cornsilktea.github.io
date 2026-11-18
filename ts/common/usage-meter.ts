@@ -76,8 +76,11 @@ class UsageFetchTap {
     return this.nativeFetch(input, init).then((response) => this.counted(response));
   }
 
+  // 204·304 처럼 본문이 없어야 하는 응답은 new Response 가 받지 않아 오류가 나므로(40번 로그인 확인 단계, 2026-11-18) 세지 않고 그대로 돌려준다.
+  private static readonly BODYLESS_STATUSES: readonly number[] = [101, 103, 204, 205, 304];
+
   private counted(response: Response): Response {
-    if (!response.body) return response;
+    if (!response.body || UsageFetchTap.BODYLESS_STATUSES.indexOf(response.status) >= 0) return response;
     const tally = this.tally;
     const counter = new TransformStream<Uint8Array, Uint8Array>({
       transform(chunk, controller) {

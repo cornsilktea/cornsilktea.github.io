@@ -69,17 +69,17 @@ class SnModelLibrary {
 
   constructor(private readonly libs: ThreeLibs) {}
 
-  async load(characterClips: Map<string, Three<"AnimationClip">>): Promise<void> {
+  async load(characterClips: Map<string, Three<"AnimationClip">>, counter = new LoadCounter()): Promise<void> {
     characterClips.forEach((clip, name) => this.clips.set(name, clip));
     const loader = new this.libs.GLTFLoader();
     const models = (Object.keys(SnModelLibrary.FILES) as SnModelKey[]).map((key) =>
-      loader.loadAsync(SnModelLibrary.DIRECTORY + SnModelLibrary.FILES[key]).then((gltf) => {
+      counter.track(loader.loadAsync(SnModelLibrary.DIRECTORY + SnModelLibrary.FILES[key]), key).then((gltf) => {
         this.prepare(key, gltf.scene);
         this.templates.set(key, gltf.scene);
         this.bounds.set(key, new this.libs.THREE.Box3().setFromObject(gltf.scene));
       })
     );
-    const clips = loader.loadAsync(SnModelLibrary.ANIMATION_FILE).then((gltf) => gltf.animations.forEach((clip) => this.clips.set(clip.name, clip)));
+    const clips = counter.track(loader.loadAsync(SnModelLibrary.ANIMATION_FILE), "snow_anims").then((gltf) => gltf.animations.forEach((clip) => this.clips.set(clip.name, clip)));
     await Promise.all([...models, clips]);
   }
 

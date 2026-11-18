@@ -31,15 +31,6 @@
   [hidden] { display: none !important; }
   html, body { width: 100%; height: 100%; overflow: hidden; background: #0E223A; font-family: var(--sg-font); color: #fff; -webkit-user-select: none; user-select: none; }
   #view { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
-  .climb-load { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 5000; width: min(420px, calc(100vw - 32px)); padding: 12px 14px; border-radius: 14px; background: rgba(16, 24, 38, .92); border: 1px solid rgba(255,255,255,.14); box-shadow: 0 10px 30px rgba(0,0,0,.45); color: #fff; font-family: var(--sg-font); }
-  .climb-load-title { font-size: 15px; font-weight: 800; border-left: 4px solid #D97B4F; padding-left: 8px; }
-  .climb-load-text { margin-top: 6px; font-size: 13px; font-weight: 700; line-height: 1.4; }
-  .climb-load-bar { margin-top: 8px; height: 8px; border-radius: 5px; background: rgba(255,255,255,.14); overflow: hidden; }
-  .climb-load-fill { height: 100%; background: #D97B4F; transform: scaleX(0); transform-origin: left center; transition: transform .25s; }
-  .climb-load-detail { margin-top: 6px; font-size: 11px; color: rgba(255,255,255,.62); word-break: break-all; }
-  .climb-load-detail:empty { display: none; }
-  .climb-load.failed .climb-load-fill { background: #e2513f; }
-  .climb-load-retry { margin-top: 10px; width: 100%; padding: 9px 0; border: 0; border-radius: 10px; background: #D97B4F; color: #fff; font: 800 14px var(--sg-font); cursor: pointer; }
   #touchZone { position: fixed; inset: 0; z-index: 2; touch-action: none; }
   .hud-box { background: rgba(16, 24, 38, .74); border-left: 3px solid #D97B4F; border-radius: 6px; padding: 8px 12px; }
   #hudTop { position: fixed; top: 8px; left: 50%; transform: translateX(-50%); z-index: 5; pointer-events: none; text-align: center; min-width: 220px; }
@@ -149,6 +140,7 @@
     </div>
   </div>
 </div>
+<script charset="utf-8" src="common/load-gauge.js?v=20261118b"></script>
 <script charset="utf-8" src="common/character-kit.js?v=20261116b"></script>
 <script charset="utf-8" src="common/fold-card.js"></script>
 <script charset="utf-8" src="games/42.tower-climb/42.climb-rules.js?v=20261117m"></script>
@@ -156,8 +148,8 @@
 <script charset="utf-8" src="games/42.tower-climb/42.climb-scene.js?v=20261118a"></script>
 <script charset="utf-8" src="games/42.tower-climb/42.climb-input.js?v=20261117e"></script>
 <script charset="utf-8" src="games/42.tower-climb/42.climb-hud.js?v=20261117j"></script>
-<script charset="utf-8" src="games/42.tower-climb/42.tower-climb.js?v=20261118a"></script>
-<script charset="utf-8" src="games/42.tower-climb/42.climb-boot.js?v=20261118a"></script>
+<script charset="utf-8" src="games/42.tower-climb/42.tower-climb.js?v=20261118b"></script>
+<script charset="utf-8" src="games/42.tower-climb/42.climb-boot.js?v=20261118b"></script>
 <script type="module">
 new ClimbBoot(async () => {
   const [THREE, loaders, SkeletonUtils] = await Promise.all([import("three"), import("three/addons/loaders/GLTFLoader.js"), import("three/addons/utils/SkeletonUtils.js")]);

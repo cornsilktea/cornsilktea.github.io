@@ -31,15 +31,15 @@ class SnModelLibrary {
         this.bounds = new Map();
         this.snowyMaps = new Map();
     }
-    async load(characterClips) {
+    async load(characterClips, counter = new LoadCounter()) {
         characterClips.forEach((clip, name) => this.clips.set(name, clip));
         const loader = new this.libs.GLTFLoader();
-        const models = Object.keys(SnModelLibrary.FILES).map((key) => loader.loadAsync(SnModelLibrary.DIRECTORY + SnModelLibrary.FILES[key]).then((gltf) => {
+        const models = Object.keys(SnModelLibrary.FILES).map((key) => counter.track(loader.loadAsync(SnModelLibrary.DIRECTORY + SnModelLibrary.FILES[key]), key).then((gltf) => {
             this.prepare(key, gltf.scene);
             this.templates.set(key, gltf.scene);
             this.bounds.set(key, new this.libs.THREE.Box3().setFromObject(gltf.scene));
         }));
-        const clips = loader.loadAsync(SnModelLibrary.ANIMATION_FILE).then((gltf) => gltf.animations.forEach((clip) => this.clips.set(clip.name, clip)));
+        const clips = counter.track(loader.loadAsync(SnModelLibrary.ANIMATION_FILE), "snow_anims").then((gltf) => gltf.animations.forEach((clip) => this.clips.set(clip.name, clip)));
         await Promise.all([...models, clips]);
     }
     size(key) {

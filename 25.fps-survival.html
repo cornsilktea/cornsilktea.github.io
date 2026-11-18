@@ -467,6 +467,7 @@
 <button type="button" id="btnGameLeave" hidden>나가기</button>
 
 <script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }</script>
+<script charset="utf-8" src="common/load-gauge.js?v=20261118b"></script>
 <script charset="utf-8" src="common/character-kit.js?v=20261116b"></script>
 <script charset="utf-8" src="common/character-maker.js?v=20261116a"></script>
 <script charset="utf-8" src="common/room-drop-recovery.js?v=20261106b"></script>
@@ -1105,10 +1106,29 @@ const PISTOL = { kind: "pistol", g: pistolGun, view: VIEW_PISTOL, base: [0.14, -
   head: () => PLAYER_CONFIG.headDamage * PLAYER_CONFIG.pistolDamageRatio, body: () => PLAYER_CONFIG.bodyDamage * PLAYER_CONFIG.pistolDamageRatio, limb: () => PLAYER_CONFIG.limbDamage * PLAYER_CONFIG.pistolDamageRatio };
 const WEAPONS = { rifle: RIFLE, pistol: PISTOL };
 
+class SurvivalLoading {
+  static PHASES = { files: { at: 0.05, span: 0.9, text: "병사·총·탄약 모델 받는 중…" } };
+  static gauge = new LoadGauge({ title: "전장 준비 중", phases: SurvivalLoading.PHASES, place: "bottom" });
+  static counter = new LoadCounter(() => SurvivalLoading.paint());
+  static menuWatch = SurvivalLoading.watchMenu();
+  static watchMenu() {
+    const watch = new MutationObserver(() => SurvivalLoading.paint());
+    watch.observe($("overlay"), { attributes: true, attributeFilter: ["style"] });
+    return watch;
+  }
+  static track(work, name) { return SurvivalLoading.counter.track(work, name); }
+  static paint() {
+    const counter = SurvivalLoading.counter, gauge = SurvivalLoading.gauge;
+    if ($("overlay").style.display === "none") gauge.finish();
+    else if (counter.pending > 0) gauge.count("files", counter);
+    else if (counter.failed.length) gauge.fail("일부 모델(" + counter.failed.join(", ") + ")을 불러오지 못해 단순한 모양으로 보일 수 있어요. 다시 불러오기를 누르면 새로 고쳐요.");
+    else gauge.finish();
+  }
+}
 const MODEL_DIR = "img/fps/models/";
 const gltfLoader = THREE.GLTFLoader ? new THREE.GLTFLoader() : null;
 function loadModel(file) {
-  return new Promise((ok, fail) => { if (!gltfLoader) return fail(new Error("no GLTFLoader")); gltfLoader.load(MODEL_DIR + file, ok, undefined, fail); });
+  return SurvivalLoading.track(new Promise((ok, fail) => { if (!gltfLoader) return fail(new Error("no GLTFLoader")); gltfLoader.load(MODEL_DIR + file, ok, undefined, fail); }), file.split("?")[0]);
 }
 const reflectionEnv = (() => {
   const envScene = new THREE.Scene();

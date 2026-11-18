@@ -13,14 +13,12 @@ class StartView {
   private readonly joinButton: HTMLButtonElement;
   private readonly codeInput: HTMLInputElement;
   private readonly message: HTMLElement;
-  private readonly loadNote: HTMLElement;
 
   constructor(private readonly page: Page) {
     this.createButton = page.byId<HTMLButtonElement>("btnCreate");
     this.joinButton = page.byId<HTMLButtonElement>("btnJoin");
     this.codeInput = page.byId<HTMLInputElement>("joinCode");
     this.message = page.byId("startMsg");
-    this.loadNote = page.byId("loadNote");
   }
 
   onCreate(handler: () => void): void { this.createButton.onclick = handler; }
@@ -36,10 +34,6 @@ class StartView {
 
   showMessage(text: string): void {
     this.page.setText(this.message, text);
-  }
-
-  showLoadNote(text: string): void {
-    this.page.setText(this.loadNote, text);
   }
 
   setCreateEnabled(enabled: boolean): void { this.createButton.disabled = !enabled; }

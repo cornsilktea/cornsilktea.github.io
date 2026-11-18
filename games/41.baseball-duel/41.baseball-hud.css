@@ -428,14 +428,3 @@ body.menu #hudTop,body.menu #bbControls{display:none}
   .bb-toast-call{font-size:clamp(28px,4.4vw,44px)}
   .bb-pause,.bb-timeout{font-size:17px;padding:10px 18px}
 }
-.bb-load{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:5000;width:min(420px,calc(100vw - 32px));padding:12px 14px;border-radius:14px;background:rgba(14,20,17,.92);border:1px solid rgba(255,255,255,.14);box-shadow:0 10px 30px rgba(0,0,0,.45);color:#fff;font-family:"Nanum Gothic","Malgun Gothic",sans-serif;pointer-events:auto}
-.bb-load[hidden]{display:none}
-.bb-load-title{font-size:15px;font-weight:800;border-left:4px solid #D97B4F;padding-left:8px}
-.bb-load-text{margin-top:6px;font-size:13px;font-weight:700;line-height:1.4}
-.bb-load-bar{margin-top:8px;height:8px;border-radius:5px;background:rgba(255,255,255,.14);overflow:hidden}
-.bb-load-fill{height:100%;background:#D97B4F;transform:scaleX(0);transform-origin:left center;transition:transform .25s}
-.bb-load-detail{margin-top:6px;font-size:11px;color:rgba(255,255,255,.62);word-break:break-all}
-.bb-load-detail:empty{display:none}
-.bb-load.failed .bb-load-fill{background:#e2513f}
-.bb-load-retry{margin-top:10px;width:100%;padding:9px 0;border:0;border-radius:10px;background:#D97B4F;color:#fff;font:800 14px "Nanum Gothic","Malgun Gothic",sans-serif;cursor:pointer}
-.bb-load-retry[hidden]{display:none}
