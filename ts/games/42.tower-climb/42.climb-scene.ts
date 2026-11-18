@@ -54,6 +54,7 @@ class ClimbModelLibrary {
     extra.animations.forEach((clip) => { if (!this.clips.has(clip.name)) this.clips.set(clip.name, clip); });
     scenes.forEach((gltf, index) => this.models.set(names[index], this.flatten(gltf.scene)));
     Object.entries(ClimbModelLibrary.TINTS).forEach(([name, color]) => this.tint(name, color));
+    new ClimbSpaceKit(this.libs).registerInto(this);
   }
 
   private fetch(loader: InstanceType<GLTFLoaderClass>, url: string): Promise<CharacterGltf> {
@@ -71,6 +72,8 @@ class ClimbModelLibrary {
       part.material = material;
     }
   }
+
+  register(name: string, model: ClimbModel): void { this.models.set(name, model); }
 
   model(name: string): ClimbModel {
     const found = this.models.get(name);
@@ -157,14 +160,95 @@ class ClimbInstanceBatcher {
   }
 }
 
-interface ClimbRiderEntry { piece: MovingPlatform; local: Three<"Matrix4"> }
+interface ClimbRiderEntry { piece: PlatformPiece; local: Three<"Matrix4"> }
+
+class ClimbSpaceKit {
+  static readonly STEEL = 0x56636F;
+  static readonly PLATE = 0xD5DDE3;
+  static readonly GLOW = 0x6EE0FF;
+  static readonly ICE = 0x9FD8F2;
+  static readonly ICE_TOP = 0xEAF8FF;
+  static readonly RUST = 0x7A4B33;
+  static readonly WARN = 0xD97B4F;
+  static readonly DARK = 0x2A2E36;
+  static readonly MAST = 0x6A7480;
+  static readonly RED = 0xE0483A;
+  static readonly DOME = 0xC9D6E0;
+  static readonly SOLAR = 0x2C4A7A;
+
+  constructor(private readonly libs: ThreeLibs) {}
+
+  private lambert(color: number, opacity = 1): Three<"MeshLambertMaterial"> {
+    return new this.libs.THREE.MeshLambertMaterial({ color, transparent: opacity < 1, opacity, depthWrite: opacity >= 1 });
+  }
+  private glow(color: number): Three<"MeshBasicMaterial"> { return new this.libs.THREE.MeshBasicMaterial({ color }); }
+
+  private box(width: number, height: number, depth: number, y: number, material: Three<"Material">): ClimbModelPart {
+    return { geometry: new this.libs.THREE.BoxGeometry(width, height, depth).translate(0, y, 0) as unknown as TileGeometry, material };
+  }
+
+  private model(parts: ClimbModelPart[]): ClimbModel {
+    const THREE = this.libs.THREE, box = new THREE.Box3();
+    for (const part of parts) { part.geometry.computeBoundingBox(); box.union(part.geometry.boundingBox as Three<"Box3">); }
+    return new ClimbModel(parts, box.min.clone(), box.max.clone());
+  }
+
+  private panel(body: Three<"Material">, top: Three<"Material">, band: Three<"Material">, bands: readonly number[]): ClimbModel {
+    return this.model([this.box(1, 0.9, 1, -0.55, body), this.box(0.96, 0.1, 0.96, -0.05, top), ...bands.map((y) => this.box(1.02, 0.08, 1.02, y, band))]);
+  }
+
+  registerInto(library: ClimbModelLibrary): void {
+    const K = ClimbSpaceKit, THREE = this.libs.THREE;
+    library.register("spaceDeck", this.panel(this.lambert(K.STEEL), this.lambert(K.PLATE), this.glow(K.GLOW), [-0.45]));
+    library.register("spaceIce", this.panel(this.lambert(K.ICE, 0.78), this.lambert(K.ICE_TOP), this.glow(0xFFFFFF), [-0.45]));
+    library.register("spaceCrumble", this.panel(this.lambert(K.RUST), this.lambert(K.WARN), this.glow(K.DARK), [-0.3, -0.7]));
+    library.register("spaceMast", this.panel(this.lambert(K.MAST), this.lambert(K.PLATE), this.glow(K.RED), [-0.25, -0.6]));
+    const isle = new THREE.CylinderGeometry(4, 2.6, 1.6, 20).translate(0, -0.8, 0) as unknown as TileGeometry;
+    library.register("spaceIsle", this.model([{ geometry: isle, material: this.lambert(K.STEEL) }]));
+    const dome = new THREE.SphereGeometry(1, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2) as unknown as TileGeometry;
+    library.register("spaceDome", this.model([{ geometry: dome, material: this.lambert(K.DOME) }, this.box(2.1, 0.12, 2.1, 0.06, this.glow(K.GLOW))]));
+    const pole = new THREE.CylinderGeometry(0.06, 0.1, 3, 6).translate(0, 1.5, 0) as unknown as TileGeometry;
+    const tip = new THREE.SphereGeometry(0.18, 8, 6).translate(0, 3.1, 0) as unknown as TileGeometry;
+    library.register("spaceAntenna", this.model([{ geometry: pole, material: this.lambert(K.MAST) }, { geometry: tip, material: this.glow(K.RED) }]));
+    const solar = new THREE.BoxGeometry(2.4, 0.08, 1.2).rotateX(-0.5).translate(0, 1.2, 0) as unknown as TileGeometry;
+    const stand = new THREE.CylinderGeometry(0.08, 0.08, 1.2, 6).translate(0, 0.6, 0) as unknown as TileGeometry;
+    library.register("spaceSolar", this.model([{ geometry: solar, material: this.lambert(K.SOLAR) }, { geometry: stand, material: this.lambert(K.MAST) }]));
+  }
+}
+
+abstract class ClimbPiecePoser {
+  abstract place(piece: PlatformPiece, blend: number, out: Three<"Matrix4">): void;
+}
+
+class ClimbRidePoser extends ClimbPiecePoser {
+  place(piece: PlatformPiece, blend: number, out: Three<"Matrix4">): void {
+    const p = piece as MovingPlatform;
+    out.makeRotationY(p.prevYaw + (p.yaw - p.prevYaw) * blend);
+    out.setPosition(p.prevX + (p.x - p.prevX) * blend, p.prevTop + (p.top - p.prevTop) * blend, p.prevZ + (p.z - p.prevZ) * blend);
+  }
+}
+
+class ClimbCrumblePoser extends ClimbPiecePoser {
+  static readonly SHAKE = 0.07;
+  static readonly SHAKE_RATE = 55;
+  static readonly FALL_GRAVITY = 18;
+  static readonly FALL_SHOWN = 1.1;
+
+  place(piece: PlatformPiece, _blend: number, out: Three<"Matrix4">): void {
+    const P = ClimbCrumblePoser, p = piece as CrumblePlatform, wobble = p.shaking * P.SHAKE, age = Math.max(0, p.age), fall = p.fallTime;
+    if (p.gone && fall > P.FALL_SHOWN) { out.makeScale(0, 0, 0); return; }
+    const drop = P.FALL_GRAVITY * fall * fall / 2;
+    out.makeRotationY(p.yaw + (p.gone ? fall * 0.8 : 0));
+    out.setPosition(p.x + Math.sin(age * P.SHAKE_RATE) * wobble, p.top - drop, p.z + Math.cos(age * P.SHAKE_RATE * 1.3) * wobble);
+  }
+}
 
 class ClimbRiderBatch {
   private readonly meshes: Three<"InstancedMesh">[] = [];
   private readonly pose: Three<"Matrix4">;
   private readonly world: Three<"Matrix4">;
 
-  constructor(libs: ThreeLibs, model: ClimbModel, private readonly entries: ClimbRiderEntry[], readonly stage: number, parent: Three<"Object3D">) {
+  constructor(libs: ThreeLibs, model: ClimbModel, private readonly entries: ClimbRiderEntry[], readonly stage: number, parent: Three<"Object3D">, private readonly poser: ClimbPiecePoser) {
     const THREE = libs.THREE;
     this.pose = new THREE.Matrix4();
     this.world = new THREE.Matrix4();
@@ -181,9 +265,7 @@ class ClimbRiderBatch {
 
   follow(blend: number): void {
     this.entries.forEach((entry, index) => {
-      const p = entry.piece;
-      this.pose.makeRotationY(p.prevYaw + (p.yaw - p.prevYaw) * blend);
-      this.pose.setPosition(p.prevX + (p.x - p.prevX) * blend, p.prevTop + (p.top - p.prevTop) * blend, p.prevZ + (p.z - p.prevZ) * blend);
+      this.poser.place(entry.piece, blend, this.pose);
       this.world.multiplyMatrices(this.pose, entry.local);
       for (const mesh of this.meshes) mesh.setMatrixAt(index, this.world);
     });
@@ -203,11 +285,117 @@ class ClimbDecorDice {
   between(low: number, high: number): number { return low + (high - low) * this.next(); }
 }
 
+class ClimbSweeperView {
+  static readonly BEAM = 0xE0483A;
+  static readonly CAP = 0xFFF1E0;
+  static readonly POST = 0x6A7480;
+  static readonly POST_HEIGHT = 0.5;
+
+  private readonly spins: { piece: SweeperBar; beam: Three<"Group"> }[] = [];
+
+  constructor(libs: ThreeLibs, pieces: readonly PlatformPiece[], groupOf: (stage: number) => Three<"Group">) {
+    const THREE = libs.THREE, V = ClimbSweeperView;
+    const beamMaterial = new THREE.MeshLambertMaterial({ color: V.BEAM }), capMaterial = new THREE.MeshBasicMaterial({ color: V.CAP }), postMaterial = new THREE.MeshLambertMaterial({ color: V.POST });
+    for (const piece of pieces) {
+      if (!(piece instanceof SweeperBar)) continue;
+      const height = piece.top - piece.bottom, beam = new THREE.Group(), length = piece.halfX * 2, width = piece.halfZ * 2;
+      const bar = new THREE.Mesh(new THREE.BoxGeometry(length, height, width), beamMaterial);
+      bar.castShadow = true;
+      beam.add(bar);
+      for (const side of [-1, 1]) {
+        const cap = new THREE.Mesh(new THREE.BoxGeometry(0.3, height + 0.04, width + 0.04), capMaterial);
+        cap.position.x = side * (length / 2 - 0.15);
+        beam.add(cap);
+      }
+      beam.position.set(piece.x, piece.top - height / 2, piece.z);
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.22, V.POST_HEIGHT, 10), postMaterial);
+      post.position.set(piece.x, piece.bottom - V.POST_HEIGHT / 2, piece.z);
+      const base = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.12, 14), postMaterial);
+      base.position.set(piece.x, piece.bottom - V.POST_HEIGHT + 0.06, piece.z);
+      groupOf(piece.stage).add(beam, post, base);
+      this.spins.push({ piece, beam });
+    }
+  }
+
+  follow(seconds: number): void { for (const spin of this.spins) spin.beam.rotation.y = spin.piece.angleAt(seconds); }
+}
+
+class ClimbWindView {
+  static readonly STREAKS = 40;
+  static readonly STREAK_LENGTH = 1.4;
+  static readonly FLOW = 9;
+
+  private readonly zones: { piece: WindZone; mesh: Three<"InstancedMesh">; material: Three<"MeshBasicMaterial">; seeds: number[][] }[] = [];
+  private readonly matrix: Three<"Matrix4">;
+  private readonly hidden: Three<"Matrix4">;
+
+  constructor(libs: ThreeLibs, pieces: readonly PlatformPiece[], groupOf: (stage: number) => Three<"Group">) {
+    const THREE = libs.THREE, V = ClimbWindView, dice = new ClimbDecorDice(77), geometry = new THREE.BoxGeometry(0.05, 0.05, V.STREAK_LENGTH);
+    this.matrix = new THREE.Matrix4();
+    this.hidden = new THREE.Matrix4().makeScale(0, 0, 0);
+    for (const piece of pieces) {
+      if (!(piece instanceof WindZone)) continue;
+      const material = new THREE.MeshBasicMaterial({ color: 0xFFFFFF, transparent: true, opacity: 0, depthWrite: false });
+      const mesh = new THREE.InstancedMesh(geometry, material, V.STREAKS);
+      mesh.frustumCulled = false;
+      const seeds = Array.from({ length: V.STREAKS }, () => [dice.between(-piece.halfX, piece.halfX), dice.between(-piece.halfZ, piece.halfZ), dice.between(piece.bottom, piece.top), dice.next()]);
+      groupOf(piece.stage).add(mesh);
+      this.zones.push({ piece, mesh, material, seeds });
+    }
+  }
+
+  follow(seconds: number): void {
+    const V = ClimbWindView;
+    for (const zone of this.zones) {
+      const piece = zone.piece, strength = piece.strengthAt(seconds), reach = (piece.halfX + piece.halfZ) * 2, yaw = piece.gust.dirDeg * Math.PI / 180;
+      zone.material.opacity = 0.06 + 0.5 * strength;
+      zone.seeds.forEach((seed, index) => {
+        const travel = ((seed[3] * reach + seconds * V.FLOW) % reach) - reach / 2;
+        const x = piece.worldX(seed[0], seed[1]) + piece.dirX * travel, z = piece.worldZ(seed[0], seed[1]) + piece.dirZ * travel;
+        if (!piece.covers(x, z)) { zone.mesh.setMatrixAt(index, this.hidden); return; }
+        this.matrix.makeRotationY(yaw);
+        this.matrix.setPosition(x, seed[2], z);
+        zone.mesh.setMatrixAt(index, this.matrix);
+      });
+      zone.mesh.instanceMatrix.needsUpdate = true;
+    }
+  }
+}
+
+class ClimbSkyTint {
+  static readonly SPACE = 0x1B2350;
+  static readonly FROM = 178;
+  static readonly TO = 194;
+
+  private readonly ground: Three<"Color">;
+  private readonly space: Three<"Color">;
+  private shown = -1;
+
+  constructor(libs: ThreeLibs, private readonly scene: Three<"Scene">, sky: number) {
+    this.ground = new libs.THREE.Color(sky);
+    this.space = new libs.THREE.Color(ClimbSkyTint.SPACE);
+  }
+
+  follow(height: number): void {
+    const S = ClimbSkyTint, mix = Math.round(Math.max(0, Math.min(1, (height - S.FROM) / (S.TO - S.FROM))) * 50) / 50;
+    if (mix === this.shown) return;
+    this.shown = mix;
+    const background = this.scene.background as Three<"Color">, fog = this.scene.fog as Three<"Fog">;
+    background.copy(this.ground).lerp(this.space, mix);
+    fog.color.copy(background);
+  }
+}
+
 class TowerLevelBuilder {
   static readonly BLOCK_OF_LOOK: Readonly<Record<string, string>> = {
     deck: "grass", block: "dirt", root: "dirt", rock: "stone", stump: "dirt", log: "wood", ramp: "wood", pad: "yellow",
     ruin: "foundation", slab: "stone", beam: "wood",
+    deck7: "spaceDeck", ice7: "spaceIce", crumble7: "spaceCrumble", mast7: "spaceMast",
   };
+  static readonly SPACE_ISLANDS: readonly (readonly [number, number, number])[] = [
+    [20, 34, 184], [80, 36, 192], [140, 33, 198], [200, 35, 188], [255, 34, 195], [330, 36, 186],
+  ];
+  static readonly HAZARD_LOOKS: readonly string[] = ["sweeper7", "wind7"];
   static readonly RUIN_ISLANDS: readonly (readonly [number, number, number, string])[] = [
     [15, 34, 33, "church"], [75, 36, 39, "ruinHouse"], [130, 33, 45, "watchtower"], [195, 35, 50, "ruinHouse"], [285, 34, 42, "watchtower"], [330, 36, 54, "church"],
   ];
@@ -232,9 +420,13 @@ class TowerLevelBuilder {
   readonly root: Three<"Group">;
   readonly stageGroups = new Map<number, Three<"Group">>();
   private readonly batchers = new Map<number, ClimbInstanceBatcher>();
-  private readonly riderLists = new Map<string, { stage: number; model: string; entries: ClimbRiderEntry[] }>();
+  private readonly riderLists = new Map<string, { stage: number; model: string; entries: ClimbRiderEntry[]; poser: ClimbPiecePoser }>();
   private readonly riders: ClimbRiderBatch[] = [];
-  private riding: MovingPlatform | null = null;
+  private readonly ridePoser = new ClimbRidePoser();
+  private readonly crumblePoser = new ClimbCrumblePoser();
+  private readonly sweepers: ClimbSweeperView;
+  private readonly winds: ClimbWindView;
+  private riding: PlatformPiece | null = null;
   private readonly ridingInverse: Three<"Matrix4">;
   private readonly marks = new Map<number, Three<"Matrix4">[]>();
   private readonly specials: Record<string, (piece: PlatformPiece) => void>;
@@ -247,16 +439,20 @@ class TowerLevelBuilder {
       trunk: (piece) => this.trunk(piece),
       hold: (piece) => this.hold(piece as GrabHold),
       rest: (piece) => this.rest(piece),
+      summit: (piece) => this.summit(piece),
     };
     for (const piece of level.pieces) this.draw(piece);
+    this.sweepers = new ClimbSweeperView(libs, level.pieces, (stage) => this.groupOf(stage));
+    this.winds = new ClimbWindView(libs, level.pieces, (stage) => this.groupOf(stage));
     this.decorate();
+    this.decorateSpace();
     this.decorateRuins();
     this.decorateDungeon();
     this.decorateKitchen();
     this.decorateGraveyard();
     this.decorateSnow();
     this.batchers.forEach((batcher, stage) => batcher.build(this.groupOf(stage), true));
-    this.riderLists.forEach((list) => this.riders.push(new ClimbRiderBatch(libs, library.model(list.model), list.entries, list.stage, this.groupOf(list.stage))));
+    this.riderLists.forEach((list) => this.riders.push(new ClimbRiderBatch(libs, library.model(list.model), list.entries, list.stage, this.groupOf(list.stage), list.poser)));
     this.buildMarks();
   }
 
@@ -264,19 +460,24 @@ class TowerLevelBuilder {
     this.stageGroups.forEach((group, index) => { group.visible = index === 0 || Math.abs(index - stage) <= 1; });
   }
 
-  followRiders(blend: number): void {
+  showEvery(): void { this.stageGroups.forEach((group) => { group.visible = true; }); }
+
+  followRiders(blend: number, seconds: number): void {
     for (const rider of this.riders) if (this.groupOf(rider.stage).visible) rider.follow(blend);
+    if (this.groupOf(ClimbBalance.STAGE_COUNT).visible) { this.sweepers.follow(seconds); this.winds.follow(seconds); }
   }
+
+  private poserOf(piece: PlatformPiece): ClimbPiecePoser { return piece instanceof MovingPlatform ? this.ridePoser : this.crumblePoser; }
 
   private addModel(stage: number, name: string, matrix: Three<"Matrix4">): void {
     if (!this.riding) { this.batcherOf(stage).add(name, matrix); return; }
-    const key = stage + "|" + name, local = matrix.clone().premultiply(this.ridingInverse);
+    const poser = this.poserOf(this.riding), key = stage + "|" + name + "|" + (poser === this.ridePoser ? "ride" : "crumble"), local = matrix.clone().premultiply(this.ridingInverse);
     const list = this.riderLists.get(key);
     if (list) list.entries.push({ piece: this.riding, local });
-    else this.riderLists.set(key, { stage, model: name, entries: [{ piece: this.riding, local }] });
+    else this.riderLists.set(key, { stage, model: name, entries: [{ piece: this.riding, local }], poser });
   }
 
-  private drawRider(piece: MovingPlatform): void {
+  private drawRider(piece: PlatformPiece): void {
     const THREE = this.libs.THREE;
     this.ridingInverse.copy(new THREE.Matrix4().makeRotationY(piece.yaw).setPosition(piece.x, piece.top, piece.z)).invert();
     this.riding = piece;
@@ -307,8 +508,8 @@ class TowerLevelBuilder {
   }
 
   private draw(piece: PlatformPiece): void {
-    if (piece.look === TowerPropShapes.HIDDEN) return;
-    if (piece instanceof MovingPlatform) this.drawRider(piece); else this.drawShape(piece);
+    if (piece.look === TowerPropShapes.HIDDEN || TowerLevelBuilder.HAZARD_LOOKS.includes(piece.look)) return;
+    if (piece instanceof MovingPlatform || piece instanceof CrumblePlatform) this.drawRider(piece); else this.drawShape(piece);
   }
 
   private drawShape(piece: PlatformPiece): void {
@@ -361,6 +562,38 @@ class TowerLevelBuilder {
     const flag = new THREE.Mesh(new THREE.PlaneGeometry(1.3, 0.8), new THREE.MeshBasicMaterial({ color: 0xD97B4F, side: THREE.DoubleSide }));
     flag.position.set(piece.x + 0.73, piece.top + 2.75, piece.z);
     group.add(flag);
+  }
+
+  private summit(piece: PlatformPiece): void {
+    const THREE = this.libs.THREE, group = this.groupOf(piece.stage), K = ClimbSpaceKit;
+    const deck = new THREE.Mesh(new THREE.CylinderGeometry(piece.radius, piece.radius * 0.7, piece.depth, 40), new THREE.MeshLambertMaterial({ color: K.STEEL }));
+    deck.position.set(piece.x, piece.top - piece.depth / 2, piece.z);
+    deck.receiveShadow = true;
+    const plate = new THREE.Mesh(new THREE.CylinderGeometry(piece.radius - 0.15, piece.radius - 0.15, 0.06, 40), new THREE.MeshLambertMaterial({ color: K.PLATE }));
+    plate.position.set(piece.x, piece.top - 0.03, piece.z);
+    plate.receiveShadow = true;
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(piece.radius, 0.08, 6, 48), new THREE.MeshBasicMaterial({ color: K.GLOW }));
+    ring.rotation.x = Math.PI / 2;
+    ring.position.set(piece.x, piece.top - 0.2, piece.z);
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.12, 6, 8), new THREE.MeshLambertMaterial({ color: K.PLATE }));
+    pole.position.set(piece.x, piece.top + 3, piece.z);
+    pole.castShadow = true;
+    const flag = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 1.6), new THREE.MeshBasicMaterial({ color: K.WARN, side: THREE.DoubleSide }));
+    flag.position.set(piece.x + 1.4, piece.top + 5.1, piece.z);
+    const star = new THREE.Mesh(new THREE.OctahedronGeometry(0.35), new THREE.MeshBasicMaterial({ color: 0xFFE7A8 }));
+    star.position.set(piece.x, piece.top + 6.3, piece.z);
+    group.add(deck, plate, ring, pole, flag, star);
+  }
+
+  private decorateSpace(): void {
+    const add = this.placer(ClimbBalance.STAGE_COUNT);
+    for (const [deg, rho, top] of TowerLevelBuilder.SPACE_ISLANDS) {
+      const angle = deg * Math.PI / 180, x = Math.sin(angle) * rho, z = Math.cos(angle) * rho, sideX = Math.cos(angle), sideZ = -Math.sin(angle), outX = Math.sin(angle), outZ = Math.cos(angle);
+      add("spaceIsle", x, top - 1.6, z, angle, 1);
+      add("spaceDome", x + outX * 1.2, top, z + outZ * 1.2, angle, 1.6);
+      add("spaceAntenna", x - sideX * 2.4 - outX * 1.2, top, z - sideZ * 2.4 - outZ * 1.2, angle, 1);
+      add("spaceSolar", x + sideX * 2.2 - outX * 1.6, top, z + sideZ * 2.2 - outZ * 1.6, angle + Math.PI, 1);
+    }
   }
 
   private hold(piece: GrabHold): void {
@@ -848,6 +1081,7 @@ class ClimbWorldView {
   readonly backdrop: TowerMenuBackdrop;
   readonly quality: ClimbQualityPlan;
   private readonly sun: Three<"DirectionalLight">;
+  private readonly sky: ClimbSkyTint;
 
   constructor(libs: ThreeLibs, canvas: HTMLCanvasElement, library: ClimbModelLibrary, factory: CharacterModelFactory, level: TowerLevel, touch: boolean, isPlaying: () => boolean) {
     const THREE = libs.THREE, V = ClimbWorldView;
@@ -856,6 +1090,7 @@ class ClimbWorldView {
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(V.SKY);
     this.scene.fog = new THREE.Fog(V.SKY, 45, 150);
+    this.sky = new ClimbSkyTint(libs, this.scene, V.SKY);
     this.camera = new THREE.PerspectiveCamera(60, 1, 0.2, 260);
     this.scene.add(new THREE.HemisphereLight(0xDFF3FF, 0x6E7F5A, 1.5));
     this.sun = new THREE.DirectionalLight(0xFFF2D8, 2.1);
@@ -891,11 +1126,13 @@ class ClimbWorldView {
     this.sun.position.set(at.x + V.SUN_OFFSET[0], at.y + V.SUN_OFFSET[1], at.z + V.SUN_OFFSET[2]);
   }
 
-  render(): void { this.aimSun(); this.renderer.render(this.scene, this.camera); }
+  render(): void { this.aimSun(); this.sky.follow(this.camera.position.y); this.renderer.render(this.scene, this.camera); }
 
   warmUp(progress: StageProgress): void {
+    this.builder.showEvery();
     this.portals.showAll(true);
     this.render();
+    this.builder.showAround(1);
     this.portals.showAll(false);
     this.render();
     this.portals.sync(progress);

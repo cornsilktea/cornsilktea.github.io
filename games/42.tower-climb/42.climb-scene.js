@@ -31,6 +31,7 @@ class ClimbModelLibrary {
             this.clips.set(clip.name, clip); });
         scenes.forEach((gltf, index) => this.models.set(names[index], this.flatten(gltf.scene)));
         Object.entries(ClimbModelLibrary.TINTS).forEach(([name, color]) => this.tint(name, color));
+        new ClimbSpaceKit(this.libs).registerInto(this);
     }
     fetch(loader, url) {
         return loader.loadAsync(url).then((gltf) => {
@@ -46,6 +47,7 @@ class ClimbModelLibrary {
             part.material = material;
         }
     }
+    register(name, model) { this.models.set(name, model); }
     model(name) {
         const found = this.models.get(name);
         if (!found)
@@ -156,10 +158,88 @@ class ClimbInstanceBatcher {
         this.lists.clear();
     }
 }
+class ClimbSpaceKit {
+    constructor(libs) {
+        this.libs = libs;
+    }
+    lambert(color, opacity = 1) {
+        return new this.libs.THREE.MeshLambertMaterial({ color, transparent: opacity < 1, opacity, depthWrite: opacity >= 1 });
+    }
+    glow(color) { return new this.libs.THREE.MeshBasicMaterial({ color }); }
+    box(width, height, depth, y, material) {
+        return { geometry: new this.libs.THREE.BoxGeometry(width, height, depth).translate(0, y, 0), material };
+    }
+    model(parts) {
+        const THREE = this.libs.THREE, box = new THREE.Box3();
+        for (const part of parts) {
+            part.geometry.computeBoundingBox();
+            box.union(part.geometry.boundingBox);
+        }
+        return new ClimbModel(parts, box.min.clone(), box.max.clone());
+    }
+    panel(body, top, band, bands) {
+        return this.model([this.box(1, 0.9, 1, -0.55, body), this.box(0.96, 0.1, 0.96, -0.05, top), ...bands.map((y) => this.box(1.02, 0.08, 1.02, y, band))]);
+    }
+    registerInto(library) {
+        const K = ClimbSpaceKit, THREE = this.libs.THREE;
+        library.register("spaceDeck", this.panel(this.lambert(K.STEEL), this.lambert(K.PLATE), this.glow(K.GLOW), [-0.45]));
+        library.register("spaceIce", this.panel(this.lambert(K.ICE, 0.78), this.lambert(K.ICE_TOP), this.glow(0xFFFFFF), [-0.45]));
+        library.register("spaceCrumble", this.panel(this.lambert(K.RUST), this.lambert(K.WARN), this.glow(K.DARK), [-0.3, -0.7]));
+        library.register("spaceMast", this.panel(this.lambert(K.MAST), this.lambert(K.PLATE), this.glow(K.RED), [-0.25, -0.6]));
+        const isle = new THREE.CylinderGeometry(4, 2.6, 1.6, 20).translate(0, -0.8, 0);
+        library.register("spaceIsle", this.model([{ geometry: isle, material: this.lambert(K.STEEL) }]));
+        const dome = new THREE.SphereGeometry(1, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2);
+        library.register("spaceDome", this.model([{ geometry: dome, material: this.lambert(K.DOME) }, this.box(2.1, 0.12, 2.1, 0.06, this.glow(K.GLOW))]));
+        const pole = new THREE.CylinderGeometry(0.06, 0.1, 3, 6).translate(0, 1.5, 0);
+        const tip = new THREE.SphereGeometry(0.18, 8, 6).translate(0, 3.1, 0);
+        library.register("spaceAntenna", this.model([{ geometry: pole, material: this.lambert(K.MAST) }, { geometry: tip, material: this.glow(K.RED) }]));
+        const solar = new THREE.BoxGeometry(2.4, 0.08, 1.2).rotateX(-0.5).translate(0, 1.2, 0);
+        const stand = new THREE.CylinderGeometry(0.08, 0.08, 1.2, 6).translate(0, 0.6, 0);
+        library.register("spaceSolar", this.model([{ geometry: solar, material: this.lambert(K.SOLAR) }, { geometry: stand, material: this.lambert(K.MAST) }]));
+    }
+}
+ClimbSpaceKit.STEEL = 0x56636F;
+ClimbSpaceKit.PLATE = 0xD5DDE3;
+ClimbSpaceKit.GLOW = 0x6EE0FF;
+ClimbSpaceKit.ICE = 0x9FD8F2;
+ClimbSpaceKit.ICE_TOP = 0xEAF8FF;
+ClimbSpaceKit.RUST = 0x7A4B33;
+ClimbSpaceKit.WARN = 0xD97B4F;
+ClimbSpaceKit.DARK = 0x2A2E36;
+ClimbSpaceKit.MAST = 0x6A7480;
+ClimbSpaceKit.RED = 0xE0483A;
+ClimbSpaceKit.DOME = 0xC9D6E0;
+ClimbSpaceKit.SOLAR = 0x2C4A7A;
+class ClimbPiecePoser {
+}
+class ClimbRidePoser extends ClimbPiecePoser {
+    place(piece, blend, out) {
+        const p = piece;
+        out.makeRotationY(p.prevYaw + (p.yaw - p.prevYaw) * blend);
+        out.setPosition(p.prevX + (p.x - p.prevX) * blend, p.prevTop + (p.top - p.prevTop) * blend, p.prevZ + (p.z - p.prevZ) * blend);
+    }
+}
+class ClimbCrumblePoser extends ClimbPiecePoser {
+    place(piece, _blend, out) {
+        const P = ClimbCrumblePoser, p = piece, wobble = p.shaking * P.SHAKE, age = Math.max(0, p.age), fall = p.fallTime;
+        if (p.gone && fall > P.FALL_SHOWN) {
+            out.makeScale(0, 0, 0);
+            return;
+        }
+        const drop = P.FALL_GRAVITY * fall * fall / 2;
+        out.makeRotationY(p.yaw + (p.gone ? fall * 0.8 : 0));
+        out.setPosition(p.x + Math.sin(age * P.SHAKE_RATE) * wobble, p.top - drop, p.z + Math.cos(age * P.SHAKE_RATE * 1.3) * wobble);
+    }
+}
+ClimbCrumblePoser.SHAKE = 0.07;
+ClimbCrumblePoser.SHAKE_RATE = 55;
+ClimbCrumblePoser.FALL_GRAVITY = 18;
+ClimbCrumblePoser.FALL_SHOWN = 1.1;
 class ClimbRiderBatch {
-    constructor(libs, model, entries, stage, parent) {
+    constructor(libs, model, entries, stage, parent, poser) {
         this.entries = entries;
         this.stage = stage;
+        this.poser = poser;
         this.meshes = [];
         const THREE = libs.THREE;
         this.pose = new THREE.Matrix4();
@@ -176,9 +256,7 @@ class ClimbRiderBatch {
     }
     follow(blend) {
         this.entries.forEach((entry, index) => {
-            const p = entry.piece;
-            this.pose.makeRotationY(p.prevYaw + (p.yaw - p.prevYaw) * blend);
-            this.pose.setPosition(p.prevX + (p.x - p.prevX) * blend, p.prevTop + (p.top - p.prevTop) * blend, p.prevZ + (p.z - p.prevZ) * blend);
+            this.poser.place(entry.piece, blend, this.pose);
             this.world.multiplyMatrices(this.pose, entry.local);
             for (const mesh of this.meshes)
                 mesh.setMatrixAt(index, this.world);
@@ -201,6 +279,99 @@ class ClimbDecorDice {
     }
     between(low, high) { return low + (high - low) * this.next(); }
 }
+class ClimbSweeperView {
+    constructor(libs, pieces, groupOf) {
+        this.spins = [];
+        const THREE = libs.THREE, V = ClimbSweeperView;
+        const beamMaterial = new THREE.MeshLambertMaterial({ color: V.BEAM }), capMaterial = new THREE.MeshBasicMaterial({ color: V.CAP }), postMaterial = new THREE.MeshLambertMaterial({ color: V.POST });
+        for (const piece of pieces) {
+            if (!(piece instanceof SweeperBar))
+                continue;
+            const height = piece.top - piece.bottom, beam = new THREE.Group(), length = piece.halfX * 2, width = piece.halfZ * 2;
+            const bar = new THREE.Mesh(new THREE.BoxGeometry(length, height, width), beamMaterial);
+            bar.castShadow = true;
+            beam.add(bar);
+            for (const side of [-1, 1]) {
+                const cap = new THREE.Mesh(new THREE.BoxGeometry(0.3, height + 0.04, width + 0.04), capMaterial);
+                cap.position.x = side * (length / 2 - 0.15);
+                beam.add(cap);
+            }
+            beam.position.set(piece.x, piece.top - height / 2, piece.z);
+            const post = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.22, V.POST_HEIGHT, 10), postMaterial);
+            post.position.set(piece.x, piece.bottom - V.POST_HEIGHT / 2, piece.z);
+            const base = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.12, 14), postMaterial);
+            base.position.set(piece.x, piece.bottom - V.POST_HEIGHT + 0.06, piece.z);
+            groupOf(piece.stage).add(beam, post, base);
+            this.spins.push({ piece, beam });
+        }
+    }
+    follow(seconds) { for (const spin of this.spins)
+        spin.beam.rotation.y = spin.piece.angleAt(seconds); }
+}
+ClimbSweeperView.BEAM = 0xE0483A;
+ClimbSweeperView.CAP = 0xFFF1E0;
+ClimbSweeperView.POST = 0x6A7480;
+ClimbSweeperView.POST_HEIGHT = 0.5;
+class ClimbWindView {
+    constructor(libs, pieces, groupOf) {
+        this.zones = [];
+        const THREE = libs.THREE, V = ClimbWindView, dice = new ClimbDecorDice(77), geometry = new THREE.BoxGeometry(0.05, 0.05, V.STREAK_LENGTH);
+        this.matrix = new THREE.Matrix4();
+        this.hidden = new THREE.Matrix4().makeScale(0, 0, 0);
+        for (const piece of pieces) {
+            if (!(piece instanceof WindZone))
+                continue;
+            const material = new THREE.MeshBasicMaterial({ color: 0xFFFFFF, transparent: true, opacity: 0, depthWrite: false });
+            const mesh = new THREE.InstancedMesh(geometry, material, V.STREAKS);
+            mesh.frustumCulled = false;
+            const seeds = Array.from({ length: V.STREAKS }, () => [dice.between(-piece.halfX, piece.halfX), dice.between(-piece.halfZ, piece.halfZ), dice.between(piece.bottom, piece.top), dice.next()]);
+            groupOf(piece.stage).add(mesh);
+            this.zones.push({ piece, mesh, material, seeds });
+        }
+    }
+    follow(seconds) {
+        const V = ClimbWindView;
+        for (const zone of this.zones) {
+            const piece = zone.piece, strength = piece.strengthAt(seconds), reach = (piece.halfX + piece.halfZ) * 2, yaw = piece.gust.dirDeg * Math.PI / 180;
+            zone.material.opacity = 0.06 + 0.5 * strength;
+            zone.seeds.forEach((seed, index) => {
+                const travel = ((seed[3] * reach + seconds * V.FLOW) % reach) - reach / 2;
+                const x = piece.worldX(seed[0], seed[1]) + piece.dirX * travel, z = piece.worldZ(seed[0], seed[1]) + piece.dirZ * travel;
+                if (!piece.covers(x, z)) {
+                    zone.mesh.setMatrixAt(index, this.hidden);
+                    return;
+                }
+                this.matrix.makeRotationY(yaw);
+                this.matrix.setPosition(x, seed[2], z);
+                zone.mesh.setMatrixAt(index, this.matrix);
+            });
+            zone.mesh.instanceMatrix.needsUpdate = true;
+        }
+    }
+}
+ClimbWindView.STREAKS = 40;
+ClimbWindView.STREAK_LENGTH = 1.4;
+ClimbWindView.FLOW = 9;
+class ClimbSkyTint {
+    constructor(libs, scene, sky) {
+        this.scene = scene;
+        this.shown = -1;
+        this.ground = new libs.THREE.Color(sky);
+        this.space = new libs.THREE.Color(ClimbSkyTint.SPACE);
+    }
+    follow(height) {
+        const S = ClimbSkyTint, mix = Math.round(Math.max(0, Math.min(1, (height - S.FROM) / (S.TO - S.FROM))) * 50) / 50;
+        if (mix === this.shown)
+            return;
+        this.shown = mix;
+        const background = this.scene.background, fog = this.scene.fog;
+        background.copy(this.ground).lerp(this.space, mix);
+        fog.color.copy(background);
+    }
+}
+ClimbSkyTint.SPACE = 0x1B2350;
+ClimbSkyTint.FROM = 178;
+ClimbSkyTint.TO = 194;
 class TowerLevelBuilder {
     constructor(libs, library, level) {
         this.libs = libs;
@@ -210,6 +381,8 @@ class TowerLevelBuilder {
         this.batchers = new Map();
         this.riderLists = new Map();
         this.riders = [];
+        this.ridePoser = new ClimbRidePoser();
+        this.crumblePoser = new ClimbCrumblePoser();
         this.riding = null;
         this.marks = new Map();
         this.root = new libs.THREE.Group();
@@ -219,38 +392,48 @@ class TowerLevelBuilder {
             trunk: (piece) => this.trunk(piece),
             hold: (piece) => this.hold(piece),
             rest: (piece) => this.rest(piece),
+            summit: (piece) => this.summit(piece),
         };
         for (const piece of level.pieces)
             this.draw(piece);
+        this.sweepers = new ClimbSweeperView(libs, level.pieces, (stage) => this.groupOf(stage));
+        this.winds = new ClimbWindView(libs, level.pieces, (stage) => this.groupOf(stage));
         this.decorate();
+        this.decorateSpace();
         this.decorateRuins();
         this.decorateDungeon();
         this.decorateKitchen();
         this.decorateGraveyard();
         this.decorateSnow();
         this.batchers.forEach((batcher, stage) => batcher.build(this.groupOf(stage), true));
-        this.riderLists.forEach((list) => this.riders.push(new ClimbRiderBatch(libs, library.model(list.model), list.entries, list.stage, this.groupOf(list.stage))));
+        this.riderLists.forEach((list) => this.riders.push(new ClimbRiderBatch(libs, library.model(list.model), list.entries, list.stage, this.groupOf(list.stage), list.poser)));
         this.buildMarks();
     }
     showAround(stage) {
         this.stageGroups.forEach((group, index) => { group.visible = index === 0 || Math.abs(index - stage) <= 1; });
     }
-    followRiders(blend) {
+    showEvery() { this.stageGroups.forEach((group) => { group.visible = true; }); }
+    followRiders(blend, seconds) {
         for (const rider of this.riders)
             if (this.groupOf(rider.stage).visible)
                 rider.follow(blend);
+        if (this.groupOf(ClimbBalance.STAGE_COUNT).visible) {
+            this.sweepers.follow(seconds);
+            this.winds.follow(seconds);
+        }
     }
+    poserOf(piece) { return piece instanceof MovingPlatform ? this.ridePoser : this.crumblePoser; }
     addModel(stage, name, matrix) {
         if (!this.riding) {
             this.batcherOf(stage).add(name, matrix);
             return;
         }
-        const key = stage + "|" + name, local = matrix.clone().premultiply(this.ridingInverse);
+        const poser = this.poserOf(this.riding), key = stage + "|" + name + "|" + (poser === this.ridePoser ? "ride" : "crumble"), local = matrix.clone().premultiply(this.ridingInverse);
         const list = this.riderLists.get(key);
         if (list)
             list.entries.push({ piece: this.riding, local });
         else
-            this.riderLists.set(key, { stage, model: name, entries: [{ piece: this.riding, local }] });
+            this.riderLists.set(key, { stage, model: name, entries: [{ piece: this.riding, local }], poser });
     }
     drawRider(piece) {
         const THREE = this.libs.THREE;
@@ -287,9 +470,9 @@ class TowerLevelBuilder {
         return matrix;
     }
     draw(piece) {
-        if (piece.look === TowerPropShapes.HIDDEN)
+        if (piece.look === TowerPropShapes.HIDDEN || TowerLevelBuilder.HAZARD_LOOKS.includes(piece.look))
             return;
-        if (piece instanceof MovingPlatform)
+        if (piece instanceof MovingPlatform || piece instanceof CrumblePlatform)
             this.drawRider(piece);
         else
             this.drawShape(piece);
@@ -347,6 +530,36 @@ class TowerLevelBuilder {
         const flag = new THREE.Mesh(new THREE.PlaneGeometry(1.3, 0.8), new THREE.MeshBasicMaterial({ color: 0xD97B4F, side: THREE.DoubleSide }));
         flag.position.set(piece.x + 0.73, piece.top + 2.75, piece.z);
         group.add(flag);
+    }
+    summit(piece) {
+        const THREE = this.libs.THREE, group = this.groupOf(piece.stage), K = ClimbSpaceKit;
+        const deck = new THREE.Mesh(new THREE.CylinderGeometry(piece.radius, piece.radius * 0.7, piece.depth, 40), new THREE.MeshLambertMaterial({ color: K.STEEL }));
+        deck.position.set(piece.x, piece.top - piece.depth / 2, piece.z);
+        deck.receiveShadow = true;
+        const plate = new THREE.Mesh(new THREE.CylinderGeometry(piece.radius - 0.15, piece.radius - 0.15, 0.06, 40), new THREE.MeshLambertMaterial({ color: K.PLATE }));
+        plate.position.set(piece.x, piece.top - 0.03, piece.z);
+        plate.receiveShadow = true;
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(piece.radius, 0.08, 6, 48), new THREE.MeshBasicMaterial({ color: K.GLOW }));
+        ring.rotation.x = Math.PI / 2;
+        ring.position.set(piece.x, piece.top - 0.2, piece.z);
+        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.12, 6, 8), new THREE.MeshLambertMaterial({ color: K.PLATE }));
+        pole.position.set(piece.x, piece.top + 3, piece.z);
+        pole.castShadow = true;
+        const flag = new THREE.Mesh(new THREE.PlaneGeometry(2.6, 1.6), new THREE.MeshBasicMaterial({ color: K.WARN, side: THREE.DoubleSide }));
+        flag.position.set(piece.x + 1.4, piece.top + 5.1, piece.z);
+        const star = new THREE.Mesh(new THREE.OctahedronGeometry(0.35), new THREE.MeshBasicMaterial({ color: 0xFFE7A8 }));
+        star.position.set(piece.x, piece.top + 6.3, piece.z);
+        group.add(deck, plate, ring, pole, flag, star);
+    }
+    decorateSpace() {
+        const add = this.placer(ClimbBalance.STAGE_COUNT);
+        for (const [deg, rho, top] of TowerLevelBuilder.SPACE_ISLANDS) {
+            const angle = deg * Math.PI / 180, x = Math.sin(angle) * rho, z = Math.cos(angle) * rho, sideX = Math.cos(angle), sideZ = -Math.sin(angle), outX = Math.sin(angle), outZ = Math.cos(angle);
+            add("spaceIsle", x, top - 1.6, z, angle, 1);
+            add("spaceDome", x + outX * 1.2, top, z + outZ * 1.2, angle, 1.6);
+            add("spaceAntenna", x - sideX * 2.4 - outX * 1.2, top, z - sideZ * 2.4 - outZ * 1.2, angle, 1);
+            add("spaceSolar", x + sideX * 2.2 - outX * 1.6, top, z + sideZ * 2.2 - outZ * 1.6, angle + Math.PI, 1);
+        }
     }
     hold(piece) {
         const THREE = this.libs.THREE, model = this.library.model("pebble");
@@ -457,7 +670,12 @@ class TowerLevelBuilder {
 TowerLevelBuilder.BLOCK_OF_LOOK = {
     deck: "grass", block: "dirt", root: "dirt", rock: "stone", stump: "dirt", log: "wood", ramp: "wood", pad: "yellow",
     ruin: "foundation", slab: "stone", beam: "wood",
+    deck7: "spaceDeck", ice7: "spaceIce", crumble7: "spaceCrumble", mast7: "spaceMast",
 };
+TowerLevelBuilder.SPACE_ISLANDS = [
+    [20, 34, 184], [80, 36, 192], [140, 33, 198], [200, 35, 188], [255, 34, 195], [330, 36, 186],
+];
+TowerLevelBuilder.HAZARD_LOOKS = ["sweeper7", "wind7"];
 TowerLevelBuilder.RUIN_ISLANDS = [
     [15, 34, 33, "church"], [75, 36, 39, "ruinHouse"], [130, 33, 45, "watchtower"], [195, 35, 50, "ruinHouse"], [285, 34, 42, "watchtower"], [330, 36, 54, "church"],
 ];
@@ -828,6 +1046,7 @@ class ClimbWorldView {
         this.scene = new THREE.Scene();
         this.scene.background = new THREE.Color(V.SKY);
         this.scene.fog = new THREE.Fog(V.SKY, 45, 150);
+        this.sky = new ClimbSkyTint(libs, this.scene, V.SKY);
         this.camera = new THREE.PerspectiveCamera(60, 1, 0.2, 260);
         this.scene.add(new THREE.HemisphereLight(0xDFF3FF, 0x6E7F5A, 1.5));
         this.sun = new THREE.DirectionalLight(0xFFF2D8, 2.1);
@@ -861,10 +1080,12 @@ class ClimbWorldView {
         this.sun.target.position.copy(at);
         this.sun.position.set(at.x + V.SUN_OFFSET[0], at.y + V.SUN_OFFSET[1], at.z + V.SUN_OFFSET[2]);
     }
-    render() { this.aimSun(); this.renderer.render(this.scene, this.camera); }
+    render() { this.aimSun(); this.sky.follow(this.camera.position.y); this.renderer.render(this.scene, this.camera); }
     warmUp(progress) {
+        this.builder.showEvery();
         this.portals.showAll(true);
         this.render();
+        this.builder.showAround(1);
         this.portals.showAll(false);
         this.render();
         this.portals.sync(progress);

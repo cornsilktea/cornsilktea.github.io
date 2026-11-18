@@ -608,13 +608,143 @@ TowerStageSixLayout.GOAL_AT = 13.5;
 TowerStageSixLayout.GOAL = 3.2;
 TowerStageSixLayout.LONG_RISE = 2;
 TowerStageSixLayout.ARRIVE_RHO = 12;
+class ClimbBoxTrail {
+    constructor(pen, deg, rho, half, sense = 1) {
+        this.pen = pen;
+        this.trail = new ClimbTrail(deg, rho, half, sense);
+    }
+    get deg() { return this.trail.deg; }
+    get rho() { return this.trail.rho; }
+    next(id, kind, look, rho, top, along, across, gap, extras = {}) {
+        const deg = this.trail.next(rho, along / 2, gap);
+        this.pen.box(id, kind, deg, rho, top, along, across, deg, { look, ...extras });
+        return deg;
+    }
+    radial(id, kind, look, deg, inner, outer, top, across, extras = {}) {
+        this.pen.box(id, kind, deg, (inner + outer) / 2, top, outer - inner, across, deg - 90, { look, ...extras });
+    }
+}
+class TowerStageSevenLayout {
+    static get launchTop() { return TowerStageSevenLayout.TOP_Y - 0.3 - TowerStageSevenLayout.LONG_RISE; }
+    static pieces() {
+        const S = TowerStageSevenLayout, pen = new ClimbLayoutPen(7);
+        const spokeOuter = S.REST_RADIUS - 0.1 + S.SPOKE_LENGTH, go = new ClimbBoxTrail(pen, S.SPOKE_DEG, spokeOuter, 0);
+        go.radial("zs1", "static", "deck7", S.SPOKE_DEG, S.REST_RADIUS - 0.1, spokeOuter, S.FLOOR, S.SPOKE_WIDTH, { depth: S.DEPTH });
+        let top = S.FLOOR + 0.6;
+        go.next("zd1", "static", "deck7", S.ENTRY_RHO, top, S.REST, S.REST, 2.4, { depth: S.DEPTH, look: "deck7" });
+        for (let k = 1; k <= S.ICE_COUNT; k++) {
+            top += S.ICE_STEP;
+            go.next("zi" + k, "ice", "ice7", S.ICE_RHO, top, S.ICE_ALONG, S.ICE_ACROSS, S.ICE_GAP, { depth: S.DEPTH, look: "ice7" });
+        }
+        top += 0.6;
+        go.next("zr1", "static", "deck7", S.CRUMBLE_RHO, top, S.REST, S.REST, 2.8, { depth: S.DEPTH, look: "deck7" });
+        for (let k = 1; k <= S.CRUMBLE_COUNT; k++) {
+            top += S.CRUMBLE_STEP;
+            go.next("zc" + k, "crumble", "crumble7", S.CRUMBLE_RHO, top, S.CRUMBLE, S.CRUMBLE, S.CRUMBLE_GAP, { depth: S.DEPTH, look: "crumble7" });
+        }
+        top += S.MAST_RISE;
+        go.next("zc4", "crumble", "crumble7", S.CRUMBLE_RHO, top, S.MAST, S.MAST, S.MAST_GAP, { depth: S.MAST_DEPTH, look: "crumble7" });
+        top += S.SWEEP_DECK_RISE;
+        const deckDeg = go.next("zr2", "static", "deck7", S.CRUMBLE_RHO, top, S.SWEEP_DECK_ALONG, S.REST, S.SWEEP_GAP, { depth: S.DEPTH, look: "deck7" });
+        pen.box("zx1", "sweeper", deckDeg, S.CRUMBLE_RHO, top + S.SWEEP_HIGH, S.SWEEP_ARM * 2, S.SWEEP_WIDTH, deckDeg, { depth: S.SWEEP_HIGH - S.SWEEP_LOW, look: "sweeper7", spin: { rate: S.SWEEP_RATE, phase: 0 } });
+        const windFrom = top;
+        let windFirst = 0, windLast = 0;
+        for (let k = 1; k <= S.WIND_COUNT; k++) {
+            top += S.WIND_STEP;
+            const deg = go.next("zw" + k, "static", "deck7", S.WIND_RHO, top, S.WIND_PANEL, S.WIND_PANEL, S.WIND_GAP, { depth: S.DEPTH, look: "deck7" });
+            if (k === 1)
+                windFirst = deg;
+            windLast = deg;
+        }
+        const windMid = (windFirst + windLast) / 2, windSpan = (windLast - windFirst) * Math.PI / 180 * S.WIND_RHO + S.WIND_PANEL + S.WIND_GAP * 2;
+        pen.box("zv1", "wind", windMid, S.WIND_RHO, top + 3, windSpan, 9, windMid, {
+            depth: top + 3 - windFrom + 1, look: "wind7", gust: { dirDeg: windMid, speed: S.WIND_SPEED, period: S.WIND_PERIOD, share: S.WIND_SHARE, phase: 0 },
+        });
+        top = S.launchTop - S.LAND_STEP;
+        const mastDeg = go.next("zt1", "static", "mast7", S.WIND_RHO, top, S.MAST, S.MAST, S.MAST_GAP, { depth: S.MAST_DEPTH, look: "mast7" });
+        const launchTop = S.launchTop, mastInner = S.WIND_RHO - S.MAST / 2, launchOuter = mastInner - 0.2;
+        const launchDeg = mastDeg + Math.atan2(S.MAST / 2 + 0.4 + S.LAUNCH_WIDTH / 2, S.WIND_RHO) * 180 / Math.PI;
+        go.radial("zl1", "static", "deck7", launchDeg, launchOuter - S.REST, launchOuter, launchTop, S.LAUNCH_WIDTH, { depth: S.DEPTH });
+        go.radial("zl2", "ice", "ice7", launchDeg, S.LAUNCH_INNER, launchOuter - S.REST, launchTop, S.LAUNCH_WIDTH, { depth: S.DEPTH });
+        const landRho = launchOuter - S.REST / 2, side = S.LAUNCH_WIDTH / 2 + S.LAND_HUB_OUT, along = ClimbLayoutPen.rad(launchDeg);
+        const hubX = ClimbLayoutPen.ringX(launchDeg, landRho) + Math.cos(along) * side, hubZ = ClimbLayoutPen.ringZ(launchDeg, landRho) - Math.sin(along) * side;
+        pen.boxAt("zx2", "sweeper", hubX, hubZ, launchTop + S.SWEEP_HIGH, S.LAND_ARM * 2, S.SWEEP_WIDTH, launchDeg, { depth: S.SWEEP_HIGH - S.SWEEP_LOW, look: "sweeper7", spin: { rate: S.LAND_RATE, phase: 1 } });
+        const padRho = S.LAUNCH_INNER + S.PAD / 2;
+        pen.box("zj1", "pad", launchDeg, padRho, launchTop + 0.3, S.PAD, S.PAD, launchDeg, { depth: 0.6, look: "pad" });
+        const windRho = (S.SUMMIT_RADIUS + S.LAUNCH_INNER) / 2;
+        pen.box("zv2", "wind", launchDeg, windRho, S.TOP_Y + 3, S.LAUNCH_INNER - S.SUMMIT_RADIUS + 2, 8, launchDeg - 90, {
+            depth: 5, look: "wind7", gust: { dirDeg: launchDeg + 90, speed: S.LONG_WIND_SPEED, period: S.LONG_WIND_PERIOD, share: S.WIND_SHARE, phase: 1.2 },
+        });
+        pen.round("summit", "summit", 0, 0, S.TOP_Y, S.SUMMIT_RADIUS, { depth: S.SUMMIT_DEPTH, look: "summit" });
+        return pen.pieces;
+    }
+    static routes() {
+        const S = TowerStageSevenLayout, ice = Array.from({ length: S.ICE_COUNT }, (_, k) => "zi" + (k + 1)), crumble = Array.from({ length: S.CRUMBLE_COUNT + 1 }, (_, k) => "zc" + (k + 1));
+        const wind = Array.from({ length: S.WIND_COUNT }, (_, k) => "zw" + (k + 1));
+        return [
+            { stage: 7, name: "hard7", label: "우주 기지 길", ratioLimit: 0.9, steps: ["rest7", "zs1", "zd1", ...ice, "zr1", ...crumble, "zr2", ...wind, "zt1", "zl1", "zl2", "zj1", "summit"] },
+        ];
+    }
+}
+TowerStageSevenLayout.FLOOR = 180;
+TowerStageSevenLayout.TOP_Y = 200;
+TowerStageSevenLayout.REST_RADIUS = 4.2;
+TowerStageSevenLayout.SPOKE_DEG = 300;
+TowerStageSevenLayout.SPOKE_LENGTH = 5;
+TowerStageSevenLayout.SPOKE_WIDTH = 2.4;
+TowerStageSevenLayout.DEPTH = 0.6;
+TowerStageSevenLayout.REST = 3.2;
+TowerStageSevenLayout.ENTRY_RHO = 13.5;
+TowerStageSevenLayout.ICE_RHO = 15;
+TowerStageSevenLayout.ICE_ALONG = 3;
+TowerStageSevenLayout.ICE_ACROSS = 2.2;
+TowerStageSevenLayout.ICE_GAP = 3.8;
+TowerStageSevenLayout.ICE_STEP = 0.8;
+TowerStageSevenLayout.ICE_COUNT = 4;
+TowerStageSevenLayout.CRUMBLE_RHO = 15;
+TowerStageSevenLayout.CRUMBLE = 2.4;
+TowerStageSevenLayout.CRUMBLE_GAP = 3.7;
+TowerStageSevenLayout.CRUMBLE_STEP = 1;
+TowerStageSevenLayout.CRUMBLE_COUNT = 3;
+TowerStageSevenLayout.MAST = 2;
+TowerStageSevenLayout.MAST_DEPTH = 4;
+TowerStageSevenLayout.MAST_RISE = 3.8;
+TowerStageSevenLayout.MAST_GAP = 1.4;
+TowerStageSevenLayout.SWEEP_DECK_ALONG = 8;
+TowerStageSevenLayout.SWEEP_DECK_RISE = 0.4;
+TowerStageSevenLayout.SWEEP_GAP = 2.4;
+TowerStageSevenLayout.SWEEP_ARM = 3.4;
+TowerStageSevenLayout.SWEEP_WIDTH = 0.5;
+TowerStageSevenLayout.SWEEP_LOW = 0.5;
+TowerStageSevenLayout.SWEEP_HIGH = 1.05;
+TowerStageSevenLayout.SWEEP_RATE = 1.9;
+TowerStageSevenLayout.LAND_ARM = 3.8;
+TowerStageSevenLayout.LAND_HUB_OUT = 1;
+TowerStageSevenLayout.LAND_STEP = 0.6;
+TowerStageSevenLayout.LAND_RATE = -2;
+TowerStageSevenLayout.WIND_RHO = 16;
+TowerStageSevenLayout.WIND_PANEL = 2.4;
+TowerStageSevenLayout.WIND_GAP = 4;
+TowerStageSevenLayout.WIND_STEP = 0.8;
+TowerStageSevenLayout.WIND_COUNT = 3;
+TowerStageSevenLayout.WIND_SPEED = 3.2;
+TowerStageSevenLayout.WIND_PERIOD = 3.6;
+TowerStageSevenLayout.WIND_SHARE = 0.5;
+TowerStageSevenLayout.LAUNCH_INNER = 9;
+TowerStageSevenLayout.LAUNCH_WIDTH = 3.2;
+TowerStageSevenLayout.PAD = 1.8;
+TowerStageSevenLayout.SUMMIT_RADIUS = 5;
+TowerStageSevenLayout.SUMMIT_DEPTH = 1.2;
+TowerStageSevenLayout.LONG_RISE = 1.6;
+TowerStageSevenLayout.LONG_WIND_SPEED = 2.4;
+TowerStageSevenLayout.LONG_WIND_PERIOD = 3;
 class TowerLevelData {
     static spec() {
         return {
             stages: TowerLevelData.STAGES.map((s) => ({ ...s })),
-            pieces: [...TowerHubLayout.pieces(), ...TowerStageOneLayout.pieces(), ...TowerStageTwoLayout.pieces(), ...TowerStageThreeLayout.pieces(), ...TowerStageFourLayout.pieces(), ...TowerStageFiveLayout.pieces(), ...TowerStageSixLayout.pieces()],
+            pieces: [...TowerHubLayout.pieces(), ...TowerStageOneLayout.pieces(), ...TowerStageTwoLayout.pieces(), ...TowerStageThreeLayout.pieces(), ...TowerStageFourLayout.pieces(), ...TowerStageFiveLayout.pieces(), ...TowerStageSixLayout.pieces(), ...TowerStageSevenLayout.pieces()],
             portals: TowerHubLayout.portals(),
-            routes: [...TowerStageOneLayout.routes(), ...TowerStageTwoLayout.routes(), ...TowerStageThreeLayout.routes(), ...TowerStageFourLayout.routes(), ...TowerStageFiveLayout.routes(), ...TowerStageSixLayout.routes()],
+            routes: [...TowerStageOneLayout.routes(), ...TowerStageTwoLayout.routes(), ...TowerStageThreeLayout.routes(), ...TowerStageFourLayout.routes(), ...TowerStageFiveLayout.routes(), ...TowerStageSixLayout.routes(), ...TowerStageSevenLayout.routes()],
             spawn: TowerHubLayout.spawn(),
         };
     }

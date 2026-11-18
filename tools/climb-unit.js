@@ -353,6 +353,61 @@ function box(id, x, z, y, sx, sz, more = {}) { return { id, kind: "static", stag
   run(r, 0.5).forEach((e) => { if (e.t === "pad" && bounced === null) bounced = r.body.driftX; });
   check("움직이는 점프대: 튕기면서 점프대 속도를 실음", bounced !== null && near(bounced, 3.5, 1e-6), bounced);
 }
+{
+  const r = world([box("ice", 0, 0, 5, 40, 40, { kind: "ice", stage: 7 })], { x: 0, y: 5, z: 0, yaw: 0 });
+  settle(r);
+  r.steer(1, 0);
+  run(r, 0.5);
+  check("얼음: 0.5초 달려도 최고 속도가 안 됨(가속 8 m/s²)", near(r.body.speed, 4, 0.1), r.body.speed);
+  run(r, 1);
+  check("얼음: 결국 7 m/s 까지 오름", near(r.body.speed, 7, 1e-6), r.body.speed);
+  r.steer(0, 0);
+  const from = r.body.x;
+  run(r, 2);
+  check("얼음: 손을 놓아도 약 4.9m 미끄러진 뒤 멈춤", near(r.body.x - from, 4.9, 0.15) && r.body.speed === 0, { slid: r.body.x - from, speed: r.body.speed });
+}
+{
+  const r = world([box("cr", 0, 0, 5, 4, 4, { kind: "crumble", stage: 7 })], { x: 0, y: 5.01, z: 0, yaw: 0 });
+  const piece = r.level.piece("cr");
+  let crumbled = null;
+  const events = run(r, 0.6);
+  check("무너지는 발판: 0.6초 동안은 그대로", piece.solid && r.body.grounded && piece.shaking > 0.5, { solid: piece.solid, shaking: piece.shaking });
+  run(r, 0.2).forEach((e) => { if (e.t === "crumble") crumbled = e.piece; });
+  check("무너지는 발판: 밟고 0.7초 뒤 무너져 떨어짐", crumbled === "cr" && !piece.solid && !r.body.grounded, { crumbled, solid: piece.solid });
+  check("무너지는 발판: 처음 이벤트 전에는 무너짐 없음", !events.some((e) => e.t === "crumble"));
+  run(r, 3);
+  check("무너지는 발판: 3초 뒤 다시 생김", piece.solid && piece.age < 0, piece.age);
+  const again = world([box("cr", 0, 0, 5, 4, 4, { kind: "crumble", stage: 7 })]);
+  check("무너지는 발판: 새 판을 시작하면 처음 상태", again.level.piece("cr").solid);
+}
+{
+  const bar = { id: "bar", kind: "sweeper", stage: 7, x: 0, y: 1.05, z: 0, sx: 6, sz: 0.5, depth: 0.55, spin: { rate: 2, phase: 0 } };
+  const r = world([bar], { x: 0, y: 0, z: 2, yaw: 0 });
+  let knock = null;
+  run(r, 1.5).forEach((e) => { if (e.t === "knock" && !knock) knock = { speed: Math.hypot(r.body.vx, r.body.vz) }; });
+  check("회전 막대: 서 있으면 지나가는 막대에 맞아 튕겨 나감", knock !== null, knock);
+  const sweeper = r.level.piece("bar");
+  sweeper.update(0);
+  const probe = { x: 2, y: 1.1, z: 0 };
+  check("회전 막대: 막대보다 높이 뛰면 안 맞음", !sweeper.hits(probe) && sweeper.hits({ x: 2, y: 0, z: 0 }));
+  const push = { x: 2, y: 0, z: 0 };
+  check("회전 막대: 막대가 도는 쪽으로 밀어냄", near(sweeper.pushX(push), 0, 1e-9) && near(sweeper.pushZ(push), -1, 1e-9), [sweeper.pushX(push), sweeper.pushZ(push)]);
+}
+{
+  const zone = { id: "wind", kind: "wind", stage: 7, x: 0, y: 5, z: 0, sx: 40, sz: 40, depth: 6, gust: { dirDeg: 90, speed: 3, period: 10, share: 1, phase: 5 } };
+  const r = world([zone], { x: 0, y: 0, z: 0, yaw: 0 });
+  settle(r);
+  const from = r.body.x;
+  run(r, 1);
+  check("바람: 땅에 서 있으면 바람의 절반(1.5 m/s)만큼 밀림", near(r.body.x - from, 1.5, 0.05), r.body.x - from);
+  const gust = r.level.piece("wind");
+  check("바람: 돌풍은 켜질 때 0.4초에 걸쳐 세짐", near(gust.strengthAt(-5 + 0.2), 0.5, 1e-6) && gust.strengthAt(-5 + 0.6) === 1, [gust.strengthAt(-4.8), gust.strengthAt(-4.4)]);
+}
+{
+  const r = world([{ id: "top", kind: "summit", stage: 7, x: 0, y: 3, z: 0, radius: 4, depth: 1 }], { x: 0, y: 3.01, z: 0, yaw: 0 }, 6);
+  const events = run(r, 0.5);
+  check("꼭대기 깃발: 서면 스테이지 7 클리어와 완주 이벤트", events.some((e) => e.t === "stageClear" && e.stage === 7) && events.filter((e) => e.t === "summit").length === 1 && r.progress.cleared === 7, events.map((e) => e.t));
+}
 
 console.log("climb-unit: 통과 " + passed + ", 실패 " + failures.length);
 failures.forEach((f) => console.log("  실패: " + f));

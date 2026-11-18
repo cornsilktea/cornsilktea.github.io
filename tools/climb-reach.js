@@ -4,7 +4,7 @@
 // 3) 발사대는 힘 단계별 결과를 모두 적음   4) 갇히는 발판·길에 없는 발판 확인
 const K = require("./climb-load.js")();
 const { ClimbBot } = require("./climb-bot.js");
-const { ClimbBalance: B, ClimbRules, TowerLevel, StageProgress, TowerLevelData, GrabHold, JumpPad, MovingJumpPad } = K;
+const { ClimbBalance: B, ClimbRules, TowerLevel, StageProgress, TowerLevelData, GrabHold, JumpPad, MovingJumpPad, SummitGoal } = K;
 const verbose = process.argv.includes("-v");
 
 class ReachReport {
@@ -157,7 +157,9 @@ class RouteInspector {
     }
     this.report.check(route.name + " 연속 점프 5회 이하", worstChain <= 5, worstChain);
     if (route.stage >= 4) this.report.check(route.name + " 점프대 멀리뛰기 구간이 있음(스테이지 4부터)", longJumps >= 1, longJumps);
-    this.report.check(route.name + " 끝이 다음 스테이지 시작 쉼터", pieces[pieces.length - 1].startOf === route.stage + 1);
+    const last = pieces[pieces.length - 1];
+    if (route.stage === B.STAGE_COUNT) this.report.check(route.name + " 끝이 꼭대기 깃발(" + B.TOP + "m)", last instanceof SummitGoal && Math.abs(last.top - B.TOP) < 1e-9, last.id);
+    else this.report.check(route.name + " 끝이 다음 스테이지 시작 쉼터", last.startOf === route.stage + 1);
     this.report.note(route.label + ": 발판 " + pieces.length + "개, 가장 먼 점프 " + worstAt + " (최대 거리의 " + Math.round(worstRatio * 100) + "%), 연속 점프 최대 " + worstChain + "회");
   }
 
@@ -188,7 +190,7 @@ class TrapInspector {
     // 기차 칸처럼 같은 무리(group)의 움직이는 발판은 길에 하나만 적어도 모두 길에 속한다
     this.level.pieces.forEach((p) => { if (p.moving && groups.has(p.group)) onRoute.add(p.id); });
     // 이름에 점이 있는 조각(hB.isle·hA.roofIn 등)은 집·섬에 딸린 몸통이라 길에 넣지 않는다
-    const decor = { has: (id) => id === "trunk" || /^tower\d$/.test(id) || id.includes(".") };
+    const decor = { has: (id) => id === "trunk" || /^tower\d$/.test(id) || id.includes(".") || this.level.piece(id).hazard };
     for (const piece of this.level.pieces) {
       if (!decor.has(piece.id)) this.report.check("발판 " + piece.id + " 는 어떤 길에든 속함", onRoute.has(piece.id));
       if (piece.solid && !piece.hub && !decor.has(piece.id)) this.report.check("발판 " + piece.id + " 에 갇히지 않음(내려갈 곳 있음)", this.open(piece));
