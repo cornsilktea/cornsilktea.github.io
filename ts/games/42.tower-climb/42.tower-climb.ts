@@ -26,7 +26,7 @@ class TowerClimbGame {
   private portalHint = "";
   private shownStage = -1;
 
-  constructor(private readonly libs: ThreeLibs) {
+  constructor(private readonly libs: ThreeLibs, private readonly gauge: ClimbLoadGauge) {
     this.handlers = {
       jump: () => this.sfx.play("jump"),
       land: (e) => { if (e.drop > 1.2) this.sfx.play("land"); },
@@ -39,14 +39,17 @@ class TowerClimbGame {
       portalEnter: () => this.sfx.play("portal"),
       portalArrive: (e) => { this.view.avatar.playOnce("Spawn_Air", 0.7); this.hud.banner("스테이지 " + e.stage + " 시작점", false, 2); },
     };
-    this.boot().catch((error) => { ClimbDom.el("loading").textContent = "불러오기 실패: " + error; });
+    this.boot().catch((error) => this.gauge.fail("불러오지 못했어요: " + ClimbLoadGauge.describe(error)));
   }
 
   private async boot(): Promise<void> {
     const assets = new CharacterAssets(this.libs);
+    assets.onProgress = (progress) => this.gauge.characters(progress);
     await assets.load();
     const library = new ClimbModelLibrary(this.libs);
+    library.onProgress = (progress) => this.gauge.models(progress);
     await library.load(assets.clips);
+    await this.gauge.step("tower");
     const factory = new CharacterModelFactory(this.libs, assets);
     this.level = new TowerLevel(TowerLevelData.spec());
     this.startPanel = new ClimbStartPanel();
@@ -55,6 +58,7 @@ class TowerClimbGame {
     this.rules = new ClimbRules(this.level, this.progress);
     const touchDevice = "ontouchstart" in window || navigator.maxTouchPoints > 0;
     this.view = new ClimbWorldView(this.libs, ClimbDom.el<HTMLCanvasElement>("view"), library, factory, this.level, touchDevice, () => this.state === "play");
+    await this.gauge.step("ready");
     const profile = new PlayerProfile();
     this.view.avatar.wear(profile.look);
     profile.onChange(() => this.view.avatar.wear(profile.look));
@@ -76,7 +80,7 @@ class TowerClimbGame {
     ClimbDom.el("btnQuit").addEventListener("click", () => this.showMenu());
     this.view.portals.sync(this.progress);
     this.view.quality.restore();
-    ClimbDom.el("loading").hidden = true;
+    this.gauge.finish();
     this.showMenu();
     requestAnimationFrame((now) => this.loop(now));
   }

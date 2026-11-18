@@ -15,6 +15,8 @@ class ClimbModelLibrary {
     constructor(libs) {
         this.libs = libs;
         this.clips = new Map();
+        this.progress = new CharacterLoadProgress();
+        this.onProgress = () => undefined;
         this.models = new Map();
         this.lambert = new Map();
     }
@@ -22,11 +24,20 @@ class ClimbModelLibrary {
         const loader = new this.libs.GLTFLoader(), D = ClimbModelLibrary.DIRECTORY;
         baseClips.forEach((clip, name) => this.clips.set(name, clip));
         const names = Object.keys(ClimbModelLibrary.FILES);
-        const [extra, ...scenes] = await Promise.all([loader.loadAsync(D + ClimbModelLibrary.EXTRA_CLIPS), ...names.map((name) => loader.loadAsync(D + ClimbModelLibrary.FILES[name]))]);
+        this.progress.total = names.length + 1;
+        this.onProgress(this.progress);
+        const [extra, ...scenes] = await Promise.all([this.fetch(loader, D + ClimbModelLibrary.EXTRA_CLIPS), ...names.map((name) => this.fetch(loader, D + ClimbModelLibrary.FILES[name]))]);
         extra.animations.forEach((clip) => { if (!this.clips.has(clip.name))
             this.clips.set(clip.name, clip); });
         scenes.forEach((gltf, index) => this.models.set(names[index], this.flatten(gltf.scene)));
         Object.entries(ClimbModelLibrary.TINTS).forEach(([name, color]) => this.tint(name, color));
+    }
+    fetch(loader, url) {
+        return loader.loadAsync(url).then((gltf) => {
+            this.progress.done++;
+            this.onProgress(this.progress);
+            return gltf;
+        });
     }
     tint(name, color) {
         for (const part of this.model(name).parts) {

@@ -37,6 +37,8 @@ class ClimbModelLibrary {
   static readonly TINTS: Readonly<Record<string, number>> = { hexIsle: 0x9FB878 };
 
   readonly clips = new Map<string, Three<"AnimationClip">>();
+  readonly progress = new CharacterLoadProgress();
+  onProgress: (progress: CharacterLoadProgress) => void = () => undefined;
   private readonly models = new Map<string, ClimbModel>();
   private readonly lambert = new Map<string, Three<"MeshLambertMaterial">>();
 
@@ -46,10 +48,20 @@ class ClimbModelLibrary {
     const loader = new this.libs.GLTFLoader(), D = ClimbModelLibrary.DIRECTORY;
     baseClips.forEach((clip, name) => this.clips.set(name, clip));
     const names = Object.keys(ClimbModelLibrary.FILES);
-    const [extra, ...scenes] = await Promise.all([loader.loadAsync(D + ClimbModelLibrary.EXTRA_CLIPS), ...names.map((name) => loader.loadAsync(D + ClimbModelLibrary.FILES[name]))]);
+    this.progress.total = names.length + 1;
+    this.onProgress(this.progress);
+    const [extra, ...scenes] = await Promise.all([this.fetch(loader, D + ClimbModelLibrary.EXTRA_CLIPS), ...names.map((name) => this.fetch(loader, D + ClimbModelLibrary.FILES[name]))]);
     extra.animations.forEach((clip) => { if (!this.clips.has(clip.name)) this.clips.set(clip.name, clip); });
     scenes.forEach((gltf, index) => this.models.set(names[index], this.flatten(gltf.scene)));
     Object.entries(ClimbModelLibrary.TINTS).forEach(([name, color]) => this.tint(name, color));
+  }
+
+  private fetch(loader: InstanceType<GLTFLoaderClass>, url: string): Promise<CharacterGltf> {
+    return loader.loadAsync(url).then((gltf) => {
+      this.progress.done++;
+      this.onProgress(this.progress);
+      return gltf as CharacterGltf;
+    });
   }
 
   private tint(name: string, color: number): void {
