@@ -1,4 +1,7 @@
-interface ClimbBestRecord { h: number; s: number; t: number; f: number }
+interface ClimbHeightRecord { h: number; s: number }
+interface ClimbSpeedRecord { t: number; sp: number[] }
+type ClimbSpeedFinish = Extract<ClimbEvent, { t: "speedrunFinish" }>;
+type ClimbRecordMerge = (local: string | null, account: string | null) => string | null;
 
 class ClimbDom {
   static el<T extends HTMLElement = HTMLElement>(id: string): T {
@@ -9,41 +12,74 @@ class ClimbDom {
 }
 
 class ClimbText {
+  static readonly MINUS = "−";
+
+  static tenths(seconds: number): number { return Math.floor(seconds * 10 + 1e-6); }
   static clock(seconds: number): string {
-    const whole = Math.floor(seconds), minutes = Math.floor(whole / 60), rest = whole % 60, tenth = Math.floor((seconds - whole) * 10);
-    return minutes + ":" + (rest < 10 ? "0" : "") + rest + "." + tenth;
+    const tenths = ClimbText.tenths(seconds), minutes = Math.floor(tenths / 600), rest = Math.floor(tenths / 10) % 60;
+    return minutes + ":" + (rest < 10 ? "0" : "") + rest + "." + (tenths % 10);
+  }
+  static delta(seconds: number): string {
+    const tenths = Math.abs(Math.round(seconds * 10));
+    return (seconds < 0 ? ClimbText.MINUS : "+") + Math.floor(tenths / 10) + "." + (tenths % 10);
   }
   static meters(value: number): string { return Math.floor(value + 1e-6) + "m"; }
+  static number(value: unknown): number { return typeof value === "number" && isFinite(value) && value > 0 ? value : 0; }
 }
 
-class ClimbRecords {
-  static readonly GAME = "towerclimb";
-  static readonly STORAGE_KEY = "towerclimb_best_v1";
-
-  best: ClimbBestRecord;
+abstract class ClimbRecordBook<T> {
+  best: T;
   readonly world: WorldRecordHandle | null;
   private readonly account: { push(): void } | null;
 
-  constructor(private readonly onChange: () => void) {
-    this.best = ClimbRecords.read();
+  constructor(private readonly game: string, private readonly storageKey: string, lower: boolean, format: (value: number) => string, private readonly onChange: () => void) {
+    this.best = this.read();
     const factory = window.WorldRecord;
-    this.world = factory ? factory(ClimbRecords.GAME, { lower: false, format: (value) => value + "m" }) : null;
+    this.world = factory ? factory(game, { lower, format }) : null;
     if (this.world) {
       this.world.onChange(() => this.onChange());
       const loading = this.world.load();
       if (loading) loading.then(() => this.onChange(), () => undefined);
     }
     this.account = factory && factory.syncBest
-      ? factory.syncBest(ClimbRecords.GAME, { storageKey: ClimbRecords.STORAGE_KEY, merge: ClimbRecords.merge, onApply: () => { this.best = ClimbRecords.read(); this.onChange(); } })
+      ? factory.syncBest(game, { storageKey, merge: this.merger(factory), onApply: () => { this.best = this.read(); this.onChange(); } })
       : null;
   }
 
-  static parse(raw: string | null): ClimbBestRecord | null {
+  protected abstract parse(raw: string | null): T | null;
+  protected abstract empty(): T;
+  protected abstract merger(factory: WorldRecordFactory): ClimbRecordMerge;
+
+  private read(): T {
+    try { return this.parse(localStorage.getItem(this.storageKey)) ?? this.empty(); } catch (error) { return this.empty(); }
+  }
+
+  protected save(): void {
+    try { localStorage.setItem(this.storageKey, JSON.stringify(this.best)); } catch (error) { return; }
+    if (this.account) this.account.push();
+    this.onChange();
+  }
+
+  protected submit(value: number): void {
+    const world = this.world;
+    if (!world || value <= 0 || (!world.beats(value) && !world.beatsClass(value))) return;
+    world.prompt(value);
+    const factory = window.WorldRecord;
+    if (factory && factory.pushBest) factory.pushBest(this.game);
+  }
+}
+
+class ClimbRecords extends ClimbRecordBook<ClimbHeightRecord> {
+  static readonly GAME = "towerclimb";
+  static readonly STORAGE_KEY = "towerclimb_best_v1";
+
+  constructor(onChange: () => void) { super(ClimbRecords.GAME, ClimbRecords.STORAGE_KEY, false, (value) => value + "m", onChange); }
+
+  static parse(raw: string | null): ClimbHeightRecord | null {
     if (!raw) return null;
     try {
-      const value = JSON.parse(raw) as Partial<ClimbBestRecord>;
-      const number = (v: unknown): number => typeof v === "number" && isFinite(v) && v > 0 ? v : 0;
-      return { h: Math.min(ClimbBalance.TOP, Math.floor(number(value.h))), s: Math.min(ClimbBalance.STAGE_COUNT, Math.floor(number(value.s))), t: number(value.t), f: number(value.f) };
+      const value = JSON.parse(raw) as Partial<ClimbHeightRecord>;
+      return { h: Math.min(ClimbBalance.TOP, Math.floor(ClimbText.number(value.h))), s: Math.min(ClimbBalance.STAGE_COUNT, Math.floor(ClimbText.number(value.s))) };
     } catch (error) {
       return null;
     }
@@ -51,21 +87,13 @@ class ClimbRecords {
 
   static merge(local: string | null, account: string | null): string | null {
     const a = ClimbRecords.parse(local), b = ClimbRecords.parse(account);
-    if (!a || !b) return a ? local : b ? account : null;
-    const faster = (x: number, y: number): number => x && y ? Math.min(x, y) : x || y;
-    return JSON.stringify({ h: Math.max(a.h, b.h), s: Math.max(a.s, b.s), t: faster(a.t, b.t), f: faster(a.f, b.f) });
+    if (!a || !b) return a ? JSON.stringify(a) : b ? JSON.stringify(b) : null;
+    return JSON.stringify({ h: Math.max(a.h, b.h), s: Math.max(a.s, b.s) });
   }
 
-  private static read(): ClimbBestRecord {
-    const empty = { h: 0, s: 0, t: 0, f: 0 };
-    try { return ClimbRecords.parse(localStorage.getItem(ClimbRecords.STORAGE_KEY)) ?? empty; } catch (error) { return empty; }
-  }
-
-  private save(): void {
-    try { localStorage.setItem(ClimbRecords.STORAGE_KEY, JSON.stringify(this.best)); } catch (error) { return; }
-    if (this.account) this.account.push();
-    this.onChange();
-  }
+  protected parse(raw: string | null): ClimbHeightRecord | null { return ClimbRecords.parse(raw); }
+  protected empty(): ClimbHeightRecord { return { h: 0, s: 0 }; }
+  protected merger(): ClimbRecordMerge { return ClimbRecords.merge; }
 
   offerHeight(meters: number): boolean {
     if (meters <= this.best.h) return false;
@@ -75,27 +103,54 @@ class ClimbRecords {
   }
 
   offerStage(stage: number): void { if (stage > this.best.s) { this.best.s = stage; this.save(); } }
+  submitWorld(meters: number): void { this.submit(meters); }
+}
 
-  offerTime(seconds: number): boolean {
-    if (this.best.t && seconds >= this.best.t) return false;
-    this.best.t = Math.round(seconds * 10) / 10;
+class ClimbSpeedRecords extends ClimbRecordBook<ClimbSpeedRecord> {
+  static readonly GAME = "towerclimbspeed";
+  static readonly STORAGE_KEY = "towerclimb_speed_v1";
+  static readonly WORLD_MIN_SECONDS = 60;
+
+  constructor(onChange: () => void) { super(ClimbSpeedRecords.GAME, ClimbSpeedRecords.STORAGE_KEY, true, (tenths) => ClimbText.clock(tenths / 10), onChange); }
+
+  static parse(raw: string | null): ClimbSpeedRecord | null {
+    if (!raw) return null;
+    try {
+      const value = JSON.parse(raw) as Partial<ClimbSpeedRecord>, t = ClimbText.number(value.t);
+      if (!t) return null;
+      const splits = Array.isArray(value.sp) ? value.sp : [];
+      return { t, sp: Array.from({ length: ClimbBalance.STAGE_COUNT }, (_, index) => ClimbText.number(splits[index])) };
+    } catch (error) {
+      return null;
+    }
+  }
+
+  static faster(local: string | null, account: string | null): string | null {
+    const a = ClimbSpeedRecords.parse(local), b = ClimbSpeedRecords.parse(account);
+    if (!a || !b) return a ? local : b ? account : null;
+    return b.t < a.t ? account : local;
+  }
+
+  protected parse(raw: string | null): ClimbSpeedRecord | null { return ClimbSpeedRecords.parse(raw); }
+  protected empty(): ClimbSpeedRecord { return { t: 0, sp: [] }; }
+  protected merger(factory: WorldRecordFactory): ClimbRecordMerge {
+    return factory.betterOf ? factory.betterOf((raw) => ClimbSpeedRecords.parse(raw)?.t ?? null, true) : ClimbSpeedRecords.faster;
+  }
+
+  get seconds(): number { return this.best.t; }
+  split(stage: number): number { return this.best.sp[stage - 1] ?? 0; }
+
+  offer(finish: ClimbSpeedFinish): boolean {
+    const seconds = ClimbText.tenths(finish.seconds) / 10;
+    if (seconds <= 0 || (this.best.t && seconds >= this.best.t)) return false;
+    this.best = { t: seconds, sp: finish.splits.map((split) => ClimbText.tenths(split) / 10) };
     this.save();
     return true;
   }
 
-  offerClimbTime(seconds: number): boolean {
-    if (this.best.f && seconds >= this.best.f) return false;
-    this.best.f = Math.round(seconds * 10) / 10;
-    this.save();
-    return true;
-  }
-
-  submitWorld(meters: number): void {
-    const world = this.world;
-    if (!world || meters <= 0 || (!world.beats(meters) && !world.beatsClass(meters))) return;
-    world.prompt(meters);
-    const factory = window.WorldRecord;
-    if (factory && factory.pushBest) factory.pushBest(ClimbRecords.GAME);
+  submitWorld(finish: ClimbSpeedFinish): void {
+    if (finish.seconds < ClimbSpeedRecords.WORLD_MIN_SECONDS) return;
+    this.submit(ClimbText.tenths(finish.seconds));
   }
 }
 
@@ -159,6 +214,12 @@ class ClimbHudFade {
   }
 }
 
+class ClimbHudSwitch {
+  private shown: boolean | null = null;
+  constructor(private readonly element: HTMLElement, private readonly name: string) {}
+  set(on: boolean): void { if (on !== this.shown) { this.shown = on; this.element.classList.toggle(this.name, on); } }
+}
+
 class ClimbHud {
   static readonly MAP_CELL = 22;
   static readonly PLAY_IDS: readonly string[] = ["hudTop", "hudLeft", "hudMap", "controls", "btnPause"];
@@ -167,6 +228,8 @@ class ClimbHud {
   private readonly stage = new ClimbHudField(ClimbDom.el("hudStage"));
   private readonly time = new ClimbHudField(ClimbDom.el("hudTime"));
   private readonly best = new ClimbHudField(ClimbDom.el("hudBest"));
+  private readonly speedBest = new ClimbHudField(ClimbDom.el("hudSpeedBest"));
+  private readonly speedMode = new ClimbHudSwitch(ClimbDom.el("hudLeft"), "speed");
   private readonly bar = new ClimbHudMeter(ClimbDom.el("hudBarFill"));
   private readonly veil = new ClimbHudFade(ClimbDom.el("slowVeil"));
   private readonly white = new ClimbHudFade(ClimbDom.el("whiteFade"));
@@ -230,13 +293,15 @@ class ClimbHud {
     if (tip) this.grabTip.innerHTML = tip;
   }
 
-  update(rules: ClimbRules, records: ClimbRecords, fresh: boolean, dt: number): void {
-    const B = ClimbBalance, height = rules.height, stage = this.level.stageAt(height);
+  update(rules: ClimbRules, records: ClimbRecords, speed: ClimbSpeedRecords, fresh: ClimbFreshMarks, dt: number): void {
+    const B = ClimbBalance, height = rules.height, stage = this.level.stageAt(height), mode = rules.mode;
     this.height.set(ClimbText.meters(height));
     this.stage.set(stage.index > 0 ? "스테이지 " + stage.index + " · " + stage.name : stage.name);
     this.bar.set(height / B.TOP);
-    this.time.set(ClimbText.clock(rules.clock));
-    this.best.set("최고 " + records.best.h + "m" + (fresh ? " NEW" : ""));
+    this.speedMode.set(mode.timed);
+    this.time.set(mode.timed ? ClimbText.clock(mode.seconds) : "");
+    this.best.set(mode.timed ? "이번 판 " + ClimbText.meters(mode.peak) + " · 최고 " + records.best.h + "m" : "최고 " + records.best.h + "m" + (fresh.height ? " NEW" : ""));
+    this.speedBest.set(mode.timed ? "최고 기록 " + (speed.seconds ? ClimbText.clock(speed.seconds) : "-") + (fresh.speed ? " NEW" : "") : "");
     this.veil.set((1 - rules.time.scale) / (1 - B.SLOW_SCALE));
     this.white.set(rules.body.mode === "portal" ? 1 - rules.body.portalTime / B.PORTAL_TIME : 0);
     const dot = Math.round((1 - Math.min(1, height / B.TOP)) * B.STAGE_COUNT * ClimbHud.MAP_CELL);
@@ -249,47 +314,100 @@ class ClimbHud {
   }
 }
 
-class ClimbResultPanel {
-  private readonly box = ClimbDom.el("resultBox");
-  private readonly time = ClimbDom.el("resultTime");
+class ClimbFreshMarks {
+  height = false;
+  speed = false;
+  clear(): void { this.height = false; this.speed = false; }
+}
+
+abstract class ClimbResultCard {
+  private readonly box: HTMLElement;
+  constructor(id: string) { this.box = ClimbDom.el(id); }
+  protected reveal(): void { this.box.hidden = false; }
+  hide(): void { this.box.hidden = true; }
+}
+
+class ClimbPracticeResult extends ClimbResultCard {
   private readonly falls = ClimbDom.el("resultFalls");
   private readonly portals = ClimbDom.el("resultPortals");
-  private readonly best = ClimbDom.el("resultBest");
 
-  show(summit: Extract<ClimbEvent, { t: "summit" }>, records: ClimbRecords, fresh: boolean): void {
-    this.time.textContent = ClimbText.clock(summit.seconds);
+  constructor() { super("resultBox"); }
+
+  show(summit: Extract<ClimbEvent, { t: "summit" }>): void {
     this.falls.textContent = summit.falls + "번";
-    this.portals.textContent = summit.portals ? summit.portals + "번 (전체 기록에는 안 들어가요)" : "안 씀";
-    const best = records.best.f;
-    this.best.textContent = best ? ClimbText.clock(best) + (fresh ? " NEW" : "") : "-";
-    this.best.classList.toggle("fresh", fresh);
-    this.box.hidden = false;
+    this.portals.textContent = summit.portals ? summit.portals + "번" : "안 씀";
+    this.reveal();
+  }
+}
+
+class ClimbSpeedrunResult extends ClimbResultCard {
+  private readonly time = ClimbDom.el("speedTime");
+  private readonly best = ClimbDom.el("speedBest");
+  private readonly falls = ClimbDom.el("speedFalls");
+  private readonly splits = ClimbDom.el("speedSplits");
+
+  constructor() { super("speedResultBox"); }
+
+  private static paintDelta(cell: HTMLElement, seconds: number, before: number): void {
+    cell.className = "";
+    if (!before) { cell.textContent = ""; return; }
+    const delta = ClimbText.tenths(seconds) / 10 - before;
+    cell.textContent = "(" + ClimbText.delta(delta) + ")";
+    cell.className = delta < 0 ? "faster" : delta > 0 ? "slower" : "";
   }
 
-  hide(): void { this.box.hidden = true; }
+  show(finish: ClimbSpeedFinish, before: ClimbSpeedRecord, fresh: boolean): void {
+    this.time.textContent = ClimbText.clock(finish.seconds) + (fresh ? " NEW" : "");
+    this.time.classList.toggle("fresh", fresh);
+    this.best.textContent = before.t ? ClimbText.clock(before.t) : "처음 완주";
+    this.falls.textContent = finish.falls + "번";
+    this.splits.replaceChildren();
+    finish.splits.forEach((seconds, index) => {
+      const stage = index + 1, row = document.createElement("tr"), name = document.createElement("td"), at = document.createElement("td"), delta = document.createElement("td");
+      name.textContent = "스테이지 " + stage + " · " + (stage === ClimbBalance.STAGE_COUNT ? ClimbBalance.TOP : stage * 30) + "m";
+      at.textContent = seconds ? ClimbText.clock(seconds) : "-";
+      ClimbSpeedrunResult.paintDelta(delta, seconds, seconds ? before.sp[index] ?? 0 : 0);
+      row.append(name, at, delta);
+      this.splits.appendChild(row);
+    });
+    this.reveal();
+  }
+}
+
+class ClimbRecordCell {
+  private readonly value: HTMLElement;
+  private readonly note: HTMLElement;
+  private readonly box: HTMLElement | null;
+
+  constructor(valueId: string, noteId: string, boxId = "") {
+    this.value = ClimbDom.el(valueId);
+    this.note = ClimbDom.el(noteId);
+    this.box = boxId ? ClimbDom.el(boxId) : null;
+  }
+
+  paint(slot: RecordSlot | null | undefined): void {
+    if (this.box) this.box.hidden = !slot;
+    this.value.textContent = slot && slot.rec ? slot.text() : "-";
+    this.note.textContent = slot && slot.rec ? slot.who() : "";
+  }
 }
 
 class ClimbStartPanel {
   private readonly best = ClimbDom.el("recBest");
-  private readonly bestNote = ClimbDom.el("recBestNote");
-  private readonly world = ClimbDom.el("recWorld");
-  private readonly worldWho = ClimbDom.el("recWorldWho");
-  private readonly classBox = ClimbDom.el("recClassBox");
-  private readonly classValue = ClimbDom.el("recClass");
-  private readonly classWho = ClimbDom.el("recClassWho");
   private readonly stage = ClimbDom.el("recStage");
+  private readonly speedBest = ClimbDom.el("recSpeedBest");
+  private readonly heightWorld = new ClimbRecordCell("recWorld", "recWorldWho");
+  private readonly heightClass = new ClimbRecordCell("recClass", "recClassWho", "recClassBox");
+  private readonly speedWorld = new ClimbRecordCell("recSpeedWorld", "recSpeedWorldWho");
+  private readonly speedClass = new ClimbRecordCell("recSpeedClass", "recSpeedClassWho", "recSpeedClassBox");
 
-  paint(records: ClimbRecords): void {
-    const best = records.best, world = records.world;
-    this.best.textContent = best.h ? best.h + "m" : "-";
-    this.bestNote.textContent = best.f ? "꼭대기까지 " + ClimbText.clock(best.f) : best.t ? "스테이지 1 " + ClimbText.clock(best.t) : "";
-    this.stage.textContent = best.s + " / " + ClimbBalance.STAGE_COUNT;
-    this.world.textContent = world && world.rec ? world.text() : "-";
-    this.worldWho.textContent = world && world.rec ? world.who() : "";
-    const slot = world ? world.cls : null;
-    this.classBox.hidden = !slot;
-    if (!slot) return;
-    this.classValue.textContent = slot.rec ? slot.text() : "-";
-    this.classWho.textContent = slot.rec ? slot.who() : "";
+  paint(records: ClimbRecords, speed: ClimbSpeedRecords): void {
+    this.best.textContent = records.best.h ? records.best.h + "m" : "-";
+    this.stage.textContent = records.best.s + " / " + ClimbBalance.STAGE_COUNT;
+    this.speedBest.textContent = speed.seconds ? ClimbText.clock(speed.seconds) : "-";
+    this.heightWorld.paint(records.world);
+    this.heightClass.paint(records.world ? records.world.cls : null);
+    this.speedWorld.paint(speed.world);
+    this.speedClass.paint(speed.world ? speed.world.cls : null);
   }
 }

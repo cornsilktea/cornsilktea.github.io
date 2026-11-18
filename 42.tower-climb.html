@@ -39,8 +39,12 @@
   #hudBar { height: 5px; margin-top: 6px; border-radius: 3px; background: rgba(255,255,255,.18); overflow: hidden; }
   #hudBarFill { height: 100%; background: #D97B4F; transform-origin: left center; transform: scaleX(0); }
   #hudLeft { position: fixed; left: 12px; top: 54px; z-index: 5; pointer-events: none; font-weight: 800; font-variant-numeric: tabular-nums; }
-  #hudTime { font-size: 20px; }
-  #hudBest { font-size: 13px; color: #FFD7BF; margin-top: 2px; }
+  #hudMode, #hudTime, #hudSpeedBest { display: none; }
+  #hudLeft.speed #hudMode, #hudLeft.speed #hudTime, #hudLeft.speed #hudSpeedBest { display: block; }
+  #hudLeft.speed { border-left-color: #FFC83D; }
+  #hudMode { align-self: flex-start; font-size: 12px; font-weight: 800; color: #10182A; background: #FFC83D; border-radius: 4px; padding: 1px 8px; width: max-content; }
+  #hudTime { font-size: 30px; line-height: 1.1; margin-top: 2px; }
+  #hudBest, #hudSpeedBest { font-size: 13px; color: #FFD7BF; margin-top: 2px; }
   #hudMap { position: fixed; right: 12px; top: 56px; z-index: 5; pointer-events: none; padding: 8px 10px 8px 18px; }
   #hudMapCells { display: flex; flex-direction: column; position: relative; }
   #hudMapCells i { display: block; width: 30px; height: 20px; margin-bottom: 2px; border-radius: 3px; background: rgba(255,255,255,.2); font-style: normal; font-size: 12px; font-weight: 800; line-height: 20px; text-align: center; color: #fff; }
@@ -66,18 +70,27 @@
   #btnJump { right: 26px; bottom: 60px; width: 112px; height: 112px; font-size: 22px; }
   #btnSlow { right: 150px; bottom: 60px; width: 74px; height: 74px; font-size: 16px; background: radial-gradient(circle at 50% 32%, rgba(150,215,255,.96), rgba(40,90,140,.96)); }
   #btnSlow.on { border-color: #6EC8FF; transform: scale(1.08); }
-  #pauseBox, #resultBox { position: fixed; inset: 0; z-index: 12; display: flex; align-items: center; justify-content: center; background: rgba(10,22,44,.55); }
-  #pauseBox[hidden], #resultBox[hidden] { display: none; }
-  #pauseBox .card, #resultBox .card { background: rgba(10,22,44,.92); border-radius: 12px; border: 2px solid rgba(110,200,255,.5); padding: 18px; width: min(380px, 92vw); }
-  #pauseBox h2, #resultBox h2 { font-size: 24px; font-weight: 800; text-align: center; color: #FFD7BF; margin-bottom: 4px; }
+  #pauseBox, #resultBox, #speedResultBox { position: fixed; inset: 0; z-index: 12; display: flex; align-items: center; justify-content: center; background: rgba(10,22,44,.55); }
+  #pauseBox[hidden], #resultBox[hidden], #speedResultBox[hidden] { display: none; }
+  #pauseBox .card, #resultBox .card, #speedResultBox .card { background: rgba(10,22,44,.92); border-radius: 12px; border: 2px solid rgba(110,200,255,.5); padding: 18px; width: min(380px, 92vw); }
+  #pauseBox h2, #resultBox h2, #speedResultBox h2 { font-size: 24px; font-weight: 800; text-align: center; color: #FFD7BF; margin-bottom: 4px; }
   #pauseBox p { font-size: 14px; color: #CFE6FF; text-align: center; margin-bottom: 4px; }
   #resultBox .card { border-color: #D97B4F; }
-  #resultBox dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 10px 4px 4px; font-size: 15px; color: #CFE6FF; }
-  #resultBox dt { color: #9FB8D6; }
-  #resultBox dd { font-weight: 800; color: #fff; text-align: right; }
-  #resultBox dd.fresh { color: #D97B4F; }
+  #speedResultBox .card { border-color: #FFC83D; max-height: 96vh; overflow-y: auto; }
+  #speedResultBox h2 { color: #FFC83D; }
+  #resultBox dl, #speedResultBox dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 10px 4px 4px; font-size: 15px; color: #CFE6FF; }
+  #resultBox dt, #speedResultBox dt { color: #9FB8D6; }
+  #resultBox dd, #speedResultBox dd { font-weight: 800; color: #fff; text-align: right; font-variant-numeric: tabular-nums; }
+  #speedResultBox dd.fresh { color: #D97B4F; }
+  #speedResultBox table { width: 100%; border-collapse: collapse; margin: 8px 0 2px; font-size: 14px; font-variant-numeric: tabular-nums; }
+  #speedResultBox td { padding: 3px 4px; border-top: 1px solid rgba(255,255,255,.1); color: #CFE6FF; }
+  #speedResultBox td:nth-child(2) { text-align: right; font-weight: 800; color: #fff; }
+  #speedResultBox td:nth-child(3) { text-align: right; width: 4.6em; font-weight: 800; }
+  #speedResultBox td.faster { color: #5FD38A; }
+  #speedResultBox td.slower { color: #FF6B6B; }
+  @media (max-height: 640px) { #speedResultBox .card { padding: 12px; } #speedResultBox h2 { font-size: 20px; } #speedResultBox td { padding: 1px 4px; } }
   .st-screen { --st-bg: 14, 34, 58; --st-panel: rgba(14, 34, 58, .86); --st-accent: #6EC8FF; --st-accent-ink: #0A162C; --st-title2: #D97B4F; --st-glow: rgba(110, 200, 255, .5); overflow-y: auto; z-index: 20; }
-  @media (max-width: 700px) { #btnJump { width: 96px; height: 96px; } #btnSlow { right: 132px; } #hudMap { display: none; } }
+  @media (max-width: 700px) { #btnJump { width: 96px; height: 96px; } #btnSlow { right: 132px; } #hudMap { display: none; } #banner { top: 166px; font-size: 15px; } #banner.strong { font-size: 18px; } }
 </style>
 </head>
 <body>
@@ -90,7 +103,7 @@
   <div id="btnJump" class="tc-btn">점프</div>
 </div>
 <div id="hudTop" class="hud-box" hidden><div id="hudHeight">0m</div><div id="hudStage"></div><div id="hudBar"><div id="hudBarFill"></div></div></div>
-<div id="hudLeft" class="hud-box" hidden><div id="hudTime">0:00.0</div><div id="hudBest"></div></div>
+<div id="hudLeft" class="hud-box" hidden><div id="hudMode">스피드런</div><div id="hudTime">0:00.0</div><div id="hudSpeedBest"></div><div id="hudBest"></div></div>
 <div id="hudMap" class="hud-box" hidden><div id="hudMapCells"><div id="hudMapDot"></div></div></div>
 <button type="button" id="btnPause" class="hud-box" hidden>멈춤</button>
 <div id="banner" class="hud-box" hidden></div>
@@ -107,13 +120,22 @@
 <div id="resultBox" hidden><div class="card">
   <h2>꼭대기 도착! 200m</h2>
   <dl>
-    <dt>걸린 시간</dt><dd id="resultTime">-</dd>
     <dt>떨어진 횟수</dt><dd id="resultFalls">-</dd>
-    <dt>포탈</dt><dd id="resultPortals">-</dd>
-    <dt>꼭대기까지 최고 기록</dt><dd id="resultBest">-</dd>
+    <dt>포탈 사용</dt><dd id="resultPortals">-</dd>
   </dl>
   <button type="button" class="st-btn primary" id="btnAgain">처음 지점에서 다시</button>
   <button type="button" class="st-btn" id="btnResultQuit">시작 화면으로</button>
+</div></div>
+<div id="speedResultBox" hidden><div class="card">
+  <h2>스피드런 완주! 200m</h2>
+  <dl>
+    <dt>걸린 시간</dt><dd id="speedTime">-</dd>
+    <dt>개인 최고 기록</dt><dd id="speedBest">-</dd>
+    <dt>떨어진 횟수</dt><dd id="speedFalls">-</dd>
+  </dl>
+  <table><tbody id="speedSplits"></tbody></table>
+  <button type="button" class="st-btn primary" id="btnSpeedAgain">스피드런 다시 하기</button>
+  <button type="button" class="st-btn" id="btnSpeedQuit">나가기 (일반 모드)</button>
 </div></div>
 <div id="startScreen" class="st-screen" hidden>
   <div class="st-wrap">
@@ -121,10 +143,15 @@
     <div class="st-card">
       <button type="button" class="st-btn primary" id="btnStart">시작</button>
       <div class="st-recs">
-        <div class="st-rec"><span>개인 최고 기록</span><b id="recBest">-</b><small id="recBestNote"></small></div>
-        <div class="st-rec" id="recClassBox" hidden><span>우리 반 신기록</span><b id="recClass">-</b><small id="recClassWho"></small></div>
-        <div class="st-rec"><span>세계 신기록</span><b id="recWorld">-</b><small id="recWorldWho"></small></div>
+        <div class="st-rec"><span>개인 최고 높이</span><b id="recBest">-</b></div>
+        <div class="st-rec" id="recClassBox" hidden><span>우리 반 높이 신기록</span><b id="recClass">-</b><small id="recClassWho"></small></div>
+        <div class="st-rec"><span>세계 높이 신기록</span><b id="recWorld">-</b><small id="recWorldWho"></small></div>
         <div class="st-rec"><span>클리어한 스테이지</span><b id="recStage">0 / 7</b></div>
+      </div>
+      <div class="st-recs">
+        <div class="st-rec"><span>스피드런 개인 최고</span><b id="recSpeedBest">-</b></div>
+        <div class="st-rec" id="recSpeedClassBox" hidden><span>우리 반 스피드런 신기록</span><b id="recSpeedClass">-</b><small id="recSpeedClassWho"></small></div>
+        <div class="st-rec"><span>세계 스피드런 신기록</span><b id="recSpeedWorld">-</b><small id="recSpeedWorldWho"></small></div>
       </div>
     </div>
     <div class="st-card st-fold">
@@ -154,6 +181,7 @@
         <li>주황 표시가 있는 <b>손잡이</b>와 발판 <b>모서리</b>는 잡을 수 있어요. 높은 블록으로 점프하면 <b>모서리를 저절로 잡아요</b>. 매달린 채 앞으로 밀거나 점프를 누르면 기어올라가고, 뒤로 당기면 손을 놓아요. 손잡이에 매달려 점프를 누르면 위 손잡이로 올라가요.</li>
         <li>노란 <b>점프대</b>는 높이 튕겨 줘요.</li>
         <li><b>슬로 모션</b>은 누르고 있는 동안 얼마든지 쓸 수 있어요.</li>
+        <li>처음 지점 뒤쪽의 <b>금색 스피드런 포탈</b>에 들어가면 그 순간부터 시간이 흘러요. 스피드런 중에는 스테이지 포탈을 쓸 수 없고, 떨어져도 시간은 계속 가요. 꼭대기 깃발에 서면 기록이 남고, 스피드런 포탈을 다시 타면 기록 없이 나가요. 멈춤 중에는 시간도 멈춰요.</li>
       </ul>
     </div>
   </div>
@@ -161,12 +189,12 @@
 <script charset="utf-8" src="common/load-gauge.js?v=20261118c"></script>
 <script charset="utf-8" src="common/character-kit.js?v=20261116b"></script>
 <script charset="utf-8" src="common/fold-card.js"></script>
-<script charset="utf-8" src="games/42.tower-climb/42.climb-rules.js?v=20261118s"></script>
-<script charset="utf-8" src="games/42.tower-climb/42.tower-level-data.js?v=20261118s"></script>
-<script charset="utf-8" src="games/42.tower-climb/42.climb-scene.js?v=20261118s"></script>
+<script charset="utf-8" src="games/42.tower-climb/42.climb-rules.js?v=20261118sp"></script>
+<script charset="utf-8" src="games/42.tower-climb/42.tower-level-data.js?v=20261118sp"></script>
+<script charset="utf-8" src="games/42.tower-climb/42.climb-scene.js?v=20261118sp"></script>
 <script charset="utf-8" src="games/42.tower-climb/42.climb-input.js?v=20261117e"></script>
-<script charset="utf-8" src="games/42.tower-climb/42.climb-hud.js?v=20261118s"></script>
-<script charset="utf-8" src="games/42.tower-climb/42.tower-climb.js?v=20261118s"></script>
+<script charset="utf-8" src="games/42.tower-climb/42.climb-hud.js?v=20261118sp"></script>
+<script charset="utf-8" src="games/42.tower-climb/42.tower-climb.js?v=20261118sp"></script>
 <script charset="utf-8" src="games/42.tower-climb/42.climb-boot.js?v=20261118b"></script>
 <script type="module">
 new ClimbBoot(async () => {

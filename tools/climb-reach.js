@@ -198,14 +198,51 @@ class TrapInspector {
     const hub = this.level.pieces.find((p) => p.hub), spawn = this.level.spawn;
     this.report.check("시작 지점은 허브 위", hub.covers(spawn.x, spawn.z));
     for (const portal of this.level.portals) {
-      this.report.check("포탈 " + portal.stage + " 는 허브 위", hub.covers(portal.x, portal.z) && Math.hypot(portal.x, portal.z) < hub.radius - 2);
-      this.report.check("포탈 " + portal.stage + " 앞이 막히지 않음", !this.level.pieces.some((p) => p.solid && !p.hub && p.bottom < 3 && p.edge(portal.x, portal.z, { x: 0, z: 0, nx: 0, nz: 0, dist: 0, inside: false }).dist < 2 || p.solid && !p.hub && p.bottom < 3 && p.covers(portal.x, portal.z)));
+      const name = portal.kind === "speedrun" ? "스피드런 포탈" : "포탈 " + portal.stage;
+      this.report.check(name + " 는 허브 위", hub.covers(portal.x, portal.z) && Math.hypot(portal.x, portal.z) < hub.radius - 2);
+      this.report.check(name + " 앞이 막히지 않음", !this.level.pieces.some((p) => p.solid && !p.hub && p.bottom < 3 && p.edge(portal.x, portal.z, { x: 0, z: 0, nx: 0, nz: 0, dist: 0, inside: false }).dist < 2 || p.solid && !p.hub && p.bottom < 3 && p.covers(portal.x, portal.z)));
     }
     for (const stage of this.level.stages) {
       const start = this.level.stageStart(stage.index);
       if (start) this.report.check("스테이지 " + stage.index + " 시작 쉼터는 한 변 3m 이상·높이 " + stage.floor, start.rest && Math.abs(start.top - stage.floor) < 1e-9, start.top);
       if (start) this.report.check("스테이지 " + stage.index + " 시작 쉼터 가운데 위가 비어 있음(포탈로 와서 설 자리)", !this.level.pieces.some((p) => p !== start && p.solid && p.covers(start.x, start.z) && p.bottom < start.top + B.HEIGHT + 1 && p.top > start.top));
     }
+  }
+}
+
+// 스피드런 봇: 허브 시작 지점에서 스피드런 포탈로 걸어가 들어간 뒤 스테이지 1~7 을 가장 빠른 길로 이어서 간다
+class SpeedrunInspector {
+  constructor(level, report) { this.level = level; this.report = report; }
+
+  fastest(stage) {
+    const routes = this.level.routes.filter((r) => r.stage === stage);
+    return routes.find((r) => !r.name.startsWith("easy")) || routes[0];
+  }
+
+  walk(rules, x, z) {
+    for (let i = 0; i < 1200 && Math.hypot(x - rules.body.x, z - rules.body.z) > 0.3 && rules.body.mode === "free"; i++) { rules.steer(x - rules.body.x, z - rules.body.z); rules.advance(B.TICK); }
+  }
+
+  play() {
+    const rules = new ClimbRules(this.level, new StageProgress(0)), log = [], emit = rules.emit.bind(rules);
+    rules.emit = (event) => { log.push(Object.assign({ tick: rules.ticks }, event)); emit(event); };
+    const portal = this.level.portals.find((p) => p.kind === "speedrun");
+    for (let deg = 0; deg >= -180; deg -= 30) this.walk(rules, 12 * Math.sin(deg * Math.PI / 180), 12 * Math.cos(deg * Math.PI / 180));
+    this.walk(rules, portal.x, portal.z);
+    rules.steer(0, 0);
+    for (let i = 0; i < 400 && rules.body.mode === "portal"; i++) rules.advance(B.TICK);
+    this.report.check("스피드런 봇이 스피드런 포탈로 들어가 허브 시작 지점에 섬", rules.mode.name === "speedrun" && log.some((e) => e.t === "hubArrive"), log.map((e) => e.t));
+    for (let stage = 1; stage <= B.STAGE_COUNT; stage++) {
+      const route = this.fastest(stage), bot = new ClimbBot(K, rules, route.steps), result = bot.run(300);
+      this.report.check("스피드런 봇: 스테이지 " + stage + " (" + route.label + ") 이어서 감", result.done, { at: route.steps[bot.index], y: rules.body.y });
+      if (!result.done) return;
+    }
+    const finish = log.find((e) => e.t === "speedrunFinish"), splits = log.filter((e) => e.t === "split");
+    this.report.check("스피드런 봇 완주(speedrunFinish 한 번, 구간 기록 7개)", !!finish && log.filter((e) => e.t === "speedrunFinish").length === 1 && splits.length === B.STAGE_COUNT && finish.splits.every((s) => s > 0), { finish, splits: splits.length });
+    if (!finish) return;
+    const start = log.find((e) => e.t === "speedrunStart");
+    this.report.check("스피드런 봇: 기록 = 들어간 틱부터 꼭대기 틱까지", Math.abs(finish.seconds - (finish.tick - start.tick) * B.TICK) < 1e-6);
+    this.report.note("스피드런 봇 완주: " + finish.seconds.toFixed(1) + "초 (구간 " + finish.splits.map((s) => s.toFixed(1)).join(" / ") + ", 떨어진 횟수 " + finish.falls + ")");
   }
 }
 
@@ -228,4 +265,5 @@ for (const stage of new Set(level.routes.map((r) => r.stage))) {
 }
 report.check("발사대가 없음", !level.pieces.some((p) => p.look === "cannon"));
 new TrapInspector(level, report).inspect();
+new SpeedrunInspector(level, report).play();
 report.finish();

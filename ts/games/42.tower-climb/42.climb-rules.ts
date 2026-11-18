@@ -15,7 +15,9 @@ interface ClimbPieceSpec {
   noLedge?: boolean; startOf?: number; look?: string; move?: ClimbMoveSpec;
   spin?: ClimbSpinSpec; gust?: ClimbGustSpec;
 }
-interface ClimbPortalSpec { stage: number; x: number; y: number; z: number; yaw: number }
+type ClimbPortalKindName = "stage" | "speedrun";
+type ClimbRunModeName = "practice" | "speedrun";
+interface ClimbPortalSpec { kind?: ClimbPortalKindName; stage: number; x: number; y: number; z: number; yaw: number }
 interface ClimbRouteSpec { stage: number; name: string; label: string; ratioLimit: number; steps: string[] }
 interface ClimbStageSpec { index: number; name: string; floor: number; ceiling: number }
 interface ClimbSpawnSpec { x: number; y: number; z: number; yaw: number }
@@ -38,7 +40,12 @@ type ClimbEvent =
   | { t: "portalArrive"; stage: number }
   | { t: "knock"; piece: string }
   | { t: "crumble"; piece: string }
-  | { t: "summit"; seconds: number; falls: number; portals: number };
+  | { t: "summit"; falls: number; portals: number }
+  | { t: "speedrunStart" }
+  | { t: "speedrunExit" }
+  | { t: "hubArrive" }
+  | { t: "split"; stage: number; seconds: number }
+  | { t: "speedrunFinish"; seconds: number; splits: number[]; falls: number; peak: number };
 
 class ClimbBalance {
   static readonly TICK = 1 / 120;
@@ -576,6 +583,102 @@ class ClimbTimeScale {
   }
 }
 
+abstract class ClimbRunMode {
+  abstract readonly name: ClimbRunModeName;
+  get stagePortalsUsable(): boolean { return true; }
+  get timed(): boolean { return false; }
+  get seconds(): number { return 0; }
+  get peak(): number { return 0; }
+  tick(_rules: ClimbRules): void {}
+  restReached(_cleared: number, _rules: ClimbRules): void {}
+  abstract finish(rules: ClimbRules): void;
+  abstract switched(rules: ClimbRules): ClimbRunMode;
+}
+
+class ClimbPracticeMode extends ClimbRunMode {
+  readonly name = "practice";
+  finish(rules: ClimbRules): void { rules.emit({ t: "summit", falls: rules.falls, portals: rules.portalsUsed }); }
+  switched(rules: ClimbRules): ClimbRunMode {
+    rules.emit({ t: "speedrunStart" });
+    return new ClimbSpeedrunMode(rules.falls);
+  }
+}
+
+class ClimbSpeedrunMode extends ClimbRunMode {
+  readonly name = "speedrun";
+  readonly splits: number[] = new Array<number>(ClimbBalance.STAGE_COUNT).fill(0);
+  finished = false;
+  private elapsed = 0;
+  private highest = 0;
+
+  constructor(private readonly fallsBefore: number) { super(); }
+
+  get stagePortalsUsable(): boolean { return false; }
+  get timed(): boolean { return true; }
+  get seconds(): number { return this.elapsed; }
+  get peak(): number { return this.highest; }
+
+  tick(rules: ClimbRules): void {
+    if (this.finished) return;
+    this.elapsed += ClimbBalance.TICK / rules.time.scale;
+    const body = rules.body;
+    if (body.grounded || body.hanging) this.highest = Math.max(this.highest, body.y);
+  }
+
+  restReached(cleared: number, rules: ClimbRules): void {
+    const slot = cleared - 1;
+    if (this.finished || slot < 0 || slot >= this.splits.length || this.splits[slot] > 0) return;
+    this.splits[slot] = this.elapsed;
+    rules.emit({ t: "split", stage: cleared, seconds: this.elapsed });
+  }
+
+  finish(rules: ClimbRules): void {
+    if (this.finished) return;
+    this.highest = ClimbBalance.TOP;
+    this.restReached(ClimbBalance.STAGE_COUNT, rules);
+    this.finished = true;
+    rules.emit({ t: "speedrunFinish", seconds: this.elapsed, splits: this.splits.slice(), falls: rules.falls - this.fallsBefore, peak: this.highest });
+  }
+
+  switched(rules: ClimbRules): ClimbRunMode {
+    rules.emit({ t: "speedrunExit" });
+    return new ClimbPracticeMode();
+  }
+}
+
+abstract class ClimbPortalKind {
+  abstract open(spec: ClimbPortalSpec, rules: ClimbRules): boolean;
+  enter(_spec: ClimbPortalSpec, _rules: ClimbRules): void {}
+  abstract arrive(spec: ClimbPortalSpec, rules: ClimbRules): void;
+}
+
+class ClimbStagePortalKind extends ClimbPortalKind {
+  open(spec: ClimbPortalSpec, rules: ClimbRules): boolean { return rules.progress.portalOpen(spec.stage, rules.level, rules.mode); }
+  arrive(spec: ClimbPortalSpec, rules: ClimbRules): void {
+    const start = rules.level.stageStart(spec.stage);
+    if (!start) return;
+    rules.dropAt(start.x, start.top, start.z, ClimbBalance.PORTAL_DROP);
+    rules.portalsUsed++;
+    rules.emit({ t: "portalArrive", stage: spec.stage });
+  }
+}
+
+class ClimbSpeedrunPortalKind extends ClimbPortalKind {
+  open(): boolean { return true; }
+  enter(_spec: ClimbPortalSpec, rules: ClimbRules): void { rules.mode = rules.mode.switched(rules); }
+  arrive(_spec: ClimbPortalSpec, rules: ClimbRules): void {
+    const spawn = rules.level.spawn;
+    rules.dropAt(spawn.x, spawn.y, spawn.z, 0);
+    rules.body.yaw = spawn.yaw;
+    rules.emit({ t: "hubArrive" });
+  }
+}
+
+class ClimbPortalKinds {
+  static readonly KINDS: Readonly<Record<ClimbPortalKindName, ClimbPortalKind>> = { stage: new ClimbStagePortalKind(), speedrun: new ClimbSpeedrunPortalKind() };
+  static of(spec: ClimbPortalSpec): ClimbPortalKind { return ClimbPortalKinds.KINDS[spec.kind ?? "stage"]; }
+}
+
 class StageProgress {
   constructor(public cleared = 0) {}
 
@@ -585,7 +688,7 @@ class StageProgress {
     return true;
   }
   unlocked(portalStage: number): boolean { return portalStage >= 2 && portalStage - 1 <= this.cleared; }
-  portalOpen(portalStage: number, level: TowerLevel): boolean { return this.unlocked(portalStage) && level.hasStage(portalStage); }
+  portalOpen(portalStage: number, level: TowerLevel, mode: ClimbRunMode): boolean { return mode.stagePortalsUsable && this.unlocked(portalStage) && level.hasStage(portalStage); }
 }
 
 class TowerStage {
@@ -706,7 +809,7 @@ class ClimbCharacterBody {
   knockCooldown = 0;
   windX = 0; windZ = 0;
   portalTime = 0;
-  portalTo = 0;
+  portal: ClimbPortalSpec | null = null;
 
   place(x: number, y: number, z: number): void {
     this.x = this.prevX = x; this.y = this.prevY = y; this.z = this.prevZ = z;
@@ -758,12 +861,10 @@ class ClimbRules {
   readonly sweepers: SweeperBar[];
   readonly winds: WindZone[];
   summitReached = false;
-  clock = 0;
   ticks = 0;
-  started = false;
   peak = 0;
   portalsUsed = 0;
-  stageOneTime: number | null = null;
+  mode: ClimbRunMode = new ClimbPracticeMode();
   private moveX = 0;
   private moveZ = 0;
   private jumpLatch = false;
@@ -813,8 +914,6 @@ class ClimbRules {
   advance(realDt: number): ClimbEvent[] {
     const B = ClimbBalance, dt = Math.min(Math.max(realDt, 0), B.FRAME_CAP);
     this.events.length = 0;
-    if (!this.started && (this.steering || this.jumpLatch)) this.started = true;
-    if (this.started) this.clock += dt;
     this.time.update(dt, this.slowHeld);
     this.bank += dt * this.time.scale;
     while (this.bank >= B.TICK - 1e-12) { this.bank -= B.TICK; this.step(); }
@@ -826,6 +925,7 @@ class ClimbRules {
     const B = ClimbBalance, body = this.body;
     body.remember();
     this.ticks++;
+    this.mode.tick(this);
     this.moveMovers();
     this.carry();
     body.grabCooldown = Math.max(0, body.grabCooldown - B.TICK);
@@ -874,8 +974,10 @@ class ClimbRules {
     if (this.summitReached) return;
     this.summitReached = true;
     if (this.progress.clear(ClimbBalance.STAGE_COUNT)) this.emit({ t: "stageClear", stage: ClimbBalance.STAGE_COUNT });
-    this.emit({ t: "summit", seconds: this.clock, falls: this.falls, portals: this.portalsUsed });
+    this.mode.finish(this);
   }
+
+  beginSpeedrun(): void { this.mode = new ClimbPracticeMode().switched(this); }
 
   private carrier(): MovingPlatform | null {
     const body = this.body;
@@ -894,9 +996,8 @@ class ClimbRules {
   }
 
   touchStageStart(stage: number): void {
-    if (!this.progress.clear(stage - 1)) return;
-    if (stage === 2 && this.portalsUsed === 0 && this.stageOneTime === null) this.stageOneTime = this.clock;
-    this.emit({ t: "stageClear", stage: stage - 1 });
+    if (this.progress.clear(stage - 1)) this.emit({ t: "stageClear", stage: stage - 1 });
+    this.mode.restReached(stage - 1, this);
   }
 
   bounce(pad: PlatformPiece): void {
@@ -1000,13 +1101,15 @@ class ClimbRules {
     const B = ClimbBalance, body = this.body;
     if (body.mode !== "free") return;
     for (const portal of this.level.portals) {
-      if (!this.progress.portalOpen(portal.stage, this.level)) continue;
+      const kind = ClimbPortalKinds.of(portal);
+      if (!kind.open(portal, this)) continue;
       if (Math.hypot(portal.x - body.x, portal.z - body.z) > B.PORTAL_RADIUS || Math.abs(portal.y - body.y) > 1) continue;
       body.mode = "portal";
       body.portalTime = B.PORTAL_TIME;
-      body.portalTo = portal.stage;
+      body.portal = portal;
       body.vx = body.vy = body.vz = 0;
       this.emit({ t: "portalEnter", stage: portal.stage });
+      kind.enter(portal, this);
       return;
     }
   }
@@ -1144,14 +1247,17 @@ class ClimbRules {
     const B = ClimbBalance, body = this.body;
     body.portalTime -= B.TICK;
     if (body.portalTime > 0) return;
-    const start = this.level.stageStart(body.portalTo);
+    const portal = body.portal;
     body.mode = "free";
-    if (!start) return;
-    body.place(start.x, start.top + B.PORTAL_DROP, start.z);
+    body.portal = null;
+    if (portal) ClimbPortalKinds.of(portal).arrive(portal, this);
+  }
+
+  dropAt(x: number, top: number, z: number, lift: number): void {
+    const body = this.body;
+    body.place(x, top + lift, z);
     body.grounded = false;
     body.ground = null;
-    body.airPeak = start.top;
-    this.portalsUsed++;
-    this.emit({ t: "portalArrive", stage: body.portalTo });
+    body.airPeak = top;
   }
 }
