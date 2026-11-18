@@ -63,20 +63,53 @@ class KeyboardInput extends ClimbInputRouter {
   }
 }
 
+class TouchStick {
+  static readonly RADIUS = 60;
+
+  private originX = 0;
+  private originY = 0;
+
+  constructor(private readonly ring: HTMLElement, private readonly knob: HTMLElement) {}
+
+  grab(x: number, y: number): void {
+    this.originX = x; this.originY = y;
+    this.ring.style.left = x + "px";
+    this.ring.style.top = y + "px";
+    this.ring.classList.add("on");
+    this.knob.style.transform = "";
+  }
+
+  pull(x: number, y: number): { dx: number; dy: number; far: number } {
+    const dx = x - this.originX, dy = y - this.originY, far = Math.hypot(dx, dy), scale = far > TouchStick.RADIUS ? TouchStick.RADIUS / far : 1;
+    this.knob.style.transform = "translate(" + dx * scale + "px," + dy * scale + "px)";
+    return { dx, dy, far };
+  }
+
+  home(): void {
+    this.ring.style.left = "";
+    this.ring.style.top = "";
+    this.ring.classList.remove("on");
+    this.knob.style.transform = "";
+  }
+}
+
 class TouchInput extends ClimbInputRouter {
   static readonly DEAD_ZONE = 14;
-  static readonly KNOB_REACH = 46;
-  static readonly STICK_SIDE = 0.45;
+  static readonly STICK_SIDE = 0.5;
   static readonly TOUCH_TURN = 0.0058;
 
   used = false;
-  private stickId = -1;
-  private stickX = 0;
-  private stickY = 0;
-  private readonly lookers = new Map<number, { x: number; y: number }>();
+  private moveId = -1;
+  private lookId = -1;
+  private lookLastX = 0;
+  private lookLastY = 0;
+  private readonly moveStick: TouchStick;
+  private readonly lookStick: TouchStick;
 
-  constructor(zone: HTMLElement, private readonly base: HTMLElement, private readonly knob: HTMLElement, jump: HTMLElement, slow: HTMLElement, pause: HTMLElement) {
+  constructor(private readonly zone: HTMLElement, moveRing: HTMLElement, lookRing: HTMLElement, jump: HTMLElement, slow: HTMLElement, pause: HTMLElement) {
     super();
+    this.moveStick = new TouchStick(moveRing, TouchInput.knobOf(moveRing));
+    this.lookStick = new TouchStick(lookRing, TouchInput.knobOf(lookRing));
     zone.addEventListener("pointerdown", (e) => this.down(e));
     zone.addEventListener("pointermove", (e) => this.move(e));
     const up = (e: PointerEvent): void => this.up(e);
@@ -91,12 +124,23 @@ class TouchInput extends ClimbInputRouter {
     slow.addEventListener("pointerleave", slowOff);
   }
 
+  private static knobOf(ring: HTMLElement): HTMLElement {
+    const knob = ring.querySelector<HTMLElement>(".tc-knob");
+    if (!knob) throw new Error("조이스틱 손잡이가 없어요: " + ring.id);
+    return knob;
+  }
+
   private press(button: HTMLElement, act: () => void): void {
     button.addEventListener("pointerdown", (e) => { e.preventDefault(); if (this.enabled) act(); });
     button.addEventListener("touchstart", (e) => e.preventDefault(), { passive: false });
   }
 
-  release(): void { super.release(); this.stickId = -1; this.lookers.clear(); this.drawKnob(0, 0, false); }
+  release(): void {
+    super.release();
+    this.moveId = this.lookId = -1;
+    this.moveStick.home();
+    this.lookStick.home();
+  }
 
   private markTouch(e: PointerEvent): void {
     if (this.used || e.pointerType !== "touch") return;
@@ -104,43 +148,39 @@ class TouchInput extends ClimbInputRouter {
     document.body.classList.add("touch");
   }
 
+  private capture(pointerId: number): void {
+    try { this.zone.setPointerCapture(pointerId); } catch (error) { return; }
+  }
+
   private down(e: PointerEvent): void {
     this.markTouch(e);
     if (!this.enabled || e.pointerType === "mouse") return;
-    if (this.stickId < 0 && e.clientX < window.innerWidth * TouchInput.STICK_SIDE) {
-      this.stickId = e.pointerId;
-      this.stickX = e.clientX; this.stickY = e.clientY;
-      this.base.style.transform = "translate(" + (e.clientX - 64) + "px," + (e.clientY - 64) + "px)";
-      this.drawKnob(0, 0, true);
-      return;
-    }
-    this.lookers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const left = e.clientX < window.innerWidth * TouchInput.STICK_SIDE;
+    if (left ? this.moveId >= 0 : this.lookId >= 0) return;
+    this.capture(e.pointerId);
+    if (left) { this.moveId = e.pointerId; this.moveStick.grab(e.clientX, e.clientY); return; }
+    this.lookId = e.pointerId;
+    this.lookLastX = e.clientX; this.lookLastY = e.clientY;
+    this.lookStick.grab(e.clientX, e.clientY);
   }
 
   private move(e: PointerEvent): void {
     if (!this.enabled) return;
-    if (e.pointerId === this.stickId) {
-      const dx = e.clientX - this.stickX, dy = e.clientY - this.stickY, far = Math.hypot(dx, dy);
-      if (far < TouchInput.DEAD_ZONE) { this.moveX = this.moveY = 0; this.drawKnob(dx, dy, true); return; }
-      this.moveX = dx / far; this.moveY = -dy / far;
-      const reach = Math.min(far, TouchInput.KNOB_REACH);
-      this.drawKnob(dx / far * reach, dy / far * reach, true);
+    if (e.pointerId === this.moveId) {
+      const pull = this.moveStick.pull(e.clientX, e.clientY);
+      if (pull.far < TouchInput.DEAD_ZONE) { this.moveX = this.moveY = 0; return; }
+      this.moveX = pull.dx / pull.far; this.moveY = -pull.dy / pull.far;
       return;
     }
-    const last = this.lookers.get(e.pointerId);
-    if (!last) return;
-    this.lookX += (e.clientX - last.x) * TouchInput.TOUCH_TURN;
-    this.lookY += (e.clientY - last.y) * TouchInput.TOUCH_TURN;
-    last.x = e.clientX; last.y = e.clientY;
+    if (e.pointerId !== this.lookId) return;
+    this.lookX += (e.clientX - this.lookLastX) * TouchInput.TOUCH_TURN;
+    this.lookY += (e.clientY - this.lookLastY) * TouchInput.TOUCH_TURN;
+    this.lookLastX = e.clientX; this.lookLastY = e.clientY;
+    this.lookStick.pull(e.clientX, e.clientY);
   }
 
   private up(e: PointerEvent): void {
-    if (e.pointerId === this.stickId) { this.stickId = -1; this.moveX = this.moveY = 0; this.drawKnob(0, 0, false); }
-    this.lookers.delete(e.pointerId);
-  }
-
-  private drawKnob(dx: number, dy: number, active: boolean): void {
-    this.knob.style.transform = "translate(" + dx + "px," + dy + "px)";
-    this.base.classList.toggle("on", active);
+    if (e.pointerId === this.moveId) { this.moveId = -1; this.moveX = this.moveY = 0; this.moveStick.home(); }
+    if (e.pointerId === this.lookId) { this.lookId = -1; this.lookStick.home(); }
   }
 }

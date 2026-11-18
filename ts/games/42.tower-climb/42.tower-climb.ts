@@ -82,7 +82,7 @@ class TowerClimbGame {
     this.hud = new ClimbHud(this.level);
     const zone = ClimbDom.el("touchZone");
     this.keyboard = new KeyboardInput();
-    this.touch = new TouchInput(zone, ClimbDom.el("joyBase"), ClimbDom.el("joyKnob"), ClimbDom.el("btnJump"), ClimbDom.el("btnSlow"), ClimbDom.el("btnPause"));
+    this.touch = new TouchInput(zone, ClimbDom.el("stickMove"), ClimbDom.el("stickLook"), ClimbDom.el("btnJump"), ClimbDom.el("btnSlow"), ClimbDom.el("btnPause"));
     for (const input of [this.keyboard, this.touch]) {
       input.onJump = () => this.rules.pressJump();
       input.onPause = () => this.pause();
