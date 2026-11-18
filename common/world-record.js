@@ -37,6 +37,11 @@
      · WR.submitParty(값, {party: [이름…], grade, cls}) → 넘었으면 party 를 붙여 세계·그 반 신기록에 등록.
      · party 가 있는 기록은 who() 가 "1학년 3반 이름 이름 …" 으로 보인다. party 를 안 쓰는 게임은 예전과 완전히 같다.
 
+   기록에 붙는 자세한 내용(42번 타워 클라임 스피드런의 구간 기록)
+     · WR.prompt(값, 제목, {splits: [숫자…]}) → 세계·반 신기록으로 등록할 때 셋째 인자의 칸을 기록에 함께 붙인다.
+       붙일 수 있는 칸은 데이터베이스 규칙이 정한다(지금은 splits — towerclimbspeed 만). 읽을 때는 WR.rec.splits.
+     · 셋째 인자를 안 넘기면 예전과 완전히 같은 모양으로 저장한다.
+
    옵션: lower(작을수록 좋음), format(값→문자열), key(기본 "all" — 곡별 기록처럼 여러 개면 지정)
    경로는 records/<게임>/<key> . 규칙(데이터베이스규칙.json)은 기존보다 큰 score 만 받으므로
    시간처럼 작을수록 좋은 기록은 score = LOWER_BASE - 값 으로 저장한다(lower:true. 규칙이 score >= 0 만 받으므로 음수 대신).
@@ -162,7 +167,7 @@
       },
       /* 규칙이 "기존보다 큰 score 만" 받으므로, 그 사이 누가 앞질렀으면 401 로 거부된다.
          로그인한 계정의 ID 토큰(?auth=)과 uid 를 함께 보낸다 — 규칙이 uid 가 그 계정인지 확인한다 */
-      submit: function (v, name, grade, cls, party) {
+      submit: function (v, name, grade, cls, party, extra) {
         var u = s.url(), user = window.PORTAL_USER;
         if (!u) return Promise.reject(new Error("no-db"));
         if (!user) return Promise.reject(new Error("login"));
@@ -170,6 +175,8 @@
         var rec = { score: lower ? LOWER_BASE - v : v, name: name, grade: grade, cls: cls, at: { ".sv": "timestamp" }, uid: user.uid };
         /* party 는 파티 기록일 때만 붙인다(없으면 예전과 똑같은 모양으로 저장) */
         if (party) rec.party = party;
+        /* extra 는 게임이 넘긴 자세한 내용(예: 구간 기록 splits). 규칙에 없는 칸이면 등록이 거부되니 규칙과 함께 늘린다 */
+        if (extra) Object.keys(extra).forEach(function (k) { if (!(k in rec)) rec[k] = extra[k]; });
         return user.getToken()
           .then(function (token) {
             return fetch(u + "?auth=" + encodeURIComponent(token), { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(rec) });
@@ -253,7 +260,7 @@
       /* 세계 신기록을 넘었으면 학년·반·이름 입력 창을, 우리 반 신기록만 넘었으면 이름 입력 창을 띄운다.
          다 채워 등록하기 전에는 닫히지 않는다(그 사이 누가 앞질러 거부되면 자동으로 닫힘).
          돌려주는 값은 세계 신기록으로 등록된 기록(반 신기록만 등록했거나 아니면 null). */
-      prompt: function (v, title) {
+      prompt: function (v, title, extra) {
         /* 한 판이 끝났다는 신호 — common/usage-meter.js 가 이때까지 쓴 Firebase 사용량을 기록한다 */
         window.dispatchEvent(new Event("portal-round-end"));
         PersonalBests.pushGame(game);
@@ -267,8 +274,8 @@
           var isWorld = api.beats(v);
           var isClass = api.beatsClass(v);
           if (!isWorld && !isClass) return null;
-          if (pc && accountName(20)) return registerNow(v, title, isWorld);
-          return openDialog(v, title, isWorld, isClass);
+          if (pc && accountName(20)) return registerNow(v, title, isWorld, extra);
+          return openDialog(v, title, isWorld, isClass, extra);
         });
       }
     };
@@ -284,14 +291,14 @@
 
     /* 반 링크 + 로그인: 이름·학년·반이 모두 정해져 있으므로 창 없이 바로 등록한다.
        세계 신기록이면 우리 반 신기록도 함께(반 기록이 이미 더 좋으면 규칙이 거부하므로 결과와 상관없이 넘어간다). */
-    function registerNow(v, title, isWorld) {
+    function registerNow(v, title, isWorld, extra) {
       var name = accountName(20), grade = pc.grade, cls_ = pc.cls;
       var job = isWorld
-        ? world.submit(v, name, grade, cls_).then(function (rec) {
-            var classJob = cls.beats(v) || !cls.loaded ? cls.submit(v, name, grade, cls_) : null;
+        ? world.submit(v, name, grade, cls_, null, extra).then(function (rec) {
+            var classJob = cls.beats(v) || !cls.loaded ? cls.submit(v, name, grade, cls_, null, extra) : null;
             return Promise.resolve(classJob).then(function () { return rec; }, function () { return rec; });
           })
-        : cls.submit(v, name, grade, cls_).then(function () { return null; });
+        : cls.submit(v, name, grade, cls_, null, extra).then(function () { return null; });
       return job.then(function (rec) {
         emit();
         toast((isWorld ? "🏆 " + (title || "세계 신기록 달성!") : "🏫 " + pc.label + " 신기록 달성!") + "  " + format(v) + " · " + name);
@@ -313,7 +320,7 @@
       setTimeout(function () { box.remove(); }, 4000);
     }
 
-    function openDialog(v, title, isWorld, isClass) {
+    function openDialog(v, title, isWorld, isClass, extra) {
         ensureStyle();
         var fixedName = accountName(20);
         var showPicks = isWorld && !(fixedName && pc);
@@ -374,7 +381,7 @@
             ok.disabled = true; msg.textContent = "등록 중…";
             var job;
             if (isWorld) {
-              job = world.submit(v, name, grade, cls_).then(function (rec) {
+              job = world.submit(v, name, grade, cls_, null, extra).then(function (rec) {
                 /* 세계 신기록이면 그 반의 신기록이기도 하다. 반 링크로 들어왔고 고른 학년·반이 같으면 그 묶음에,
                    아니면(반 링크 없이 들어왔거나 다른 반을 골랐으면) 고른 학년·반의 경로를 새로 읽어서 등록한다 */
                 var picked = { grade: grade, cls: cls_ };
@@ -383,7 +390,7 @@
                 return ready
                   .then(function () {
                     /* 못 읽었으면(loaded=false) 일단 써 본다 — 규칙이 더 낮은 점수는 거부한다 */
-                    if (!target.loaded || target.beats(v)) return target.submit(v, name, grade, cls_);
+                    if (!target.loaded || target.beats(v)) return target.submit(v, name, grade, cls_, null, extra);
                   })
                   .then(function () {
                     if (target !== cls) {   /* 게임이 결과 화면에 그 반 신기록을 보여 줄 수 있게 붙여 둔다 */
@@ -395,7 +402,7 @@
                   }, function () { return rec; });
               });
             } else {
-              job = cls.submit(v, name, grade, cls_).then(function () { return null; });
+              job = cls.submit(v, name, grade, cls_, null, extra).then(function () { return null; });
             }
             job
               .then(function (rec) { emit(); close(rec); })
