@@ -7,6 +7,34 @@ class ClimbSeededRandom {
   spread(width) { return (this.next() + this.next() + this.next() - 1.5) / 1.5 * width; }
 }
 
+// 회전 막대(SweeperBar)가 앞으로 어디를 지날지 내다본다. 봇은 막대에 맞지 않게 때를 기다리거나 제자리에서 뛰어넘는다
+class ClimbHazardWatch {
+  constructor(K, rules) { this.B = K.ClimbBalance; this.rules = rules; }
+
+  hitsAt(bar, seconds, x, y, z, margin) {
+    if (!(y < bar.top && y + this.B.HEIGHT > bar.bottom)) return false;
+    const a = bar.angleAt(seconds), c = Math.cos(a), s = Math.sin(a), R = this.B.RADIUS + margin;
+    const lx = (x - bar.x) * c - (z - bar.z) * s, lz = (x - bar.x) * s + (z - bar.z) * c;
+    return Math.abs(lx) <= bar.halfX + R && Math.abs(lz) <= bar.halfZ + R;
+  }
+
+  // now+from ~ now+to 사이에 (x,y,z) 에 선 몸을 막대가 치는가
+  threat(x, y, z, from, to, margin = 0.15) {
+    const now = this.rules.worldTime;
+    for (const bar of this.rules.sweepers)
+      for (let t = from; t <= to; t += 1 / 60) if (this.hitsAt(bar, now + t, x, y, z, margin)) return true;
+    return false;
+  }
+
+  // 지금 속도로 달릴 때 처음 맞는 시각(없으면 -1)
+  firstHit(body, to) {
+    const now = this.rules.worldTime;
+    for (let t = 0; t <= to; t += 1 / 120)
+      for (const bar of this.rules.sweepers) if (this.hitsAt(bar, now + t, body.x + body.vx * t, body.y, body.z + body.vz * t, 0.05)) return t;
+    return -1;
+  }
+}
+
 class ClimbBot {
   // skill: { aimNoise(rad), jumpEarly(m), power(0.6~1), slip(틱당 실수 확률) } — 잡기는 규칙 엔진이 저절로 한다
   constructor(K, rules, route, skill = {}, random = new ClimbSeededRandom(1)) {
@@ -22,6 +50,7 @@ class ClimbBot {
     this.pose = new K.ClimbPose();
     this.chosen = null;
     this.launch = 0;
+    this.watch = new ClimbHazardWatch(K, rules);
   }
 
   // 길의 첫 발판에 선 채로 시작하는 한 판(스테이지 2부터는 앞 스테이지를 깬 것으로 친다)
@@ -92,6 +121,7 @@ class ClimbBot {
     if (body.hanging) {
       rules.steer(0, 0);
       if (body.hopTime > 0) return;
+      if (body.spot.ledge && !this.mantleSafe()) return;
       if (--this.hopWait <= 0) { rules.pressJump(); this.hopWait = body.spot.ledge ? 12 : 30; }
       return;
     }
@@ -118,16 +148,19 @@ class ClimbBot {
     const overTarget = target.solid && target.covers(body.x, body.z) && Math.abs(target.top - body.y) < 3;
 
     if (!body.grounded) {
-      if (overTarget && body.speed > 1.5 && far < 0.5) rules.steer(-body.vx, -body.vz); else rules.steer(dx, dz);
+      if (overTarget && body.speed > 1.5 && far < 0.5) rules.steer(-body.vx, -body.vz);
+      else if (body.windX !== 0 || body.windZ !== 0) this.steerAgainstWind(target, aimX, aimZ);
+      else rules.steer(dx, dz);
       return;
     }
+    if (this.dodge()) return;
     if (far < 0.08 && overTarget) { rules.steer(0, 0); return; }
     rules.steer(dx, dz);
     if (this.skill.slip > 0 && this.random.next() < this.skill.slip) { rules.pressJump(); return; }
     const ground = body.ground;
     if (needsGrab) {
       const reach = target instanceof K.GrabHold ? Math.hypot(target.x - body.x, target.z - body.z) : target.edge(body.x, body.z, this.probe).dist;
-      if (reach < 0.95 || !ground.covers(body.x + dx * this.edgeMargin, body.z + dz * this.edgeMargin)) rules.pressJump();
+      if (reach < 0.95 || !ground.covers(body.x + dx * this.edgeMargin, body.z + dz * this.edgeMargin)) this.takeoff(target, aimX, aimZ);
       return;
     }
     const edge = target.edge(body.x, body.z, this.probe);
@@ -136,10 +169,51 @@ class ClimbBot {
     const level = touchingGround && Math.abs(target.topAt(edge.x, edge.z) - body.y) <= B.STEP;
     if (level && edge.dist < 0.1) return;
     if (level && edge.dist < 1.2) { rules.steer(edge.x - body.x, edge.z - body.z); return; }
-    if (target.topAt(edge.x, edge.z) > body.y + B.STEP) { if (touching || !ground.covers(body.x + dx * this.edgeMargin, body.z + dz * this.edgeMargin)) rules.pressJump(); return; }
+    if (target.topAt(edge.x, edge.z) > body.y + B.STEP) { if (touching || !ground.covers(body.x + dx * this.edgeMargin, body.z + dz * this.edgeMargin)) this.takeoff(target, aimX, aimZ); return; }
     if (ground.covers(body.x + dx * this.edgeMargin, body.z + dz * this.edgeMargin)) return;
     if (target.covers(body.x + dx * 0.6, body.z + dz * 0.6) && target.topAt(edge.x, edge.z) >= body.y - 1.2) return;
-    rules.pressJump();
+    this.takeoff(target, aimX, aimZ);
+  }
+
+  // 막대가 곧 몸을 치면(0.12~0.2초 뒤) 제자리에서 뛰어넘는다
+  dodge() {
+    if (!this.rules.sweepers.length) return false;
+    const hit = this.watch.firstHit(this.rules.body, 0.2);
+    if (hit < 0.12) return false;
+    this.rules.pressJump();
+    return true;
+  }
+
+  // 뛰어서 내려설 곳을 막대가 지나가는 때면 기다린다(무너지는 발판 위에서는 기다릴 수 없어 그냥 뛴다)
+  takeoff(target, aimX, aimZ) {
+    const K = this.K, B = K.ClimbBalance, body = this.rules.body;
+    if (this.rules.sweepers.length && !(body.ground instanceof K.CrumblePlatform)) {
+      const flight = Math.min(0.9, Math.hypot(aimX - body.x, aimZ - body.z) / B.RUN + 0.1);
+      if (this.watch.threat(aimX, target.top, aimZ, flight - 0.35, flight + 0.35)) { this.rules.steer(0, 0); return; }
+    }
+    this.rules.pressJump();
+  }
+
+  // 매달린 모서리에서 올라간 뒤 다음 발판에 내려설 때 막대가 지나가지 않을 때만 올라간다
+  mantleSafe() {
+    const next = this.after, body = this.rules.body;
+    if (!this.rules.sweepers.length || !next) return true;
+    const B = this.K.ClimbBalance, spot = body.spot, piece = spot.piece, [x, z] = this.aim(next, body);
+    const landX = spot.x - spot.nx * B.MANTLE_INSET, landZ = spot.z - spot.nz * B.MANTLE_INSET, d = Math.hypot(x - landX, z - landZ) || 1;
+    let run = 0;
+    while (run < 6 && piece.covers(landX + (x - landX) / d * (run + 0.05), landZ + (z - landZ) / d * (run + 0.05))) run += 0.05;
+    const start = B.CLIMB_UP_TIME + 0.12, eta = start + run / B.RUN + ClimbBot.airTime(B.JUMP, next.top - piece.top, B.GRAVITY);
+    const midX = landX + (x - landX) / d * run / 2, midZ = landZ + (z - landZ) / d * run / 2, mid = start + run / 2 / B.RUN;
+    if (this.watch.threat(landX, piece.top, landZ, B.CLIMB_UP_TIME * B.CLIMB_UP_RISE_SHARE, start, 0.3)) return false;
+    if (this.watch.threat(midX, piece.top, midZ, mid - 0.2, mid + 0.2, 0.3)) return false;
+    return !this.watch.threat(x, next.top, z, eta - 0.3, eta + 0.35, 0.4);
+  }
+
+  // 바람 속에서는 내려설 때까지 바람에 밀릴 만큼 반대쪽으로 조준한다
+  steerAgainstWind(target, aimX, aimZ) {
+    const body = this.rules.body, rem = this.landingIn(target);
+    const wantX = (aimX - body.x) / rem - body.windX, wantZ = (aimZ - body.z) / rem - body.windZ;
+    if (Math.hypot(wantX - body.vx, wantZ - body.vz) < 0.3) this.rules.steer(0, 0); else this.steerNoisy(wantX, wantZ);
   }
 
   // 움직이는 발판: 발판이 앞으로 있을 곳을 내다보고, 관성(drift)을 빼서 조준하고, 때가 될 때까지 가장자리에서 기다린다

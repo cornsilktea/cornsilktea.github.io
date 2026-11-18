@@ -1,4 +1,4 @@
-type TowerClimbState = "loading" | "menu" | "countdown" | "play" | "pause";
+type TowerClimbState = "loading" | "menu" | "countdown" | "play" | "pause" | "result";
 type ClimbEventHandlers = { [K in ClimbEvent["t"]]?: (event: Extract<ClimbEvent, { t: K }>) => void };
 
 class TowerClimbGame {
@@ -11,6 +11,7 @@ class TowerClimbGame {
   private view!: ClimbWorldView;
   private hud!: ClimbHud;
   private startPanel!: ClimbStartPanel;
+  private resultPanel!: ClimbResultPanel;
   private records!: ClimbRecords;
   private progress!: StageProgress;
   private rules!: ClimbRules;
@@ -38,6 +39,9 @@ class TowerClimbGame {
       stageClear: (e) => this.cleared(e.stage),
       portalEnter: () => this.sfx.play("portal"),
       portalArrive: (e) => { this.view.avatar.playOnce("Spawn_Air", 0.7); this.hud.banner("스테이지 " + e.stage + " 시작점", false, 2); },
+      knock: () => this.sfx.play("knock"),
+      crumble: () => this.sfx.play("crumble"),
+      summit: (e) => this.summit(e),
     };
     this.boot().catch((error) => this.gauge.fail("불러오지 못했어요: " + LoadGauge.describe(error)));
   }
@@ -53,6 +57,7 @@ class TowerClimbGame {
     const factory = new CharacterModelFactory(this.libs, assets);
     this.level = new TowerLevel(TowerLevelData.spec());
     this.startPanel = new ClimbStartPanel();
+    this.resultPanel = new ClimbResultPanel();
     this.records = new ClimbRecords(() => this.recordsChanged());
     this.progress = new StageProgress(this.records.best.s);
     this.rules = new ClimbRules(this.level, this.progress);
@@ -78,6 +83,8 @@ class TowerClimbGame {
     ClimbDom.el("btnResume").addEventListener("click", () => this.resume());
     ClimbDom.el("btnRestart").addEventListener("click", () => this.startRun());
     ClimbDom.el("btnQuit").addEventListener("click", () => this.showMenu());
+    ClimbDom.el("btnAgain").addEventListener("click", () => this.startRun());
+    ClimbDom.el("btnResultQuit").addEventListener("click", () => this.showMenu());
     this.view.portals.sync(this.progress);
     this.view.quality.restore();
     this.gauge.finish();
@@ -102,6 +109,7 @@ class TowerClimbGame {
     this.setInputs(false);
     this.hud.showPlay(false);
     ClimbDom.el("pauseBox").hidden = true;
+    this.resultPanel.hide();
     ClimbDom.el("startScreen").hidden = false;
     this.view.builder.showAround(1);
     this.shownStage = -1;
@@ -117,6 +125,7 @@ class TowerClimbGame {
     this.state = "countdown";
     ClimbDom.el("startScreen").hidden = true;
     ClimbDom.el("pauseBox").hidden = true;
+    this.resultPanel.hide();
     this.hud.showPlay(true);
     this.hud.banner("", false, 0);
     this.setInputs(false);
@@ -152,9 +161,23 @@ class TowerClimbGame {
     if (this.rules.stageOneTime !== null && stage === 1) this.records.offerTime(this.rules.stageOneTime);
     this.view.portals.sync(this.progress);
     this.view.avatar.playOnce("Cheering", 1.6);
+    if (stage >= ClimbBalance.STAGE_COUNT) return;
     const opened = this.level.hasStage(stage + 1) ? " 포탈 " + (stage + 1) + "가 열렸어요" : "";
     this.hud.banner("스테이지 " + stage + " 클리어!" + opened, true, 4);
     this.records.submitWorld(Math.floor(this.rules.peak + 1e-6));
+  }
+
+  private summit(event: Extract<ClimbEvent, { t: "summit" }>): void {
+    this.sfx.play("summit");
+    this.view.avatar.playOnce("Cheering", 3);
+    this.records.offerHeight(ClimbBalance.TOP);
+    const fresh = event.portals === 0 && event.seconds > 0 && this.records.offerClimbTime(event.seconds);
+    this.records.submitWorld(ClimbBalance.TOP);
+    this.state = "result";
+    this.setInputs(false);
+    this.rules.steer(0, 0);
+    this.hud.banner("꼭대기 도착!", true, 3);
+    this.resultPanel.show(event, this.records, fresh);
   }
 
   private dispatch(events: ClimbEvent[]): void {
@@ -208,8 +231,9 @@ class TowerClimbGame {
     if (this.state === "menu") { view.backdrop.update(dt); view.portals.update(dt); view.render(); return; }
     if (this.state === "countdown") this.countdownFrame(dt);
     else if (this.state === "play") this.playFrame(dt);
+    if (this.state === "result") this.dispatch(this.rules.advance(dt));
     const still = this.state === "pause" ? 0 : dt;
-    view.builder.followRiders(this.rules.blend);
+    view.builder.followRiders(this.rules.blend, this.rules.worldTime + (this.rules.blend - 1) * ClimbBalance.TICK);
     view.avatar.follow(this.rules, still);
     view.rig.follow(this.rules, view.avatar.root.position, still);
     view.portals.update(still * this.rules.time.scale);

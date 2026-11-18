@@ -36,7 +36,7 @@ class ClimbRecords {
         try {
             const value = JSON.parse(raw);
             const number = (v) => typeof v === "number" && isFinite(v) && v > 0 ? v : 0;
-            return { h: Math.min(ClimbBalance.TOP, Math.floor(number(value.h))), s: Math.min(ClimbBalance.STAGE_COUNT, Math.floor(number(value.s))), t: number(value.t) };
+            return { h: Math.min(ClimbBalance.TOP, Math.floor(number(value.h))), s: Math.min(ClimbBalance.STAGE_COUNT, Math.floor(number(value.s))), t: number(value.t), f: number(value.f) };
         }
         catch (error) {
             return null;
@@ -46,15 +46,16 @@ class ClimbRecords {
         const a = ClimbRecords.parse(local), b = ClimbRecords.parse(account);
         if (!a || !b)
             return a ? local : b ? account : null;
-        const time = a.t && b.t ? Math.min(a.t, b.t) : a.t || b.t;
-        return JSON.stringify({ h: Math.max(a.h, b.h), s: Math.max(a.s, b.s), t: time });
+        const faster = (x, y) => x && y ? Math.min(x, y) : x || y;
+        return JSON.stringify({ h: Math.max(a.h, b.h), s: Math.max(a.s, b.s), t: faster(a.t, b.t), f: faster(a.f, b.f) });
     }
     static read() {
+        const empty = { h: 0, s: 0, t: 0, f: 0 };
         try {
-            return ClimbRecords.parse(localStorage.getItem(ClimbRecords.STORAGE_KEY)) ?? { h: 0, s: 0, t: 0 };
+            return ClimbRecords.parse(localStorage.getItem(ClimbRecords.STORAGE_KEY)) ?? empty;
         }
         catch (error) {
-            return { h: 0, s: 0, t: 0 };
+            return empty;
         }
     }
     save() {
@@ -83,6 +84,13 @@ class ClimbRecords {
         if (this.best.t && seconds >= this.best.t)
             return false;
         this.best.t = Math.round(seconds * 10) / 10;
+        this.save();
+        return true;
+    }
+    offerClimbTime(seconds) {
+        if (this.best.f && seconds >= this.best.f)
+            return false;
+        this.best.f = Math.round(seconds * 10) / 10;
         this.save();
         return true;
     }
@@ -130,6 +138,7 @@ class ClimbSfx {
 ClimbSfx.SOUNDS = {
     jump: [420, 640, 0.12, "square"], land: [180, 110, 0.09, "triangle"], pad: [300, 900, 0.25, "square"], grab: [520, 560, 0.07, "triangle"],
     portal: [700, 240, 0.9, "sine"], clear: [520, 1040, 0.6, "square"], fall: [300, 90, 0.5, "sawtooth"],
+    knock: [240, 120, 0.18, "sawtooth"], crumble: [160, 60, 0.35, "triangle"], summit: [520, 1560, 1.2, "square"],
 };
 ClimbSfx.VOLUME = 0.07;
 class ClimbHudField {
@@ -263,6 +272,25 @@ ClimbHud.LEDGE_TIP = "<b>W / Space</b><span>올라가기</span><b>S</b><span>놓
 ClimbHud.HOLD_TIP = "<b>Space</b><span>위로</span><b>S</b><span>놓기</span>";
 ClimbHud.LEDGE_TIP_TOUCH = "<b>위로 밀기 · 점프</b><span>올라가기</span><b>아래로 당기기</b><span>놓기</span>";
 ClimbHud.HOLD_TIP_TOUCH = "<b>점프</b><span>위로</span><b>아래로 당기기</b><span>놓기</span>";
+class ClimbResultPanel {
+    constructor() {
+        this.box = ClimbDom.el("resultBox");
+        this.time = ClimbDom.el("resultTime");
+        this.falls = ClimbDom.el("resultFalls");
+        this.portals = ClimbDom.el("resultPortals");
+        this.best = ClimbDom.el("resultBest");
+    }
+    show(summit, records, fresh) {
+        this.time.textContent = ClimbText.clock(summit.seconds);
+        this.falls.textContent = summit.falls + "번";
+        this.portals.textContent = summit.portals ? summit.portals + "번 (전체 기록에는 안 들어가요)" : "안 씀";
+        const best = records.best.f;
+        this.best.textContent = best ? ClimbText.clock(best) + (fresh ? " NEW" : "") : "-";
+        this.best.classList.toggle("fresh", fresh);
+        this.box.hidden = false;
+    }
+    hide() { this.box.hidden = true; }
+}
 class ClimbStartPanel {
     constructor() {
         this.best = ClimbDom.el("recBest");
@@ -277,7 +305,7 @@ class ClimbStartPanel {
     paint(records) {
         const best = records.best, world = records.world;
         this.best.textContent = best.h ? best.h + "m" : "-";
-        this.bestNote.textContent = best.t ? "스테이지 1 " + ClimbText.clock(best.t) : "";
+        this.bestNote.textContent = best.f ? "꼭대기까지 " + ClimbText.clock(best.f) : best.t ? "스테이지 1 " + ClimbText.clock(best.t) : "";
         this.stage.textContent = best.s + " / " + ClimbBalance.STAGE_COUNT;
         this.world.textContent = world && world.rec ? world.text() : "-";
         this.worldWho.textContent = world && world.rec ? world.who() : "";

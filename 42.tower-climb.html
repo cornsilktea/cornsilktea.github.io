@@ -66,10 +66,16 @@
   #btnJump { right: 26px; bottom: 60px; width: 112px; height: 112px; font-size: 22px; }
   #btnSlow { right: 150px; bottom: 60px; width: 74px; height: 74px; font-size: 16px; background: radial-gradient(circle at 50% 32%, rgba(150,215,255,.96), rgba(40,90,140,.96)); }
   #btnSlow.on { border-color: #6EC8FF; transform: scale(1.08); }
-  #pauseBox { position: fixed; inset: 0; z-index: 12; display: flex; align-items: center; justify-content: center; background: rgba(10,22,44,.55); }
-  #pauseBox .card { background: rgba(10,22,44,.92); border-radius: 12px; border: 2px solid rgba(110,200,255,.5); padding: 18px; width: min(380px, 92vw); }
-  #pauseBox h2 { font-size: 24px; font-weight: 800; text-align: center; color: #FFD7BF; margin-bottom: 4px; }
+  #pauseBox, #resultBox { position: fixed; inset: 0; z-index: 12; display: flex; align-items: center; justify-content: center; background: rgba(10,22,44,.55); }
+  #pauseBox[hidden], #resultBox[hidden] { display: none; }
+  #pauseBox .card, #resultBox .card { background: rgba(10,22,44,.92); border-radius: 12px; border: 2px solid rgba(110,200,255,.5); padding: 18px; width: min(380px, 92vw); }
+  #pauseBox h2, #resultBox h2 { font-size: 24px; font-weight: 800; text-align: center; color: #FFD7BF; margin-bottom: 4px; }
   #pauseBox p { font-size: 14px; color: #CFE6FF; text-align: center; margin-bottom: 4px; }
+  #resultBox .card { border-color: #D97B4F; }
+  #resultBox dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 10px 4px 4px; font-size: 15px; color: #CFE6FF; }
+  #resultBox dt { color: #9FB8D6; }
+  #resultBox dd { font-weight: 800; color: #fff; text-align: right; }
+  #resultBox dd.fresh { color: #D97B4F; }
   .st-screen { --st-bg: 14, 34, 58; --st-panel: rgba(14, 34, 58, .86); --st-accent: #6EC8FF; --st-accent-ink: #0A162C; --st-title2: #D97B4F; --st-glow: rgba(110, 200, 255, .5); overflow-y: auto; z-index: 20; }
   @media (max-width: 700px) { #btnJump { width: 96px; height: 96px; } #btnSlow { right: 132px; } #hudMap { display: none; } }
 </style>
@@ -97,6 +103,17 @@
   <button type="button" class="st-btn primary" id="btnResume">계속하기</button>
   <button type="button" class="st-btn" id="btnRestart">처음 지점에서 다시</button>
   <button type="button" class="st-btn" id="btnQuit">시작 화면으로</button>
+</div></div>
+<div id="resultBox" hidden><div class="card">
+  <h2>꼭대기 도착! 200m</h2>
+  <dl>
+    <dt>걸린 시간</dt><dd id="resultTime">-</dd>
+    <dt>떨어진 횟수</dt><dd id="resultFalls">-</dd>
+    <dt>포탈</dt><dd id="resultPortals">-</dd>
+    <dt>꼭대기까지 최고 기록</dt><dd id="resultBest">-</dd>
+  </dl>
+  <button type="button" class="st-btn primary" id="btnAgain">처음 지점에서 다시</button>
+  <button type="button" class="st-btn" id="btnResultQuit">시작 화면으로</button>
 </div></div>
 <div id="startScreen" class="st-screen" hidden>
   <div class="st-wrap">
@@ -132,7 +149,8 @@
       <h2>규칙</h2>
       <ul class="st-rules">
         <li>탑을 뛰어 올라가요. <b>저장은 없어요.</b> 발판에 서거나 잡지 못하면 <b>맨 처음 지점까지</b> 떨어져요.</li>
-        <li>깃발 쉼터(30m, 60m…)에 닿을 때마다 <b>스테이지 클리어</b>! 처음 지점의 다음 <b>포탈</b>이 열려 그곳으로 바로 갈 수 있어요. 지금은 <b>스테이지 5(묘지)</b>까지 있어요. 폐허 마을에서는 망루·성벽·상자·통, 집 지붕 꼭대기를 밟고, 지하 던전에서는 돌기둥·바닥 타일·상자·술통·던전 벽을, 거인의 주방에서는 냉장고·식탁·조리대·가스레인지·도마·접시를, 묘지에서는 돌기둥·관·묘석 판·흙더미·호박을 건너요. 주방과 묘지 끝에는 <b>점프대로 튕겨 멀리 뛰어야만</b> 건널 수 있는 곳이 있어요.</li>
+        <li>깃발 쉼터(30m, 60m…)에 닿을 때마다 <b>스테이지 클리어</b>! 처음 지점의 다음 <b>포탈</b>이 열려 그곳으로 바로 갈 수 있어요. 꼭대기는 <b>스테이지 7(우주 기지) 200m 깃발</b>이에요. 폐허 마을에서는 망루·성벽·상자·통, 집 지붕 꼭대기를 밟고, 지하 던전에서는 돌기둥·바닥 타일·상자·술통·던전 벽을, 거인의 주방에서는 냉장고·식탁·조리대·가스레인지·도마·접시를, 묘지에서는 돌기둥·관·묘석 판·흙더미·호박을 건너요. 주방과 묘지 끝에는 <b>점프대로 튕겨 멀리 뛰어야만</b> 건널 수 있는 곳이 있어요. 눈 덮인 장난감 마을에서는 달리는 기차와 오르내리는 선물 상자를 타요.</li>
+        <li>우주 기지는 가장 어려워요. 하늘색 <b>얼음</b>은 미끄러워서 잘 멈추지도 돌지도 못해요. 주황색 <b>무너지는 발판</b>은 밟고 0.7초 뒤 떨어져요(3초 뒤 다시 생겨요). 빨간 <b>회전 막대</b>는 뛰어넘지 않으면 밀려 떨어져요. 하얀 줄이 흐르는 곳은 <b>돌풍</b>이 불어 몸을 밀어요.</li>
         <li>주황 표시가 있는 <b>손잡이</b>와 발판 <b>모서리</b>는 잡을 수 있어요. 높은 블록으로 점프하면 <b>모서리를 저절로 잡아요</b>. 매달린 채 앞으로 밀거나 점프를 누르면 기어올라가고, 뒤로 당기면 손을 놓아요. 손잡이에 매달려 점프를 누르면 위 손잡이로 올라가요.</li>
         <li>노란 <b>점프대</b>는 높이 튕겨 줘요.</li>
         <li><b>슬로 모션</b>은 누르고 있는 동안 얼마든지 쓸 수 있어요.</li>
@@ -143,12 +161,12 @@
 <script charset="utf-8" src="common/load-gauge.js?v=20261118c"></script>
 <script charset="utf-8" src="common/character-kit.js?v=20261116b"></script>
 <script charset="utf-8" src="common/fold-card.js"></script>
-<script charset="utf-8" src="games/42.tower-climb/42.climb-rules.js?v=20261117m"></script>
-<script charset="utf-8" src="games/42.tower-climb/42.tower-level-data.js?v=20261117m"></script>
-<script charset="utf-8" src="games/42.tower-climb/42.climb-scene.js?v=20261118a"></script>
+<script charset="utf-8" src="games/42.tower-climb/42.climb-rules.js?v=20261118s"></script>
+<script charset="utf-8" src="games/42.tower-climb/42.tower-level-data.js?v=20261118s"></script>
+<script charset="utf-8" src="games/42.tower-climb/42.climb-scene.js?v=20261118s"></script>
 <script charset="utf-8" src="games/42.tower-climb/42.climb-input.js?v=20261117e"></script>
-<script charset="utf-8" src="games/42.tower-climb/42.climb-hud.js?v=20261117j"></script>
-<script charset="utf-8" src="games/42.tower-climb/42.tower-climb.js?v=20261118b"></script>
+<script charset="utf-8" src="games/42.tower-climb/42.climb-hud.js?v=20261118s"></script>
+<script charset="utf-8" src="games/42.tower-climb/42.tower-climb.js?v=20261118s"></script>
 <script charset="utf-8" src="games/42.tower-climb/42.climb-boot.js?v=20261118b"></script>
 <script type="module">
 new ClimbBoot(async () => {
