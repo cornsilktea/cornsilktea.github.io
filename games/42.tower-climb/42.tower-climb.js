@@ -46,7 +46,7 @@ class TowerClimbGame {
         await this.gauge.phase("tower");
         const factory = new CharacterModelFactory(this.libs, assets);
         this.level = new TowerLevel(TowerLevelData.spec());
-        this.startPanel = new ClimbStartPanel();
+        this.startPanel = new ClimbStartPanel(this.level);
         this.practiceResult = new ClimbPracticeResult();
         this.speedrunResult = new ClimbSpeedrunResult();
         this.records = new ClimbRecords(() => this.recordsChanged());

@@ -8,6 +8,7 @@ interface RecordSlot {
 interface WorldRecordNameAsk { value: number; seconds: number; fallback: string; needClass: boolean; title?: string }
 interface WorldRecordNameAnswer { name: string; grade: number; cls: number }
 interface WorldRecordParty { party: string[]; grade: number; cls: number }
+interface WorldRecordDetail { splits?: readonly number[] }
 
 interface WorldRecordHandle extends RecordSlot {
   cls?: RecordSlot | null;
@@ -15,7 +16,7 @@ interface WorldRecordHandle extends RecordSlot {
   noRecord?: boolean;
   onChange(listener: () => void): void;
   load(): Promise<unknown> | void;
-  prompt(value: number): void;
+  prompt(value: number, title?: string, detail?: WorldRecordDetail): void;
   beats(value: number): boolean;
   beatsClass(value: number): boolean;
   askName?(options: WorldRecordNameAsk): Promise<WorldRecordNameAnswer>;

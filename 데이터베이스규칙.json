@@ -317,6 +317,10 @@
             ".validate": "$game === 'dungeonraid' && newData.hasChildren(['0', '1', '2', '3', '4']) && !newData.hasChild('5')",
             "$i": { ".validate": "$i.matches(/^[0-4]$/) && newData.isString() && newData.val().length >= 1 && newData.val().length <= 8" }
           },
+          "splits": {
+            ".validate": "$game === 'towerclimbspeed' && newData.hasChildren(['0', '1', '2', '3', '4', '5', '6']) && !newData.hasChild('7')",
+            "$i": { ".validate": "$i.matches(/^[0-6]$/) && newData.isNumber() && newData.val() >= 0 && newData.val() <= 360000" }
+          },
           "$other": { ".validate": false }
         }
       }

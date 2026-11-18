@@ -60,10 +60,10 @@ abstract class ClimbRecordBook<T> {
     this.onChange();
   }
 
-  protected submit(value: number): void {
+  protected submit(value: number, detail?: WorldRecordDetail): void {
     const world = this.world;
     if (!world || value <= 0 || (!world.beats(value) && !world.beatsClass(value))) return;
-    world.prompt(value);
+    world.prompt(value, undefined, detail);
     const factory = window.WorldRecord;
     if (factory && factory.pushBest) factory.pushBest(this.game);
   }
@@ -150,7 +150,7 @@ class ClimbSpeedRecords extends ClimbRecordBook<ClimbSpeedRecord> {
 
   submitWorld(finish: ClimbSpeedFinish): void {
     if (finish.seconds < ClimbSpeedRecords.WORLD_MIN_SECONDS) return;
-    this.submit(ClimbText.tenths(finish.seconds));
+    this.submit(ClimbText.tenths(finish.seconds), { splits: finish.splits.map((split) => ClimbText.tenths(split)) });
   }
 }
 
@@ -392,6 +392,43 @@ class ClimbRecordCell {
   }
 }
 
+class ClimbSpeedBoard {
+  private readonly rows: HTMLElement[] = [];
+  private readonly times: HTMLElement[] = [];
+  private readonly who = ClimbDom.el("speedBoardWho");
+  private readonly total = ClimbDom.el("speedBoardTime");
+
+  constructor(level: TowerLevel) {
+    const list = ClimbDom.el("speedBoardRows");
+    for (let stage = 1; stage <= ClimbBalance.STAGE_COUNT; stage++) {
+      const row = document.createElement("li"), chip = document.createElement("i"), name = document.createElement("span"), time = document.createElement("b");
+      chip.textContent = String(stage);
+      name.textContent = level.stageOf(stage)?.name ?? "스테이지 " + stage;
+      row.append(chip, name, time);
+      list.appendChild(row);
+      this.rows.push(row);
+      this.times.push(time);
+    }
+  }
+
+  static splitsOf(record: unknown): number[] {
+    const raw = record && typeof record === "object" ? (record as { splits?: unknown }).splits : null;
+    const table = raw && typeof raw === "object" ? raw as Record<string, unknown> : {};
+    return Array.from({ length: ClimbBalance.STAGE_COUNT }, (_, index) => ClimbText.number(table[String(index)]) / 10);
+  }
+
+  paint(world: WorldRecordHandle | null): void {
+    const held = !!(world && world.rec), splits = held && world ? ClimbSpeedBoard.splitsOf(world.rec) : [];
+    this.rows.forEach((row, index) => {
+      const seconds = splits[index] ?? 0;
+      row.classList.toggle("done", seconds > 0);
+      this.times[index].textContent = seconds > 0 ? ClimbText.clock(seconds) : "-";
+    });
+    this.who.textContent = held && world ? "🏆 " + world.who() : "아직 기록이 없어요";
+    this.total.textContent = held && world ? world.text() : "-";
+  }
+}
+
 class ClimbStartPanel {
   private readonly best = ClimbDom.el("recBest");
   private readonly stage = ClimbDom.el("recStage");
@@ -400,6 +437,9 @@ class ClimbStartPanel {
   private readonly heightClass = new ClimbRecordCell("recClass", "recClassWho", "recClassBox");
   private readonly speedWorld = new ClimbRecordCell("recSpeedWorld", "recSpeedWorldWho");
   private readonly speedClass = new ClimbRecordCell("recSpeedClass", "recSpeedClassWho", "recSpeedClassBox");
+  private readonly board: ClimbSpeedBoard;
+
+  constructor(level: TowerLevel) { this.board = new ClimbSpeedBoard(level); }
 
   paint(records: ClimbRecords, speed: ClimbSpeedRecords): void {
     this.best.textContent = records.best.h ? records.best.h + "m" : "-";
@@ -409,5 +449,6 @@ class ClimbStartPanel {
     this.heightClass.paint(records.world ? records.world.cls : null);
     this.speedWorld.paint(speed.world);
     this.speedClass.paint(speed.world ? speed.world.cls : null);
+    this.board.paint(speed.world);
   }
 }

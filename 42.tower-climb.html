@@ -42,7 +42,7 @@
   #hudMode, #hudTime, #hudSpeedBest { display: none; }
   #hudLeft.speed #hudMode, #hudLeft.speed #hudTime, #hudLeft.speed #hudSpeedBest { display: block; }
   #hudLeft.speed { border-left-color: #FFC83D; }
-  #hudMode { align-self: flex-start; font-size: 12px; font-weight: 800; color: #10182A; background: #FFC83D; border-radius: 4px; padding: 1px 8px; width: max-content; }
+  .speed-tag { font-size: 12px; font-weight: 800; color: #10182A; background: #FFC83D; border-radius: 4px; padding: 1px 8px; width: max-content; }
   #hudTime { font-size: 30px; line-height: 1.1; margin-top: 2px; }
   #hudBest, #hudSpeedBest { font-size: 13px; color: #FFD7BF; margin-top: 2px; }
   #hudMap { position: fixed; right: 12px; top: 56px; z-index: 5; pointer-events: none; padding: 8px 10px 8px 18px; }
@@ -89,6 +89,19 @@
   #speedResultBox td.faster { color: #5FD38A; }
   #speedResultBox td.slower { color: #FF6B6B; }
   @media (max-height: 640px) { #speedResultBox .card { padding: 12px; } #speedResultBox h2 { font-size: 20px; } #speedResultBox td { padding: 1px 4px; } }
+  #speedBoard { margin-bottom: 14px; padding: 12px 14px; border-left-color: #FFC83D; font-weight: 800; font-variant-numeric: tabular-nums; }
+  #speedBoard .sb-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 16px; color: #fff; }
+  #speedBoardRows { list-style: none; }
+  #speedBoardRows li { display: grid; grid-template-columns: 30px 1fr auto; column-gap: 10px; align-items: center; padding: 4px 0; border-top: 1px solid rgba(255,255,255,.1); font-size: 14px; }
+  #speedBoardRows i { display: block; height: 20px; border-radius: 3px; background: rgba(255,255,255,.2); font-style: normal; font-size: 12px; line-height: 20px; text-align: center; color: #fff; }
+  #speedBoardRows li.done i { background: #D97B4F; }
+  #speedBoardRows span { color: #CFE6FF; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #speedBoardRows b { color: rgba(255,255,255,.4); }
+  #speedBoardRows li.done b { color: #fff; }
+  #speedBoard .sb-final { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-top: 6px; padding-top: 8px; border-top: 2px solid #FFC83D; }
+  #speedBoardWho { font-size: 14px; color: #FFD7BF; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #speedBoardTime { font-size: 26px; line-height: 1.1; color: #FFC83D; }
+  @media (min-width: 1000px) { #speedBoard { position: fixed; right: max(24px, 5vw); top: 50%; transform: translateY(-50%); width: 320px; margin: 0; } }
   .st-screen { --st-bg: 14, 34, 58; --st-panel: rgba(14, 34, 58, .86); --st-accent: #6EC8FF; --st-accent-ink: #0A162C; --st-title2: #D97B4F; --st-glow: rgba(110, 200, 255, .5); overflow-y: auto; z-index: 20; }
   @media (max-width: 700px) { #btnJump { width: 96px; height: 96px; } #btnSlow { right: 132px; } #hudMap { display: none; } #banner { top: 166px; font-size: 15px; } #banner.strong { font-size: 18px; } }
 </style>
@@ -103,7 +116,7 @@
   <div id="btnJump" class="tc-btn">점프</div>
 </div>
 <div id="hudTop" class="hud-box" hidden><div id="hudHeight">0m</div><div id="hudStage"></div><div id="hudBar"><div id="hudBarFill"></div></div></div>
-<div id="hudLeft" class="hud-box" hidden><div id="hudMode">스피드런</div><div id="hudTime">0:00.0</div><div id="hudSpeedBest"></div><div id="hudBest"></div></div>
+<div id="hudLeft" class="hud-box" hidden><div id="hudMode" class="speed-tag">스피드런</div><div id="hudTime">0:00.0</div><div id="hudSpeedBest"></div><div id="hudBest"></div></div>
 <div id="hudMap" class="hud-box" hidden><div id="hudMapCells"><div id="hudMapDot"></div></div></div>
 <button type="button" id="btnPause" class="hud-box" hidden>멈춤</button>
 <div id="banner" class="hud-box" hidden></div>
@@ -154,6 +167,11 @@
         <div class="st-rec"><span>세계 스피드런 신기록</span><b id="recSpeedWorld">-</b><small id="recSpeedWorldWho"></small></div>
       </div>
     </div>
+    <div id="speedBoard" class="hud-box">
+      <div class="sb-head"><span class="speed-tag">스피드런</span>세계 신기록 구간</div>
+      <ol id="speedBoardRows"></ol>
+      <div class="sb-final"><span id="speedBoardWho">아직 기록이 없어요</span><b id="speedBoardTime">-</b></div>
+    </div>
     <div class="st-card st-fold">
       <h2>캐릭터 만들기</h2>
       <div id="profileHost"></div>
@@ -189,12 +207,12 @@
 <script charset="utf-8" src="common/load-gauge.js?v=20261118c"></script>
 <script charset="utf-8" src="common/character-kit.js?v=20261116b"></script>
 <script charset="utf-8" src="common/fold-card.js"></script>
-<script charset="utf-8" src="games/42.tower-climb/42.climb-rules.js?v=20261118sp"></script>
-<script charset="utf-8" src="games/42.tower-climb/42.tower-level-data.js?v=20261118sp"></script>
-<script charset="utf-8" src="games/42.tower-climb/42.climb-scene.js?v=20261118sp"></script>
+<script charset="utf-8" src="games/42.tower-climb/42.climb-rules.js?v=20261118sb"></script>
+<script charset="utf-8" src="games/42.tower-climb/42.tower-level-data.js?v=20261118sb"></script>
+<script charset="utf-8" src="games/42.tower-climb/42.climb-scene.js?v=20261118sb"></script>
 <script charset="utf-8" src="games/42.tower-climb/42.climb-input.js?v=20261117e"></script>
-<script charset="utf-8" src="games/42.tower-climb/42.climb-hud.js?v=20261118sp"></script>
-<script charset="utf-8" src="games/42.tower-climb/42.tower-climb.js?v=20261118sp"></script>
+<script charset="utf-8" src="games/42.tower-climb/42.climb-hud.js?v=20261118sb"></script>
+<script charset="utf-8" src="games/42.tower-climb/42.tower-climb.js?v=20261118sb"></script>
 <script charset="utf-8" src="games/42.tower-climb/42.climb-boot.js?v=20261118b"></script>
 <script type="module">
 new ClimbBoot(async () => {
