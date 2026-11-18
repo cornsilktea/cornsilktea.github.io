@@ -130,7 +130,7 @@ ClimbModelLibrary.FILES = {
     gingerHouse: "holiday/gingerbread_house_decorated.gltf", holidayLantern: "holiday/lantern.gltf", snowBlock: "blocks/snow.gltf", snowman: "snow/snowman_A.gltf",
     roofPlate: "space-base/roofmodule_base.gltf", marsBlock: "space-base/terrain_low.gltf", marsTall: "space-base/terrain_tall.gltf",
     marsRock: "space-base/rock_B.gltf", marsRocks: "space-base/rocks_B.gltf", frameTall: "space-base/structure_tall.gltf",
-    domeModule: "space-base/basemodule_E.gltf", baseModule: "space-base/basemodule_A.gltf", cargoDepot: "space-base/cargodepot_A.gltf",
+    domeModule: "space-base/basemodule_E.gltf", baseModule: "space-base/basemodule_A.gltf",
     landingPad: "space-base/landingpad_large.gltf", lander: "space-base/lander_A.gltf", windTurbine: "space-base/windturbine_tall.gltf",
     solarPanel: "space-base/solarpanel.gltf", spaceTruck: "space-base/spacetruck.gltf", drill: "space-base/drill_structure.gltf", cargoStack: "space-base/cargo_A_stacked.gltf",
 };
