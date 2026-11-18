@@ -393,6 +393,25 @@ class MovingJumpPad extends MovingPlatform {
     get ledge() { return false; }
     stand(rules) { rules.bounce(this); }
 }
+class ClimbWallAxes {
+    constructor() {
+        this.rightX = 0;
+        this.rightZ = 0;
+        this.forwardX = 0;
+        this.forwardZ = 0;
+    }
+    static of(spot, view) {
+        const axes = ClimbWallAxes.shared, faceRightX = spot.nz, faceRightZ = -spot.nx;
+        const side = view.rightX * faceRightX + view.rightZ * faceRightZ < ClimbWallAxes.MIRROR_DOT ? -1 : 1;
+        axes.forwardX = -spot.nx;
+        axes.forwardZ = -spot.nz;
+        axes.rightX = faceRightX * side;
+        axes.rightZ = faceRightZ * side;
+        return axes;
+    }
+}
+ClimbWallAxes.MIRROR_DOT = -0.3;
+ClimbWallAxes.shared = new ClimbWallAxes();
 class ClimbGrabSpot {
     constructor() {
         this.x = 0;
@@ -883,6 +902,15 @@ class ClimbRules {
         const length = Math.hypot(x, z);
         this.moveX = length > 1e-6 ? x / length : 0;
         this.moveZ = length > 1e-6 ? z / length : 0;
+    }
+    steerStick(stickX, stickY, view) {
+        const body = this.body;
+        if (!body.hanging) {
+            this.steer(view.rightX * stickX + view.forwardX * stickY, view.rightZ * stickX + view.forwardZ * stickY);
+            return;
+        }
+        const axes = ClimbWallAxes.of(body.spot, view);
+        this.steer(axes.rightX * stickX + axes.forwardX * stickY, axes.rightZ * stickX + axes.forwardZ * stickY);
     }
     pressJump() { this.jumpLatch = true; }
     holdSlow(held) { this.slowHeld = held; }
