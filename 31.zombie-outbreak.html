@@ -434,7 +434,7 @@
   </div>
 </section>
 
-<script charset="utf-8" src="common/load-gauge.js?v=20261118b"></script>
+<script charset="utf-8" src="common/load-gauge.js?v=20261118c"></script>
 <script charset="utf-8" src="common/character-kit.js?v=20261116b"></script>
 <script charset="utf-8" src="common/character-maker.js?v=20261116a"></script>
 <div id="versusCurtain" class="zv-curtain" hidden>
@@ -492,7 +492,7 @@ class ZombieLoading {
     library: { at: 0.08, text: "그래픽 라이브러리 받는 중…" },
     models: { at: 0.3, span: 0.65, text: "학생·좀비 모델 받는 중…" }
   };
-  static gauge = new LoadGauge({ title: "3D 학교 준비 중", phases: ZombieLoading.PHASES, place: "bottom" });
+  static gauge = new LoadGauge({ title: "3D 학교 준비 중", phases: ZombieLoading.PHASES });
   static counter = new LoadCounter((counter) => ZombieLoading.gauge.count("models", counter));
 }
 ZombieLoading.gauge.phase("library");

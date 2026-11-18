@@ -12,7 +12,7 @@ class LoadGauge {
         this.startedAt = performance.now();
         this.retryAction = () => location.reload();
         this.settled = false;
-        this.root = LoadGauge.box("lg-load lg-" + (options.place || "center"), document.body);
+        this.root = LoadGauge.box("lg-load", document.body);
         this.root.hidden = true;
         this.titleLine = LoadGauge.box("lg-title", this.root, options.title);
         this.text = LoadGauge.box("lg-text", this.root);

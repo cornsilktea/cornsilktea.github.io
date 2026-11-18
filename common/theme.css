@@ -296,13 +296,11 @@ button.mk-seat:disabled{cursor:default;}
 .room-code-tag.in-flow{position:static;transform:none;display:block;width:max-content;max-width:100%;margin:4px auto 0;padding:0;background:none;color:rgba(255,255,255,.72);}
 
 /* 공용 로딩 게이지(ts/common/load-gauge.ts 의 LoadGauge, 2026-11-18). 3D 에셋을 받는 모든 게임이 같은 판을 쓴다.
-   .lg-center 는 받는 동안 할 게 없는 게임(화면 가운데), .lg-bottom 은 받는 동안에도 시작 화면을 보는 게임(아래쪽).
+   자리는 모든 게임에서 화면 아래 가운데 하나로 고정한다(2026-11-18 선생님 요청 — 게임마다 가운데·아래로 오가면 헷갈려서).
    잠금 가드의 목록 버튼·게임 HUD 보다 위에 오도록 z-index 를 크게 둔다. */
-.lg-load{position:fixed;left:50%;z-index:5000;width:min(420px,calc(100vw - 32px));padding:12px 14px;border-radius:14px;
+.lg-load{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:5000;width:min(420px,calc(100vw - 32px));padding:12px 14px;border-radius:14px;
   background:rgba(14,20,17,.92);border:1px solid rgba(255,255,255,.14);box-shadow:0 10px 30px rgba(0,0,0,.45);color:#fff;
   font-family:var(--sg-font,"Nanum Gothic","Malgun Gothic",sans-serif);text-align:left;pointer-events:auto;}
-.lg-load.lg-center{top:50%;transform:translate(-50%,-50%);}
-.lg-load.lg-bottom{bottom:calc(16px + env(safe-area-inset-bottom));transform:translateX(-50%);}
 .lg-load[hidden],.lg-retry[hidden]{display:none !important;}
 .lg-title{font-size:15px;font-weight:800;border-left:4px solid #D97B4F;padding-left:8px;}
 .lg-text{margin-top:6px;font-size:13px;font-weight:700;line-height:1.4;}

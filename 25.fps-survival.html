@@ -467,7 +467,7 @@
 <button type="button" id="btnGameLeave" hidden>나가기</button>
 
 <script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }</script>
-<script charset="utf-8" src="common/load-gauge.js?v=20261118b"></script>
+<script charset="utf-8" src="common/load-gauge.js?v=20261118c"></script>
 <script charset="utf-8" src="common/character-kit.js?v=20261116b"></script>
 <script charset="utf-8" src="common/character-maker.js?v=20261116a"></script>
 <script charset="utf-8" src="common/room-drop-recovery.js?v=20261106b"></script>
@@ -1108,7 +1108,7 @@ const WEAPONS = { rifle: RIFLE, pistol: PISTOL };
 
 class SurvivalLoading {
   static PHASES = { files: { at: 0.05, span: 0.9, text: "병사·총·탄약 모델 받는 중…" } };
-  static gauge = new LoadGauge({ title: "전장 준비 중", phases: SurvivalLoading.PHASES, place: "bottom" });
+  static gauge = new LoadGauge({ title: "전장 준비 중", phases: SurvivalLoading.PHASES });
   static counter = new LoadCounter(() => SurvivalLoading.paint());
   static menuWatch = SurvivalLoading.watchMenu();
   static watchMenu() {

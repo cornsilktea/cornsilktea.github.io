@@ -11,7 +11,7 @@ class BbLoading {
   };
 
   static gauge(): LoadGauge<BbLoadStep> {
-    return new LoadGauge({ title: "야구장 준비 중", phases: BbLoading.PHASES, place: "bottom" });
+    return new LoadGauge({ title: "야구장 준비 중", phases: BbLoading.PHASES });
   }
 }
 

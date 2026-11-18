@@ -546,7 +546,7 @@
 <div id="rankBox" hidden><div class="hud-box" id="rkTime">0:00.00</div><div id="rkList"></div></div>
 <div id="viewBtns" hidden></div>
 
-<script charset="utf-8" src="common/load-gauge.js?v=20261118b"></script>
+<script charset="utf-8" src="common/load-gauge.js?v=20261118c"></script>
 <script charset="utf-8" src="common/character-kit.js?v=20261116b"></script>
 <script charset="utf-8" src="common/character-maker.js?v=20261116a"></script>
 <script charset="utf-8" src="common/room-drop-recovery.js?v=20261106b"></script>
@@ -879,7 +879,7 @@ class TurboLapLoading {
     car: { at: 0.84, text: "자동차 모델 받는 중…" },
     course: { at: 0.92, text: "코스 준비 중…" }
   };
-  static gauge = new LoadGauge({ title: "서킷 준비 중", phases: TurboLapLoading.PHASES, place: "bottom" });
+  static gauge = new LoadGauge({ title: "서킷 준비 중", phases: TurboLapLoading.PHASES });
   static onMenu() { return $("overlay").style.display !== "none"; }
   static paint(myModel, warm) {
     const gauge = TurboLapLoading.gauge;

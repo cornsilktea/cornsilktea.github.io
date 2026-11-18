@@ -384,7 +384,7 @@ class WarGameApp {
 }
 class WarLoading {
     static gauge() {
-        return new LoadGauge({ title: "전장 준비 중", phases: WarLoading.PHASES, place: "bottom" });
+        return new LoadGauge({ title: "전장 준비 중", phases: WarLoading.PHASES });
     }
 }
 WarLoading.PHASES = {

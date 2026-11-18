@@ -316,7 +316,7 @@
   </div>
 </div>
 
-<script charset="utf-8" src="common/load-gauge.js?v=20261118b"></script>
+<script charset="utf-8" src="common/load-gauge.js?v=20261118c"></script>
 <script charset="utf-8" src="common/character-kit.js?v=20261116b"></script>
 <script charset="utf-8" src="common/character-maker.js?v=20261116a"></script>
 <script>new CharacterMakerDialog(undefined, false);</script>
@@ -13027,7 +13027,7 @@ SinglePassMaterials.enable(THREE);
   class KitLoadNote {
     static PHASES = { files: { at: 0.04, span: 0.92, text: "캐릭터·무기·아레나 장식 받는 중…" } };
     constructor(services) { this.services = services; this.files = null; this.slowTimer = 0; this.gauge = null; }
-    bind() { if (!this.gauge && !Environment.SILENT_RUN) this.gauge = new LoadGauge({ title: "아레나 준비 중", phases: KitLoadNote.PHASES, place: "bottom" }); }
+    bind() { if (!this.gauge && !Environment.SILENT_RUN) this.gauge = new LoadGauge({ title: "아레나 준비 중", phases: KitLoadNote.PHASES }); }
     track(files) { var note = this;
       this.files = files;
       clearTimeout(this.slowTimer); this.slowTimer = setTimeout(function () { note.render(); }, LoadGauge.SLOW_MS + 50);

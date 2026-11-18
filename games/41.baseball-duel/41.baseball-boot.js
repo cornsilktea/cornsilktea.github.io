@@ -1,7 +1,7 @@
 "use strict";
 class BbLoading {
     static gauge() {
-        return new LoadGauge({ title: "야구장 준비 중", phases: BbLoading.PHASES, place: "bottom" });
+        return new LoadGauge({ title: "야구장 준비 중", phases: BbLoading.PHASES });
     }
 }
 BbLoading.PHASES = {

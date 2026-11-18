@@ -126,7 +126,7 @@ MiniGamesApp.MAX_BACKUP_SECONDS = 0.1;
 MiniGamesApp.HOST_TICK_MS = 250;
 class MiniGamesLoading {
     static gauge() {
-        return new LoadGauge({ title: "미니게임 모음 준비 중", phases: MiniGamesLoading.PHASES, place: "bottom" });
+        return new LoadGauge({ title: "미니게임 모음 준비 중", phases: MiniGamesLoading.PHASES });
     }
 }
 MiniGamesLoading.PHASES = {

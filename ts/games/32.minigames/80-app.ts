@@ -148,7 +148,7 @@ class MiniGamesLoading {
   };
 
   static gauge(): LoadGauge<MiniGamesLoadStep> {
-    return new LoadGauge({ title: "미니게임 모음 준비 중", phases: MiniGamesLoading.PHASES, place: "bottom" });
+    return new LoadGauge({ title: "미니게임 모음 준비 중", phases: MiniGamesLoading.PHASES });
   }
 }
 

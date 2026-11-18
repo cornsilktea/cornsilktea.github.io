@@ -17,13 +17,9 @@ interface LoadGaugeCount {
   readonly total: number;
 }
 
-type LoadGaugePlace = "center" | "bottom";
-
 interface LoadGaugeOptions<K extends string> {
   readonly title: string;
   readonly phases: Readonly<Record<K, LoadGaugePhase>>;
-  // center: 받는 동안 할 게 없는 게임(화면 가운데). bottom: 받는 동안에도 시작 화면을 볼 수 있는 게임(아래쪽에 작게).
-  readonly place?: LoadGaugePlace;
 }
 
 class LoadGauge<K extends string = string> {
@@ -44,7 +40,7 @@ class LoadGauge<K extends string = string> {
   private settled = false;
 
   constructor(private readonly options: LoadGaugeOptions<K>) {
-    this.root = LoadGauge.box("lg-load lg-" + (options.place || "center"), document.body);
+    this.root = LoadGauge.box("lg-load", document.body);
     this.root.hidden = true;
     this.titleLine = LoadGauge.box("lg-title", this.root, options.title);
     this.text = LoadGauge.box("lg-text", this.root);
