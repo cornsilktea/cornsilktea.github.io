@@ -32,9 +32,11 @@ class ClimbModelLibrary {
     wagon: "holiday/train_wagon.gltf", giftRed: "holiday/present_D_red.gltf", giftGreen: "holiday/present_D_green.gltf", giftBlue: "holiday/present_D_blue.gltf",
     giftTallRed: "holiday/present_B_red.gltf", giftTallGreen: "holiday/present_B_green.gltf", giftLongGreen: "holiday/present_F_green.gltf", giftLongBlue: "holiday/present_F_blue.gltf",
     gingerHouse: "holiday/gingerbread_house_decorated.gltf", holidayLantern: "holiday/lantern.gltf", snowBlock: "blocks/snow.gltf", snowman: "snow/snowman_A.gltf",
-    spacePlate: "../kenney/space/platform_large.glb", spaceCrate: "../kenney/space/structure_closed.glb", meteorHalf: "../kenney/space/meteor_half.glb",
-    hangar: "../kenney/space/hangar_roundGlass.glb", dish: "../kenney/space/satelliteDish_large.glb", rover: "../kenney/space/rover.glb",
-    rocketFins: "../kenney/space/rocket_finsA.glb", rocketFuel: "../kenney/space/rocket_fuelA.glb", rocketTop: "../kenney/space/rocket_topA.glb",
+    roofPlate: "space-base/roofmodule_base.gltf", marsBlock: "space-base/terrain_low.gltf", marsTall: "space-base/terrain_tall.gltf",
+    marsRock: "space-base/rock_B.gltf", marsRocks: "space-base/rocks_B.gltf", frameTall: "space-base/structure_tall.gltf",
+    domeModule: "space-base/basemodule_E.gltf", baseModule: "space-base/basemodule_A.gltf", cargoDepot: "space-base/cargodepot_A.gltf",
+    landingPad: "space-base/landingpad_large.gltf", lander: "space-base/lander_A.gltf", windTurbine: "space-base/windturbine_tall.gltf",
+    solarPanel: "space-base/solarpanel.gltf", spaceTruck: "space-base/spacetruck.gltf", drill: "space-base/drill_structure.gltf", cargoStack: "space-base/cargo_A_stacked.gltf",
   };
 
   static readonly TINTS: Readonly<Record<string, number>> = { hexIsle: 0x9FB878 };
@@ -212,31 +214,22 @@ class ClimbSpaceKit {
   }
 
   private deck(): ClimbModel {
-    return this.model([...this.fitted("spacePlate", [-0.5, -0.3, -0.5], [0.5, 0, 0.5]), ...this.fitted("spaceCrate", [-0.46, -1, -0.46], [0.46, -0.3, 0.46])]);
+    return this.model([...this.fitted("roofPlate", [-0.44, -0.1, -0.44], [0.44, 0, 0.44]), this.box(1, 0.06, 1, -0.07, this.lambert(ClimbSpaceKit.STEEL)), ...this.fitted("marsBlock", [-0.5, -1, -0.5], [0.5, -0.1, 0.5])]);
   }
 
   private ice(): ClimbModel {
     const K = ClimbSpaceKit;
-    return this.model([...this.fitted("spacePlate", [-0.5, -1, -0.5], [0.5, 0, 0.5], false, this.lambert(K.ICE, 0.78)), this.box(0.9, 0.04, 0.9, -0.03, this.lambert(K.ICE_TOP)), this.box(1.02, 0.08, 1.02, -0.5, this.glow(0xFFFFFF))]);
+    return this.model([...this.fitted("marsBlock", [-0.5, -1, -0.5], [0.5, 0, 0.5], false, this.lambert(K.ICE, 0.78)), this.box(0.9, 0.04, 0.9, -0.03, this.lambert(K.ICE_TOP)), this.box(1.02, 0.08, 1.02, -0.5, this.glow(0xFFFFFF))]);
   }
 
   private crumble(): ClimbModel {
     const K = ClimbSpaceKit;
-    return this.model([...this.fitted("meteorHalf", [-0.5, -1, -0.5], [0.5, -0.1, 0.5], true), this.box(1, 0.06, 1, -0.11, this.lambert(K.DARK)), this.box(0.96, 0.08, 0.96, -0.04, this.lambert(K.WARN))]);
+    return this.model([...this.fitted("marsRock", [-0.5, -1, -0.5], [0.5, -0.1, 0.5], true), this.box(1, 0.06, 1, -0.11, this.lambert(K.DARK)), this.box(0.96, 0.08, 0.96, -0.04, this.lambert(K.WARN))]);
   }
 
   private mast(): ClimbModel {
     const K = ClimbSpaceKit;
-    return this.model([...this.fitted("spaceCrate", [-0.5, -1, -0.5], [0.5, 0, 0.5]), ...[-0.25, -0.6].map((y) => this.box(1.03, 0.06, 1.03, y, this.glow(K.RED)))]);
-  }
-
-  private rocket(): ClimbModel {
-    return this.model([
-      ...this.fitted("rocketFins", [-0.6, 0, -0.6], [0.6, 0.7, 0.6]),
-      ...this.fitted("rocketFuel", [-0.5, 0.7, -0.5], [0.5, 1.2, 0.5]),
-      ...this.fitted("rocketFuel", [-0.5, 1.2, -0.5], [0.5, 1.7, 0.5]),
-      ...this.fitted("rocketTop", [-0.5, 1.7, -0.5], [0.5, 2.5, 0.5]),
-    ]);
+    return this.model([...this.fitted("frameTall", [-0.5, -1, -0.5], [0.5, 0, 0.5]), ...[-0.25, -0.6].map((y) => this.box(1.03, 0.06, 1.03, y, this.glow(K.RED)))]);
   }
 
   registerInto(library: ClimbModelLibrary): void {
@@ -245,8 +238,7 @@ class ClimbSpaceKit {
     library.register("spaceIce", this.ice());
     library.register("spaceCrumble", this.crumble());
     library.register("spaceMast", this.mast());
-    library.register("spaceIsle", this.model(this.fitted("meteorHalf", [-4.6, -K.ISLE_DEPTH, -4.2], [4.6, 0, 4.2], true)));
-    library.register("spaceRocket", this.rocket());
+    library.register("spaceIsle", this.model(this.fitted("marsTall", [-4.6, -K.ISLE_DEPTH, -4.2], [4.6, 0, 4.2])));
   }
 }
 
@@ -397,7 +389,7 @@ class ClimbWindView {
 }
 
 class ClimbSkyTint {
-  static readonly SPACE = 0x1B2350;
+  static readonly SPACE = 0x3B2440;
   static readonly FROM = 178;
   static readonly TO = 194;
 
@@ -621,13 +613,17 @@ class TowerLevelBuilder {
 
   private decorateSpace(): void {
     const add = this.placer(ClimbBalance.STAGE_COUNT);
-    for (const [deg, rho, top] of TowerLevelBuilder.SPACE_ISLANDS) {
+    for (const [index, [deg, rho, top]] of TowerLevelBuilder.SPACE_ISLANDS.entries()) {
       const angle = deg * Math.PI / 180, x = Math.sin(angle) * rho, z = Math.cos(angle) * rho, sideX = Math.cos(angle), sideZ = -Math.sin(angle), outX = Math.sin(angle), outZ = Math.cos(angle);
       add("spaceIsle", x, top - ClimbSpaceKit.ISLE_DEPTH, z, angle, 1);
-      add("hangar", x + outX * 1.4, top, z + outZ * 1.4, angle + Math.PI, 1.3);
-      add("spaceRocket", x - sideX * 2.6 - outX * 1.4, top, z - sideZ * 2.6 - outZ * 1.4, angle, 1.6);
-      add("dish", x + sideX * 2.6 - outX * 1.6, top, z + sideZ * 2.6 - outZ * 1.6, angle + Math.PI, 2.6);
-      add("rover", x - outX * 2.6, top, z - outZ * 2.6, angle + 0.8, 3);
+      add(index % 2 ? "domeModule" : "baseModule", x + outX * 1.6, top, z + outZ * 1.6, angle + Math.PI, 1.7);
+      add("landingPad", x - sideX * 2.3 - outX * 1.3, top, z - sideZ * 2.3 - outZ * 1.3, angle, 1.4);
+      add("lander", x - sideX * 2.3 - outX * 1.3, top + 0.7, z - sideZ * 2.3 - outZ * 1.3, angle + 0.5, 1.4);
+      add(index % 3 ? "windTurbine" : "drill", x + sideX * 2.9 + outX * 0.4, top, z + sideZ * 2.9 + outZ * 0.4, angle + Math.PI, 1.6);
+      add("solarPanel", x + sideX * 2.4 - outX * 2.4, top, z + sideZ * 2.4 - outZ * 2.4, angle + Math.PI, 2);
+      add("spaceTruck", x - outX * 2.8, top, z - outZ * 2.8, angle + 1.2, 2.2);
+      add("cargoStack", x + sideX * 0.8 - outX * 3.1, top, z + sideZ * 0.8 - outZ * 3.1, angle + 0.3, 1.2);
+      add("marsRocks", x + sideX * 3.3 - outX * 3, top, z + sideZ * 3.3 - outZ * 3, angle * 3, 1.3);
     }
   }
 

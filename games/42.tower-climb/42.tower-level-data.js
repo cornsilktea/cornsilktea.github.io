@@ -685,7 +685,7 @@ class TowerStageSevenLayout {
         const S = TowerStageSevenLayout, ice = Array.from({ length: S.ICE_COUNT }, (_, k) => "zi" + (k + 1)), crumble = Array.from({ length: S.CRUMBLE_COUNT + 1 }, (_, k) => "zc" + (k + 1));
         const wind = Array.from({ length: S.WIND_COUNT }, (_, k) => "zw" + (k + 1));
         return [
-            { stage: 7, name: "hard7", label: "우주 기지 길", ratioLimit: 0.9, steps: ["rest7", "zs1", "zd1", ...ice, "zr1", ...crumble, "zr2", ...wind, "zt1", "zl1", "zl2", "zj1", "summit"] },
+            { stage: 7, name: "hard7", label: "화성 기지 길", ratioLimit: 0.9, steps: ["rest7", "zs1", "zd1", ...ice, "zr1", ...crumble, "zr2", ...wind, "zt1", "zl1", "zl2", "zj1", "summit"] },
         ];
     }
 }
@@ -760,5 +760,5 @@ TowerLevelData.STAGES = [
     { index: 4, name: "거인의 주방", floor: 90, ceiling: 120 },
     { index: 5, name: "묘지", floor: 120, ceiling: 150 },
     { index: 6, name: "눈 덮인 장난감 마을", floor: 150, ceiling: 180 },
-    { index: 7, name: "우주 기지", floor: 180, ceiling: 200 },
+    { index: 7, name: "화성 기지", floor: 180, ceiling: 200 },
 ];
