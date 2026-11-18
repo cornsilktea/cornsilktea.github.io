@@ -228,25 +228,28 @@ function box(id, x, z, y, sx, sz, more = {}) { return { id, kind: "static", stag
   check("슬로를 놓으면 원래 속도", !r.time.active && near(r.time.scale, 1, 1e-9), r.time.scale);
 }
 {
-  const p = new StageProgress(0);
+  const p = new StageProgress(0), practice = new K.ClimbPracticeMode();
   const level = new TowerLevel(TowerLevelData.spec());
-  check("포탈 2: 스테이지 1 클리어 전에는 잠김", !p.portalOpen(2, level));
-  check("스테이지 1 클리어 → 포탈 2 열림", p.clear(1) && p.portalOpen(2, level));
+  check("포탈 2: 스테이지 1 클리어 전에는 잠김", !p.portalOpen(2, level, practice));
+  check("스테이지 1 클리어 → 포탈 2 열림", p.clear(1) && p.portalOpen(2, level, practice));
   check("포탈 3: 스테이지 2 클리어 전에는 잠김", !p.unlocked(3));
   p.clear(2);
-  check("포탈 3: 스테이지 2 클리어 → 열림", p.unlocked(3) && p.portalOpen(3, level));
-  check("포탈 4: 스테이지 3 클리어 전에는 잠김", !p.unlocked(4) && !p.portalOpen(4, level));
+  check("포탈 3: 스테이지 2 클리어 → 열림", p.unlocked(3) && p.portalOpen(3, level, practice));
+  check("포탈 4: 스테이지 3 클리어 전에는 잠김", !p.unlocked(4) && !p.portalOpen(4, level, practice));
   p.clear(3);
-  check("포탈 4: 스테이지 3 클리어 → 열림", p.unlocked(4) && p.portalOpen(4, level));
-  check("포탈 5: 스테이지 4 클리어 전에는 잠김", !p.unlocked(5) && !p.portalOpen(5, level));
+  check("포탈 4: 스테이지 3 클리어 → 열림", p.unlocked(4) && p.portalOpen(4, level, practice));
+  check("포탈 5: 스테이지 4 클리어 전에는 잠김", !p.unlocked(5) && !p.portalOpen(5, level, practice));
   p.clear(4);
-  check("포탈 5: 스테이지 4 클리어 → 열림", p.unlocked(5) && p.portalOpen(5, level));
+  check("포탈 5: 스테이지 4 클리어 → 열림", p.unlocked(5) && p.portalOpen(5, level, practice));
   p.clear(5);
-  check("포탈 6: 스테이지 5 클리어 → 열림", p.unlocked(6) && p.portalOpen(6, level));
+  check("포탈 6: 스테이지 5 클리어 → 열림", p.unlocked(6) && p.portalOpen(6, level, practice));
   p.clear(6);
-  check("포탈 7: 스테이지 6 클리어 → 열림", p.unlocked(7) && p.portalOpen(7, level));
+  check("포탈 7: 스테이지 6 클리어 → 열림", p.unlocked(7) && p.portalOpen(7, level, practice));
   check("이미 깬 스테이지는 다시 세지 않음", !p.clear(1) && p.cleared === 6);
-  check("포탈은 6개(스테이지 2~7)", level.portals.length === 6 && level.portals.map((x) => x.stage).join("") === "234567");
+  const stagePortals = level.portals.filter((x) => (x.kind || "stage") === "stage");
+  check("스테이지 포탈은 6개(스테이지 2~7)", stagePortals.length === 6 && stagePortals.map((x) => x.stage).join("") === "234567");
+  check("스피드런 포탈은 1개", level.portals.filter((x) => x.kind === "speedrun").length === 1);
+  check("스피드런 중에는 열린 스테이지 포탈도 닫힘", !p.portalOpen(2, level, new K.ClimbSpeedrunMode(0)) && p.portalOpen(2, level, practice));
 }
 {
   const rest = { id: "rest2", kind: "rest", stage: 1, x: 0, y: 30, z: 0, radius: 4, depth: 0.5, startOf: 2 };
@@ -407,6 +410,105 @@ function box(id, x, z, y, sx, sz, more = {}) { return { id, kind: "static", stag
   const r = world([{ id: "top", kind: "summit", stage: 7, x: 0, y: 3, z: 0, radius: 4, depth: 1 }], { x: 0, y: 3.01, z: 0, yaw: 0 }, 6);
   const events = run(r, 0.5);
   check("꼭대기 깃발: 서면 스테이지 7 클리어와 완주 이벤트", events.some((e) => e.t === "stageClear" && e.stage === 7) && events.filter((e) => e.t === "summit").length === 1 && r.progress.cleared === 7, events.map((e) => e.t));
+}
+
+{
+  const speedLevel = (cleared = 1) => {
+    const hub = { id: "hub", kind: "hub", stage: 0, x: 0, y: 0, z: 0, radius: 60, depth: 3 };
+    const pieces = [hub,
+      { id: "rest2", kind: "rest", stage: 1, x: 0, y: 30, z: 40, radius: 4, depth: 0.5, startOf: 2 },
+      { id: "rest3", kind: "rest", stage: 2, x: 0, y: 60, z: 40, radius: 4, depth: 0.5, startOf: 3 },
+      { id: "high", kind: "static", stage: 1, x: 20, y: 12, z: 20, sx: 3, sz: 3 },
+      { id: "top", kind: "summit", stage: 7, x: 0, y: 200, z: 40, radius: 4, depth: 1 }];
+    const portals = [{ kind: "stage", stage: 2, x: 30, y: 0, z: 0, yaw: 0 }, { kind: "speedrun", stage: 0, x: -10, y: 0, z: 0, yaw: 0 }];
+    const level = new TowerLevel({ stages: STAGES, pieces, portals, routes: [], spawn: { x: 0, y: 0, z: 0, yaw: 0 } });
+    return new ClimbRules(level, new StageProgress(cleared));
+  };
+  const tickRun = (rules, seconds, log) => { for (let i = 0; i < Math.round(seconds / B.TICK); i++) for (const e of rules.advance(B.TICK)) log.push({ ...e, tick: rules.ticks }); return log; };
+  const enterSpeedrun = (rules, log) => { rules.body.place(-10, 0, 0); tickRun(rules, 1.8, log); return log.find((e) => e.t === "speedrunStart"); };
+
+  const r = speedLevel(), log = [];
+  settle(r);
+  const start = enterSpeedrun(r, log);
+  check("스피드런 포탈에 닿으면 그 틱에 speedrunStart, 모드가 스피드런", !!start && r.mode.name === "speedrun" && log.some((e) => e.t === "portalEnter" && e.tick === start.tick), log.map((e) => e.t));
+  check("스피드런: 닿은 틱부터 시간이 흐름(입력을 기다리지 않음)", near(r.mode.seconds, (r.ticks - start.tick) * B.TICK, 1e-9), [r.mode.seconds, r.ticks - start.tick]);
+  check("스피드런: 하얗게 넘어간 뒤 허브 시작 지점에 섬", log.some((e) => e.t === "hubArrive") && r.body.grounded && Math.hypot(r.body.x, r.body.z) < 1e-6 && r.body.mode === "free");
+  check("스피드런 포탈은 포탈 사용으로 세지 않음", r.portalsUsed === 0);
+
+  const blocked = [];
+  r.body.place(30, 0, 0);
+  tickRun(r, 2, blocked);
+  check("스피드런 중에는 열린 스테이지 포탈에 닿아도 이동 안 함", !blocked.some((e) => e.t === "portalEnter") && r.body.mode === "free" && near(r.body.x, 30, 1e-6), blocked.map((e) => e.t));
+
+  const fall = [];
+  const before = r.mode.seconds;
+  r.body.place(20, 12, 20);
+  tickRun(r, 0.2, fall);
+  r.steer(1, 0);
+  tickRun(r, 0.5, fall);
+  r.steer(0, 0);
+  tickRun(r, 2, fall);
+  check("스피드런: 떨어져 허브로 와도 시간 계속·스피드런 유지", fall.some((e) => e.t === "fellHome") && r.mode.name === "speedrun" && near(r.mode.seconds - before, 2.7, 1e-6), [r.mode.seconds - before, fall.map((e) => e.t)]);
+
+  const splits = [];
+  r.body.place(0, 30, 40);
+  tickRun(r, 0.5, splits);
+  r.body.place(0, 30.01, 40);
+  tickRun(r, 0.3, splits);
+  r.body.place(0, 60, 40);
+  tickRun(r, 0.5, splits);
+  const splitEvents = splits.filter((e) => e.t === "split");
+  check("스피드런: 쉼터마다 split 한 번씩(다시 서도 안 셈)", splitEvents.length === 2 && splitEvents[0].stage === 1 && splitEvents[1].stage === 2 && splitEvents[0].seconds < splitEvents[1].seconds, splitEvents);
+
+  const finish = [];
+  r.body.place(0, 200, 40);
+  tickRun(r, 1, finish);
+  const done = finish.filter((e) => e.t === "speedrunFinish");
+  const doneTick = done.length ? done[0].tick : -1;
+  check("스피드런: 꼭대기에서 speedrunFinish 한 번, summit 이벤트는 없음", done.length === 1 && !finish.some((e) => e.t === "summit"), finish.map((e) => e.t));
+  check("스피드런: 기록 = 들어간 틱부터 꼭대기 틱까지", done.length === 1 && near(done[0].seconds, (doneTick - start.tick) * B.TICK, 1e-9), done[0] && [done[0].seconds, (doneTick - start.tick) * B.TICK]);
+  check("스피드런: 결과에 구간 기록(1·2·7)과 떨어진 횟수", done.length === 1 && done[0].splits.length === 7 && done[0].splits[0] > 0 && done[0].splits[1] > 0 && done[0].splits[6] === done[0].seconds && done[0].splits[3] === 0 && done[0].falls === 1, done[0]);
+  const after = r.mode.seconds;
+  tickRun(r, 0.5, []);
+  check("스피드런: 끝난 뒤에는 시계가 멈춤", r.mode.seconds === after);
+
+  const exit = speedLevel(), exitLog = [];
+  settle(exit);
+  enterSpeedrun(exit, exitLog);
+  exit.body.place(-10, 0, 0);
+  tickRun(exit, 1.8, exitLog);
+  check("스피드런 포탈을 다시 타면 일반 모드로 돌아오고 기록 이벤트 없음", exit.mode.name === "practice" && exitLog.some((e) => e.t === "speedrunExit") && !exitLog.some((e) => e.t === "speedrunFinish" || e.t === "split") && Math.hypot(exit.body.x, exit.body.z) < 1e-6, exitLog.map((e) => e.t));
+  check("나간 뒤에는 스테이지 포탈을 다시 씀", exit.progress.portalOpen(2, exit.level, exit.mode));
+
+  const practice = speedLevel(), plog = [];
+  settle(practice);
+  practice.body.place(0, 30, 40);
+  tickRun(practice, 0.5, plog);
+  practice.body.place(0, 200, 40);
+  tickRun(practice, 0.5, plog);
+  const summit = plog.find((e) => e.t === "summit");
+  check("일반 모드: 시간 기록 이벤트가 없음(split·speedrunFinish 없음, summit 에 시간 없음)", !!summit && !plog.some((e) => e.t === "split" || e.t === "speedrunFinish") && summit.seconds === undefined && practice.mode.seconds === 0, plog.map((e) => e.t));
+
+  const again = () => {
+    const rules = speedLevel(), out = [];
+    settle(rules);
+    enterSpeedrun(rules, out);
+    rules.steer(0.3, 1);
+    tickRun(rules, 1.3, out);
+    rules.pressJump();
+    tickRun(rules, 1, out);
+    return rules.mode.seconds;
+  };
+  check("같은 입력이면 같은 스피드런 시간", again() === again());
+
+  const slow = speedLevel();
+  settle(slow);
+  enterSpeedrun(slow, []);
+  const slowFrom = slow.mode.seconds, worldFrom = slow.worldTime;
+  slow.holdSlow(true);
+  for (let i = 0; i < 180; i++) slow.advance(1 / 60);
+  check("스피드런 기록은 실제 시간: 슬로를 3초 써도 시계는 약 3초", near(slow.mode.seconds - slowFrom, 3, 0.02), slow.mode.seconds - slowFrom);
+  check("슬로 중에는 판 시간이 덜 감(3초 동안 1.5초 미만)", slow.worldTime - worldFrom < 1.5, slow.worldTime - worldFrom);
 }
 
 console.log("climb-unit: 통과 " + passed + ", 실패 " + failures.length);

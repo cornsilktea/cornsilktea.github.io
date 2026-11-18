@@ -558,6 +558,95 @@ class ClimbTimeScale {
         this.scale = this.scale < target ? Math.min(target, this.scale + pace) : Math.max(target, this.scale - pace);
     }
 }
+class ClimbRunMode {
+    get stagePortalsUsable() { return true; }
+    get timed() { return false; }
+    get seconds() { return 0; }
+    get peak() { return 0; }
+    tick(_rules) { }
+    restReached(_cleared, _rules) { }
+}
+class ClimbPracticeMode extends ClimbRunMode {
+    constructor() {
+        super(...arguments);
+        this.name = "practice";
+    }
+    finish(rules) { rules.emit({ t: "summit", falls: rules.falls, portals: rules.portalsUsed }); }
+    switched(rules) {
+        rules.emit({ t: "speedrunStart" });
+        return new ClimbSpeedrunMode(rules.falls);
+    }
+}
+class ClimbSpeedrunMode extends ClimbRunMode {
+    constructor(fallsBefore) {
+        super();
+        this.fallsBefore = fallsBefore;
+        this.name = "speedrun";
+        this.splits = new Array(ClimbBalance.STAGE_COUNT).fill(0);
+        this.finished = false;
+        this.elapsed = 0;
+        this.highest = 0;
+    }
+    get stagePortalsUsable() { return false; }
+    get timed() { return true; }
+    get seconds() { return this.elapsed; }
+    get peak() { return this.highest; }
+    tick(rules) {
+        if (this.finished)
+            return;
+        this.elapsed += ClimbBalance.TICK / rules.time.scale;
+        const body = rules.body;
+        if (body.grounded || body.hanging)
+            this.highest = Math.max(this.highest, body.y);
+    }
+    restReached(cleared, rules) {
+        const slot = cleared - 1;
+        if (this.finished || slot < 0 || slot >= this.splits.length || this.splits[slot] > 0)
+            return;
+        this.splits[slot] = this.elapsed;
+        rules.emit({ t: "split", stage: cleared, seconds: this.elapsed });
+    }
+    finish(rules) {
+        if (this.finished)
+            return;
+        this.highest = ClimbBalance.TOP;
+        this.restReached(ClimbBalance.STAGE_COUNT, rules);
+        this.finished = true;
+        rules.emit({ t: "speedrunFinish", seconds: this.elapsed, splits: this.splits.slice(), falls: rules.falls - this.fallsBefore, peak: this.highest });
+    }
+    switched(rules) {
+        rules.emit({ t: "speedrunExit" });
+        return new ClimbPracticeMode();
+    }
+}
+class ClimbPortalKind {
+    enter(_spec, _rules) { }
+}
+class ClimbStagePortalKind extends ClimbPortalKind {
+    open(spec, rules) { return rules.progress.portalOpen(spec.stage, rules.level, rules.mode); }
+    arrive(spec, rules) {
+        const start = rules.level.stageStart(spec.stage);
+        if (!start)
+            return;
+        rules.dropAt(start.x, start.top, start.z, ClimbBalance.PORTAL_DROP);
+        rules.portalsUsed++;
+        rules.emit({ t: "portalArrive", stage: spec.stage });
+    }
+}
+class ClimbSpeedrunPortalKind extends ClimbPortalKind {
+    open() { return true; }
+    enter(_spec, rules) { rules.mode = rules.mode.switched(rules); }
+    arrive(_spec, rules) {
+        const spawn = rules.level.spawn;
+        rules.dropAt(spawn.x, spawn.y, spawn.z, 0);
+        rules.body.yaw = spawn.yaw;
+        rules.emit({ t: "hubArrive" });
+    }
+}
+class ClimbPortalKinds {
+    static of(spec) { return ClimbPortalKinds.KINDS[spec.kind ?? "stage"]; }
+}
+ClimbPortalKinds.KINDS = { stage: new ClimbStagePortalKind(), speedrun: new ClimbSpeedrunPortalKind() };
 class StageProgress {
     constructor(cleared = 0) {
         this.cleared = cleared;
@@ -569,7 +658,7 @@ class StageProgress {
         return true;
     }
     unlocked(portalStage) { return portalStage >= 2 && portalStage - 1 <= this.cleared; }
-    portalOpen(portalStage, level) { return this.unlocked(portalStage) && level.hasStage(portalStage); }
+    portalOpen(portalStage, level, mode) { return mode.stagePortalsUsable && this.unlocked(portalStage) && level.hasStage(portalStage); }
 }
 class TowerStage {
     constructor(index, name, floor, ceiling) {
@@ -708,7 +797,7 @@ class ClimbCharacterBody {
         this.windX = 0;
         this.windZ = 0;
         this.portalTime = 0;
-        this.portalTo = 0;
+        this.portal = null;
     }
     place(x, y, z) {
         this.x = this.prevX = x;
@@ -758,12 +847,10 @@ class ClimbRules {
         this.body = new ClimbCharacterBody();
         this.events = [];
         this.summitReached = false;
-        this.clock = 0;
         this.ticks = 0;
-        this.started = false;
         this.peak = 0;
         this.portalsUsed = 0;
-        this.stageOneTime = null;
+        this.mode = new ClimbPracticeMode();
         this.moveX = 0;
         this.moveZ = 0;
         this.jumpLatch = false;
@@ -807,10 +894,6 @@ class ClimbRules {
     advance(realDt) {
         const B = ClimbBalance, dt = Math.min(Math.max(realDt, 0), B.FRAME_CAP);
         this.events.length = 0;
-        if (!this.started && (this.steering || this.jumpLatch))
-            this.started = true;
-        if (this.started)
-            this.clock += dt;
         this.time.update(dt, this.slowHeld);
         this.bank += dt * this.time.scale;
         while (this.bank >= B.TICK - 1e-12) {
@@ -825,6 +908,7 @@ class ClimbRules {
         const B = ClimbBalance, body = this.body;
         body.remember();
         this.ticks++;
+        this.mode.tick(this);
         this.moveMovers();
         this.carry();
         body.grabCooldown = Math.max(0, body.grabCooldown - B.TICK);
@@ -886,8 +970,9 @@ class ClimbRules {
         this.summitReached = true;
         if (this.progress.clear(ClimbBalance.STAGE_COUNT))
             this.emit({ t: "stageClear", stage: ClimbBalance.STAGE_COUNT });
-        this.emit({ t: "summit", seconds: this.clock, falls: this.falls, portals: this.portalsUsed });
+        this.mode.finish(this);
     }
+    beginSpeedrun() { this.mode = new ClimbPracticeMode().switched(this); }
     carrier() {
         const body = this.body;
         const piece = body.mode === "hang" ? body.spot.piece : body.mode === "climbUp" ? body.climbPath.piece : body.grounded ? body.ground : null;
@@ -908,11 +993,9 @@ class ClimbRules {
             body.climbPath.ride(piece);
     }
     touchStageStart(stage) {
-        if (!this.progress.clear(stage - 1))
-            return;
-        if (stage === 2 && this.portalsUsed === 0 && this.stageOneTime === null)
-            this.stageOneTime = this.clock;
-        this.emit({ t: "stageClear", stage: stage - 1 });
+        if (this.progress.clear(stage - 1))
+            this.emit({ t: "stageClear", stage: stage - 1 });
+        this.mode.restReached(stage - 1, this);
     }
     bounce(pad) {
         this.body.vy = ClimbBalance.PAD_SPEED;
@@ -1050,15 +1133,17 @@ class ClimbRules {
         if (body.mode !== "free")
             return;
         for (const portal of this.level.portals) {
-            if (!this.progress.portalOpen(portal.stage, this.level))
+            const kind = ClimbPortalKinds.of(portal);
+            if (!kind.open(portal, this))
                 continue;
             if (Math.hypot(portal.x - body.x, portal.z - body.z) > B.PORTAL_RADIUS || Math.abs(portal.y - body.y) > 1)
                 continue;
             body.mode = "portal";
             body.portalTime = B.PORTAL_TIME;
-            body.portalTo = portal.stage;
+            body.portal = portal;
             body.vx = body.vy = body.vz = 0;
             this.emit({ t: "portalEnter", stage: portal.stage });
+            kind.enter(portal, this);
             return;
         }
     }
@@ -1221,15 +1306,17 @@ class ClimbRules {
         body.portalTime -= B.TICK;
         if (body.portalTime > 0)
             return;
-        const start = this.level.stageStart(body.portalTo);
+        const portal = body.portal;
         body.mode = "free";
-        if (!start)
-            return;
-        body.place(start.x, start.top + B.PORTAL_DROP, start.z);
+        body.portal = null;
+        if (portal)
+            ClimbPortalKinds.of(portal).arrive(portal, this);
+    }
+    dropAt(x, top, z, lift) {
+        const body = this.body;
+        body.place(x, top + lift, z);
         body.grounded = false;
         body.ground = null;
-        body.airPeak = start.top;
-        this.portalsUsed++;
-        this.emit({ t: "portalArrive", stage: body.portalTo });
+        body.airPeak = top;
     }
 }

@@ -122,6 +122,7 @@ class TowerHubLayout {
   static readonly PORTAL_RHO = 15;
   static readonly PORTAL_FIRST_DEG = -50;
   static readonly PORTAL_STEP_DEG = 20;
+  static readonly SPEEDRUN_DEG = 180;
 
   static pieces(): ClimbPieceSpec[] {
     const pen = new ClimbLayoutPen(0);
@@ -133,8 +134,10 @@ class TowerHubLayout {
     const H = TowerHubLayout, list: ClimbPortalSpec[] = [];
     for (let stage = 2; stage <= ClimbBalance.STAGE_COUNT; stage++) {
       const angle = H.PORTAL_FIRST_DEG + (stage - 2) * H.PORTAL_STEP_DEG;
-      list.push({ stage, x: ClimbLayoutPen.ringX(angle, H.PORTAL_RHO), y: 0, z: ClimbLayoutPen.ringZ(angle, H.PORTAL_RHO), yaw: ClimbLayoutPen.rad(angle + 180) });
+      list.push({ kind: "stage", stage, x: ClimbLayoutPen.ringX(angle, H.PORTAL_RHO), y: 0, z: ClimbLayoutPen.ringZ(angle, H.PORTAL_RHO), yaw: ClimbLayoutPen.rad(angle + 180) });
     }
+    const speed = H.SPEEDRUN_DEG;
+    list.push({ kind: "speedrun", stage: 0, x: ClimbLayoutPen.ringX(speed, H.PORTAL_RHO), y: 0, z: ClimbLayoutPen.ringZ(speed, H.PORTAL_RHO), yaw: ClimbLayoutPen.rad(speed + 180) });
     return list;
   }
 

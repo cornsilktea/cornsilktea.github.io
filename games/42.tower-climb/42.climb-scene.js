@@ -700,11 +700,20 @@ class PortalLooks {
         this.libs = libs;
         this.door = library.model("door");
         this.doorOpen = this.door.parts.map((part) => part.material);
-        const grays = new Map();
-        this.doorLocked = this.doorOpen.map((material) => {
-            if (!grays.has(material))
-                grays.set(material, library.grayOf(material));
-            return grays.get(material);
+        this.doorLocked = this.copies(this.doorOpen, (material) => library.grayOf(material));
+        this.doorGold = this.copies(this.doorOpen, (material) => {
+            const gold = material.clone();
+            gold.color.setHex(PortalLooks.GOLD_DOOR);
+            return gold;
+        });
+        this.blank = new libs.THREE.MeshBasicMaterial({ color: 0x101826 });
+    }
+    copies(materials, make) {
+        const made = new Map();
+        return materials.map((material) => {
+            if (!made.has(material))
+                made.set(material, make(material));
+            return made.get(material);
         });
     }
     texture(size, heightRatio, paint) {
@@ -737,7 +746,7 @@ class PortalLooks {
         });
         return new this.libs.THREE.MeshBasicMaterial({ map, side: this.libs.THREE.DoubleSide });
     }
-    plate(stage, color, caption) {
+    plate(title, color, caption) {
         const map = this.texture(256, 0.75, (context, width, height) => {
             context.fillStyle = "rgba(16,24,38,.92)";
             context.fillRect(0, 0, width, height);
@@ -747,8 +756,9 @@ class PortalLooks {
             context.fillStyle = color;
             context.textAlign = "center";
             context.textBaseline = "middle";
-            context.font = '800 ' + (caption ? 112 : 140) + 'px "Nanum Gothic", "Malgun Gothic", sans-serif';
-            context.fillText(String(stage), width / 2, caption ? height * 0.4 : height * 0.53);
+            const big = title.length > 1 ? Math.min(64, Math.floor(400 / title.length)) : caption ? 112 : 140;
+            context.font = '800 ' + big + 'px "Nanum Gothic", "Malgun Gothic", sans-serif';
+            context.fillText(title, width / 2, caption ? height * 0.4 : height * 0.53);
             if (!caption)
                 return;
             context.font = '800 34px "Nanum Gothic", "Malgun Gothic", sans-serif';
@@ -759,13 +769,15 @@ class PortalLooks {
 }
 PortalLooks.STAGE_COLORS = { 2: "#E0A05A", 3: "#9B7BE0", 4: "#F0C04A", 5: "#7FCB5E", 6: "#6EC8FF", 7: "#F07AA8" };
 PortalLooks.GRAY = "#9A9A9A";
-class StagePortal {
-    constructor(libs, looks, spec, built) {
+PortalLooks.GOLD = "#FFC83D";
+PortalLooks.GOLD_DOOR = 0xFFD66B;
+class ClimbPortalView {
+    constructor(libs, looks, spec) {
         this.looks = looks;
         this.spec = spec;
         this.open = false;
         this.doorMeshes = [];
-        const THREE = libs.THREE, door = looks.door, scale = StagePortal.DOOR_SCALE, color = PortalLooks.STAGE_COLORS[spec.stage] ?? "#FFFFFF";
+        const THREE = libs.THREE, door = looks.door, scale = ClimbPortalView.DOOR_SCALE;
         this.group = new THREE.Group();
         this.group.position.set(spec.x, spec.y, spec.z);
         this.group.rotation.y = spec.yaw;
@@ -777,54 +789,95 @@ class StagePortal {
             this.doorMeshes.push(mesh);
             this.group.add(mesh);
         });
-        this.swirlOpen = looks.swirl(color);
-        this.swirlLocked = looks.swirl(PortalLooks.GRAY);
-        this.plateOpen = looks.plate(spec.stage, color, built ? "" : "공사 중");
-        this.plateLocked = looks.plate(spec.stage, PortalLooks.GRAY, built ? "" : "공사 중");
-        this.swirl = new THREE.Mesh(new THREE.CircleGeometry(1.05, 28), this.swirlLocked);
+        this.swirl = new THREE.Mesh(new THREE.CircleGeometry(1.05, 28), looks.blank);
         this.swirl.position.set(0, door.sizeY * scale * 0.42, door.sizeZ * scale / 2 + 0.06);
-        this.plate = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 1.125), this.plateLocked);
+        this.plate = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 1.125), looks.blank);
         this.plate.position.y = door.sizeY * scale + 0.75;
         this.group.add(this.swirl, this.plate);
     }
-    show(open) {
+    paint(open, doors, swirl, plate) {
         this.open = open;
-        this.doorMeshes.forEach((mesh, index) => { mesh.material = open ? this.looks.doorOpen[index] : this.looks.doorLocked[index]; });
-        this.swirl.material = open ? this.swirlOpen : this.swirlLocked;
-        this.plate.material = open ? this.plateOpen : this.plateLocked;
+        this.doorMeshes.forEach((mesh, index) => { mesh.material = doors[index]; });
+        this.swirl.material = swirl;
+        this.plate.material = plate;
     }
+    hint(_progress, _mode, _level) { return ""; }
     update(dt) { if (this.open)
-        this.swirl.rotation.z -= StagePortal.SPIN * dt; }
+        this.swirl.rotation.z -= ClimbPortalView.SPIN * dt; }
 }
-StagePortal.DOOR_SCALE = 0.75;
-StagePortal.SPIN = 1.6;
+ClimbPortalView.DOOR_SCALE = 0.75;
+ClimbPortalView.SPIN = 1.6;
+class StagePortal extends ClimbPortalView {
+    constructor(libs, looks, spec, built) {
+        super(libs, looks, spec);
+        const color = PortalLooks.STAGE_COLORS[spec.stage] ?? "#FFFFFF", caption = built ? "" : "공사 중";
+        this.swirlOpen = looks.swirl(color);
+        this.swirlLocked = looks.swirl(PortalLooks.GRAY);
+        this.plateOpen = looks.plate(String(spec.stage), color, caption);
+        this.plateLocked = looks.plate(String(spec.stage), PortalLooks.GRAY, caption);
+        this.show(false);
+    }
+    show(open) {
+        this.paint(open, open ? this.looks.doorOpen : this.looks.doorLocked, open ? this.swirlOpen : this.swirlLocked, open ? this.plateOpen : this.plateLocked);
+    }
+    sync(progress, mode, level) { this.show(progress.portalOpen(this.spec.stage, level, mode)); }
+    preview(variant) { this.show(variant); }
+    hint(progress, mode, level) {
+        const stage = this.spec.stage;
+        if (this.open)
+            return "";
+        if (!mode.stagePortalsUsable)
+            return "스피드런 중에는 포탈을 쓸 수 없어요";
+        if (!level.hasStage(stage))
+            return "스테이지 " + stage + " 은 공사 중이에요";
+        if (!progress.unlocked(stage))
+            return "스테이지 " + (stage - 1) + " 을 클리어하면 열려요";
+        return "";
+    }
+}
+class SpeedrunPortal extends ClimbPortalView {
+    constructor(libs, looks, spec) {
+        super(libs, looks, spec);
+        const C = SpeedrunPortal.CAPTIONS, gold = PortalLooks.GOLD;
+        this.swirlGold = looks.swirl(gold);
+        this.plates = { practice: looks.plate(C.practice, gold, ""), speedrun: looks.plate(C.speedrun, gold, "") };
+        this.face("practice");
+    }
+    face(name) { this.paint(true, this.looks.doorGold, this.swirlGold, this.plates[name]); }
+    sync(_progress, mode) { this.face(mode.name); }
+    preview(variant) { this.face(variant ? "practice" : "speedrun"); }
+}
+SpeedrunPortal.CAPTIONS = { practice: "스피드런", speedrun: "나가기" };
 class PortalHub {
     constructor(libs, library, level) {
         this.level = level;
         const looks = new PortalLooks(libs, library);
         this.group = new libs.THREE.Group();
-        this.portals = level.portals.map((spec) => new StagePortal(libs, looks, spec, level.hasStage(spec.stage)));
+        this.portals = level.portals.map((spec) => PortalHub.VIEWS[spec.kind ?? "stage"](libs, looks, spec, level));
         this.portals.forEach((portal) => this.group.add(portal.group));
     }
-    sync(progress) { this.portals.forEach((portal) => portal.show(progress.portalOpen(portal.spec.stage, this.level))); }
-    showAll(open) { this.portals.forEach((portal) => portal.show(open)); }
+    sync(progress, mode) { this.portals.forEach((portal) => portal.sync(progress, mode, this.level)); }
+    preview(variant) { this.portals.forEach((portal) => portal.preview(variant)); }
     update(dt) { this.portals.forEach((portal) => portal.update(dt)); }
-    hintNear(x, y, z, progress) {
+    hintNear(x, y, z, progress, mode) {
         if (Math.abs(y) > 1.5)
             return "";
         for (const portal of this.portals) {
             const spec = portal.spec;
-            if (portal.open || Math.hypot(spec.x - x, spec.z - z) > PortalHub.HINT_RANGE)
+            if (Math.hypot(spec.x - x, spec.z - z) > PortalHub.HINT_RANGE)
                 continue;
-            if (!this.level.hasStage(spec.stage))
-                return "스테이지 " + spec.stage + " 은 공사 중이에요";
-            if (!progress.unlocked(spec.stage))
-                return "스테이지 " + (spec.stage - 1) + " 을 클리어하면 열려요";
+            const hint = portal.hint(progress, mode, this.level);
+            if (hint)
+                return hint;
         }
         return "";
     }
 }
 PortalHub.HINT_RANGE = 3;
+PortalHub.VIEWS = {
+    stage: (libs, looks, spec, level) => new StagePortal(libs, looks, spec, level.hasStage(spec.stage)),
+    speedrun: (libs, looks, spec) => new SpeedrunPortal(libs, looks, spec),
+};
 class ClimbAvatar {
     constructor(libs, factory, clips, scene) {
         this.libs = libs;
@@ -1081,14 +1134,14 @@ class ClimbWorldView {
         this.sun.position.set(at.x + V.SUN_OFFSET[0], at.y + V.SUN_OFFSET[1], at.z + V.SUN_OFFSET[2]);
     }
     render() { this.aimSun(); this.sky.follow(this.camera.position.y); this.renderer.render(this.scene, this.camera); }
-    warmUp(progress) {
+    warmUp(progress, mode) {
         this.builder.showEvery();
-        this.portals.showAll(true);
+        this.portals.preview(true);
         this.render();
         this.builder.showAround(1);
-        this.portals.showAll(false);
+        this.portals.preview(false);
         this.render();
-        this.portals.sync(progress);
+        this.portals.sync(progress, mode);
     }
 }
 ClimbWorldView.SKY = 0x9FD3F2;
