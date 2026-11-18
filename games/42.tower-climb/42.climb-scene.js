@@ -132,6 +132,7 @@ ClimbModelLibrary.FILES = {
     marsRock: "space-base/rock_B.gltf", marsRocks: "space-base/rocks_B.gltf", frameTall: "space-base/structure_tall.gltf",
     domeModule: "space-base/basemodule_E.gltf", baseModule: "space-base/basemodule_A.gltf",
     landingPad: "space-base/landingpad_large.gltf", lander: "space-base/lander_A.gltf", windTurbine: "space-base/windturbine_tall.gltf",
+    cloudBig: "medieval-hexagon/cloud_big.gltf", cloudSmall: "medieval-hexagon/cloud_small.gltf",
     solarPanel: "space-base/solarpanel.gltf", spaceTruck: "space-base/spacetruck.gltf", drill: "space-base/drill_structure.gltf", cargoStack: "space-base/cargo_A_stacked.gltf",
 };
 ClimbModelLibrary.TINTS = { hexIsle: 0x9FB878 };
@@ -376,31 +377,12 @@ class ClimbWindView {
 ClimbWindView.STREAKS = 40;
 ClimbWindView.STREAK_LENGTH = 1.4;
 ClimbWindView.FLOW = 9;
-class ClimbSkyTint {
-    constructor(libs, scene, sky) {
-        this.scene = scene;
-        this.shown = -1;
-        this.ground = new libs.THREE.Color(sky);
-        this.space = new libs.THREE.Color(ClimbSkyTint.SPACE);
-    }
-    follow(height) {
-        const S = ClimbSkyTint, mix = Math.round(Math.max(0, Math.min(1, (height - S.FROM) / (S.TO - S.FROM))) * 50) / 50;
-        if (mix === this.shown)
-            return;
-        this.shown = mix;
-        const background = this.scene.background, fog = this.scene.fog;
-        background.copy(this.ground).lerp(this.space, mix);
-        fog.color.copy(background);
-    }
-}
-ClimbSkyTint.SPACE = 0x3B2440;
-ClimbSkyTint.FROM = 178;
-ClimbSkyTint.TO = 194;
 class TowerLevelBuilder {
     constructor(libs, library, level) {
         this.libs = libs;
         this.library = library;
         this.level = level;
+        this.glows = [];
         this.stageGroups = new Map();
         this.batchers = new Map();
         this.riderLists = new Map();
@@ -573,6 +555,7 @@ class TowerLevelBuilder {
         flag.position.set(piece.x + 1.4, piece.top + 5.1, piece.z);
         const star = new THREE.Mesh(new THREE.OctahedronGeometry(0.35), new THREE.MeshBasicMaterial({ color: 0xFFE7A8 }));
         star.position.set(piece.x, piece.top + 6.3, piece.z);
+        this.glows.push({ x: piece.x, y: piece.top + 6.3, z: piece.z, color: 0xFFE7A8, always: false });
         group.add(deck, plate, ring, pole, flag, star);
     }
     decorateSpace() {
@@ -581,6 +564,7 @@ class TowerLevelBuilder {
             const angle = deg * Math.PI / 180, x = Math.sin(angle) * rho, z = Math.cos(angle) * rho, sideX = Math.cos(angle), sideZ = -Math.sin(angle), outX = Math.sin(angle), outZ = Math.cos(angle);
             add("spaceIsle", x, top - ClimbSpaceKit.ISLE_DEPTH, z, angle, 1);
             add(index % 2 ? "domeModule" : "baseModule", x + outX * 1.6, top, z + outZ * 1.6, angle + Math.PI, 1.7);
+            this.glows.push({ x: x - outX * 0.4, y: top + 1.1, z: z - outZ * 0.4, color: 0x9FE8FF, always: false }, { x: x - sideX * 2.3 - outX * 1.3, y: top + 2.6, z: z - sideZ * 2.3 - outZ * 1.3, color: 0xFF5A4A, always: false });
             add("landingPad", x - sideX * 2.3 - outX * 1.3, top, z - sideZ * 2.3 - outZ * 1.3, angle, 1.4);
             add("lander", x - sideX * 2.3 - outX * 1.3, top + 0.7, z - sideZ * 2.3 - outZ * 1.3, angle + 0.5, 1.4);
             add(index % 3 ? "windTurbine" : "drill", x + sideX * 2.9 + outX * 0.4, top, z + sideZ * 2.9 + outZ * 0.4, angle + Math.PI, 1.6);
@@ -630,6 +614,7 @@ class TowerLevelBuilder {
             for (const side of [-1, 1])
                 batcher.add("pillar", this.fit(pillar, x + sideX * side * 3.2, top + 5.4, z + sideZ * side * 3.2, angle, 0, 1.4, 5.4, 1.4));
             batcher.add("torch", this.fit(torch, x + Math.sin(angle) * 2.1, top + 3.4, z + Math.cos(angle) * 2.1, angle + Math.PI, 0, torch.sizeX * 2, torch.sizeY * 2, torch.sizeZ * 2));
+            this.glows.push({ x: x + Math.sin(angle) * 2.1, y: top + 3.3, z: z + Math.cos(angle) * 2.1, color: 0xFF8A3A, always: true });
             batcher.add("rubble", this.fit(rubble, x - sideX * 1.2, top + 1.2, z - sideZ * 1.2, angle + 0.4, 0, 4, 1.2, 1.6));
         }
     }
@@ -662,6 +647,7 @@ class TowerLevelBuilder {
             add("grave", x + sideX * 2.4 - outX * 2, top, z + sideZ * 2.4 - outZ * 2, angle + Math.PI, 0.8);
             add("gravestone", x + sideX * 0.6 - outX * 2.6, top, z + sideZ * 0.6 - outZ * 2.6, angle + Math.PI + 0.2, 0.9);
             add("lantern", x - sideX * 1 - outX * 2.8, top, z - sideZ * 1 - outZ * 2.8, angle + Math.PI, 1);
+            this.glows.push({ x: x - sideX * 1 - outX * 2.8, y: top + 0.45, z: z - sideZ * 1 - outZ * 2.8, color: 0xFF9A3A, always: false });
             add("fence", x - outX * 3.7, top, z - outZ * 3.7, angle, 1);
         }
     }
@@ -673,6 +659,7 @@ class TowerLevelBuilder {
             add("gingerHouse", x + outX * 1.4, top, z + outZ * 1.4, angle + Math.PI, 2.4);
             add("snowman", x - sideX * 2.4 - outX * 1.6, top, z - sideZ * 2.4 - outZ * 1.6, angle + Math.PI + 0.3, 1.1);
             add("holidayLantern", x + sideX * 2.9 - outX * 2.2, top, z + sideZ * 2.9 - outZ * 2.2, angle, 0.9);
+            this.glows.push({ x: x + sideX * 2.9 - outX * 2.2, y: top + this.library.model("holidayLantern").sizeY * 0.6, z: z + sideZ * 2.9 - outZ * 2.2, color: 0xFFD27A, always: false }, { x: x + outX * 0.2, y: top + 1.2, z: z + outZ * 0.2, color: 0xFFC36A, always: false });
             add("giftRed", x + sideX * 1.6 - outX * 2.8, top, z + sideZ * 1.6 - outZ * 2.8, angle + 0.5, 1.2);
             add("giftTallGreen", x + sideX * 0.6 - outX * 3, top, z + sideZ * 0.6 - outZ * 3, angle - 0.3, 1.3);
         }
@@ -1128,9 +1115,9 @@ class ClimbWorldView {
         this.scene = new THREE.Scene();
         this.scene.background = new THREE.Color(V.SKY);
         this.scene.fog = new THREE.Fog(V.SKY, 45, 150);
-        this.sky = new ClimbSkyTint(libs, this.scene, V.SKY);
         this.camera = new THREE.PerspectiveCamera(60, 1, 0.2, 260);
-        this.scene.add(new THREE.HemisphereLight(0xDFF3FF, 0x6E7F5A, 1.5));
+        const hemi = new THREE.HemisphereLight(0xDFF3FF, 0x6E7F5A, 1.5);
+        this.scene.add(hemi);
         this.sun = new THREE.DirectionalLight(0xFFF2D8, 2.1);
         this.sun.castShadow = true;
         this.sun.shadow.mapSize.set(1024, 1024);
@@ -1144,6 +1131,7 @@ class ClimbWorldView {
         this.builder = new TowerLevelBuilder(libs, library, level);
         this.portals = new PortalHub(libs, library, level);
         this.scene.add(this.builder.root, this.portals.group);
+        this.sky = new ClimbDayCycle(libs, library, this.scene, hemi, this.sun, this.builder);
         this.avatar = new ClimbAvatar(libs, factory, library.clips, this.scene);
         this.rig = new ClimbCameraRig(this.camera);
         this.backdrop = new TowerMenuBackdrop(this.camera, this.avatar, level);
@@ -1162,7 +1150,7 @@ class ClimbWorldView {
         this.sun.target.position.copy(at);
         this.sun.position.set(at.x + V.SUN_OFFSET[0], at.y + V.SUN_OFFSET[1], at.z + V.SUN_OFFSET[2]);
     }
-    render() { this.aimSun(); this.sky.follow(this.camera.position.y); this.renderer.render(this.scene, this.camera); }
+    render() { this.aimSun(); this.sky.follow(this.camera); this.renderer.render(this.scene, this.camera); }
     warmUp(progress, mode) {
         this.builder.showEvery();
         this.portals.preview(true);
