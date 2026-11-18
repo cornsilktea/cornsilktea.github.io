@@ -129,8 +129,9 @@ class WarLocalMatch {
 }
 WarLocalMatch.TEST_SPEED = Math.max(1, Math.min(8, Number(new URLSearchParams(window.location.search).get("speed")) || 1));
 class WarGameApp {
-    constructor(libs) {
+    constructor(libs, gauge) {
         this.libs = libs;
+        this.gauge = gauge;
         this.canvas = WarDom.byId("view");
         this.topBar = new WarTopBar();
         this.notice = new WarNotice();
@@ -164,16 +165,16 @@ class WarGameApp {
         return this.match ? this.match.viewer : 0;
     }
     async loadAssets() {
-        const note = WarDom.byId("loadNote");
         try {
-            await this.assets.load();
+            await this.assets.load(new LoadCounter((counter) => this.gauge.count("models", counter)));
+            await this.gauge.phase("field");
             this.ready = true;
-            note.textContent = "";
             WarDom.byId("btnStart").disabled = false;
             this.backdrop.show();
+            this.gauge.finish();
         }
         catch (error) {
-            note.textContent = "모델을 불러오지 못했어요. 새로고침해 주세요.";
+            this.gauge.fail("모델을 불러오지 못했어요: " + LoadGauge.describe(error));
         }
     }
     bindUi() {
@@ -380,4 +381,21 @@ class WarGameApp {
         this.world.render(deltaSeconds);
         requestAnimationFrame((next) => this.frame(next));
     }
+}
+class WarLoading {
+    static gauge() {
+        return new LoadGauge({ title: "전장 준비 중", phases: WarLoading.PHASES, place: "bottom" });
+    }
+}
+WarLoading.PHASES = {
+    library: { at: 0.06, text: "그래픽 라이브러리 받는 중…" },
+    models: { at: 0.1, span: 0.8, text: "모험가·해골 군단·기지 모델 받는 중…" },
+    field: { at: 0.94, text: "전장 펼치는 중…" },
+};
+class WarBoot {
+    constructor(importer) {
+        const gauge = WarLoading.gauge();
+        this.three = new ThreeBoot(gauge, "library", importer, (libs) => new WarGameApp(libs, gauge));
+    }
+    get game() { return this.three.started; }
 }

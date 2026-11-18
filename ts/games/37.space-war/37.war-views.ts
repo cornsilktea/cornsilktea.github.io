@@ -164,8 +164,8 @@ class WarAssetLibrary {
 
   constructor(private readonly libs: ThreeLibs) {}
 
-  load(): Promise<void> {
-    if (!this.loading) this.loading = this.loadAll();
+  load(counter = new LoadCounter()): Promise<void> {
+    if (!this.loading) this.loading = this.loadAll(counter);
     return this.loading;
   }
 
@@ -210,19 +210,19 @@ class WarAssetLibrary {
     return found;
   }
 
-  private rigLoads(loader: InstanceType<GLTFLoaderClass>): Promise<void>[] {
-    return (Object.keys(WarAssetLibrary.RIG_ANIMATIONS) as WarRigId[]).map((rig) => loader.loadAsync(WarAssetLibrary.ROOT + WarAssetLibrary.RIG_ANIMATIONS[rig]).then((gltf) => gltf.animations.forEach((clip) => this.rigClips[rig].set(clip.name, clip))));
+  private rigLoads(loader: InstanceType<GLTFLoaderClass>, counter: LoadCounter): Promise<void>[] {
+    return (Object.keys(WarAssetLibrary.RIG_ANIMATIONS) as WarRigId[]).map((rig) => counter.track(loader.loadAsync(WarAssetLibrary.ROOT + WarAssetLibrary.RIG_ANIMATIONS[rig]), rig).then((gltf) => gltf.animations.forEach((clip) => this.rigClips[rig].set(clip.name, clip))));
   }
 
-  private async loadAll(): Promise<void> {
+  private async loadAll(counter: LoadCounter): Promise<void> {
     const loader = new this.libs.GLTFLoader();
     const files = Array.from(new Set(WarUnitLooks.files().concat(WarBuildingLooks.files(), WarAssetLibrary.EXTRA_MODELS, WarSceneryKit.files())));
-    const models = files.map((file) => loader.loadAsync(WarAssetLibrary.ROOT + file).then((gltf) => {
+    const models = files.map((file) => counter.track(loader.loadAsync(WarAssetLibrary.ROOT + file), file.split("/").pop()).then((gltf) => {
       const clips = new Map<string, Three<"AnimationClip">>();
       gltf.animations.forEach((clip) => clips.set(clip.name, clip));
       this.assets.set(file, { scene: gltf.scene, clips });
     }));
-    await Promise.all(this.rigLoads(loader).concat(models));
+    await Promise.all(this.rigLoads(loader, counter).concat(models));
   }
 }
 

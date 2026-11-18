@@ -166,7 +166,6 @@
         <button type="button" data-level="hard">어려움</button>
       </div>
       <button type="button" class="st-btn primary" id="btnStart" disabled>게임 시작</button>
-      <div class="st-hint" id="loadNote">모델을 불러오는 중…</div>
     </div>
     <div class="st-card">
       <h2>조작 방법</h2>
@@ -206,19 +205,20 @@
   </div>
 </div>
 
+<script charset="utf-8" src="common/load-gauge.js?v=20261118b"></script>
 <script charset="utf-8" src="common/character-kit.js?v=20261116b"></script>
-<script charset="utf-8" src="games/37.space-war/37.war-data.js?v=20261010i"></script>
-<script charset="utf-8" src="games/37.space-war/37.war-rules.js?v=20261010i"></script>
-<script charset="utf-8" src="games/37.space-war/37.war-bot.js?v=20261010i"></script>
-<script charset="utf-8" src="games/37.space-war/37.war-scenery.js?v=20261010i"></script>
-<script charset="utf-8" src="games/37.space-war/37.war-views.js?v=20261010i"></script>
-<script charset="utf-8" src="games/37.space-war/37.war-hud.js?v=20261010i"></script>
-<script charset="utf-8" src="games/37.space-war/37.space-war.js?v=20261010i"></script>
+<script charset="utf-8" src="games/37.space-war/37.war-data.js?v=20261118a"></script>
+<script charset="utf-8" src="games/37.space-war/37.war-rules.js?v=20261118a"></script>
+<script charset="utf-8" src="games/37.space-war/37.war-bot.js?v=20261118a"></script>
+<script charset="utf-8" src="games/37.space-war/37.war-scenery.js?v=20261118a"></script>
+<script charset="utf-8" src="games/37.space-war/37.war-views.js?v=20261118a"></script>
+<script charset="utf-8" src="games/37.space-war/37.war-hud.js?v=20261118a"></script>
+<script charset="utf-8" src="games/37.space-war/37.space-war.js?v=20261118a"></script>
 <script type="module">
-import * as THREE from "three";
-import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
-import * as SkeletonUtils from "three/addons/utils/SkeletonUtils.js";
-new WarGameApp({ THREE, GLTFLoader, SkeletonUtils });
+new WarBoot(async () => {
+  const [THREE, loaders, SkeletonUtils] = await Promise.all([import("three"), import("three/addons/loaders/GLTFLoader.js"), import("three/addons/utils/SkeletonUtils.js")]);
+  return { THREE, GLTFLoader: loaders.GLTFLoader, SkeletonUtils };
+});
 </script>
 </body>
 </html>

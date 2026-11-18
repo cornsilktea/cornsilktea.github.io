@@ -4,7 +4,8 @@ const path = require("path");
 class WarTestHelper {
   static SOURCE = `
 class WarDebug {
-  constructor(app) { this.app = app; }
+  constructor(boot) { this.boot = boot; }
+  get app() { return this.boot.game; }
   get engine() { return this.app.match.engine; }
   start(faction) {
     const button = document.querySelector("#startBtn") || [...document.querySelectorAll("button")].find((b) => b.textContent.includes("게임 시작"));
@@ -43,6 +44,7 @@ class WarDebug {
   }
   errors() { return window.__consoleErrors.slice(); }
 }
+Object.defineProperty(window, "__app", { get: () => (window.__boot ? window.__boot.game : null) });
 window.__consoleErrors = [];
 window.addEventListener("error", (e) => window.__consoleErrors.push(String(e.message)));
 window.addEventListener("unhandledrejection", (e) => window.__consoleErrors.push(String(e.reason)));
@@ -60,9 +62,10 @@ class WarTestPageBuilder {
     let html = fs.readFileSync(path.join(this.root, "37.space-war.html"), "utf8");
     html = html.replace('<script charset="utf-8" src="common/access-guard.js" data-game="spacewar"></script>', "");
     html = html.replace("<head>", '<head><base href="/"><script>window.requestAnimationFrame=function(cb){return setTimeout(function(){cb(performance.now())},16)}</script><script>' + WarTestHelper.SOURCE + "</script>");
-    const entry = "new WarGameApp({ THREE, GLTFLoader, SkeletonUtils });";
+    const entry = "new WarBoot(";
     if (!html.includes(entry)) throw new Error("시작 줄을 찾지 못했어요");
-    html = html.replace(entry, "window.__app = " + entry + " window.__t = new WarDebug(window.__app);");
+    html = html.replace(entry, "window.__t = new WarDebug(window.__boot = " + entry).replace("return { THREE, GLTFLoader: loaders.GLTFLoader, SkeletonUtils };\n});", "return { THREE, GLTFLoader: loaders.GLTFLoader, SkeletonUtils };\n}));");
+    if (!html.includes("}));")) throw new Error("시작 줄 끝을 찾지 못했어요");
     const target = path.join(this.root, ".claude", "war-test.html");
     fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.writeFileSync(target, html, "utf8");

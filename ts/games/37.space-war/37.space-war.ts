@@ -153,7 +153,7 @@ class WarGameApp {
   private frameCount = 0;
   private ready = false;
 
-  constructor(private readonly libs: ThreeLibs) {
+  constructor(private readonly libs: ThreeLibs, private readonly gauge: LoadGauge<WarLoadStep>) {
     const touchDevice = "ontouchstart" in window || navigator.maxTouchPoints > 0;
     this.world = new WarWorldView(libs, this.canvas, touchDevice);
     WarBalanceText.fill(document);
@@ -173,15 +173,15 @@ class WarGameApp {
   }
 
   private async loadAssets(): Promise<void> {
-    const note = WarDom.byId("loadNote");
     try {
-      await this.assets.load();
+      await this.assets.load(new LoadCounter((counter) => this.gauge.count("models", counter)));
+      await this.gauge.phase("field");
       this.ready = true;
-      note.textContent = "";
       WarDom.byId<HTMLButtonElement>("btnStart").disabled = false;
       this.backdrop.show();
+      this.gauge.finish();
     } catch (error) {
-      note.textContent = "모델을 불러오지 못했어요. 새로고침해 주세요.";
+      this.gauge.fail("모델을 불러오지 못했어요: " + LoadGauge.describe(error));
     }
   }
 
@@ -378,4 +378,29 @@ class WarGameApp {
     this.world.render(deltaSeconds);
     requestAnimationFrame((next) => this.frame(next));
   }
+}
+
+type WarLoadStep = "library" | "models" | "field";
+
+class WarLoading {
+  static readonly PHASES: Readonly<Record<WarLoadStep, LoadGaugePhase>> = {
+    library: { at: 0.06, text: "그래픽 라이브러리 받는 중…" },
+    models: { at: 0.1, span: 0.8, text: "모험가·해골 군단·기지 모델 받는 중…" },
+    field: { at: 0.94, text: "전장 펼치는 중…" },
+  };
+
+  static gauge(): LoadGauge<WarLoadStep> {
+    return new LoadGauge({ title: "전장 준비 중", phases: WarLoading.PHASES, place: "bottom" });
+  }
+}
+
+class WarBoot {
+  private readonly three: ThreeBoot<string, WarGameApp>;
+
+  constructor(importer: () => Promise<ThreeLibs>) {
+    const gauge = WarLoading.gauge();
+    this.three = new ThreeBoot(gauge, "library", importer, (libs) => new WarGameApp(libs, gauge));
+  }
+
+  get game(): WarGameApp | null { return this.three.started; }
 }

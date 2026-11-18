@@ -133,9 +133,9 @@ class WarAssetLibrary {
         this.heights = new Map();
         this.loading = null;
     }
-    load() {
+    load(counter = new LoadCounter()) {
         if (!this.loading)
-            this.loading = this.loadAll();
+            this.loading = this.loadAll(counter);
         return this.loading;
     }
     actor(file, rig) {
@@ -175,18 +175,18 @@ class WarAssetLibrary {
             throw new Error("모델을 아직 불러오지 못했어요: " + file);
         return found;
     }
-    rigLoads(loader) {
-        return Object.keys(WarAssetLibrary.RIG_ANIMATIONS).map((rig) => loader.loadAsync(WarAssetLibrary.ROOT + WarAssetLibrary.RIG_ANIMATIONS[rig]).then((gltf) => gltf.animations.forEach((clip) => this.rigClips[rig].set(clip.name, clip))));
+    rigLoads(loader, counter) {
+        return Object.keys(WarAssetLibrary.RIG_ANIMATIONS).map((rig) => counter.track(loader.loadAsync(WarAssetLibrary.ROOT + WarAssetLibrary.RIG_ANIMATIONS[rig]), rig).then((gltf) => gltf.animations.forEach((clip) => this.rigClips[rig].set(clip.name, clip))));
     }
-    async loadAll() {
+    async loadAll(counter) {
         const loader = new this.libs.GLTFLoader();
         const files = Array.from(new Set(WarUnitLooks.files().concat(WarBuildingLooks.files(), WarAssetLibrary.EXTRA_MODELS, WarSceneryKit.files())));
-        const models = files.map((file) => loader.loadAsync(WarAssetLibrary.ROOT + file).then((gltf) => {
+        const models = files.map((file) => counter.track(loader.loadAsync(WarAssetLibrary.ROOT + file), file.split("/").pop()).then((gltf) => {
             const clips = new Map();
             gltf.animations.forEach((clip) => clips.set(clip.name, clip));
             this.assets.set(file, { scene: gltf.scene, clips });
         }));
-        await Promise.all(this.rigLoads(loader).concat(models));
+        await Promise.all(this.rigLoads(loader, counter).concat(models));
     }
 }
 WarAssetLibrary.ROOT = "assets/kaykit/war/";

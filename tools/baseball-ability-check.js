@@ -133,7 +133,7 @@ class AbilityCheck {
     const folder = path.join(__dirname, "..", "sim-reports");
     fs.mkdirSync(folder, { recursive: true });
     const csv = ["대상,능력치,확인하는 값,기대,1,2,3,4,5,6,7,판정", ...this.rows.map((row) => [row.who, row.ability, row.measure, words[row.direction], ...row.values.map(format), row.ok ? "정상" : "이상"].join(","))];
-    fs.writeFileSync(path.join(folder, "baseball-ability-check.csv"), "﻿" + csv.join("\n") + "\n", "utf8");
+    fs.writeFileSync(path.join(folder, "baseball-ability-check.csv"), "\uFEFF" + csv.join("\n") + "\n", "utf8");
   }
 
   run() {
