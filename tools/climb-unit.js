@@ -1,6 +1,6 @@
 // 42번 타워 클라임: 규칙 엔진 단위 검사. 실행: node tools/climb-unit.js
 const K = require("./climb-load.js")();
-const { ClimbBalance: B, ClimbRules, TowerLevel, StageProgress, TowerLevelData } = K;
+const { ClimbBalance: B, ClimbRules, TowerLevel, StageProgress, TowerLevelData, ClimbWallAxes } = K;
 
 let passed = 0;
 const failures = [];
@@ -131,6 +131,26 @@ function box(id, x, z, y, sx, sz, more = {}) { return { id, kind: "static", stag
   r3.steer(0, 0);
   run(r3, 1);
   check("벽 반대쪽(S)으로 당기면 손을 놓고, 떨어지는 동안 같은 모서리를 다시 잡지 않음", evLet.some((e) => e.t === "release") && r3.body.grounded && !r3.body.hanging, r3.body.mode);
+  const viewFrom = (yaw) => ({ rightX: Math.cos(yaw), rightZ: -Math.sin(yaw), forwardX: -Math.sin(yaw), forwardZ: -Math.cos(yaw) });
+  const views = { "뒤에서": viewFrom(-Math.PI / 2), "옆에서": viewFrom(0), "반대 옆에서": viewFrom(Math.PI), "앞에서": viewFrom(Math.PI / 2) };
+  for (const [label, view] of Object.entries(views)) {
+    const hangOn = () => { const h = world([box("wall", 2, 0, 2.8, 2, 4, { depth: 2.8 })], { x: 0.6, y: 0, z: 0, yaw: 0 }); settle(h); h.pressJump(); run(h, 0.4); return h; };
+    const up = hangOn();
+    up.steerStick(0, 1, view);
+    const evUp = run(up, 0.9, () => { if (up.body.grounded) up.steerStick(0, 0, view); else up.steerStick(0, 1, view); });
+    check("매달린 채 " + label + " 보아도 W 로 기어오름", evUp.some((e) => e.t === "mantle") && up.body.grounded && near(up.body.y, 2.8, 1e-6), { y: up.body.y, mode: up.body.mode });
+    const down = hangOn();
+    const evDown = run(down, 0.1, () => down.steerStick(0, -1, view));
+    check("매달린 채 " + label + " 보아도 S 로 손을 놓음", evDown.some((e) => e.t === "release"), down.body.mode);
+    const still = hangOn();
+    run(still, 0.6, () => still.steerStick(1, 0, view));
+    check("매달린 채 " + label + " 보며 옆(D)을 눌러도 손을 놓거나 오르지 않음", still.body.hanging, still.body.mode);
+  }
+  const spot = { nx: -1, nz: 0 };
+  const behind = ClimbWallAxes.of(spot, views["뒤에서"]);
+  check("벽 기준 축: 뒤에서 보면 D 는 화면 오른쪽", near(behind.rightX, views["뒤에서"].rightX, 1e-9) && near(behind.rightZ, views["뒤에서"].rightZ, 1e-9), behind);
+  const front = ClimbWallAxes.of(spot, views["앞에서"]);
+  check("벽 기준 축: 앞에서 보면 D 도 화면 오른쪽(거울)", near(front.rightX, views["앞에서"].rightX, 1e-9) && near(front.rightZ, views["앞에서"].rightZ, 1e-9) && near(front.forwardX, 1, 1e-9), front);
   const low = world([box("step", 2, 0, 1.2, 2, 4, { depth: 1.2 })], { x: 0.6, y: 0, z: 0, yaw: Math.PI / 2 });
   settle(low);
   low.steer(1, 0);

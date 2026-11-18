@@ -1,4 +1,5 @@
 type ClimbMode = "free" | "hang" | "climbUp" | "portal" | "stun";
+interface ClimbViewAxes { readonly rightX: number; readonly rightZ: number; readonly forwardX: number; readonly forwardZ: number }
 
 type ClimbMoveSpec =
   | { track: "orbit"; group: string; rho: number; speed: number; startDeg: number }
@@ -442,6 +443,23 @@ class MovingPlatform extends PlatformPiece {
 class MovingJumpPad extends MovingPlatform {
   get ledge(): boolean { return false; }
   stand(rules: ClimbRules): void { rules.bounce(this); }
+}
+
+class ClimbWallAxes implements ClimbViewAxes {
+  static readonly MIRROR_DOT = -0.3;
+  private static readonly shared = new ClimbWallAxes();
+  rightX = 0;
+  rightZ = 0;
+  forwardX = 0;
+  forwardZ = 0;
+
+  static of(spot: ClimbGrabSpot, view: ClimbViewAxes): ClimbWallAxes {
+    const axes = ClimbWallAxes.shared, faceRightX = spot.nz, faceRightZ = -spot.nx;
+    const side = view.rightX * faceRightX + view.rightZ * faceRightZ < ClimbWallAxes.MIRROR_DOT ? -1 : 1;
+    axes.forwardX = -spot.nx; axes.forwardZ = -spot.nz;
+    axes.rightX = faceRightX * side; axes.rightZ = faceRightZ * side;
+    return axes;
+  }
 }
 
 class ClimbGrabSpot {
@@ -901,6 +919,12 @@ class ClimbRules {
     const length = Math.hypot(x, z);
     this.moveX = length > 1e-6 ? x / length : 0;
     this.moveZ = length > 1e-6 ? z / length : 0;
+  }
+  steerStick(stickX: number, stickY: number, view: ClimbViewAxes): void {
+    const body = this.body;
+    if (!body.hanging) { this.steer(view.rightX * stickX + view.forwardX * stickY, view.rightZ * stickX + view.forwardZ * stickY); return; }
+    const axes = ClimbWallAxes.of(body.spot, view);
+    this.steer(axes.rightX * stickX + axes.forwardX * stickY, axes.rightZ * stickX + axes.forwardZ * stickY);
   }
   pressJump(): void { this.jumpLatch = true; }
   holdSlow(held: boolean): void { this.slowHeld = held; }

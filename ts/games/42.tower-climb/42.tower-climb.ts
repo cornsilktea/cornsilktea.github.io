@@ -235,7 +235,7 @@ class TowerClimbGame {
     const rig = this.view.rig;
     this.keyboard.advance(dt);
     const moveX = Math.max(-1, Math.min(1, this.keyboard.moveX + this.touch.moveX)), moveY = Math.max(-1, Math.min(1, this.keyboard.moveY + this.touch.moveY));
-    this.rules.steer(rig.rightX * moveX + rig.forwardX * moveY, rig.rightZ * moveX + rig.forwardZ * moveY);
+    this.rules.steerStick(moveX, moveY, rig);
     this.rules.holdSlow(this.keyboard.slowHeld || this.touch.slowHeld);
     rig.turn(this.keyboard.takeLookX() + this.touch.takeLookX(), this.keyboard.takeLookY() + this.touch.takeLookY());
   }
