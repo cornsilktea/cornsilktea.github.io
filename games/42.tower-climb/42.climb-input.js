@@ -74,16 +74,45 @@ KeyboardInput.TURN_SPEED = 2.4;
 KeyboardInput.PITCH_SPEED = 1.4;
 KeyboardInput.MOVE_OF_CODE = { KeyW: "up", KeyS: "down", KeyA: "left", KeyD: "right" };
 KeyboardInput.LOOK_OF_KEY = { ArrowUp: "lookUp", ArrowDown: "lookDown", ArrowLeft: "lookLeft", ArrowRight: "lookRight" };
-class TouchInput extends ClimbInputRouter {
-    constructor(zone, base, knob, jump, slow, pause) {
-        super();
-        this.base = base;
+class TouchStick {
+    constructor(ring, knob) {
+        this.ring = ring;
         this.knob = knob;
+        this.originX = 0;
+        this.originY = 0;
+    }
+    grab(x, y) {
+        this.originX = x;
+        this.originY = y;
+        this.ring.style.left = x + "px";
+        this.ring.style.top = y + "px";
+        this.ring.classList.add("on");
+        this.knob.style.transform = "";
+    }
+    pull(x, y) {
+        const dx = x - this.originX, dy = y - this.originY, far = Math.hypot(dx, dy), scale = far > TouchStick.RADIUS ? TouchStick.RADIUS / far : 1;
+        this.knob.style.transform = "translate(" + dx * scale + "px," + dy * scale + "px)";
+        return { dx, dy, far };
+    }
+    home() {
+        this.ring.style.left = "";
+        this.ring.style.top = "";
+        this.ring.classList.remove("on");
+        this.knob.style.transform = "";
+    }
+}
+TouchStick.RADIUS = 60;
+class TouchInput extends ClimbInputRouter {
+    constructor(zone, moveRing, lookRing, jump, slow, pause) {
+        super();
+        this.zone = zone;
         this.used = false;
-        this.stickId = -1;
-        this.stickX = 0;
-        this.stickY = 0;
-        this.lookers = new Map();
+        this.moveId = -1;
+        this.lookId = -1;
+        this.lookLastX = 0;
+        this.lookLastY = 0;
+        this.moveStick = new TouchStick(moveRing, TouchInput.knobOf(moveRing));
+        this.lookStick = new TouchStick(lookRing, TouchInput.knobOf(lookRing));
         zone.addEventListener("pointerdown", (e) => this.down(e));
         zone.addEventListener("pointermove", (e) => this.move(e));
         const up = (e) => this.up(e);
@@ -97,70 +126,88 @@ class TouchInput extends ClimbInputRouter {
         slow.addEventListener("pointercancel", slowOff);
         slow.addEventListener("pointerleave", slowOff);
     }
+    static knobOf(ring) {
+        const knob = ring.querySelector(".tc-knob");
+        if (!knob)
+            throw new Error("조이스틱 손잡이가 없어요: " + ring.id);
+        return knob;
+    }
     press(button, act) {
         button.addEventListener("pointerdown", (e) => { e.preventDefault(); if (this.enabled)
             act(); });
         button.addEventListener("touchstart", (e) => e.preventDefault(), { passive: false });
     }
-    release() { super.release(); this.stickId = -1; this.lookers.clear(); this.drawKnob(0, 0, false); }
+    release() {
+        super.release();
+        this.moveId = this.lookId = -1;
+        this.moveStick.home();
+        this.lookStick.home();
+    }
     markTouch(e) {
         if (this.used || e.pointerType !== "touch")
             return;
         this.used = true;
         document.body.classList.add("touch");
     }
+    capture(pointerId) {
+        try {
+            this.zone.setPointerCapture(pointerId);
+        }
+        catch (error) {
+            return;
+        }
+    }
     down(e) {
         this.markTouch(e);
         if (!this.enabled || e.pointerType === "mouse")
             return;
-        if (this.stickId < 0 && e.clientX < window.innerWidth * TouchInput.STICK_SIDE) {
-            this.stickId = e.pointerId;
-            this.stickX = e.clientX;
-            this.stickY = e.clientY;
-            this.base.style.transform = "translate(" + (e.clientX - 64) + "px," + (e.clientY - 64) + "px)";
-            this.drawKnob(0, 0, true);
+        const left = e.clientX < window.innerWidth * TouchInput.STICK_SIDE;
+        if (left ? this.moveId >= 0 : this.lookId >= 0)
+            return;
+        this.capture(e.pointerId);
+        if (left) {
+            this.moveId = e.pointerId;
+            this.moveStick.grab(e.clientX, e.clientY);
             return;
         }
-        this.lookers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        this.lookId = e.pointerId;
+        this.lookLastX = e.clientX;
+        this.lookLastY = e.clientY;
+        this.lookStick.grab(e.clientX, e.clientY);
     }
     move(e) {
         if (!this.enabled)
             return;
-        if (e.pointerId === this.stickId) {
-            const dx = e.clientX - this.stickX, dy = e.clientY - this.stickY, far = Math.hypot(dx, dy);
-            if (far < TouchInput.DEAD_ZONE) {
+        if (e.pointerId === this.moveId) {
+            const pull = this.moveStick.pull(e.clientX, e.clientY);
+            if (pull.far < TouchInput.DEAD_ZONE) {
                 this.moveX = this.moveY = 0;
-                this.drawKnob(dx, dy, true);
                 return;
             }
-            this.moveX = dx / far;
-            this.moveY = -dy / far;
-            const reach = Math.min(far, TouchInput.KNOB_REACH);
-            this.drawKnob(dx / far * reach, dy / far * reach, true);
+            this.moveX = pull.dx / pull.far;
+            this.moveY = -pull.dy / pull.far;
             return;
         }
-        const last = this.lookers.get(e.pointerId);
-        if (!last)
+        if (e.pointerId !== this.lookId)
             return;
-        this.lookX += (e.clientX - last.x) * TouchInput.TOUCH_TURN;
-        this.lookY += (e.clientY - last.y) * TouchInput.TOUCH_TURN;
-        last.x = e.clientX;
-        last.y = e.clientY;
+        this.lookX += (e.clientX - this.lookLastX) * TouchInput.TOUCH_TURN;
+        this.lookY += (e.clientY - this.lookLastY) * TouchInput.TOUCH_TURN;
+        this.lookLastX = e.clientX;
+        this.lookLastY = e.clientY;
+        this.lookStick.pull(e.clientX, e.clientY);
     }
     up(e) {
-        if (e.pointerId === this.stickId) {
-            this.stickId = -1;
+        if (e.pointerId === this.moveId) {
+            this.moveId = -1;
             this.moveX = this.moveY = 0;
-            this.drawKnob(0, 0, false);
+            this.moveStick.home();
         }
-        this.lookers.delete(e.pointerId);
-    }
-    drawKnob(dx, dy, active) {
-        this.knob.style.transform = "translate(" + dx + "px," + dy + "px)";
-        this.base.classList.toggle("on", active);
+        if (e.pointerId === this.lookId) {
+            this.lookId = -1;
+            this.lookStick.home();
+        }
     }
 }
 TouchInput.DEAD_ZONE = 14;
-TouchInput.KNOB_REACH = 46;
-TouchInput.STICK_SIDE = 0.45;
+TouchInput.STICK_SIDE = 0.5;
 TouchInput.TOUCH_TURN = 0.0058;
