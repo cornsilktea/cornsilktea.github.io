@@ -96,6 +96,17 @@ function box(id, x, z, y, sx, sz, more = {}) { return { id, kind: "static", stag
   check("경사를 걸어 올라감", r.body.grounded && r.body.y > 5.8, r.body.y);
 }
 {
+  const r = world([box("low", 2, 0, 1.8, 2, 4, { depth: 1.8 })], { x: 0.5, y: 0, z: 0, yaw: 0 });
+  settle(r);
+  r.steer(1, 0);
+  run(r, 0.4);
+  r.steer(0, 0);
+  r.pressJump();
+  let lowest = Infinity;
+  run(r, 1, () => { if (r.body.hanging) lowest = Math.min(lowest, r.body.y); });
+  check("땅 바로 위 낮은 턱에 매달려도 몸이 땅 아래로 안 내려감", lowest < Infinity && lowest >= -1e-6, { lowest, mode: r.body.mode });
+}
+{
   const r = world([box("wall", 2, 0, 2.4, 2, 4, { depth: 2.4 })], { x: 0.5, y: 0, z: 0, yaw: 0 });
   settle(r);
   r.steer(1, 0);

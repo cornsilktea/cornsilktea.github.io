@@ -492,6 +492,17 @@ class ClimbCollisionWorld {
         }
         return out;
     }
+    floorBelow(x, z, ceiling, out) {
+        let floor = -Infinity;
+        for (const piece of this.near(x, z, ceiling - ClimbBalance.HANG_DROP - 1, ceiling, ClimbBalance.RADIUS, out)) {
+            if (!piece.solid || piece instanceof GrabHold || !piece.covers(x, z))
+                continue;
+            const top = piece.topAt(x, z);
+            if (top <= ceiling && top > floor)
+                floor = top;
+        }
+        return floor;
+    }
     rayReach(ox, oy, oz, dx, dy, dz, limit) {
         let reach = limit;
         for (const piece of this.pieces)
@@ -1189,8 +1200,8 @@ class ClimbRules {
     settleOnSpot() {
         const body = this.body, spot = body.spot;
         body.x = spot.bodyX;
-        body.y = spot.bodyY;
         body.z = spot.bodyZ;
+        body.y = Math.max(spot.bodyY, this.world.floorBelow(body.x, body.z, spot.y - ClimbBalance.STEP, this.found));
         body.vx = body.vy = body.vz = 0;
         body.stopDrift();
         body.yaw = Math.atan2(-spot.nx, -spot.nz);
