@@ -5237,18 +5237,23 @@ class ShielderTests {
 
   registerShots() {
     var self = this, api = this.api, run = this.kit.run, G = ShielderTests.GROUP;
-    run(G, "투사체: 앞에서 오는 화살·관통 검기가 방패에서 사라져 방패병과 방패 뒤 아군이 안 맞고, 막은 피해가 쌓이는가", function (done) {
+    run(G, "투사체: 앞에서 오는 화살·관통 검기가 방패에서 사라져 방패병과 방패 뒤 아군이 안 맞고, 막은 피해가 쌓이고 \"막음\" 숫자가 뜨는가", function (done) {
       var bad = [], W = self.withShield([self.ally("al", 0, -80), self.foe("rg", 0, 350, { char: "ranger" })]), S = self.raise(W), A = W.ent("al");
       api.fireBasic(W.ent("rg"), -Math.PI / 2); self.cutCount = 0;
-      W.step(1500, null, function () { self.cutCount = Math.max(self.cutCount, Object.keys(api.MATCH.remoteShots).filter(function (k) { return api.MATCH.remoteShots[k].shieldCut; }).length); });
+      var popSum = 0;
+      W.step(1500, null, function () {
+        self.cutCount = Math.max(self.cutCount, Object.keys(api.MATCH.remoteShots).filter(function (k) { return api.MATCH.remoteShots[k].shieldCut; }).length);
+        var seen = 0; (api.MATCH.fx || []).forEach(function (f) { var m = f.k === "txt" && /^막음 (\d+)$/.exec(f.s); if (m) seen += +m[1]; }); popSum = Math.max(popSum, seen);
+      });
       var cut = self.cutCount;
+      if (popSum !== api.CHARS.ranger.dmg * api.CHARS.ranger.shots) bad.push("막음 글자 합 " + popSum);
       if (cut !== api.CHARS.ranger.shots) bad.push("멈춘 화살 " + cut);
       if (self.lost(A) || self.lost(S)) bad.push("화살이 맞음 아군 " + self.lost(A) + "·방패병 " + self.lost(S));
       if (S.blocked !== api.CHARS.ranger.dmg * api.CHARS.ranger.shots) bad.push("막은 피해 " + S.blocked);
       var W2 = self.withShield([self.ally("al", 0, -80), self.foe("ph", 0, 300, { char: "phantom" })]), S2 = self.raise(W2), A2 = W2.ent("al");
       api.fireBasic(W2.ent("ph"), -Math.PI / 2); W2.step(1500);
       if (self.lost(A2) || self.lost(S2)) bad.push("관통 검기가 맞음 아군 " + self.lost(A2) + "·방패병 " + self.lost(S2));
-      self.verdict(done, bad, "화살 " + cut + "발 멈춤, 막은 피해 " + S.blocked + ", 관통 검기도 멈춤");
+      self.verdict(done, bad, "화살 " + cut + "발 멈춤, 막은 피해 " + S.blocked + "·글자 \"막음\" 합 " + popSum + ", 관통 검기도 멈춤");
     });
     run(G, "투사체: 옆·뒤에서 오면 맞고, 방패 폭 안인 앞 50° 는 막고 방패 끝 밖인 70° 는 맞는가", function (done) {
       var bad = [], shown = [];

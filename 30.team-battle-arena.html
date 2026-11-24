@@ -7306,8 +7306,20 @@ SinglePassMaterials.enable(THREE);
 
 
 
+  class ShieldBlockPopups {
+    static COLOR = "#8FC8FF";
+    static MERGE_MS = 300;
+    constructor(services) { this.services = services; this.last = {}; }
+    label(n) { return n > 0 ? "막음 " + n : "막음"; }
+    pop(hit, amount) { var services = this.services, id = hit.G.E.id, now = Date.now(), n = Math.max(0, Math.round(amount || 0)), L = this.last[id];
+      if (L && now - L.at < ShieldBlockPopups.MERGE_MS && services.match.fx.indexOf(L.f) >= 0) { L.sum += n; L.at = now; L.f.s = this.label(L.sum); L.f.t = now; return; }
+      var f = { k: "txt", x: hit.x, y: hit.y, s: this.label(n), c: ShieldBlockPopups.COLOR, t: now, life: 800 };
+      services.match.fx.push(f);
+      this.last[id] = { f: f, sum: n, at: now };
+    }
+  }
   class ShieldWallSystem {
-    constructor(services) { this.services = services; }
+    constructor(services) { this.services = services; this.popups = new ShieldBlockPopups(services); }
     static SPARK_SIZE = 1.4;
     static LAND_TRIES = [0, 0.5, -0.5, 1, -1, 1.6, -1.6, 2.3, -2.3, Math.PI];
     active(t) { var services = this.services;
@@ -7362,9 +7374,11 @@ SinglePassMaterials.enable(THREE);
       return this.guardsFrom(T, sx, sy, t) || this.blocks(sx, sy, T.x, T.y, attackerTeam, t);
     }
     isLocal(E) { var services = this.services; return E === services.match.me || (services.session.isHost() && services.match.bots[E.id] === E); }
-    showBlock(hit) { var services = this.services, me = services.match.me;
+    showBlock(hit, amount) { var services = this.services, me = services.match.me;
       hit.G.E.blockShownAt = Date.now();
-      if (!me || me.team === hit.G.team || services.vision.visibleTo(hit.G.E, me)) services.fxView.spark(hit.x, hit.y, Palette.SHIELD_SPARK, ShieldWallSystem.SPARK_SIZE);
+      if (me && me.team !== hit.G.team && !services.vision.visibleTo(hit.G.E, me)) return;
+      services.fxView.spark(hit.x, hit.y, Palette.SHIELD_SPARK, ShieldWallSystem.SPARK_SIZE);
+      this.popups.pop(hit, amount);
     }
     credit(hit, amount) { var services = this.services, E = hit.G.E;
       if (!(amount > 0)) return;
@@ -7374,14 +7388,14 @@ SinglePassMaterials.enable(THREE);
     shrug(T, cx, cy, amount, t) {
       var hit = this.guardsFrom(T, cx, cy, t);
       if (!hit) return false;
-      this.showBlock(hit);
+      this.showBlock(hit, amount);
       if (this.isLocal(T)) this.credit(hit, amount);
       return true;
     }
     stopsDirect(T, sx, sy, attackerTeam, amount, t) {
       var hit = this.stops(T, sx, sy, attackerTeam, t);
       if (!hit) return false;
-      this.showBlock(hit);
+      this.showBlock(hit, amount);
       this.credit(hit, amount);
       return true;
     }
@@ -7413,8 +7427,9 @@ SinglePassMaterials.enable(THREE);
     }
     cutShot(p, hit) { var services = this.services;
       p.shieldCut = true; p.life = hit.at; p.dist = p.sp * hit.at / 1000; p.sparked = true; p.spun = true;
-      this.showBlock(hit);
-      if (this.isLocal(hit.G.E)) this.credit(hit, Math.round(services.charTypes.of(p.d.ownerCharacterType).shotDamage(p.d, hit.G.E) || 0));
+      var amount = Math.round(services.charTypes.of(p.d.ownerCharacterType).shotDamage(p.d, hit.G.E) || 0);
+      this.showBlock(hit, amount);
+      if (this.isLocal(hit.G.E)) this.credit(hit, amount);
     }
     jumpTarget(E, t) { var services = this.services, best = null, bd = Infinity;
       services.targets.fighters().forEach(function (A) {
@@ -7520,7 +7535,7 @@ SinglePassMaterials.enable(THREE);
       var ally = T.team === d.team;
       if (ally && (!d.heal || T.id === d.owner)) return;
       var stop = ally ? null : services.shieldWalls.strikeStop(T, d, services.clock.now());
-      if (stop) { services.shieldWalls.showBlock(stop); return; }
+      if (stop) { services.shieldWalls.showBlock(stop, d.dmg); return; }
       if (!ally && d.kb && !T.minion) T.knockedAt = Date.now();
       if (!services.match.me || services.match.me.team === T.team || services.vision.visibleTo(T, services.match.me)) services.fxView.spark(T.x, T.y, ally ? Palette.HEAL_SPARK : (services.charTypes.of(who).meleeSpark || "#FFFFFF"), services.charTypes.of(who).heavyStrikeSpark || d.u ? 1.5 : 1);
     }
