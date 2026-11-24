@@ -2755,7 +2755,7 @@ SinglePassMaterials.enable(THREE);
   class KnightType extends ArcMeleeType {
     get meleeTrail() { return 36; }
     static MELEE = { color: 0xFFFFFF, spark: "#FFFFFF" };
-    static MODEL = { file: "Knight", right: "sword_1handed", left: "shield_badge_color" };
+    static MODEL = { file: "Knight", right: "sword_1handed", left: "shield_badge_color", leftPos: [0, 0, 0.22] };
     static ULT = {
       tkDur: GameTime.gameMs(6), tkDef: 0.35, tkStunR: 140, tkStunMs: GameTime.gameMs(1.5)
     };
@@ -3357,7 +3357,7 @@ SinglePassMaterials.enable(THREE);
   class GuardianType extends ArcMeleeType {
     get meleeTrail() { return 42; }
     static MELEE = { color: 0x8FD9A8, spark: "#8FD9A8" };
-    static MODEL = { file: "Knight", portraitPlant: true, right: "halberd", rightScale: 1.2, rightTilt: Math.PI / 2, left: "Skeleton_Shield_Large_A", leftScale: 0.8, leftRot: [-0.266, 0, -1.588],
+    static MODEL = { file: "Knight", portraitPlant: true, right: "halberd", rightScale: 1.2, rightTilt: Math.PI / 2, left: "Skeleton_Shield_Large_A", leftScale: 0.8, leftRot: [-0.266, 0, -1.588], leftPos: [0, 0.063, 0.232],
                 recolor: [[0, 3, 1, "#1F4A2E", "#0E2417"], [1, 0, 1, "#1F4A2E", "#0E2417"], [2, 2, 1, "#1F4A2E", "#0E2417"], [1, 1, 1, "#E4EAEF", "#9AA4AC"], [1, 2, 2, "#C7D1D9", "#6E7880"]] };
     static ULT = {
       gdR: 200, gdKb: 150, gdKbMs: 500, gdDmg: 40, gdSlowMul: 0.8, gdSlowMs: GameTime.gameMs(1.5)
@@ -4872,10 +4872,10 @@ SinglePassMaterials.enable(THREE);
     static MODEL = { file: "Knight", right: "shield_square_color", rightScale: 1.6, rightPos: [0, 0, 0.28], left: "shield_square_color", leftScale: 1.6, leftPos: [0, 0, 0.28],
                recolor: [[0, 3, 1, "#6F8294", "#34404D"], [1, 0, 1, "#6F8294", "#34404D"], [2, 2, 1, "#6F8294", "#34404D"], [1, 1, 1, "#D7A75E", "#7E5527"], [1, 2, 2, "#C3CCD6", "#6D7A88"]] };
     static ULT = {
-      sgDur: GameTime.gameMs(5), sgWidth: 240, sgAhead: 70, sgDepth: 36, sgHeight: 42, sgMoveMul: 0.6, sgJumpR: 400,
+      sgDur: GameTime.gameMs(5), sgWidth: 240, sgAhead: 70, sgDepth: 36, sgHeight: 42, sgPushLen: 200, sgPush: 200, sgSlideMs: GameTime.gameMs(0.15), sgMoveMul: 0.6, sgJumpR: 400,
       sgJumpMinMs: GameTime.gameMs(0.25), sgJumpMaxMs: GameTime.gameMs(0.55), sgLandGap: 6, sgBotFoeR: 450, sgBotThreatR: 420
     };
-    static STATS = { name: "방패병", role: "fighter", icon: "🧱", hp: 400, speed: GameTime.gameSpeed(150), cd: GameTime.gameMs(1.6), dmg: 20, range: 150, width: 200,
+    static STATS = { name: "방패병", role: "fighter", icon: "🧱", hp: 450, speed: GameTime.gameSpeed(150), cd: GameTime.gameMs(1.6), dmg: 20, range: 150, width: 200,
                guardJumpCd: GameTime.gameMs(2), ultName: "방패 세우기", ultAim: true, blocks: true };
     static GUARD_CLIP = "Melee_Blocking";
     static BLOCK_CLIP = "Melee_Block";
@@ -4898,7 +4898,15 @@ SinglePassMaterials.enable(THREE);
       E.buffUntil = t + ShielderType.ULT.sgDur;
       E.skillDur = ShielderType.ULT.sgDur;
       E.pending = null;
+      this.pushAhead(E, t);
     }
+    pushAhead(E, t) { var services = this.services, u = ShielderType.ULT, len = Math.round(services.melee.lineReach(E.x, E.y, E.guardAng, u.sgPushLen));
+      services.session.room.ref.child("meleeHits").push({ team: E.team, owner: E.id, x: MathKit.r1(E.x), y: MathKit.r1(E.y), angle: Math.round(E.guardAng * 1000) / 1000, len: len, width: u.sgWidth, radius: len,
+                                        dmg: 0, u: 1, slam: 1, kb: u.sgPush, kbAlong: 1, guardPush: 1, createdAt: t });
+      services.vision.revealBriefly(E.id, t);
+    }
+    drawsOwnStrike(d) { return !!d.guardPush; }
+    slideOf(E, t) { return MathKit.clamp((t - (E.buffUntil - ShielderType.ULT.sgDur)) / ShielderType.ULT.sgSlideMs, 0, 1); }
     stepSkill(E, t) { if (this.isGuarding(E, t)) E.angle = E.guardAng; }
     adoptRemote(r, pos) { r.guardAng = pos.angle; }
     takeoverBasic(E, ang, reach, t) {
@@ -4912,7 +4920,7 @@ SinglePassMaterials.enable(THREE);
       return this.isGuarding(E, services.clock.now());
     }
     addMarkers(v, root, body) { ShieldStanceClips.ensure(this.services); v.guardArc = ShieldPlateMarker.attach(this.services, root, v.team); }
-    renderMarkers(v, E, t, nowMs) { if (v.guardArc) v.guardArc.update(this.isGuarding(E, t), nowMs, E.guardAng); }
+    renderMarkers(v, E, t, nowMs) { if (v.guardArc) v.guardArc.update(this.isGuarding(E, t), nowMs, E.guardAng, this.slideOf(E, t)); }
     locksFacing(E, t) { return this.isGuarding(E, t); }
     poseHeldProp(v, E, t) { var services = this.services;
       if (v.kit) ShieldStanceClips.stepLegs(services, v, E, this.isGuarding(E, t), t);
@@ -4947,7 +4955,7 @@ SinglePassMaterials.enable(THREE);
       return "앞쪽 길이 " + c.range + "·폭 " + c.width + "의 지역을 방패로 밀쳐 " + c.dmg + "의 피해";
     }
     ultDesc() { var services = this.services, u = ShielderType.ULT;
-      return services.skilltext.secs(u.sgDur) + "간 조준한 방향 앞에 폭 " + u.sgWidth + "의 방패를 세워 그 방패에 닿는 공격을 막음(뒤의 아군도 보호). 그동안 이동속도 " + services.skilltext.pctOf(1 - u.sgMoveMul) +
+      return services.skilltext.secs(u.sgDur) + "간 조준한 방향 앞에 폭 " + u.sgWidth + "의 방패를 세움. 세울 때 앞쪽 길이 " + u.sgPushLen + " 안의 적을 " + u.sgPush + " 밀어내고, 방패에 닿는 공격을 막음(뒤의 아군도 보호). 그동안 이동속도 " + services.skilltext.pctOf(1 - u.sgMoveMul) +
              "% 감소, 기본 공격 대신 " + services.skilltext.secs(this.data.guardJumpCd) + "마다 반경 " + u.sgJumpR + " 안 가장 가까운 아군에게 점프";
     }
   }
@@ -5028,13 +5036,17 @@ SinglePassMaterials.enable(THREE);
       var edge = new THREE.Mesh(geos.edge, mats.edge);
       edge.position.set(u.sgAhead, u.sgHeight, 0);
       [floor, wall, edge].forEach(function (m) { m.renderOrder = 7; });
-      this.group.add(floor); this.group.add(wall); this.group.add(edge);
+      this.slide = new THREE.Group();
+      this.slide.add(floor); this.slide.add(wall); this.slide.add(edge);
+      this.group.add(this.slide);
       this.edge = edge; this.group.visible = false;
     }
-    update(on, nowMs, ang) {
+    update(on, nowMs, ang, slide) {
       this.group.visible = on;
       if (!on) return;
       this.group.rotation.y = -ang;
+      var k = slide == null ? 1 : slide, ease = 1 - (1 - k) * (1 - k);
+      this.slide.position.x = (ease - 1) * ShielderType.ULT.sgAhead;
       this.edge.scale.y = 1 + 0.35 * Math.sin(nowMs / 140);
     }
   }
