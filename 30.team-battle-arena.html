@@ -4756,7 +4756,7 @@ SinglePassMaterials.enable(THREE);
   class PhantomType extends CharacterType {
     static MELEE = { color: 0xBFF5EE, spark: "#CFFAF4" };
     static MODEL = { file: "Ranger", right: "sword_2handed", rightScale: 0.8, hide: ["Ranger_Head", "Ranger_Quiver"],
-               wear: { from: "rogue", part: "RogueHooded_Head", recolor: [[1, 1, 1, "#EEF4F5", "#8FA4AE"], [2, 1, 1, "#DCE7EA", "#6F8590"], [1, 0, 1, "#141A1E", "#020304"], [0, 0, 2, "#2A343C", "#10161A"], [0, 5, 2, "#2A343C", "#10161A"], [0, 2, 1, "#D2FFF9", "#86F0E5"]] },
+               wear: { from: "rogue", part: "RogueHooded_Head", recolor: [[1, 1, 1, "#EEF4F5", "#8FA4AE"], [2, 1, 1, "#DCE7EA", "#6F8590"], [1, 0, 1, "#141A1E", "#020304"], [0, 0, 1, "#D6E1E4", "#9DB0B6"], [0, 1, 1, "#AEBEC3", "#7A8D93"], [0, 5, 2, "#2A343C", "#10161A"], [0, 2, 1, "#3FD6C8", "#167E76"]] },
                recolor: [[0, 5, 2, "#E9F1F2", "#5B6E7A"], [1, 0, 1, "#C9F4EE", "#4E8F8C"], [0, 3, 1, "#C3D2D6", "#56676F"], [0, 7, 1, "#7C8C95", "#36434C"],
                          [0, 1, 1, "#D5E1E3", "#8C9FA5"], [2, 7, 1, "#BFC9CD", "#76838A"], [2, 3, 1, "#4A5862", "#212A31"], [1, 7, 1, "#3C4A54", "#1C242B"], [1, 1, 1, "#3C4A54", "#1C242B"],
                          [0, 2, 1, "#161C20", "#030506"], [2, 1, 1, "#C9F4EE", "#4E8F8C"], [0, 0, 1, "#CBD8DC", "#90A3A9"]],
@@ -4764,7 +4764,7 @@ SinglePassMaterials.enable(THREE);
                               [0, 4, 1, "#3A3F45", "#1E2226"], [0, 5, 2, "#3A3F45", "#1E2226"], [1, 5, 2, "#3A3F45", "#1E2226"], [1, 4, 1, "#AEB7BC", "#6C767C"], [1, 7, 1, "#3A3F45", "#1E2226"], [0, 7, 1, "#4A5056", "#24282C"]] };
     static ULT = {
       phWind: GameTime.gameMs(0.7), phLen: 500, phWidth: 150, phSpeed: GameTime.gameSpeed(2000), phDmg: 35, phAfterStunMs: GameTime.gameMs(0.5),
-      phStay: GameTime.gameMs(4), phBackSpeed: GameTime.gameSpeed(1000), phMinSweepMs: 40, phBotAllyReach: 350
+      phStay: GameTime.gameMs(4), phBackSpeed: GameTime.gameSpeed(1000), phMinSweepMs: 40
     };
     static STATS = { name: "팬텀", role: "assassin", icon: "👻", hp: 150, speed: GameTime.gameSpeed(175), cd: GameTime.gameMs(0.7), meleeCd: GameTime.gameMs(0.7), waveCd: GameTime.gameMs(1.1),
                dmg: 35, range: 150, arc: Math.PI * 100 / 180, throwDmg: 20, throwRange: 400, pSpeed: GameTime.gameSpeed(700), pr: 10,
@@ -5818,10 +5818,7 @@ SinglePassMaterials.enable(THREE);
     botWorthIt(B, target) { var services = this.services, u = PhantomType.ULT, t = services.clock.now(), ang = Math.atan2(target.y - B.y, target.x - B.x);
       var reach = services.dashMoves.dashReach(B, ang, u.phLen), line = { x: B.x, y: B.y, angle: ang, len: reach, width: u.phWidth };
       var caught = services.targets.everyone(t).filter(function (o) { return o && o.alive && o.team !== B.team && !o.isProtected(t) && services.vision.visibleTo(o, B, t) && services.melee.inLine(o, line); });
-      if (caught.length >= 2) return true;
-      if (!caught.length) return false;
-      var ex = B.x + Math.cos(ang) * reach, ey = B.y + Math.sin(ang) * reach;
-      return services.targets.fighters().some(function (a) { return a && a !== B && a.alive && a.team === B.team && MathKit.hyp(a.x - ex, a.y - ey) <= u.phBotAllyReach; });
+      return caught.some(function (o) { return !o.minion; });
     }
   }
   class StatusEffects {
@@ -11315,20 +11312,25 @@ SinglePassMaterials.enable(THREE);
       void main() {
         if (vP.x > uHead) discard;
         float n = texture2D(uTex, vec2(vP.x * uLen / 220.0 + uSeed, vP.y * 0.8 + uSeed)).g;
-        float across = 1.0 - smoothstep(0.12, 0.5, abs(vP.y) + (n - 0.5) * 0.22);
+        float across = 1.0 - smoothstep(0.34, 0.5, abs(vP.y) + (n - 0.5) * 0.1);
+        float streak = smoothstep(0.58, 0.85, texture2D(uTex, vec2(vP.x * uLen / 120.0 + uSeed, vP.y * 2.6 + uSeed * 0.5)).b);
         float behind = clamp(1.0 - (uHead - vP.x) * uLen / 360.0, 0.0, 1.0);
-        vec3 color = mix(mix(uDeep, uBlade, n), uCore, behind * across * 0.6);
-        gl_FragColor = vec4(color, across * (0.18 + 0.5 * behind) * (0.55 + 0.45 * n) * uFade);
+        vec3 color = mix(mix(uDeep, uBlade, n), uCore, behind * across * 0.45 + streak * 0.35);
+        gl_FragColor = vec4(color, across * ((0.1 + 0.36 * behind) * (0.55 + 0.45 * n) + streak * 0.22 * (0.4 + 0.6 * behind)) * uFade);
         #include <colorspace_fragment>
       }`;
     static SCAR_FRAGMENT = `
-      uniform sampler2D uTex; uniform float uHead; uniform float uFade; uniform float uSeed; uniform float uLen; uniform vec3 uDeep; uniform vec3 uBlade; uniform vec3 uCore; varying vec2 vP;
+      uniform sampler2D uTex; uniform float uHead; uniform float uFade; uniform float uSeed; uniform float uLen; uniform float uWide; uniform vec3 uDeep; uniform vec3 uBlade; uniform vec3 uCore; varying vec2 vP;
+      float streak(float side, float thick, float from, float to, float wave) {
+        float along = clamp((vP.x - from) / (to - from), 0.0, 1.0), thin = thick * sin(along * 3.1416) / uWide;
+        return step(from, vP.x) * step(vP.x, to) * smoothstep(thin, thin * 0.2, abs(vP.y - side + wave));
+      }
       void main() {
         if (vP.x > uHead) discard;
         float n = texture2D(uTex, vec2(vP.x * uLen / 160.0 + uSeed, vP.y * 0.6 + uSeed * 0.7)).r;
-        float taper = sin(clamp(vP.x, 0.0, 1.0) * 3.1416), thin = 0.05 + 0.13 * taper;
-        float line = smoothstep(thin, thin * 0.2, abs(vP.y + (n - 0.5) * 0.12));
-        float halo = smoothstep(0.5, 0.0, abs(vP.y)) * 0.3 * taper;
+        float wave = (n - 0.5) * 0.05, taper = sin(clamp(vP.x, 0.0, 1.0) * 3.1416);
+        float line = max(streak(0.0, 7.0, 0.0, 1.0, wave), max(streak(-0.27, 4.0, 0.08, 0.86, wave), streak(0.29, 3.5, 0.2, 0.97, -wave)));
+        float halo = smoothstep(0.5, 0.0, abs(vP.y)) * 0.16 * taper;
         float lose = (1.0 - uFade) * 1.25 - 0.1, keep = smoothstep(lose, lose + 0.2, n);
         vec3 color = mix(mix(uDeep, uBlade, max(line, halo)), uCore, line * 0.7);
         gl_FragColor = vec4(color, max(line, halo) * keep * (0.35 + 0.65 * uFade));
@@ -11343,15 +11345,30 @@ SinglePassMaterials.enable(THREE);
         gl_FragColor = vec4(mix(uBlade, uCore, line), line * uFade);
         #include <colorspace_fragment>
       }`;
+    static TETHER_FRAGMENT = `
+      uniform sampler2D uTex; uniform float uTime; uniform float uFade; uniform float uLen; uniform vec3 uBlade; uniform vec3 uCore; varying vec2 vP;
+      void main() {
+        float ends = smoothstep(0.0, 0.1, vP.x) * smoothstep(1.0, 0.88, vP.x);
+        float n = texture2D(uTex, vec2(vP.x * uLen / 260.0 - uTime * 0.3, uTime * 0.1)).r - 0.5;
+        float sway = (sin(vP.x * uLen / 75.0 - uTime * 3.0) * 0.14 + n * 0.24) * ends;
+        float twin = (sin(vP.x * uLen / 52.0 + uTime * 2.3 + 1.7) * 0.18 - n * 0.16) * ends;
+        float d = abs(vP.y - sway), d2 = abs(vP.y - twin);
+        float core = smoothstep(0.08, 0.0, d), thread = smoothstep(0.045, 0.0, d2) * 0.55, glow = smoothstep(0.45, 0.0, d);
+        float pulse = 0.65 + 0.35 * sin(vP.x * uLen / 38.0 - uTime * 5.5);
+        float a = (max(core, thread) * 0.8 + glow * 0.3 * pulse) * ends * uFade;
+        gl_FragColor = vec4(mix(uBlade, uCore, max(core, thread)), a);
+        #include <colorspace_fragment>
+      }`;
   }
   class PhantomWake extends ShaderMark {
     static HOLD_SEC = 0.25;
+    static WIDE = 0.9;
     constructor(d, scale) { super(d.createdAt); this.d = d; this.travelSec = d.ph.ms / scale / 1000; }
     get partName() { return "wake"; }
     get lifeSec() { return this.travelSec + PhantomWake.HOLD_SEC; }
     place(vis) { var d = this.d, length = d.len + ArenaSize.BODY_R;
       vis.group.position.set(d.x, 4, d.y); vis.group.rotation.y = -d.angle;
-      vis.wake.scale.set(length, 1, d.width * 0.55); vis.uniforms.uLen.value = length;
+      vis.wake.scale.set(length, 1, d.width * PhantomWake.WIDE); vis.uniforms.uLen.value = length;
     }
     paint(vis, sec) { vis.uniforms.uHead.value = Math.min(1, sec / this.travelSec); vis.uniforms.uFade.value = MathKit.clamp((this.lifeSec - sec) / PhantomWake.HOLD_SEC, 0, 1); }
   }
@@ -11360,13 +11377,14 @@ SinglePassMaterials.enable(THREE);
     static DRAW_SEC = 0.08;
     static HOLD_SEC = 1;
     static MIST_SEC = 0.55;
-    static WIDTH = 34;
+    static WIDE = 0.8;
     constructor(d, scale) { super(d.createdAt + d.ph.ms + PhantomScar.DELAY_SEC * 1000 * scale); this.d = d; }
     get partName() { return "scar"; }
     get lifeSec() { return PhantomScar.DRAW_SEC + PhantomScar.HOLD_SEC + PhantomScar.MIST_SEC; }
     place(vis) { var d = this.d, length = d.len + ArenaSize.BODY_R;
       vis.group.position.set(d.x, 1.6, d.y); vis.group.rotation.y = -d.angle;
-      vis.scar.scale.set(length, 1, PhantomScar.WIDTH); vis.uniforms.uLen.value = length;
+      var width = d.width * PhantomScar.WIDE;
+      vis.scar.scale.set(length, 1, width); vis.uniforms.uLen.value = length; vis.uniforms.uWide.value = width;
     }
     paint(vis, sec) { var S = PhantomScar;
       vis.uniforms.uHead.value = Math.min(1, sec / S.DRAW_SEC);
@@ -11436,6 +11454,8 @@ SinglePassMaterials.enable(THREE);
     static WOBBLE = 0.018;
     static COLOR = 0xD6FBF6;
     static POSE_SEC = 0.3;
+    static TETHER_HEIGHT = 16;
+    static TETHER_WIDTH = 46;
     static ghostMaterial() {
       var mat = new THREE.MeshBasicMaterial({ color: PhantomEchoForm.COLOR, transparent: true, opacity: 0, depthWrite: false });
       mat.onBeforeCompile = function (sh) {
@@ -11451,8 +11471,14 @@ SinglePassMaterials.enable(THREE);
       model.rotation.y = Math.PI / 2; model.scale.setScalar(ModelTuning.MODEL_SCALE);
       model.traverse(function (o) { if (o.isMesh) { o.material = mat; o.frustumCulled = false; o.renderOrder = 6; } });
       if (clip) { var mix = new THREE.AnimationMixer(model); mix.clipAction(clip).play(); mix.update(PhantomEchoForm.POSE_SEC); }
-      var group = new THREE.Group(); group.add(model);
-      return { group: group, mat: mat };
+      var group = new THREE.Group(), tether = PhantomEchoForm.tether(); group.add(model); group.add(tether.mesh);
+      return { group: group, mat: mat, tether: tether };
+    }
+    static tether() { var T = PhantomShaders.TONES;
+      var uniforms = { uTex: { value: WaterNoise.texture() }, uTime: PhantomEchoForm.TIME, uFade: { value: 1 }, uLen: { value: 200 }, uBlade: { value: new THREE.Color(T.blade) }, uCore: { value: new THREE.Color(T.core) } };
+      var mesh = new THREE.Mesh(ShaderMarkView.geometry().line, WaterNoise.softMaterial(uniforms, HitmanSlashShaders.VERTEX, PhantomShaders.TETHER_FRAGMENT));
+      mesh.frustumCulled = false; mesh.renderOrder = 5; mesh.position.y = PhantomEchoForm.TETHER_HEIGHT; mesh.scale.set(200, 1, PhantomEchoForm.TETHER_WIDTH);
+      return { mesh: mesh, uniforms: uniforms };
     }
   }
   class PhantomEffect extends EffectHandler {
@@ -11464,7 +11490,7 @@ SinglePassMaterials.enable(THREE);
     static ECHO_ALPHA = 0.6;
     static ABSORB_DIST = 24;
     static BACK_SLACK_MS = 900;
-    static FOOT_MIST_MS = 140;
+    static TETHER_IN_SEC = 0.3;
     static ECHO_MIST_MS = 110;
     static TRAIL_MIST_MS = 40;
     constructor(services) { this.services = services; this.free = []; this.live = new Set(); this.mist = new PhantomMist(services); this.mistAt = {}; }
@@ -11518,7 +11544,7 @@ SinglePassMaterials.enable(THREE);
     }
     release(r) { if (!r.vis) return; if (r.vis.group.parent) r.vis.group.parent.remove(r.vis.group); this.live.delete(r.vis); this.free.push(r.vis); r.vis = null; }
     prefill(count) { var services = this.services; if (!services.models.kit.ready || !services.models.kit.chars.phantom) return; while (this.free.length < count) this.free.push(PhantomEchoForm.build(services)); }
-    spareRoots() { return this.free.map(function (vis) { vis.group.position.set(ShaderWarmup.PROBE_SPOT, 0, ShaderWarmup.PROBE_SPOT); vis.mat.opacity = PhantomView.ECHO_ALPHA; return vis.group; }); }
+    spareRoots() { return this.free.map(function (vis) { vis.group.position.set(ShaderWarmup.PROBE_SPOT, 0, ShaderWarmup.PROBE_SPOT); vis.mat.opacity = PhantomView.ECHO_ALPHA; vis.tether.mesh.visible = true; return vis.group; }); }
     warmSample() { var services = this.services;
       this.mist.build();
       if (!services.models.kit.chars.phantom) return this.mist.mesh;
@@ -11530,6 +11556,16 @@ SinglePassMaterials.enable(THREE);
       if (r.endAt) k *= 1 - MathKit.clamp((t - r.endAt) / scale / 1000 / PhantomView.FADE_OUT_SEC, 0, 1);
       return PhantomView.ECHO_ALPHA * k * (0.82 + 0.18 * Math.sin(nowMs / 90 + r.e.createdAt));
     }
+    placeTether(r, t) { var services = this.services, line = r.vis.tether, e = r.e, v = services.fighterView.fighters[e.owner], arrive = e.createdAt + e.ms;
+      line.mesh.visible = false;
+      if (r.endAt || t < arrive || !v || !v.root.visible) return;
+      var dx = v.root.position.x - e.x, dy = v.root.position.z - e.y, len = MathKit.hyp(dx, dy);
+      if (len < PhantomView.ABSORB_DIST) return;
+      line.mesh.visible = true;
+      line.mesh.rotation.y = -(Math.atan2(dy, dx) - e.angle); line.mesh.scale.x = len;
+      line.uniforms.uLen.value = len;
+      line.uniforms.uFade.value = MathKit.clamp((t - arrive) / services.clock.scale / 1000 / PhantomView.TETHER_IN_SEC, 0, 1);
+    }
     puffEvery(key, nowMs, gap) { if (nowMs - (this.mistAt[key] || 0) < gap) return false; this.mistAt[key] = nowMs; return true; }
     render(t, nowMs, dt) { var services = this.services, view = this, used = new Set();
       PhantomEchoForm.TIME.value = (nowMs % 100000) / 1000;
@@ -11540,6 +11576,7 @@ SinglePassMaterials.enable(THREE);
         var grow = r.absorbed && r.endAt ? 1 + 0.25 * MathKit.clamp((t - r.endAt) / services.clock.scale / 1000 / PhantomView.FADE_OUT_SEC, 0, 1) : 1;
         r.vis.group.position.set(r.e.x, 0, r.e.y); r.vis.group.rotation.y = -r.e.angle; r.vis.group.scale.setScalar(grow);
         r.vis.mat.opacity = view.echoAlpha(r, t, nowMs);
+        view.placeTether(r, t);
         if (!r.endAt && view.puffEvery("echo" + r.e.owner, nowMs, PhantomView.ECHO_MIST_MS)) view.mist.emit(r.e.x, r.e.y, 6, 13, 46, 1100, 0.32, nowMs);
         if (r.endAt && !r.burst) { r.burst = true; for (var i = 0; i < 6; i++) view.mist.emit(r.e.x, r.e.y, 10 + i * 8, 16, 40, 700, 0.4, nowMs + i); }
       });
@@ -11547,8 +11584,7 @@ SinglePassMaterials.enable(THREE);
       services.targets.participants().forEach(function (id) {
         var E = services.targets.ent(id), v = services.fighterView.fighters[id];
         if (!E || !E.alive || E.char !== "phantom" || !v || !v.root.visible) return;
-        if (view.isReturning(E, t)) { if (view.puffEvery("trail" + id, nowMs, PhantomView.TRAIL_MIST_MS)) view.mist.emit(E.x, E.y, 30, 14, 20, 600, 0.45, nowMs); }
-        else if (view.puffEvery("foot" + id, nowMs, PhantomView.FOOT_MIST_MS)) view.mist.emit(E.x, E.y, 3, 10, 16, 900, 0.22, nowMs);
+        if (view.isReturning(E, t) && view.puffEvery("trail" + id, nowMs, PhantomView.TRAIL_MIST_MS)) view.mist.emit(E.x, E.y, 30, 14, 20, 600, 0.45, nowMs);
       });
       this.mist.update(nowMs);
     }
