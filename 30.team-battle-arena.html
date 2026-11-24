@@ -3588,15 +3588,14 @@ SinglePassMaterials.enable(THREE);
   class DruidType extends MagicShooterType {
     static MODEL = { file: "Druid", portraitPlant: true, right: "druid_staff" };
     static ULT = {
-      drR: 150, drDur: 3600000, drTick: GameTime.gameMs(1), drHeal: 18, drCast: 450, drMin: 60, drSelfHeal: 18, drSelfGauge: 1, drRiseMs: 350, drCastMs: 500
+      drR: 150, drDur: 3600000, drTick: GameTime.gameMs(1), drHeal: 20, drCast: 450, drMin: 60, drSelfHeal: 20, drSelfGauge: 1, drRiseMs: 350, drCastMs: 500
     };
-    static STATS = { name: "드루이드", role: "caster", icon: "🌿", hp: 110, speed: GameTime.gameSpeed(165), cd: GameTime.gameMs(1.4), dmg: 14, range: 350, pSpeed: 1000, pr: 12, lanes: 2, fx: { slowMs: GameTime.gameMs(1.5), slowMul: 0.7 },
+    static STATS = { name: "드루이드", role: "caster", icon: "🌿", hp: 110, speed: GameTime.gameSpeed(165), cd: GameTime.gameMs(1.4), dmg: 10, range: 350, pSpeed: 1000, pr: 12, lanes: 2,
                ultName: "덩굴 부쉬", ultAim: true, heals: true };
     get startsSkillTimer() { return false; }
     get shotName() { return "덩굴 가시"; }
     get tintsHit() { return true; }
     hitColor(d) { return "#8FD14F"; }
-    projectileEffect(d, T, immune, fx) { return !d.isSkill && !immune && !T.minion ? { slowMs: this.data.fx.slowMs, slowMul: this.data.fx.slowMul } : fx; }
     projectileMesh(g, d) { var services = this.services;
       VineTrail.build(services, g, services.models.kit.props.vineBlade);
     }
@@ -3634,9 +3633,8 @@ SinglePassMaterials.enable(THREE);
     ultDesc() {
       return "지정한 곳에 게임이 끝날 때까지 유지되는 " + GroveSystem.TILES_PER_SIDE + "×" + GroveSystem.TILES_PER_SIDE + "칸 부쉬 생성(풀숲처럼 안에서 모습이 숨겨짐). 안에 있는 아군은 1초당 체력 " + DruidType.ULT.drHeal + " 회복";
     }
-    passiveDesc() { var services = this.services;
-      var c = this.data;
-      return "기본 공격에 맞은 적은 " + services.skilltext.secs(c.fx.slowMs) + "간 " + services.skilltext.slowPct(c.fx.slowMul) + ". 자신이 부쉬 안에 있으면 1초당 체력 " + DruidType.ULT.drSelfHeal + " 회복, 게이지 " + DruidType.ULT.drSelfGauge + " 회복";
+    passiveDesc() {
+      return "자신이 부쉬 안에 있으면 1초당 체력 " + DruidType.ULT.drSelfHeal + " 회복, 게이지 " + DruidType.ULT.drSelfGauge + " 회복";
     }
     basicDesc() {
       var c = this.data;

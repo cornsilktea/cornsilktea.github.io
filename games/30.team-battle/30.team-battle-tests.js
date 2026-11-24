@@ -7888,19 +7888,15 @@ class EngineerDruidTests {
 
   registerDruid() {
     var self = this, api = this.api, run = this.kit.run, FRAME = this.kit.FRAME, ULT = api.ULT, G = EngineerDruidTests.DRUID_GROUP, C = api.CHARS.druid, y = this.kit.OPEN_Y.forest;
-    run(G, "드루이드 기본 공격: 덩굴 가시가 " + C.dmg + "의 피해를 주고 적을 둔화시키는가", function (done) {
+    run(G, "드루이드 기본 공격: 덩굴 가시가 " + C.dmg + "의 피해만 주고 적을 둔화시키지 않는가", function (done) {
       var bad = [], W = self.druidWorld([{ id: "foe", team: "red", char: "guardian", x: 200 + 280, y: y }]), dr = W.ent("dr"), foe = W.ent("foe");
       var before = api.speedOf(foe);
       api.fireBasic(dr, 0);
       for (var ms = 0; ms < 2500 && !self.lost(W, "foe"); ms += FRAME) W.frame(FRAME);
       if (self.lost(W, "foe") !== C.dmg) bad.push("피해 " + self.lost(W, "foe") + " (기대 " + C.dmg + ")");
-      var slowed = api.speedOf(foe), want = Math.round(before * C.fx.slowMul);
-      if (foe.slowUntil <= W.t()) bad.push("둔화가 걸리지 않음");
-      else if (Math.abs(slowed - want) > 1) bad.push("둔화 뒤 속도 " + slowed + " (기대 " + want + ")");
-      W.step(C.fx.slowMs + 100);
-      if (api.speedOf(foe) !== before) bad.push("둔화가 풀리지 않음 " + api.speedOf(foe));
+      if ((foe.slowUntil || 0) > W.t() || api.speedOf(foe) !== before) bad.push("둔화가 걸림 " + api.speedOf(foe));
       if (dr.gauge !== api.roleGauge("druid")) bad.push("게이지 " + dr.gauge + " (기대 " + api.roleGauge("druid") + ")");
-      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "피해 " + C.dmg + "·둔화·게이지 " + dr.gauge);
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "피해 " + C.dmg + "·둔화 없음·게이지 " + dr.gauge);
     });
     run(G, "드루이드 기본 공격: 덩굴이 " + C.lanes + "줄 나란히 나가 맞는 폭이 넓어지고, 한 적에게 두 줄이 맞아도 피해는 한 번뿐인가", function (done) {
       var bad = [], reach = api.BODY_R + C.pr;
