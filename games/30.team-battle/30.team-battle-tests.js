@@ -5419,7 +5419,7 @@ class ShielderTests {
       var bad = [], text = api.ultDesc("shielder"), basic = api.basicDesc("shielder");
       [api.secs(U.sgDur), "150°", String(U.sgJumpR), api.secs(C.guardJumpCd), Math.round((1 - U.sgMoveMul) * 100) + "%"].forEach(function (k) { if (text.indexOf(k) < 0) bad.push("스킬 설명에 " + k + " 없음"); });
       [String(C.range), String(C.width), String(C.dmg)].forEach(function (k) { if (basic.indexOf(k) < 0) bad.push("기본 공격 설명에 " + k + " 없음"); });
-      if (C.hp !== 400 || C.dmg !== 20 || C.range !== 200 || Math.abs(api.secs(C.cd).replace("초", "") - 1.6) > 1e-9) bad.push("능력치 " + C.hp + "·" + C.dmg + "·" + C.range + "·" + api.secs(C.cd));
+      if (C.hp !== 400 || C.dmg !== 20 || C.range !== 150 || C.width !== 200 || Math.abs(api.secs(C.cd).replace("초", "") - 1.6) > 1e-9) bad.push("능력치 " + C.hp + "·" + C.dmg + "·" + C.range + "·" + api.secs(C.cd));
       if (/\.$/.test(text)) bad.push("설명 끝에 마침표");
       self.verdict(done, bad, text);
     });
