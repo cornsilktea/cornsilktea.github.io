@@ -5229,6 +5229,7 @@ class ShielderTests {
     this.registerArea();
     this.registerCast();
     this.registerPush();
+    this.registerPassive();
     this.registerJump();
     this.registerLook();
     this.registerCard();
@@ -5355,13 +5356,13 @@ class ShielderTests {
 
   registerCast() {
     var self = this, api = this.api, run = this.kit.run, G = ShielderTests.GROUP, U = api.ULT;
-    run(G, "시전: 자동 조준은 가장 가까운 적 방향, 방패 중 이동 " + Math.round(U.sgMoveMul * 100) + "%, " + api.secs(U.sgDur) + " 뒤 사라지고 게이지는 그동안 안 차는가", function (done) {
+    run(G, "시전: 자동 조준은 가장 가까운 적 방향, 방패 중에도 이동 속도 그대로, " + api.secs(U.sgDur) + " 뒤 사라지고 게이지는 그동안 안 차는가", function (done) {
       var bad = [], W = self.withShield([self.foe("near", 200, 120), self.foe("far", -300, 300)]), S = W.ent("sh"), base = api.speedOf(S);
       S.gauge = api.GAUGE_MAX;
       var aim = api.AUTO_AIM.angle(S), want = self.toward(S, W.ent("near"));
       api.useUlt(S, aim);
       if (self.angGap(S.guardAng, want) > api.AUTO_AIM_ERR + 0.03) bad.push("방패 방향 " + S.guardAng.toFixed(2) + " / 가까운 적 " + want.toFixed(2));
-      if (Math.abs(api.speedOf(S) - base * U.sgMoveMul) > 0.01) bad.push("방패 중 속도 " + api.speedOf(S) + " / " + base);
+      if (Math.abs(api.speedOf(S) - base) > 0.01) bad.push("방패 중 속도 " + api.speedOf(S) + " / " + base);
       S.angle = 0; W.step(100);
       if (self.angGap(S.angle, S.guardAng) > 1e-6) bad.push("방패 중 몸 방향이 고정되지 않음");
       W.step(U.sgDur / 2);
@@ -5371,7 +5372,7 @@ class ShielderTests {
       W.step(U.sgDur / 2 + 50);
       if (api.CHAR_TYPES.of("shielder").isGuarding(S, W.t())) bad.push(api.secs(U.sgDur) + " 뒤에도 방패가 남음");
       if (Math.abs(api.speedOf(S) - base) > 0.01) bad.push("끝난 뒤 속도 " + api.speedOf(S));
-      self.verdict(done, bad, "방향 차 " + self.angGap(S.guardAng, want).toFixed(3) + ", 이동 " + Math.round(U.sgMoveMul * 100) + "%, " + api.secs(U.sgDur) + " 뒤 꺼짐");
+      self.verdict(done, bad, "방향 차 " + self.angGap(S.guardAng, want).toFixed(3) + ", 이동 속도 그대로, " + api.secs(U.sgDur) + " 뒤 꺼짐");
     });
   }
 
@@ -5389,6 +5390,17 @@ class ShielderTests {
       var push = W.log.filter(function (p) { return p.path === "meleeHits" && p.v.owner === "sh" && p.v.guardPush; });
       if (push.length !== 1) bad.push("밀어내기 신호 " + push.length + "번");
       self.verdict(done, bad, "앞 120·60 의 적 " + U.sgPush + " 밀림, 밖·옆·뒤·아군 그대로");
+    });
+  }
+
+  registerPassive() {
+    var self = this, api = this.api, run = this.kit.run, G = ShielderTests.GROUP, C = api.CHARS.shielder;
+    run(G, "패시브: 받는 피해가 " + Math.round(C.takenCut * 100) + "% 줄어드는가(방패 밖에서 맞은 공격)", function (done) {
+      var bad = [], W = self.withShield([]), S = W.ent("sh");
+      api.damage(S, 40, "x", true, null);
+      var lost = self.lost(S), want = Math.round(40 * (1 - C.takenCut));
+      if (lost !== want) bad.push("40 피해에 " + lost + " 깎임(기대 " + want + ")");
+      self.verdict(done, bad, "40 피해 → " + lost);
     });
   }
 
@@ -5462,11 +5474,13 @@ class ShielderTests {
     var self = this, api = this.api, run = this.kit.run, G = ShielderTests.GROUP, U = api.ULT, C = api.CHARS.shielder;
     run(G, "카드: 능력치와 스킬 설명 숫자가 수치 표에서 나오는가", function (done) {
       var bad = [], text = api.ultDesc("shielder"), basic = api.basicDesc("shielder");
-      [api.secs(U.sgDur), "폭 " + U.sgWidth, "길이 " + U.sgPushLen, String(U.sgPush) + " 밀어", String(U.sgJumpR), api.secs(C.guardJumpCd), Math.round((1 - U.sgMoveMul) * 100) + "%"].forEach(function (k) { if (text.indexOf(k) < 0) bad.push("스킬 설명에 " + k + " 없음"); });
+      [api.secs(U.sgDur) + "간", String(U.sgPush) + " 밀어", "가장 가까운 아군"].forEach(function (k) { if (text.indexOf(k) < 0) bad.push("스킬 설명에 " + k + " 없음"); });
       [String(C.range), String(C.width), String(C.dmg)].forEach(function (k) { if (basic.indexOf(k) < 0) bad.push("기본 공격 설명에 " + k + " 없음"); });
       if (C.hp !== 450 || C.dmg !== 20 || C.range !== 150 || C.width !== 200 || Math.abs(api.secs(C.cd).replace("초", "") - 1.6) > 1e-9) bad.push("능력치 " + C.hp + "·" + C.dmg + "·" + C.range + "·" + api.secs(C.cd));
+      var pas = api.passiveDesc("shielder");
+      if (pas.indexOf(Math.round(C.takenCut * 100) + "% 감소") < 0) bad.push("패시브 설명 " + pas);
       if (/\.$/.test(text)) bad.push("설명 끝에 마침표");
-      self.verdict(done, bad, text);
+      self.verdict(done, bad, text + " / " + pas);
     });
   }
 }
