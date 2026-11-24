@@ -5233,7 +5233,7 @@ class ShielderTests {
 
   registerShots() {
     var self = this, api = this.api, run = this.kit.run, G = ShielderTests.GROUP;
-    run(G, "투사체: 앞에서 오는 화살·관통 검기가 방패 호에서 사라져 방패병과 방패 뒤 아군이 안 맞고, 막은 피해가 쌓이는가", function (done) {
+    run(G, "투사체: 앞에서 오는 화살·관통 검기가 방패에서 사라져 방패병과 방패 뒤 아군이 안 맞고, 막은 피해가 쌓이는가", function (done) {
       var bad = [], W = self.withShield([self.ally("al", 0, -80), self.foe("rg", 0, 350, { char: "ranger" })]), S = self.raise(W), A = W.ent("al");
       api.fireBasic(W.ent("rg"), -Math.PI / 2); self.cutCount = 0;
       W.step(1500, null, function () { self.cutCount = Math.max(self.cutCount, Object.keys(api.MATCH.remoteShots).filter(function (k) { return api.MATCH.remoteShots[k].shieldCut; }).length); });
@@ -5246,10 +5246,10 @@ class ShielderTests {
       if (self.lost(A2) || self.lost(S2)) bad.push("관통 검기가 맞음 아군 " + self.lost(A2) + "·방패병 " + self.lost(S2));
       self.verdict(done, bad, "화살 " + cut + "발 멈춤, 막은 피해 " + S.blocked + ", 관통 검기도 멈춤");
     });
-    run(G, "투사체: 옆·뒤(150° 밖)에서 오면 맞고, 앞 70° 는 막고 80° 는 맞는가", function (done) {
+    run(G, "투사체: 옆·뒤에서 오면 맞고, 방패 폭 안인 앞 60° 는 막고 방패 끝 밖인 75° 는 맞는가", function (done) {
       var bad = [], shown = [];
       var deg = Math.PI / 180, D = ShielderTests.DOWN;
-      [[0, "오른쪽", true], [-D, "뒤", true], [D + 70 * deg, "앞 70°", false], [D + 80 * deg, "앞 80°", true], [D - 70 * deg, "앞 -70°", false]].forEach(function (c) {
+      [[0, "오른쪽", true], [-D, "뒤", true], [D + 60 * deg, "앞 60°", false], [D + 75 * deg, "앞 75°", true], [D - 60 * deg, "앞 -60°", false]].forEach(function (c) {
         var ang = c[0];
         var x = Math.cos(ang) * 250, y = Math.sin(ang) * 250;
         var W = self.withShield([self.foe("rg", x, y, { char: "ranger" })]), S = self.raise(W), R = W.ent("rg");
@@ -5260,11 +5260,11 @@ class ShielderTests {
       });
       self.verdict(done, bad, shown.join(" · "));
     });
-    run(G, "호 안쪽까지 들어온 적의 투사체: 방패 뒤 아군으로 쏘면 바로 사라지고, 방패 바깥 앞쪽 아군으로 쏘면 맞는가", function (done) {
-      var bad = [], W = self.withShield([self.ally("al", 0, -80), self.foe("rg", 40, 90, { char: "ranger" })]), S = self.raise(W), R = W.ent("rg"), A = W.ent("al");
+    run(G, "방패와 몸 사이까지 들어온 적의 투사체: 방패 뒤 아군으로 쏘면 바로 사라지고, 방패 바깥 앞쪽 아군으로 쏘면 맞는가", function (done) {
+      var bad = [], W = self.withShield([self.ally("al", 0, -80), self.foe("rg", 40, 55, { char: "ranger" })]), S = self.raise(W), R = W.ent("rg"), A = W.ent("al");
       api.fireBasic(R, self.toward(R, A)); W.step(1500);
       if (self.lost(A) || self.lost(S)) bad.push("방패 안쪽에서 쏜 화살이 맞음 " + self.lost(A) + "·" + self.lost(S));
-      var W2 = self.withShield([self.ally("fr", 0, 320), self.foe("rg", 0, 100, { char: "ranger" })]), S2 = self.raise(W2), R2 = W2.ent("rg"), F = W2.ent("fr");
+      var W2 = self.withShield([self.ally("fr", 0, 320), self.foe("rg", 0, 55, { char: "ranger" })]), S2 = self.raise(W2), R2 = W2.ent("rg"), F = W2.ent("fr");
       api.fireBasic(R2, self.toward(R2, F)); W2.step(1500);
       if (!self.lost(F)) bad.push("방패 바깥 앞쪽 아군이 안 맞음");
       self.verdict(done, bad, "뒤 아군 보호, 바깥 앞쪽 아군 " + self.lost(F) + " 피해");
@@ -5292,12 +5292,12 @@ class ShielderTests {
       if (self.lost(A)) bad.push("찌르기가 뒤 아군을 맞힘");
       self.verdict(done, bad, "띠·부채꼴·찌르기 막음, 막은 피해 " + S.blocked);
     });
-    run(G, "호 안쪽까지 들어온 적의 근접: 방패병·뒤 아군은 막고, 같은 적이 방패 바깥 앞쪽 아군을 치면 맞는가", function (done) {
-      var bad = [], W = self.withShield([self.ally("al", 0, -80), self.ally("fr", 0, 260), self.foe("fo", 0, 100)]), S = self.raise(W);
-      self.strike(W, "in-back", { team: "red", owner: "fo", x: X, y: Y + 100, angle: -Math.PI / 2, len: 220, width: 90, radius: 220, dmg: 30 });
-      self.strike(W, "in-arc", { team: "red", owner: "fo", x: X, y: Y + 100, angle: -Math.PI / 2, radius: 120, arc: 1.5, dmg: 30 });
+    run(G, "방패와 몸 사이까지 들어온 적의 근접: 방패병·뒤 아군은 막고, 같은 적이 방패 바깥 앞쪽 아군을 치면 맞는가", function (done) {
+      var bad = [], W = self.withShield([self.ally("al", 0, -80), self.ally("fr", 0, 260), self.foe("fo", 0, 55)]), S = self.raise(W);
+      self.strike(W, "in-back", { team: "red", owner: "fo", x: X, y: Y + 55, angle: -Math.PI / 2, len: 220, width: 90, radius: 220, dmg: 30 });
+      self.strike(W, "in-arc", { team: "red", owner: "fo", x: X, y: Y + 55, angle: -Math.PI / 2, radius: 120, arc: 1.5, dmg: 30 });
       if (self.lost(S) || self.lost(W.ent("al"))) bad.push("안쪽 적에게 맞음 방패병 " + self.lost(S) + "·뒤 아군 " + self.lost(W.ent("al")));
-      self.strike(W, "in-front", { team: "red", owner: "fo", x: X, y: Y + 100, angle: Math.PI / 2, len: 220, width: 90, radius: 220, dmg: 30 });
+      self.strike(W, "in-front", { team: "red", owner: "fo", x: X, y: Y + 55, angle: Math.PI / 2, len: 220, width: 90, radius: 220, dmg: 30 });
       if (self.lost(W.ent("fr")) !== 30) bad.push("바깥 앞쪽 아군 피해 " + self.lost(W.ent("fr")));
       self.verdict(done, bad, "방패병·뒤 아군 막음, 바깥 앞쪽 아군 30");
     });
@@ -5417,7 +5417,7 @@ class ShielderTests {
     var self = this, api = this.api, run = this.kit.run, G = ShielderTests.GROUP, U = api.ULT, C = api.CHARS.shielder;
     run(G, "카드: 능력치와 스킬 설명 숫자가 수치 표에서 나오는가", function (done) {
       var bad = [], text = api.ultDesc("shielder"), basic = api.basicDesc("shielder");
-      [api.secs(U.sgDur), "150°", String(U.sgJumpR), api.secs(C.guardJumpCd), Math.round((1 - U.sgMoveMul) * 100) + "%"].forEach(function (k) { if (text.indexOf(k) < 0) bad.push("스킬 설명에 " + k + " 없음"); });
+      [api.secs(U.sgDur), "폭 " + U.sgWidth, String(U.sgJumpR), api.secs(C.guardJumpCd), Math.round((1 - U.sgMoveMul) * 100) + "%"].forEach(function (k) { if (text.indexOf(k) < 0) bad.push("스킬 설명에 " + k + " 없음"); });
       [String(C.range), String(C.width), String(C.dmg)].forEach(function (k) { if (basic.indexOf(k) < 0) bad.push("기본 공격 설명에 " + k + " 없음"); });
       if (C.hp !== 400 || C.dmg !== 20 || C.range !== 150 || C.width !== 200 || Math.abs(api.secs(C.cd).replace("초", "") - 1.6) > 1e-9) bad.push("능력치 " + C.hp + "·" + C.dmg + "·" + C.range + "·" + api.secs(C.cd));
       if (/\.$/.test(text)) bad.push("설명 끝에 마침표");

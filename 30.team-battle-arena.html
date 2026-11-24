@@ -4872,7 +4872,7 @@ SinglePassMaterials.enable(THREE);
     static MODEL = { file: "Knight", right: "hammer_A", rightScale: 0.8, left: "shield_square_color", leftScale: 1.6,
                recolor: [[0, 3, 1, "#6F8294", "#34404D"], [1, 0, 1, "#6F8294", "#34404D"], [2, 2, 1, "#6F8294", "#34404D"], [1, 1, 1, "#D7A75E", "#7E5527"], [1, 2, 2, "#C3CCD6", "#6D7A88"]] };
     static ULT = {
-      sgDur: GameTime.gameMs(5), sgArc: Math.PI * 150 / 180, sgR: 155, sgMoveMul: 0.6, sgJumpR: 400,
+      sgDur: GameTime.gameMs(5), sgWidth: 300, sgAhead: 70, sgDepth: 36, sgHeight: 42, sgMoveMul: 0.6, sgJumpR: 400,
       sgJumpMinMs: GameTime.gameMs(0.25), sgJumpMaxMs: GameTime.gameMs(0.55), sgLandGap: 6, sgBotFoeR: 450, sgBotThreatR: 420
     };
     static STATS = { name: "방패병", role: "fighter", icon: "🧱", hp: 400, speed: GameTime.gameSpeed(150), cd: GameTime.gameMs(1.6), dmg: 20, range: 150, width: 200,
@@ -4908,10 +4908,10 @@ SinglePassMaterials.enable(THREE);
     }
     onLeapLand(E, t) { this.services.match.game.forceNet = true; return true; }
     showAimGuide(E, ult, c) { var services = this.services;
-      if (ult) { services.aimGuide.showAimSector(ShielderType.ULT.sgR, ShielderType.ULT.sgArc); return true; }
+      if (ult) { services.aimGuide.showAimStrip(ShielderType.ULT.sgAhead - ShielderType.ULT.sgDepth, ShielderType.ULT.sgDepth, ShielderType.ULT.sgWidth); return true; }
       return this.isGuarding(E, services.clock.now());
     }
-    addMarkers(v, root, body) { v.guardArc = ShieldArcMarker.attach(this.services, root, v.team); }
+    addMarkers(v, root, body) { v.guardArc = ShieldPlateMarker.attach(this.services, root, v.team); }
     renderMarkers(v, E, t, nowMs) { if (v.guardArc) v.guardArc.update(this.isGuarding(E, t), nowMs, E.guardAng); }
     locksFacing(E, t) { return this.isGuarding(E, t); }
     poseHeldProp(v, E, t) { var services = this.services;
@@ -4946,52 +4946,63 @@ SinglePassMaterials.enable(THREE);
       return "앞쪽 길이 " + c.range + "·폭 " + c.width + "의 지역을 방패로 밀쳐 " + c.dmg + "의 피해";
     }
     ultDesc() { var services = this.services, u = ShielderType.ULT;
-      return services.skilltext.secs(u.sgDur) + "간 조준한 방향으로 방패를 들어 앞쪽 " + Math.round(u.sgArc * 180 / Math.PI) + "°에서 오는 공격을 막음(뒤의 아군도 보호). 그동안 이동속도 " + services.skilltext.pctOf(1 - u.sgMoveMul) +
+      return services.skilltext.secs(u.sgDur) + "간 조준한 방향 앞에 폭 " + u.sgWidth + "의 방패를 세워 그 방패에 닿는 공격을 막음(뒤의 아군도 보호). 그동안 이동속도 " + services.skilltext.pctOf(1 - u.sgMoveMul) +
              "% 감소, 기본 공격 대신 " + services.skilltext.secs(this.data.guardJumpCd) + "마다 반경 " + u.sgJumpR + " 안 가장 가까운 아군에게 점프";
     }
   }
-  class ShieldArcMarker {
-    static Y = 7;
-    static RIM_IN = 0.88;
+  class ShieldPlateMarker {
+    static FLOOR_Y = 6;
     static TINT = { blue: 0xAFD6FF, red: 0xFFC2B4 };
-    static FILL_OPACITY = 0.22;
-    static RIM_OPACITY = 0.8;
+    static FLOOR_OPACITY = 0.3;
+    static WALL_OPACITY = 0.42;
+    static EDGE_OPACITY = 0.9;
+    static EDGE = 3;
     static geos(services) {
       var u = ShielderType.ULT, cache = services.matlib.sector;
-      if (!cache.shieldArcRim) {
-        cache.shieldArcRim = new THREE.RingGeometry(u.sgR * ShieldArcMarker.RIM_IN, u.sgR, 32, 1, -u.sgArc / 2, u.sgArc);
-        cache.shieldArcFill = new THREE.CircleGeometry(u.sgR * ShieldArcMarker.RIM_IN, 32, -u.sgArc / 2, u.sgArc);
+      if (!cache.shieldPlateFloor) {
+        cache.shieldPlateFloor = new THREE.PlaneGeometry(u.sgDepth, u.sgWidth);
+        cache.shieldPlateWall = new THREE.PlaneGeometry(u.sgWidth, u.sgHeight);
+        cache.shieldPlateEdge = new THREE.BoxGeometry(ShieldPlateMarker.EDGE, ShieldPlateMarker.EDGE, u.sgWidth);
       }
-      return { rim: cache.shieldArcRim, fill: cache.shieldArcFill };
+      return { floor: cache.shieldPlateFloor, wall: cache.shieldPlateWall, edge: cache.shieldPlateEdge };
     }
     static mats(services, team) {
-      var tint = ShieldArcMarker.TINT[team] || ShieldArcMarker.TINT.blue;
-      return { rim: services.models.basicMat("shieldArcRim-" + team, tint, ShieldArcMarker.RIM_OPACITY), fill: services.models.basicMat("shieldArcFill-" + team, tint, ShieldArcMarker.FILL_OPACITY) };
+      var tint = ShieldPlateMarker.TINT[team] || ShieldPlateMarker.TINT.blue, key = "shieldPlate-" + team, mats = services.matlib.mats;
+      if (!mats[key + ":wall"]) {
+        mats[key + ":floor"] = new THREE.MeshBasicMaterial({ color: tint, transparent: true, opacity: ShieldPlateMarker.FLOOR_OPACITY, depthWrite: false });
+        mats[key + ":wall"] = new THREE.MeshBasicMaterial({ color: tint, transparent: true, opacity: ShieldPlateMarker.WALL_OPACITY, depthWrite: false, side: THREE.DoubleSide });
+        mats[key + ":edge"] = new THREE.MeshBasicMaterial({ color: tint, transparent: true, opacity: ShieldPlateMarker.EDGE_OPACITY, depthWrite: false });
+      }
+      return { floor: mats[key + ":floor"], wall: mats[key + ":wall"], edge: mats[key + ":edge"] };
     }
     static attach(services, root, team) {
-      var marker = new ShieldArcMarker(services, team);
+      var marker = new ShieldPlateMarker(services, team);
       root.add(marker.group);
       return marker;
     }
     static warmSample(services) {
-      var g = new ShieldArcMarker(services, "blue").group, red = new ShieldArcMarker(services, "red").group;
+      var g = new ShieldPlateMarker(services, "blue").group, red = new ShieldPlateMarker(services, "red").group;
       g.visible = red.visible = true; g.add(red);
       return g;
     }
     constructor(services, team) {
-      var geos = ShieldArcMarker.geos(services), mats = ShieldArcMarker.mats(services, team);
+      var u = ShielderType.ULT, geos = ShieldPlateMarker.geos(services), mats = ShieldPlateMarker.mats(services, team);
       this.group = new THREE.Group();
-      var fill = services.arenaView.flatMesh(geos.fill, mats.fill), rim = services.arenaView.flatMesh(geos.rim, mats.rim);
-      [fill, rim].forEach(function (m) { m.material.depthWrite = false; m.renderOrder = 7; });
-      fill.position.y = ShieldArcMarker.Y; rim.position.y = ShieldArcMarker.Y + 0.4;
-      this.group.add(fill); this.group.add(rim);
-      this.rim = rim; this.group.visible = false;
+      var floor = services.arenaView.flatMesh(geos.floor, mats.floor);
+      floor.position.set(u.sgAhead - u.sgDepth / 2, ShieldPlateMarker.FLOOR_Y, 0);
+      var wall = new THREE.Mesh(geos.wall, mats.wall);
+      wall.rotation.y = Math.PI / 2; wall.position.set(u.sgAhead, u.sgHeight / 2, 0);
+      var edge = new THREE.Mesh(geos.edge, mats.edge);
+      edge.position.set(u.sgAhead, u.sgHeight, 0);
+      [floor, wall, edge].forEach(function (m) { m.renderOrder = 7; });
+      this.group.add(floor); this.group.add(wall); this.group.add(edge);
+      this.edge = edge; this.group.visible = false;
     }
     update(on, nowMs, ang) {
       this.group.visible = on;
       if (!on) return;
       this.group.rotation.y = -ang;
-      this.rim.scale.setScalar(1 + 0.015 * Math.sin(nowMs / 140));
+      this.edge.scale.y = 1 + 0.35 * Math.sin(nowMs / 140);
     }
   }
   class CharacterRegistry {
@@ -7258,30 +7269,33 @@ SinglePassMaterials.enable(THREE);
       return services.targets.fighters().filter(function (E) { return E && E.char === "shielder" && E.type.isGuarding(E, t); })
         .map(function (E) { return { E: E, team: E.team, x: E.x, y: E.y, ang: E.guardAng }; });
     }
-    facesFront(G, x, y) { return Math.abs(MathKit.angDiff(Math.atan2(y - G.y, x - G.x), G.ang)) <= ShielderType.ULT.sgArc / 2; }
-    arcCross(G, ax, ay, bx, by) {
-      var R = ShielderType.ULT.sgR, dx = bx - ax, dy = by - ay, fx = ax - G.x, fy = ay - G.y;
-      var a = dx * dx + dy * dy, b = 2 * (fx * dx + fy * dy), c = fx * fx + fy * fy - R * R;
-      if (a < 1e-9) return -1;
-      var disc = b * b - 4 * a * c;
-      if (disc < 0) return -1;
-      if (c <= 0) return -1;
-      var s = (-b - Math.sqrt(disc)) / (2 * a);
-      return s >= 0 && s <= 1 && this.facesFront(G, ax + dx * s, ay + dy * s) ? s : -1;
+    frame(G) { var u = ShielderType.ULT, ux = Math.cos(G.ang), uy = Math.sin(G.ang); return { ux: ux, uy: uy, cx: G.x + ux * u.sgAhead, cy: G.y + uy * u.sgAhead, half: u.sgWidth / 2 }; }
+    ahead(F, x, y) { return (x - F.cx) * F.ux + (y - F.cy) * F.uy; }
+    side(F, x, y) { return -(x - F.cx) * F.uy + (y - F.cy) * F.ux; }
+    wallCross(G, ax, ay, bx, by) {
+      var F = this.frame(G), fa = this.ahead(F, ax, ay), fb = this.ahead(F, bx, by);
+      if (fa <= 0 || fb > 0) return -1;
+      var s = fa / (fa - fb);
+      return Math.abs(this.side(F, ax + (bx - ax) * s, ay + (by - ay) * s)) <= F.half ? s : -1;
     }
-    insideFront(G, sx, sy) { return MathKit.hyp(sx - G.x, sy - G.y) <= ShielderType.ULT.sgR && this.facesFront(G, sx, sy); }
-    tangentHolds(G, sx, sy, tx, ty) {
-      var d = MathKit.hyp(sx - G.x, sy - G.y), a = d > 1e-6 ? Math.atan2(sy - G.y, sx - G.x) : G.ang, ux = Math.cos(a), uy = Math.sin(a), R = ShielderType.ULT.sgR;
-      return (tx - (G.x + ux * R)) * ux + (ty - (G.y + uy * R)) * uy < 0;
+    inGap(G, sx, sy) {
+      var F = this.frame(G), along = this.ahead(F, sx, sy) + ShielderType.ULT.sgAhead;
+      return along > 0 && along <= ShielderType.ULT.sgAhead && Math.abs(this.side(F, sx, sy)) <= F.half;
+    }
+    behindWall(G, tx, ty) { return this.ahead(this.frame(G), tx, ty) < 0; }
+    wallPoint(G, sx, sy) {
+      var F = this.frame(G), along = this.ahead(F, sx, sy) + ShielderType.ULT.sgAhead, lat = this.side(F, sx, sy);
+      var k = along > ShielderType.ULT.sgAhead ? ShielderType.ULT.sgAhead / along : 1;
+      return { x: F.cx - F.uy * lat * k, y: F.cy + F.ux * lat * k };
     }
     blocks(sx, sy, tx, ty, attackerTeam, t) {
       var list = this.active(t);
       for (var i = 0; i < list.length; i++) {
         var G = list[i];
         if (G.team === attackerTeam) continue;
-        var s = this.arcCross(G, sx, sy, tx, ty);
+        var s = this.wallCross(G, sx, sy, tx, ty);
         if (s >= 0) return { G: G, x: sx + (tx - sx) * s, y: sy + (ty - sy) * s };
-        if (this.insideFront(G, sx, sy) && this.tangentHolds(G, sx, sy, tx, ty)) return { G: G, x: sx, y: sy };
+        if (this.inGap(G, sx, sy) && this.behindWall(G, tx, ty)) { var w = this.wallPoint(G, sx, sy); return { G: G, x: w.x, y: w.y }; }
       }
       return null;
     }
@@ -7293,9 +7307,10 @@ SinglePassMaterials.enable(THREE);
     }
     guardsFrom(T, sx, sy, t) {
       var G = this.guardOf(T, t);
-      if (!G || MathKit.hyp(sx - G.x, sy - G.y) <= ArenaSize.BODY_R || !this.facesFront(G, sx, sy)) return null;
-      var a = Math.atan2(sy - G.y, sx - G.x), R = Math.min(ShielderType.ULT.sgR, MathKit.hyp(sx - G.x, sy - G.y));
-      return { G: G, x: G.x + Math.cos(a) * R, y: G.y + Math.sin(a) * R };
+      if (!G || MathKit.hyp(sx - G.x, sy - G.y) <= ArenaSize.BODY_R) return null;
+      if (!this.inGap(G, sx, sy) && this.wallCross(G, sx, sy, G.x, G.y) < 0) return null;
+      var w = this.wallPoint(G, sx, sy);
+      return { G: G, x: w.x, y: w.y };
     }
     stops(T, sx, sy, attackerTeam, t) {
       if (!T || T.team === attackerTeam) return null;
@@ -7341,9 +7356,9 @@ SinglePassMaterials.enable(THREE);
           if (G.team === d.team) return;
           if (first) {
             var sx = d.castX != null ? d.castX : d.x, sy = d.castY != null ? d.castY : d.y, end = services.projectiles.projAt(p, p.life);
-            if (self.insideFront(G, sx, sy) && self.tangentHolds(G, sx, sy, end.x, end.y)) { best = { G: G, at: 0, x: a.x, y: a.y }; return; }
+            if (self.inGap(G, sx, sy) && self.behindWall(G, end.x, end.y)) { best = { G: G, at: 0, x: a.x, y: a.y }; return; }
           }
-          var s = self.arcCross(G, a.x, a.y, b.x, b.y);
+          var s = self.wallCross(G, a.x, a.y, b.x, b.y);
           if (s < 0) return;
           var at = pe + (e - pe) * s;
           if (!best || at < best.at) best = { G: G, at: at, x: a.x + (b.x - a.x) * s, y: a.y + (b.y - a.y) * s };
@@ -13885,7 +13900,7 @@ SinglePassMaterials.enable(THREE);
         function () { return services.hookView.warmSample(); },
         function () { return new BannerStrikeGlow(services, { x: P, y: P, angle: 0, len: 120, width: 60, createdAt: 0 }).group; },
         function () { return BannerBearerRig.warmSample(services); },
-        function () { return ShieldArcMarker.warmSample(services); },
+        function () { return ShieldPlateMarker.warmSample(services); },
         function () { return services.marinaStreamView.warmSample(); },
         function () { return services.tsunamiView.warmSample(); }
       ].concat(this.sharedGeometryMakers());
