@@ -3193,7 +3193,7 @@ class ResultCollector {
 
   run(AIMG, "AI 역할: 기사·창술사·대장장이는 앞, 화염술사·주술사·궁수·뇌전사수·저격수는 뒤, 은신자·자객·결투가는 틈새를 노리는 역할인가", function (done) {
     var want = { knight: "front", lancer: "front", blacksmith: "front", guardian: "front", warrior: "front", mage: "back", shaman: "back", ranger: "back", stormbow: "back", sniper: "back", frost: "back", cleric: "back", necro: "back", thrower: "back",
-                 rogue: "flank", hitman: "flank", duelist: "flank", dancer: "back", engineer: "back", druid: "back", giant: "front", astrologer: "back", wraith: "front", bearer: "front", marina: "back", phantom: "flank" }, bad = [];
+                 rogue: "flank", hitman: "flank", duelist: "flank", dancer: "back", engineer: "back", druid: "back", giant: "front", astrologer: "back", wraith: "front", bearer: "front", marina: "back", phantom: "flank", shielder: "front" }, bad = [];
     Object.keys(want).forEach(function (c) { var got = api.CHAR_TYPES.of(c).botRole; if (got !== want[c]) bad.push(c + " " + got + " (기대 " + want[c] + ")"); });
     api.CHAR_LIST.forEach(function (c) { if (!want[c]) bad.push(c + " 역할이 정해지지 않음"); });
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : Object.keys(want).length + "명 역할이 맞음");
@@ -4681,6 +4681,7 @@ class ResultCollector {
       var parts = { 기본: api.basicDesc(c), 패시브: api.passiveDesc(c), 스킬: api.ultDesc(c), 표: api.statTable(c), 블록: api.skillBlocks(c) };
       Object.keys(parts).forEach(function (k) {
         var t = String(parts[k]);
+        if (k === "패시브" && t === "" && String(parts.블록).indexOf("없음") >= 0) return;
         if (!t || t === "undefined") bad.push(C[c].name + " " + k + " 비어 있음");
         else if (/undefined|NaN|\[object|null/.test(t)) bad.push(C[c].name + " " + k + " 에 이상한 글자: " + (t.match(/.{0,12}(undefined|NaN|\[object|null).{0,8}/) || [""])[0]);
       });
@@ -5158,6 +5159,13 @@ class ResultCollector {
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : map + " 맵 한 줄 벽: " + shown.join(" · "));
   });
   new PhantomTests(api, { world: world, run: run, FRAME: FRAME }).register();
+  new ShielderTests(api, { world: world, run: run, FRAME: FRAME }).register();
+  run(AUTO, "AI 6명 60초 난전 — 숲 맵 + 방패병 고정 (시드 2045)", function (done) {
+    var r = autoMelee("forest", 60, 2045, "shielder"), kinds = Object.keys(r.issues);
+    var roster = r.list.map(function (e) { return api.CHARS[e.char].name; }).join("·");
+    done(kinds.length ? "fail" : "pass", "출전: " + roster + " / 킬 " + r.kills + ", 궁극기 " + r.ults + "번" +
+      (kinds.length ? " / 규칙 위반: " + kinds.map(function (k) { return k + " " + r.issues[k].n + "번 (처음: " + r.issues[k].first + ")"; }).join("; ") : " / 규칙 위반 없음"));
+  });
   run(AUTO, "AI 6명 60초 난전 — 강 맵 + 팬텀 고정 (시드 2044)", function (done) {
     var r = autoMelee("river", 60, 2044, "phantom"), kinds = Object.keys(r.issues);
     var roster = r.list.map(function (e) { return api.CHARS[e.char].name; }).join("·");
@@ -5188,6 +5196,233 @@ class ResultCollector {
   new AccountStatsTests(api, { run: run, runAsync: runAsync }).register();
   results.pending = Promise.resolve().then(function () { api.finish(api.currentMap()); }).then(drainAsync);
   return results;
+  }
+}
+
+class ShielderTests {
+  static GROUP = "방패병";
+  static X = 450;
+  static Y = 600;
+  static DOWN = Math.PI / 2;
+  constructor(api, kit) { this.api = api; this.kit = kit; }
+
+  scene(list, map) {
+    this.api.MATCH.stateByKey = {};
+    return this.kit.world(map || "practice", list.map(function (e, i) { return Object.assign({ team: "red", char: "guardian", slot: (i % 3) + 1 }, e); }));
+  }
+  at(id, dx, dy, more) { return Object.assign({ id: id, x: ShielderTests.X + dx, y: ShielderTests.Y + dy }, more); }
+  ally(id, dx, dy, more) { return this.at(id, dx, dy, Object.assign({ team: "blue" }, more)); }
+  foe(id, dx, dy, more) { return this.at(id, dx, dy, Object.assign({ team: "red" }, more)); }
+  withShield(list, map) { return this.scene([this.ally("sh", 0, 0, { char: "shielder", slot: 1 })].concat(list || []), map); }
+  raise(W, ang) { var S = W.ent("sh"); S.gauge = this.api.GAUGE_MAX; this.api.useUlt(S, ang == null ? ShielderTests.DOWN : ang); return S; }
+  lost(E) { return E.maxHp - E.hp; }
+  angGap(a, b) { var d = (a - b) % (Math.PI * 2); if (d > Math.PI) d -= Math.PI * 2; if (d < -Math.PI) d += Math.PI * 2; return Math.abs(d); }
+  toward(A, B) { return Math.atan2(B.y - A.y, B.x - A.x); }
+  strike(W, key, d) { this.api.onMelee(key, Object.assign({ createdAt: W.t() }, d)); W.step(200); }
+  verdict(done, bad, okText) { done(bad.length ? "fail" : "pass", bad.length ? bad.slice(0, 6).join(" / ") : okText); }
+  jumpMs() { var u = this.api.ULT; return u.sgJumpMaxMs + 60; }
+
+  register() {
+    this.registerShots();
+    this.registerMelee();
+    this.registerArea();
+    this.registerCast();
+    this.registerJump();
+    this.registerCard();
+  }
+
+  registerShots() {
+    var self = this, api = this.api, run = this.kit.run, G = ShielderTests.GROUP;
+    run(G, "투사체: 앞에서 오는 화살·관통 검기가 방패 호에서 사라져 방패병과 방패 뒤 아군이 안 맞고, 막은 피해가 쌓이는가", function (done) {
+      var bad = [], W = self.withShield([self.ally("al", 0, -80), self.foe("rg", 0, 350, { char: "ranger" })]), S = self.raise(W), A = W.ent("al");
+      api.fireBasic(W.ent("rg"), -Math.PI / 2); self.cutCount = 0;
+      W.step(1500, null, function () { self.cutCount = Math.max(self.cutCount, Object.keys(api.MATCH.remoteShots).filter(function (k) { return api.MATCH.remoteShots[k].shieldCut; }).length); });
+      var cut = self.cutCount;
+      if (cut !== api.CHARS.ranger.shots) bad.push("멈춘 화살 " + cut);
+      if (self.lost(A) || self.lost(S)) bad.push("화살이 맞음 아군 " + self.lost(A) + "·방패병 " + self.lost(S));
+      if (S.blocked !== api.CHARS.ranger.dmg * api.CHARS.ranger.shots) bad.push("막은 피해 " + S.blocked);
+      var W2 = self.withShield([self.ally("al", 0, -80), self.foe("ph", 0, 300, { char: "phantom" })]), S2 = self.raise(W2), A2 = W2.ent("al");
+      api.fireBasic(W2.ent("ph"), -Math.PI / 2); W2.step(1500);
+      if (self.lost(A2) || self.lost(S2)) bad.push("관통 검기가 맞음 아군 " + self.lost(A2) + "·방패병 " + self.lost(S2));
+      self.verdict(done, bad, "화살 " + cut + "발 멈춤, 막은 피해 " + S.blocked + ", 관통 검기도 멈춤");
+    });
+    run(G, "투사체: 옆·뒤(150° 밖)에서 오면 맞고, 앞 70° 는 막고 80° 는 맞는가", function (done) {
+      var bad = [], shown = [];
+      var deg = Math.PI / 180, D = ShielderTests.DOWN;
+      [[0, "오른쪽", true], [-D, "뒤", true], [D + 70 * deg, "앞 70°", false], [D + 80 * deg, "앞 80°", true], [D - 70 * deg, "앞 -70°", false]].forEach(function (c) {
+        var ang = c[0];
+        var x = Math.cos(ang) * 250, y = Math.sin(ang) * 250;
+        var W = self.withShield([self.foe("rg", x, y, { char: "ranger" })]), S = self.raise(W), R = W.ent("rg");
+        api.fireBasic(R, self.toward(R, S)); W.step(1500);
+        var hit = self.lost(S) > 0;
+        if (hit !== c[2]) bad.push(c[1] + (c[2] ? " 이 안 맞음" : " 이 맞음"));
+        shown.push(c[1] + (hit ? " 맞음" : " 막음"));
+      });
+      self.verdict(done, bad, shown.join(" · "));
+    });
+    run(G, "호 안쪽까지 들어온 적의 투사체: 방패 뒤 아군으로 쏘면 바로 사라지고, 방패 바깥 앞쪽 아군으로 쏘면 맞는가", function (done) {
+      var bad = [], W = self.withShield([self.ally("al", 0, -80), self.foe("rg", 40, 90, { char: "ranger" })]), S = self.raise(W), R = W.ent("rg"), A = W.ent("al");
+      api.fireBasic(R, self.toward(R, A)); W.step(1500);
+      if (self.lost(A) || self.lost(S)) bad.push("방패 안쪽에서 쏜 화살이 맞음 " + self.lost(A) + "·" + self.lost(S));
+      var W2 = self.withShield([self.ally("fr", 0, 320), self.foe("rg", 0, 100, { char: "ranger" })]), S2 = self.raise(W2), R2 = W2.ent("rg"), F = W2.ent("fr");
+      api.fireBasic(R2, self.toward(R2, F)); W2.step(1500);
+      if (!self.lost(F)) bad.push("방패 바깥 앞쪽 아군이 안 맞음");
+      self.verdict(done, bad, "뒤 아군 보호, 바깥 앞쪽 아군 " + self.lost(F) + " 피해");
+    });
+    run(G, "아군 공격은 방패를 통과: 방패 뒤 아군 화살이 앞의 적을 맞히는가", function (done) {
+      var bad = [], W = self.withShield([self.ally("ar", 0, -150, { char: "ranger" }), self.foe("fo", 0, 250)]), S = self.raise(W);
+      api.fireBasic(W.ent("ar"), Math.PI / 2); W.step(1500);
+      if (!self.lost(W.ent("fo"))) bad.push("아군 화살이 막힘 (화살 " + W.log.filter(function (p) { return p.path === "shots"; }).length + "번, 적 위치 " + Math.round(W.ent("fo").x) + "," + Math.round(W.ent("fo").y) + ")");
+      if (S.blocked) bad.push("아군 공격이 막은 피해에 쌓임");
+      self.verdict(done, bad, "적 피해 " + self.lost(W.ent("fo")));
+    });
+  }
+
+  registerMelee() {
+    var self = this, api = this.api, run = this.kit.run, G = ShielderTests.GROUP, X = ShielderTests.X, Y = ShielderTests.Y;
+    run(G, "근접: 앞에서 친 띠·부채꼴·찌르기는 방패병과 방패 뒤 아군 모두 막고, 막은 피해·불꽃이 생기는가", function (done) {
+      var bad = [], W = self.withShield([self.ally("al", 0, -80), self.foe("fo", 0, 180)]), S = self.raise(W), A = W.ent("al"), fx0 = api.MATCH.fx.length;
+      self.strike(W, "sh-line", { team: "red", owner: "fo", x: X, y: Y + 180, angle: -Math.PI / 2, len: 320, width: 100, radius: 320, dmg: 30 });
+      if (self.lost(S) || self.lost(A)) bad.push("띠가 맞음 " + self.lost(S) + "·" + self.lost(A));
+      if (S.blocked !== 60) bad.push("띠 막은 피해 " + S.blocked);
+      if (!api.MATCH.fx.slice(fx0).some(function (f) { return f.k === "spark" && f.c === "#CFEBFF"; })) bad.push("막을 때 불꽃 없음");
+      self.strike(W, "sh-arc", { team: "red", owner: "fo", x: X, y: Y + 130, angle: -Math.PI / 2, radius: 160, arc: 1.2, dmg: 30 });
+      if (self.lost(S)) bad.push("부채꼴이 방패병을 맞힘");
+      self.strike(W, "sh-stab", { team: "red", owner: "fo", x: X, y: Y + 150, angle: -Math.PI / 2, radius: 300, stab: 1, tgt: "al", dmg: 30 });
+      if (self.lost(A)) bad.push("찌르기가 뒤 아군을 맞힘");
+      self.verdict(done, bad, "띠·부채꼴·찌르기 막음, 막은 피해 " + S.blocked);
+    });
+    run(G, "호 안쪽까지 들어온 적의 근접: 방패병·뒤 아군은 막고, 같은 적이 방패 바깥 앞쪽 아군을 치면 맞는가", function (done) {
+      var bad = [], W = self.withShield([self.ally("al", 0, -80), self.ally("fr", 0, 260), self.foe("fo", 0, 100)]), S = self.raise(W);
+      self.strike(W, "in-back", { team: "red", owner: "fo", x: X, y: Y + 100, angle: -Math.PI / 2, len: 220, width: 90, radius: 220, dmg: 30 });
+      self.strike(W, "in-arc", { team: "red", owner: "fo", x: X, y: Y + 100, angle: -Math.PI / 2, radius: 120, arc: 1.5, dmg: 30 });
+      if (self.lost(S) || self.lost(W.ent("al"))) bad.push("안쪽 적에게 맞음 방패병 " + self.lost(S) + "·뒤 아군 " + self.lost(W.ent("al")));
+      self.strike(W, "in-front", { team: "red", owner: "fo", x: X, y: Y + 100, angle: Math.PI / 2, len: 220, width: 90, radius: 220, dmg: 30 });
+      if (self.lost(W.ent("fr")) !== 30) bad.push("바깥 앞쪽 아군 피해 " + self.lost(W.ent("fr")));
+      self.verdict(done, bad, "방패병·뒤 아군 막음, 바깥 앞쪽 아군 30");
+    });
+    run(G, "막힌 공격은 기절·둔화·넉백이 없고, 방패가 없을 때는 그대로 걸리는가", function (done) {
+      var bad = [], hit = { team: "red", owner: "fo", x: ShielderTests.X, y: ShielderTests.Y + 100, angle: -Math.PI / 2, radius: 160, arc: Math.PI * 2, dmg: 20, u: 1, slam: 1, kb: api.ULT.gdKb, fx: { slowMs: 600, slowMul: 0.7 } };
+      var W = self.withShield([self.foe("fo", 0, 100)]), S = self.raise(W);
+      self.strike(W, "cc-on", hit);
+      if (S.shove || S.slowUntil > W.t() || self.lost(S)) bad.push("방패 중 넉백·둔화·피해가 걸림");
+      self.strike(W, "cc-stun", { team: "red", owner: "fo", x: ShielderTests.X, y: ShielderTests.Y + 100, angle: 0, radius: 140, arc: Math.PI * 2, dmg: 0, u: 1, slam: 1, thruWall: 1, fx: { stunMs: 900 } });
+      if (S.stunUntil > W.t()) bad.push("방패 중 앞쪽 기절이 걸림");
+      var W2 = self.withShield([self.foe("fo", 0, 100)]), S2 = W2.ent("sh");
+      self.strike(W2, "cc-off", hit);
+      if (!S2.shove || !(S2.slowUntil > W2.t()) || !self.lost(S2)) bad.push("방패 없을 때 넉백·둔화·피해가 안 걸림");
+      var W3 = self.withShield([self.foe("fo", 0, -100)]), S3 = self.raise(W3);
+      self.strike(W3, "cc-back", { team: "red", owner: "fo", x: ShielderTests.X, y: ShielderTests.Y - 100, angle: 0, radius: 140, arc: Math.PI * 2, dmg: 0, u: 1, slam: 1, thruWall: 1, fx: { stunMs: 900 } });
+      if (!(S3.stunUntil > W3.t())) bad.push("뒤에서 온 기절이 안 걸림");
+      self.verdict(done, bad, "앞쪽 넉백·둔화·기절 막음, 뒤·방패 없음은 걸림");
+    });
+    run(G, "해골 병사 공격도 막고 막은 피해에 쌓이며, 공학자 포탑·마리나 물줄기처럼 대상을 고르는 공격도 막는가", function (done) {
+      var bad = [], W = self.withShield([self.ally("al", 0, -80), self.foe("nc", 300, 400, { char: "necro", gauge: api.GAUGE_MAX })]), S = self.raise(W), N = W.ent("nc");
+      api.useUlt(N, -Math.PI / 2); W.step(api.ULT.smRiseMs + 100);
+      N.minions.forEach(function (m, i) { m.x = ShielderTests.X - 20 + i * 20; m.y = ShielderTests.Y + 70; m.cdUntil = 0; });
+      var before = S.blocked || 0;
+      W.step(1500, null, function () { N.minions.forEach(function (m, i) { m.x = ShielderTests.X - 20 + i * 20; m.y = ShielderTests.Y + 70; }); });
+      if (self.lost(S)) bad.push("해골 공격이 맞음 " + self.lost(S));
+      if (!(S.blocked > before)) bad.push("해골 공격이 막은 피해에 안 쌓임");
+      var W2 = self.withShield([self.ally("al", 0, -80), self.foe("en", 0, 380, { char: "engineer" }), self.foe("mr", 60, 300, { char: "marina" })]), S2 = self.raise(W2), A2 = W2.ent("al");
+      W2.room.ref.child("effects").push({ type: "tshot", team: "red", owner: "en", x: ShielderTests.X, y: ShielderTests.Y + 380, mx: ShielderTests.X, my: ShielderTests.Y + 360, tx: A2.x, ty: A2.y, fly: 250, tgt: "al", heavy: 0, dmg: 10, stun: 0, createdAt: W2.t() });
+      W2.room.ref.child("effects").push({ type: "marina", step: 1, team: "red", owner: "mr", tgt: "al", kind: "hit", createdAt: W2.t() });
+      W2.step(1200);
+      if (self.lost(A2)) bad.push("포탑·물줄기가 뒤 아군을 맞힘 " + self.lost(A2));
+      self.verdict(done, bad, "해골 공격 막은 피해 " + (S.blocked - before) + ", 포탑·물줄기 막음");
+    });
+  }
+
+  registerArea() {
+    var self = this, api = this.api, run = this.kit.run, G = ShielderTests.GROUP;
+    run(G, "광역: 앞쪽 메테오는 방패병 본인만 막고(뒤 아군은 맞음), 발밑에 떨어진 메테오는 못 막는가", function (done) {
+      var bad = [], W = self.withShield([self.ally("al", 0, -80), self.foe("mg", 0, 400, { char: "mage", gauge: api.GAUGE_MAX })]), S = self.raise(W), A = W.ent("al");
+      api.useUlt(W.ent("mg"), -Math.PI / 2, 280); W.step(api.ULT.mbDelay + 300);
+      if (self.lost(S) || S.stunUntil > W.t() - 200) bad.push("앞쪽 메테오가 방패병을 맞힘 " + self.lost(S));
+      if (!self.lost(A)) bad.push("뒤 아군은 메테오를 맞아야 함");
+      if (!(S.blocked > 0)) bad.push("메테오 막은 피해 없음");
+      var W2 = self.withShield([self.foe("mg", 0, 400, { char: "mage", gauge: api.GAUGE_MAX })]), S2 = self.raise(W2);
+      api.useUlt(W2.ent("mg"), -Math.PI / 2, 400); W2.step(api.ULT.mbDelay + 300);
+      if (!self.lost(S2)) bad.push("발밑 메테오를 막음");
+      self.verdict(done, bad, "앞쪽 막음(뒤 아군 " + self.lost(A) + "), 발밑 " + self.lost(S2) + " 피해");
+    });
+  }
+
+  registerCast() {
+    var self = this, api = this.api, run = this.kit.run, G = ShielderTests.GROUP, U = api.ULT;
+    run(G, "시전: 자동 조준은 가장 가까운 적 방향, 방패 중 이동 " + Math.round(U.sgMoveMul * 100) + "%, " + api.secs(U.sgDur) + " 뒤 사라지고 게이지는 그동안 안 차는가", function (done) {
+      var bad = [], W = self.withShield([self.foe("near", 200, 120), self.foe("far", -300, 300)]), S = W.ent("sh"), base = api.speedOf(S);
+      S.gauge = api.GAUGE_MAX;
+      var aim = api.AUTO_AIM.angle(S);
+      api.useUlt(S, aim);
+      var want = self.toward(S, W.ent("near"));
+      if (self.angGap(S.guardAng, want) > api.AUTO_AIM_ERR + 0.03) bad.push("방패 방향 " + S.guardAng.toFixed(2) + " / 가까운 적 " + want.toFixed(2));
+      if (Math.abs(api.speedOf(S) - base * U.sgMoveMul) > 0.01) bad.push("방패 중 속도 " + api.speedOf(S) + " / " + base);
+      S.angle = 0; W.step(100);
+      if (self.angGap(S.angle, S.guardAng) > 1e-6) bad.push("방패 중 몸 방향이 고정되지 않음");
+      W.step(U.sgDur / 2);
+      var mid = S.gauge;
+      api.damage(W.ent("near"), 30, "sh", true, null);
+      if (S.gauge > mid) bad.push("방패 중 게이지가 참");
+      W.step(U.sgDur / 2 + 50);
+      if (api.CHAR_TYPES.of("shielder").isGuarding(S, W.t())) bad.push(api.secs(U.sgDur) + " 뒤에도 방패가 남음");
+      if (Math.abs(api.speedOf(S) - base) > 0.01) bad.push("끝난 뒤 속도 " + api.speedOf(S));
+      self.verdict(done, bad, "방향 차 " + self.angGap(S.guardAng, want).toFixed(3) + ", 이동 " + Math.round(U.sgMoveMul * 100) + "%, " + api.secs(U.sgDur) + " 뒤 꺼짐");
+    });
+  }
+
+  registerJump() {
+    var self = this, api = this.api, run = this.kit.run, G = ShielderTests.GROUP, U = api.ULT, C = api.CHARS.shielder;
+    run(G, "점프: 기본 공격 버튼이 " + U.sgJumpR + " 안 가장 가까운 아군에게 점프하고, 대기 " + api.secs(C.guardJumpCd) + "로 여러 번, 점프 중에도 방패가 유지되는가", function (done) {
+      var bad = [], W = self.withShield([self.ally("a1", 200, 0), self.ally("a2", -300, 0), self.foe("fo", 0, 450)]), S = self.raise(W), A1 = W.ent("a1"), n = W.log.length;
+      api.fireBasic(S, 0);
+      if (!S.leap || Math.hypot(S.leap.tx - A1.x, S.leap.ty - A1.y) > api.BODY_R * 2 + U.sgLandGap + 1) bad.push("가까운 아군 쪽으로 안 뜀");
+      if (W.log.slice(n).some(function (p) { return p.path === "meleeHits"; })) bad.push("점프 대신 밀치기가 나감");
+      var cd = S.cdUntil - W.t();
+      if (Math.abs(cd - C.guardJumpCd) > 1) bad.push("대기 " + cd);
+      W.step(U.sgJumpMinMs);
+      if (!api.CHAR_TYPES.of("shielder").isGuarding(S, W.t())) bad.push("점프 중 방패가 꺼짐");
+      W.step(self.jumpMs());
+      var gap = Math.hypot(S.x - A1.x, S.y - A1.y);
+      if (gap > api.BODY_R * 2 + U.sgLandGap + 2 || gap < api.BODY_R * 2 - 1) bad.push("착지 거리 " + gap.toFixed(1));
+      A1.y = S.y + 450; api.resolve(A1); W.ent("a2").x = S.x - 100; W.ent("a2").y = S.y + 250; api.resolve(W.ent("a2"));
+      api.fireBasic(S, 0);
+      if (S.leap) bad.push("대기 중에도 뜀");
+      W.step(C.guardJumpCd - self.jumpMs() + 20);
+      api.fireBasic(S, 0);
+      if (!S.leap) bad.push("대기가 끝난 뒤 두 번째 점프가 안 됨");
+      W.step(self.jumpMs());
+      if (Math.hypot(S.x - W.ent("a2").x, S.y - W.ent("a2").y) > api.BODY_R * 2 + U.sgLandGap + 2) bad.push("두 번째 점프가 a2 옆이 아님");
+      self.verdict(done, bad, "대기 " + api.secs(cd) + ", 두 번 점프, 착지 간격 " + gap.toFixed(1));
+    });
+    run(G, "점프: " + U.sgJumpR + " 밖 아군·해골 병사는 대상이 아니고, 아군이 없으면 대기 시간을 쓰지 않으며, 방패가 없으면 밀치기", function (done) {
+      var bad = [], W = self.withShield([self.ally("far", 300, 300), self.ally("nc", -300, 300, { char: "necro", gauge: api.GAUGE_MAX }), self.foe("fo", 0, 450)]), S = self.raise(W), N = W.ent("nc");
+      api.useUlt(N, 0); W.step(api.ULT.smRiseMs + 100);
+      N.minions.forEach(function (m, i) { m.x = ShielderTests.X + 60 + i * 30; m.y = ShielderTests.Y - 60; m.cdUntil = Infinity; });
+      var cd0 = S.cdUntil, n = W.log.length;
+      api.fireBasic(S, 0);
+      if (S.leap) bad.push("400 밖 아군이나 해골에게 뜀");
+      if (S.cdUntil !== cd0) bad.push("아군이 없는데 대기 시간을 씀");
+      if (W.log.slice(n).some(function (p) { return p.path === "meleeHits"; })) bad.push("방패 중 밀치기가 나감");
+      var W2 = self.withShield([self.foe("fo", 0, 150)]), S2 = W2.ent("sh"), n2 = W2.log.length;
+      api.fireBasic(S2, ShielderTests.DOWN); W2.step(200);
+      var bash = W2.log.slice(n2).filter(function (p) { return p.path === "meleeHits" && p.v.owner === "sh"; })[0];
+      if (!bash || bash.v.width !== C.width || bash.v.len !== C.range) bad.push("밀치기 띠 " + (bash && bash.v.len + "·" + bash.v.width));
+      if (self.lost(W2.ent("fo")) !== C.dmg) bad.push("밀치기 피해 " + self.lost(W2.ent("fo")));
+      self.verdict(done, bad, "대상 없음 → 점프·대기 없음, 밀치기 " + C.range + "·" + C.width + " 띠 " + C.dmg);
+    });
+  }
+
+  registerCard() {
+    var self = this, api = this.api, run = this.kit.run, G = ShielderTests.GROUP, U = api.ULT, C = api.CHARS.shielder;
+    run(G, "카드: 능력치와 스킬 설명 숫자가 수치 표에서 나오는가", function (done) {
+      var bad = [], text = api.ultDesc("shielder"), basic = api.basicDesc("shielder");
+      [api.secs(U.sgDur), "150°", String(U.sgJumpR), api.secs(C.guardJumpCd), Math.round((1 - U.sgMoveMul) * 100) + "%"].forEach(function (k) { if (text.indexOf(k) < 0) bad.push("스킬 설명에 " + k + " 없음"); });
+      [String(C.range), String(C.width), String(C.dmg)].forEach(function (k) { if (basic.indexOf(k) < 0) bad.push("기본 공격 설명에 " + k + " 없음"); });
+      if (C.hp !== 400 || C.dmg !== 20 || C.range !== 200 || Math.abs(api.secs(C.cd).replace("초", "") - 1.6) > 1e-9) bad.push("능력치 " + C.hp + "·" + C.dmg + "·" + C.range + "·" + api.secs(C.cd));
+      if (/\.$/.test(text)) bad.push("설명 끝에 마침표");
+      self.verdict(done, bad, text);
+    });
   }
 }
 
