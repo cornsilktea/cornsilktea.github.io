@@ -3112,8 +3112,9 @@ class CharMvpRatePanel {
 
   winnersRow(row) {
     const detail = el("tr", "mvp-winners"), cell = el("td");
+    /* 학생 순서(2026-11-24 선생님 요청): MVP율이 아니라 MVP 횟수 많은 순. 같으면 MVP율 높은 순, 그다음 픽이 적은 순 */
     const rateOf = (w) => (w.picks ? w.mvp / w.picks : 0);
-    const winners = this.tally.byRole.get(row.role.id).winners.slice().sort((a, b) => rateOf(b) - rateOf(a) || b.mvp - a.mvp || b.picks - a.picks);
+    const winners = this.tally.byRole.get(row.role.id).winners.slice().sort((a, b) => b.mvp - a.mvp || rateOf(b) - rateOf(a) || a.picks - b.picks);
     cell.colSpan = 4;
     if (winners.length) cell.appendChild(this.winnersColumns(winners));
     else cell.textContent = "이 직업으로 MVP 를 한 학생이 없습니다.";
@@ -3179,6 +3180,7 @@ class CharMvpRatePanel {
     const notes = el("ul", "hint");
     ["학생 계정에 쌓인 대회모드(AI 없이 치른 경기, 랜덤 매칭 포함) 기록의 합계입니다. 밸런스 패치 구분 없이 모든 기간을 더했습니다.",
      "픽 수 " + CharMvpRatePanel.MIN_PICKS + " 미만인 직업은 흐리게 표시하고 MVP율 순서에서는 맨 아래로 보냅니다(표본이 적어 비율이 크게 흔들립니다).",
+     "직업을 누르면 그 직업으로 MVP 를 한 학생이 MVP 횟수 많은 순(같으면 MVP율 높은 순)으로 나옵니다.",
      "점수가 같으면 공동 MVP 라 MVP 횟수가 판 수보다 조금 많을 수 있고, 중간에 나간 사람과 처치·어시스트가 없는 사람은 MVP 후보에서 빠집니다.",
      "기록이 남지 않는 옛 직업과 계정이 없는 경기는 포함되지 않습니다."].forEach((t) => notes.appendChild(el("li", null, t)));
     box.appendChild(notes);
