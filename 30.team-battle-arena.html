@@ -4755,7 +4755,7 @@ SinglePassMaterials.enable(THREE);
   }
   class PhantomType extends CharacterType {
     static MELEE = { color: 0xBFF5EE, spark: "#CFFAF4" };
-    static MODEL = { file: "Ranger", right: "sword_2handed", rightScale: 0.8, hide: ["Ranger_Head", "Ranger_Quiver"],
+    static MODEL = { file: "Ranger", right: "sword_2handed", rightScale: 0.8, launchPose: { clip: "Melee_1H_Attack_Slice_Horizontal", sec: 0.23, node: "handslotr" }, hide: ["Ranger_Head", "Ranger_Quiver"],
                wear: { from: "rogue", part: "RogueHooded_Head", recolor: [[1, 1, 1, "#EEF4F5", "#8FA4AE"], [2, 1, 1, "#DCE7EA", "#6F8590"], [1, 0, 1, "#141A1E", "#020304"], [0, 0, 1, "#D6E1E4", "#9DB0B6"], [0, 1, 1, "#AEBEC3", "#7A8D93"], [0, 5, 2, "#2A343C", "#10161A"], [0, 2, 1, "#3FD6C8", "#167E76"]] },
                recolor: [[0, 5, 2, "#E9F1F2", "#5B6E7A"], [1, 0, 1, "#C9F4EE", "#4E8F8C"], [0, 3, 1, "#C3D2D6", "#56676F"], [0, 7, 1, "#7C8C95", "#36434C"],
                          [0, 1, 1, "#D5E1E3", "#8C9FA5"], [2, 7, 1, "#BFC9CD", "#76838A"], [2, 3, 1, "#4A5862", "#212A31"], [1, 7, 1, "#3C4A54", "#1C242B"], [1, 1, 1, "#3C4A54", "#1C242B"],
@@ -4767,9 +4767,10 @@ SinglePassMaterials.enable(THREE);
       phStay: GameTime.gameMs(4), phBackSpeed: GameTime.gameSpeed(1000), phMinSweepMs: 40
     };
     static STATS = { name: "팬텀", role: "assassin", icon: "👻", hp: 150, speed: GameTime.gameSpeed(175), cd: GameTime.gameMs(0.7), meleeCd: GameTime.gameMs(0.7), waveCd: GameTime.gameMs(1.1),
-               dmg: 35, range: 150, arc: Math.PI * 100 / 180, throwDmg: 20, throwRange: 280, pSpeed: GameTime.gameSpeed(350), pr: 30,
+               dmg: 35, range: 150, arc: Math.PI * 100 / 180, throwDmg: 20, throwRange: 380, pSpeed: GameTime.gameSpeed(350), pr: 50,
                gust: { add: 15 / MatchRules.GAME_SPEED, ms: GameTime.gameMs(4), max: 4 }, ultName: "잔영섬", ultAim: true };
-    static SWORD_WAVE = { arc: Math.PI * 0.72, glowR: 40, glowThick: 15, coreR: 37, coreThick: 7, afterGap: 11, lead: 6 };
+    static SWORD_WAVE = { arc: Math.PI * 0.72, glowR: 60, glowThick: 19, coreR: 56, coreThick: 8, afterGap: 14, lead: 8 };
+    static WAVE_SWING = { clip: "Melee_1H_Attack_Slice_Horizontal", speed: 2.2, from: 0.17, release: 0.23 };
     static WIND_CLIP = "Melee_2H_Idle";
     static WIND_HOLD_SPEED = 0.05;
     static SWEEP_CLIP = "Melee_2H_Attack_Slice";
@@ -4839,7 +4840,7 @@ SinglePassMaterials.enable(THREE);
       if (!clip) return;
       var mix = new THREE.AnimationMixer(m); mix.clipAction(clip).play(); mix.update(0.3); m.updateMatrixWorld(true);
     }
-    attackClip(v, E, t) { return this.foeInReach(E, t) ? ["Melee_1H_Attack_Slice_Horizontal", 2.2] : ["Melee_1H_Attack_Slice_Diagonal", 2.0]; }
+    attackClip(v, E, t) { var W = PhantomType.WAVE_SWING; return this.foeInReach(E, t) ? [W.clip, W.speed] : [W.clip, W.speed, null, W.from]; }
     statDamageText(c) { return c.dmg + " / " + c.throwDmg; }
     statCooldownText(c) { var services = this.services; return services.skilltext.num(c.meleeCd / services.clock.scale / 1000) + " / " + services.skilltext.num(c.waveCd / services.clock.scale / 1000); }
     statRangeText(c) { return c.range + " / " + c.throwRange; }
@@ -8575,11 +8576,12 @@ SinglePassMaterials.enable(THREE);
     glowMat(key, color, opacity) { var services = this.services;
       return services.matlib.mats[key] || (services.matlib.mats[key] = new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: opacity, depthWrite: false, blending: THREE.AdditiveBlending }));
     }
-    aimedMuzzle(c) { var services = this.services;
+    aimedMuzzle(c) { return this.posedPoint(c, "Ranged_2H_Aiming", 0.3, "muzzle"); }
+    posedPoint(c, clipName, sec, nodeName) { var services = this.services;
       var m = SkeletonUtils.clone(services.models.kit.chars[c]), mix = new THREE.AnimationMixer(m), at = new THREE.Vector3();
-      mix.clipAction(services.models.kit.clips.Ranged_2H_Aiming).play(); mix.update(0.3);
+      mix.clipAction(services.models.kit.clips[clipName]).play(); mix.update(sec);
       m.rotation.y = Math.PI / 2; m.scale.setScalar(ModelTuning.MODEL_SCALE); m.updateMatrixWorld(true);
-      m.getObjectByName("muzzle").getWorldPosition(at);
+      m.getObjectByName(nodeName).getWorldPosition(at);
       return at;
     }
     loadKit() { var services = this.services;
@@ -8614,7 +8616,7 @@ SinglePassMaterials.enable(THREE);
           if (spec.halo) services.modelStyle.attachHalo(m, spec.halo);
           (spec.hide || []).forEach(function (part) { var o = m.getObjectByName(part); if (o) o.visible = false; });
         });
-        services.charTypes.list.forEach(function (c) { if (services.charTypes.modelOf(c).muzzle) services.models.kit.muzzle[c] = services.models.aimedMuzzle(c); });
+        services.charTypes.list.forEach(function (c) { var spec = services.charTypes.modelOf(c); if (spec.muzzle) services.models.kit.muzzle[c] = services.models.aimedMuzzle(c); else if (spec.launchPose) services.models.kit.muzzle[c] = services.models.posedPoint(c, spec.launchPose.clip, spec.launchPose.sec, spec.launchPose.node); });
         services.models.kit.ready = true; services.models.kit.failed = false;
         services.models.makePortraits();
         services.shaderWarmup.warmEffects();
@@ -11318,35 +11320,6 @@ SinglePassMaterials.enable(THREE);
   }
   class PhantomShaders {
     static TONES = { deep: 0x1F4F56, blade: 0x8FEDE2, core: 0xF2FFFD };
-    static WAKE_FRAGMENT = `
-      uniform sampler2D uTex; uniform float uHead; uniform float uFade; uniform float uSeed; uniform float uLen; uniform vec3 uDeep; uniform vec3 uBlade; uniform vec3 uCore; varying vec2 vP;
-      void main() {
-        if (vP.x > uHead) discard;
-        float n = texture2D(uTex, vec2(vP.x * uLen / 220.0 + uSeed, vP.y * 0.8 + uSeed)).g;
-        float across = 1.0 - smoothstep(0.34, 0.5, abs(vP.y) + (n - 0.5) * 0.1);
-        float streak = smoothstep(0.58, 0.85, texture2D(uTex, vec2(vP.x * uLen / 120.0 + uSeed, vP.y * 2.6 + uSeed * 0.5)).b);
-        float behind = clamp(1.0 - (uHead - vP.x) * uLen / 360.0, 0.0, 1.0);
-        vec3 color = mix(mix(uDeep, uBlade, n), uCore, behind * across * 0.45 + streak * 0.35);
-        gl_FragColor = vec4(color, across * ((0.1 + 0.36 * behind) * (0.55 + 0.45 * n) + streak * 0.22 * (0.4 + 0.6 * behind)) * uFade);
-        #include <colorspace_fragment>
-      }`;
-    static SCAR_FRAGMENT = `
-      uniform sampler2D uTex; uniform float uHead; uniform float uFade; uniform float uSeed; uniform float uLen; uniform float uWide; uniform vec3 uDeep; uniform vec3 uBlade; uniform vec3 uCore; varying vec2 vP;
-      float streak(float side, float thick, float from, float to, float wave) {
-        float along = clamp((vP.x - from) / (to - from), 0.0, 1.0), thin = thick * sin(along * 3.1416) / uWide;
-        return step(from, vP.x) * step(vP.x, to) * smoothstep(thin, thin * 0.2, abs(vP.y - side + wave));
-      }
-      void main() {
-        if (vP.x > uHead) discard;
-        float n = texture2D(uTex, vec2(vP.x * uLen / 160.0 + uSeed, vP.y * 0.6 + uSeed * 0.7)).r;
-        float wave = (n - 0.5) * 0.05, taper = sin(clamp(vP.x, 0.0, 1.0) * 3.1416);
-        float line = max(streak(0.0, 7.0, 0.0, 1.0, wave), max(streak(-0.27, 4.0, 0.08, 0.86, wave), streak(0.29, 3.5, 0.2, 0.97, -wave)));
-        float halo = smoothstep(0.5, 0.0, abs(vP.y)) * 0.16 * taper;
-        float lose = (1.0 - uFade) * 1.25 - 0.1, keep = smoothstep(lose, lose + 0.2, n);
-        vec3 color = mix(mix(uDeep, uBlade, max(line, halo)), uCore, line * 0.7);
-        gl_FragColor = vec4(color, max(line, halo) * keep * (0.35 + 0.65 * uFade));
-        #include <colorspace_fragment>
-      }`;
     static FLASH_FRAGMENT = `
       uniform float uHead; uniform float uFade; uniform vec3 uBlade; uniform vec3 uCore; varying vec2 vP;
       void main() {
@@ -11371,37 +11344,6 @@ SinglePassMaterials.enable(THREE);
         #include <colorspace_fragment>
       }`;
   }
-  class PhantomWake extends ShaderMark {
-    static HOLD_SEC = 0.25;
-    static WIDE = 0.9;
-    constructor(d, scale) { super(d.createdAt); this.d = d; this.travelSec = d.ph.ms / scale / 1000; }
-    get partName() { return "wake"; }
-    get lifeSec() { return this.travelSec + PhantomWake.HOLD_SEC; }
-    place(vis) { var d = this.d, length = d.len + ArenaSize.BODY_R;
-      vis.group.position.set(d.x, 4, d.y); vis.group.rotation.y = -d.angle;
-      vis.wake.scale.set(length, 1, d.width * PhantomWake.WIDE); vis.uniforms.uLen.value = length;
-    }
-    paint(vis, sec) { vis.uniforms.uHead.value = Math.min(1, sec / this.travelSec); vis.uniforms.uFade.value = MathKit.clamp((this.lifeSec - sec) / PhantomWake.HOLD_SEC, 0, 1); }
-  }
-  class PhantomScar extends ShaderMark {
-    static DELAY_SEC = 0.1;
-    static DRAW_SEC = 0.08;
-    static HOLD_SEC = 1;
-    static MIST_SEC = 0.55;
-    static WIDE = 0.8;
-    constructor(d, scale) { super(d.createdAt + d.ph.ms + PhantomScar.DELAY_SEC * 1000 * scale); this.d = d; }
-    get partName() { return "scar"; }
-    get lifeSec() { return PhantomScar.DRAW_SEC + PhantomScar.HOLD_SEC + PhantomScar.MIST_SEC; }
-    place(vis) { var d = this.d, length = d.len + ArenaSize.BODY_R;
-      vis.group.position.set(d.x, 1.6, d.y); vis.group.rotation.y = -d.angle;
-      var width = d.width * PhantomScar.WIDE;
-      vis.scar.scale.set(length, 1, width); vis.uniforms.uLen.value = length; vis.uniforms.uWide.value = width;
-    }
-    paint(vis, sec) { var S = PhantomScar;
-      vis.uniforms.uHead.value = Math.min(1, sec / S.DRAW_SEC);
-      vis.uniforms.uFade.value = 1 - MathKit.clamp((sec - S.DRAW_SEC - S.HOLD_SEC) / S.MIST_SEC, 0, 1);
-    }
-  }
   class PhantomFlash extends ShaderMark {
     static SIZE = 38;
     static LIFE_SEC = 0.28;
@@ -11413,15 +11355,13 @@ SinglePassMaterials.enable(THREE);
   }
   class PhantomSlashView extends ShaderMarkView {
     get fieldName() { return "phantomSlashes"; }
-    get partSpecs() { var S = PhantomShaders; return { wake: { shape: "line", fragment: S.WAKE_FRAGMENT }, scar: { shape: "line", fragment: S.SCAR_FRAGMENT }, flash: { shape: "flat", fragment: S.FLASH_FRAGMENT } }; }
+    get partSpecs() { var S = PhantomShaders; return { flash: { shape: "flat", fragment: S.FLASH_FRAGMENT } }; }
     buildVis() { var vis = super.buildVis(), T = PhantomShaders.TONES;
       vis.uniforms.uDeep.value.set(T.deep); vis.uniforms.uBlade.value.set(T.blade); vis.uniforms.uCore.value.set(T.core);
       return vis;
     }
     warmSample() { var vis = this.warmVis(); vis.parts.forEach(function (part) { part.visible = true; }); return vis.group; }
     sweep(d, flashes) { var services = this.services, scale = services.clock.scale, view = this;
-      this.add(new PhantomWake(d, scale));
-      this.add(new PhantomScar(d, scale));
       flashes.forEach(function (f) { view.add(new PhantomFlash(f.x, f.y, f.at)); });
     }
   }
@@ -11503,7 +11443,6 @@ SinglePassMaterials.enable(THREE);
     static BACK_SLACK_MS = 900;
     static TETHER_IN_SEC = 0.3;
     static ECHO_MIST_MS = 110;
-    static TRAIL_MIST_MS = 40;
     constructor(services) { this.services = services; this.free = []; this.live = new Set(); this.mist = new PhantomMist(services); this.mistAt = {}; }
     get casts() { return this.services.field.phantomCasts; }
     set casts(list) { this.services.field.phantomCasts = list; }
@@ -11592,11 +11531,6 @@ SinglePassMaterials.enable(THREE);
         if (r.endAt && !r.burst) { r.burst = true; for (var i = 0; i < 6; i++) view.mist.emit(r.e.x, r.e.y, 10 + i * 8, 16, 40, 700, 0.4, nowMs + i); }
       });
       this.live.forEach(function (vis) { if (!used.has(vis)) { if (vis.group.parent) vis.group.parent.remove(vis.group); view.live.delete(vis); view.free.push(vis); } });
-      services.targets.participants().forEach(function (id) {
-        var E = services.targets.ent(id), v = services.fighterView.fighters[id];
-        if (!E || !E.alive || E.char !== "phantom" || !v || !v.root.visible) return;
-        if (view.isReturning(E, t) && view.puffEvery("trail" + id, nowMs, PhantomView.TRAIL_MIST_MS)) view.mist.emit(E.x, E.y, 30, 14, 20, 600, 0.45, nowMs);
-      });
       this.mist.update(nowMs);
     }
   }
