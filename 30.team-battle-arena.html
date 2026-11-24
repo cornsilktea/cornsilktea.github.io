@@ -3513,7 +3513,7 @@ SinglePassMaterials.enable(THREE);
       E.skillDur = StormbowType.ULT.ocDur;
       E.cdUntil = Math.min(E.cdUntil, t + StormbowType.STATS.cd / StormbowType.ULT.ocRate);
       services.session.room.ref.child("meleeHits").push({ team: E.team, owner: E.id, x: MathKit.r1(E.x), y: MathKit.r1(E.y), angle: MathKit.r1(E.angle), radius: StormbowType.ULT.ocR, arc: Math.PI * 2,
-                                        dmg: StormbowType.ULT.ocDmg, u: 1, slam: 1, zap: 1, fx: { stunMs: StormbowType.ULT.ocStunMs }, createdAt: t });
+                                        dmg: StormbowType.ULT.ocDmg, u: 1, slam: 1, zap: 1, thruWall: 1, fx: { stunMs: StormbowType.ULT.ocStunMs }, createdAt: t });
       services.vision.revealBriefly(E.id, t);
     }
     ultDesc() { var services = this.services;
@@ -7121,7 +7121,7 @@ SinglePassMaterials.enable(THREE);
       var br = T.hitR;
       return along >= -br && along <= d.len + br && Math.abs(side) <= d.width / 2 + br;
     }
-    inStrike(T, d) { var services = this.services; return d.lanes ? TsunamiLanes.hits(T, d, services.melee.waveFront(d, services.clock.now(), MarinaType.WAVE.travel)) : d.stab ? !!d.tgt && T.id === d.tgt : d.len ? services.melee.inLine(T, d) : services.melee.inArc(T, d) && services.physics.losClear(d.x, d.y, T.x, T.y); }
+    inStrike(T, d) { var services = this.services; return d.lanes ? TsunamiLanes.hits(T, d, services.melee.waveFront(d, services.clock.now(), MarinaType.WAVE.travel)) : d.stab ? !!d.tgt && T.id === d.tgt : d.len ? services.melee.inLine(T, d) : services.melee.inArc(T, d) && (!!d.thruWall || services.physics.losClear(d.x, d.y, T.x, T.y)); }
     lineReach(x, y, ang, len) { var services = this.services; return Math.min(len, services.physics.rayObst(x, y, Math.cos(ang), Math.sin(ang), 2) + ArenaSize.BODY_R); }
     onMelee(key, d) { var services = this.services;
       if (!d) return;
@@ -7339,7 +7339,7 @@ SinglePassMaterials.enable(THREE);
       if (!E.alive) return;
       E.atkAt = t; E.ultUntil = t + 500;
       services.session.room.ref.child("meleeHits").push({ team: E.team, owner: E.id, x: MathKit.r1(E.x), y: MathKit.r1(E.y), angle: MathKit.r1(E.angle), radius: KnightType.ULT.tkStunR, arc: Math.PI * 2,
-                                        dmg: 0, u: 1, slam: 1, fx: { stunMs: KnightType.ULT.tkStunMs }, createdAt: t });
+                                        dmg: 0, u: 1, slam: 1, thruWall: 1, fx: { stunMs: KnightType.ULT.tkStunMs }, createdAt: t });
       services.vision.revealBriefly(E.id, t);
       services.match.game.forceNet = true;
     }
@@ -7359,7 +7359,7 @@ SinglePassMaterials.enable(THREE);
       services.physics.resolve(E);
       if (E.type.onLeapLand(E, t)) return;
       services.session.room.ref.child("meleeHits").push({ team: E.team, owner: E.id, x: MathKit.r1(E.x), y: MathKit.r1(E.y), angle: MathKit.r1(E.angle), radius: BlacksmithType.ULT.bsR, arc: Math.PI * 2,
-                                        dmg: BlacksmithType.ULT.bsDmg, u: 1, slam: 1, hammer: 1, fx: { stunMs: BlacksmithType.ULT.bsStunMs }, createdAt: t });
+                                        dmg: BlacksmithType.ULT.bsDmg, u: 1, slam: 1, hammer: 1, thruWall: 1, fx: { stunMs: BlacksmithType.ULT.bsStunMs }, createdAt: t });
       services.vision.revealBriefly(E.id, t);
       services.match.game.forceNet = true;
     }

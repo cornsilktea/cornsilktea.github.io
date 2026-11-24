@@ -5121,6 +5121,42 @@ class ResultCollector {
   new DraggedChainTests(api, { run: run }).register();
   new BannerBearerTests(api, { world: world, run: run, recordRef: recordRef }).register();
   new MarinaTests(api, { world: world, run: run }).register();
+  run(MOVE, "벽 너머: 대장장이 착지·기사 방어태세 기절·뇌전사수 과충전은 벽 너머 반경 안 적도 맞히고, 수문장 창벽·자객 회전베기·해골 공격은 벽에 막히는가", function (done) {
+    var bad = [], shown = [], q = null, map = null;
+    api.MAP_IDS.some(function (m) { api.loadMapData(m); q = singleRowWall(); map = m; return !!q; });
+    if (!q) { done("fail", "한 줄짜리 벽을 찾지 못함"); return; }
+    var R = api.BODY_R, below = q.y + q.h / 2 + R + 2, above = q.y - q.h / 2 - R - 2;
+    function grab(char, prep) {
+      var W = world("practice", [{ id: "me", team: "blue", char: char, x: 450, y: 340, gauge: api.GAUGE_MAX }, { id: "dummy", team: "red", char: "guardian", x: 1400, y: 340 }]), E = W.ent("me"), n = W.log.length;
+      prep(W, E);
+      var hit = W.log.slice(n).filter(function (p) { return p.path === "meleeHits" && p.v.owner === "me" && p.v.arc && p.v.radius && p.v.u; })[0];
+      return hit && hit.v;
+    }
+    var thru = {
+      "대장장이 착지": grab("blacksmith", function (W, E) { api.useUlt(E, 0, 200); W.step(api.ULT.bsLeapMaxMs + 200); }),
+      "기사 방어태세 기절": grab("knight", function (W, E) { api.useUlt(E, 0); W.step(api.ULT.tkDur + 200); }),
+      "뇌전사수 과충전": grab("stormbow", function (W, E) { api.useUlt(E, 0); W.step(100); })
+    };
+    var walled = {
+      "수문장 창벽": grab("guardian", function (W, E) { api.useUlt(E, 0); W.step(100); }),
+      "자객 회전베기": { team: "blue", owner: "me", x: 0, y: 0, angle: 0, radius: 120, arc: Math.PI * 2, dmg: 30 },
+      "해골 공격": { team: "blue", owner: "me", m: 1, mi: 0, x: 0, y: 0, angle: -Math.PI / 2, radius: 120, arc: Math.PI * 2, dmg: 20 }
+    };
+    function tryHit(name, d, wantHit) {
+      if (!d) { bad.push(name + " 판정 자료를 못 받음"); return; }
+      var W = world(map, [{ id: "me", team: "blue", char: "guardian", x: q.x, y: below }, { id: "foe", team: "red", char: "guardian", x: q.x, y: above }]), T = W.ent("foe");
+      var dd = Object.assign({}, d, { team: "blue", owner: "me", x: q.x, y: below, createdAt: W.t() });
+      if (hyp(T.x - dd.x, T.y - dd.y) > dd.radius) { bad.push(name + " 반경 " + dd.radius + " 이 벽 두께보다 작음"); return; }
+      api.onMelee("wall-" + name, dd); W.step(300);
+      var hit = T.hp < T.maxHp || T.stunUntil > W.t();
+      if (hit !== wantHit) bad.push(name + (wantHit ? " 이 벽 너머 적을 못 맞힘" : " 이 벽 너머 적을 맞힘"));
+      if (wantHit && !d.thruWall) bad.push(name + " 에 thruWall 표시 없음");
+      shown.push(name + (hit ? " 맞음" : " 막힘"));
+    }
+    Object.keys(thru).forEach(function (k) { tryHit(k, thru[k], true); });
+    Object.keys(walled).forEach(function (k) { tryHit(k, walled[k], false); });
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : map + " 맵 한 줄 벽: " + shown.join(" · "));
+  });
   new PhantomTests(api, { world: world, run: run, FRAME: FRAME }).register();
   run(AUTO, "AI 6명 60초 난전 — 강 맵 + 팬텀 고정 (시드 2044)", function (done) {
     var r = autoMelee("river", 60, 2044, "phantom"), kinds = Object.keys(r.issues);
