@@ -5210,6 +5210,7 @@ class ResultCollector {
   new AstrologerTests(api, { world: world, run: run, OPEN_Y: OPEN_Y, FRAME: FRAME }).register();
   new MinionSkillTests(api, { world: world, run: run, OPEN_Y: OPEN_Y, FRAME: FRAME }).register();
   new RangerGaugeTests(api, { world: world, run: run, OPEN_Y: OPEN_Y }).register();
+  new AimGuideReachTests(api, { world: world, run: run, OPEN_Y: OPEN_Y, FRAME: FRAME }).register();
   new AccountStatsTests(api, { run: run, runAsync: runAsync }).register();
   results.pending = Promise.resolve().then(function () { api.finish(api.currentMap()); }).then(drainAsync);
   return results;
@@ -8666,6 +8667,58 @@ class MinionSkillTests {
     run(G, "결투가 능력치 표: 사거리에 돌진 거리 " + api.CHARS.duelist.dashRange + " 가 적히는가", function (done) {
       var html = api.statTable("duelist"), want = "<th>사거리</th><td>" + api.CHARS.duelist.dashRange + "</td>";
       done(html.indexOf(want) < 0 ? "fail" : "pass", html.indexOf(want) < 0 ? "표에 " + want + " 없음" : "사거리 " + api.CHARS.duelist.dashRange);
+    });
+  }
+}
+
+class AimGuideReachTests {
+  static GROUP = "스킬 조준 범위";
+  static EDGE = 4;
+  constructor(api, kit) { this.api = api; this.kit = kit; }
+  hurtOrMoved(E, x, y) { return E.hp < E.maxHp || Math.hypot(E.x - x, E.y - y) > 2; }
+  trial(c, d) {
+    var api = this.api, y = this.kit.OPEN_Y.forest, foe = c.place(d, y), team = c.ally ? "blue" : "red";
+    var W = this.kit.world("forest", [{ id: "me", team: "blue", char: c.char, x: 200, y: y, gauge: api.GAUGE_MAX }, { id: "t", team: team, char: "guardian", x: foe.x, y: foe.y }]), T = W.ent("t");
+    if (c.ally) T.hp = T.maxHp - 200;
+    var hp0 = T.hp;
+    api.useUlt(W.ent("me"), 0, c.reach); W.step(c.ms);
+    return c.ally ? T.hp > hp0 : this.hurtOrMoved(T, foe.x, foe.y);
+  }
+  cases() {
+    var api = this.api, U = api.ULT, R = api.BODY_R, half = R / 2, round = function (r) { return function (d, y) { return { x: 400, y: y + d }; }; };
+    return [
+      { name: "화염술사 메테오", char: "mage", reach: 200, ms: 3000, edge: U.mbR + R, place: round() },
+      { name: "대장장이 내려찍기", char: "blacksmith", reach: 200, ms: 3000, edge: U.bsR + R, place: round() },
+      { name: "투척병 독안개", char: "thrower", reach: 200, ms: 3000, edge: U.fgR + half, place: round() },
+      { name: "사제 블랙홀", char: "priest", reach: 200, ms: U.bhDelay + 1500, edge: U.bhR + half, place: round() },
+      { name: "점성술사 블랙홀", char: "astrologer", reach: 200, ms: 2000, edge: U.agR + half, place: round() },
+      { name: "가르강튀아 블랙홀", char: "gargantua", reach: 200, ms: 3000, edge: U.gaR + half, place: round() },
+      { name: "창술사 창 찌르기(옆)", char: "lancer", reach: 200, ms: U.lnWind + 600, edge: U.lnW / 2 + R, place: function (d, y) { return { x: 380, y: y + d }; } },
+      { name: "방패병 밀어내기(옆)", char: "shielder", reach: 200, ms: 1200, edge: U.sgWidth / 2 + R, place: function (d, y) { return { x: 300, y: y + d }; } },
+      { name: "방패병 밀어내기(앞)", char: "shielder", reach: 200, ms: 1200, edge: U.sgPushLen + R, place: function (d, y) { return { x: 200 + d, y: y }; } },
+      { name: "저격수 거대 화살(옆)", char: "sniper", reach: 200, ms: 1500, edge: U.pnPr + R, place: function (d, y) { return { x: 600, y: y + d }; } }
+    ];
+  }
+  register() {
+    var self = this, api = this.api, run = this.kit.run, G = AimGuideReachTests.GROUP, E = AimGuideReachTests.EDGE;
+    this.cases().forEach(function (c) {
+      run(G, c.name + ": 빨간 조준 범위 가장자리(" + c.edge + ") 바로 안쪽은 맞고 바로 바깥은 안 맞는가", function (done) {
+        var bad = [];
+        if (!self.trial(c, c.edge - E)) bad.push("안쪽 " + (c.edge - E) + " 이 안 맞음");
+        if (self.trial(c, c.edge + E)) bad.push("바깥 " + (c.edge + E) + " 이 맞음");
+        done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "경계 " + c.edge + " ±" + E);
+      });
+    });
+    run(G, "드루이드 부쉬: 빨간 정사각형 안 모서리의 아군은 회복하고 바로 바깥은 회복하지 않는가", function (done) {
+      var bad = [], h = api.ULT.drR, y = self.kit.OPEN_Y.forest;
+      var probe = api.useUlt && self.kit.world("forest", [{ id: "me", team: "blue", char: "druid", x: 200, y: y, gauge: api.GAUGE_MAX }]);
+      api.useUlt(probe.ent("me"), 0, 200); probe.frame(self.kit.FRAME);
+      var g = api.FIELD.groves[0].e, cx = g.x, cy = g.y;
+      var at = function (dx, dy) { return { name: "", char: "druid", reach: 200, ms: 1500, ally: true, place: function () { return { x: cx + dx, y: cy + dy }; } }; };
+      if (!self.trial(at(h - E, h - E), 0)) bad.push("안 모서리 아군이 회복 안 됨");
+      if (self.trial(at(h + E, 0), 0)) bad.push("오른쪽 바깥 아군이 회복됨");
+      if (self.trial(at(0, -h - E), 0)) bad.push("위쪽 바깥 아군이 회복됨");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "부쉬 중심 (" + cx + ", " + cy + ") 한 변 " + h * 2);
     });
   }
 }

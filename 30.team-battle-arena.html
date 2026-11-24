@@ -2632,7 +2632,7 @@ SinglePassMaterials.enable(THREE);
     renderMarkers(v, E, t, nowMs) {}
     locksFacing(E, t) { return false; }
     showAimGuide(E, ult, c) { return false; }
-    ultAimShot() { return { len: RangerType.ULT.mkRange, halfWidth: 12 }; }
+    ultAimShot() { return { len: RangerType.ULT.mkRange, pr: RangerType.ULT.mkPr }; }
     skillShotSpec() { return { count: RangerType.ULT.mkCount, gap: RangerType.ULT.mkGap, sp: RangerType.ULT.mkSpeed, dmg: RangerType.ULT.mkDmg, pr: RangerType.ULT.mkPr, range: RangerType.ULT.mkRange, ultKey: "volley" }; }
     statDamageText(c) { return null; }
     statSkillDamage(c) { return null; }
@@ -2836,7 +2836,7 @@ SinglePassMaterials.enable(THREE);
     static STATS = { name: "화염술사", role: "caster", icon: "🔥", hp: 115, speed: GameTime.gameSpeed(170), cd: GameTime.gameMs(1.4), dmg: 5, range: 350, pSpeed: 1000, pr: 9, burn: { ms: GameTime.gameMs(6), maxHpRate: 0.025 }, ultName: "메테오", ultAim: true };
     showAimGuide(E, ult, c) { var services = this.services;
       if (!ult) return false;
-      services.aimGuide.showAimCircle(services.input.aimReach(E, "ult"), MageType.ULT.mbR);
+      services.aimGuide.showAimArea(E, this.skillSpot(E, E.angle, services.input.aimReach(E, "ult")), MageType.ULT.mbR + AimGuide.EDGE_HIT);
       return true;
     }
     afterDealtDamage(T, owner, ultKey, t) { var services = this.services; if (ultKey !== "burn") services.status.igniteBurn(T, owner, t); }
@@ -2856,8 +2856,9 @@ SinglePassMaterials.enable(THREE);
     playSkillClip(v, E, t) { var services = this.services; services.fighterMotion.playOnce(v, "Ranged_Magic_Spellcasting_Long", 2.6, t); }
     get shotName() { return "불꽃 구슬"; }
     get startsSkillTimer() { return true; }
+    skillSpot(E, ang, reach) { return this.services.attack.burstSpot(E, ang, reach); }
     cast(E, ang, reach, t) { var services = this.services;
-      var spot = services.attack.burstSpot(E, ang, reach);
+      var spot = this.skillSpot(E, ang, reach);
       E.angle = Math.atan2(spot.y - E.y, spot.x - E.x);
       E.ultUntil = t + 450;
       E.skillDur = MageType.ULT.mbDelay;
@@ -2959,7 +2960,7 @@ SinglePassMaterials.enable(THREE);
     };
     static STATS = { name: "저격수", role: "shooter", icon: "🎯", hp: 100, speed: GameTime.gameSpeed(130), cd: GameTime.gameMs(1), dmg: 37, range: 600, pSpeed: 800, pr: 12, farDist: 500, farBonus: 0.5, ultName: "거대 화살", ultAim: true };
     get idleClip() { return "Ranged_2H_Aiming"; }
-    ultAimShot() { return { len: SniperType.ULT.pnRange, halfWidth: 22 }; }
+    ultAimShot() { return { len: SniperType.ULT.pnRange, pr: SniperType.ULT.pnPr }; }
     skillShotSpec() { return { count: 1, gap: 0, sp: SniperType.ULT.pnSpeed, dmg: SniperType.ULT.pnDmg, pr: SniperType.ULT.pnPr, range: SniperType.ULT.pnRange, ultKey: "giant" }; }
     onHitLate(owner, h) { if (h.u === "giant") owner.gauge = Math.min(MatchRules.GAUGE_MAX, owner.gauge + SniperType.ULT.pnRefund); }
     ultLeadSeconds(dist) { return dist / SniperType.ULT.pnSpeed; }
@@ -3001,7 +3002,8 @@ SinglePassMaterials.enable(THREE);
       fgR: 150, fgDur: GameTime.gameMs(6), fgDmg: 15, fgHeal: 5, fgSlowMul: 0.6, fgSlowMs: 400, fgCast: ArenaSize.KEY * 4 + 100, fgRefund: 1
     };
     static STATS = { name: "투척병", role: "shooter", icon: "🧪", hp: 120, speed: GameTime.gameSpeed(145), cd: GameTime.gameMs(1.4), dmg: 15, ticks: 3, range: ArenaSize.KEY * 4 + 120, minRange: ArenaSize.KEY * 1, poison: { ms: GameTime.gameMs(4), maxHpRate: 0.01 }, ultName: "독안개", ultAim: true, heals: true };
-    showAimGuide(E, ult, c) { var services = this.services; services.aimGuide.showAimCircle(services.input.aimReach(E, services.input.aim.btn), ult ? ThrowerType.ULT.fgR : ThrowerType.ULT.plR); return true; }
+    showAimGuide(E, ult, c) { var services = this.services; services.aimGuide.showAimArea(E, this.potionSpot(E, E.angle, services.input.aimReach(E, services.input.aim.btn), ult), (ult ? ThrowerType.ULT.fgR : ThrowerType.ULT.plR) + AimGuide.HALF_IN); return true; }
+    potionSpot(E, ang, reach, ult) { return this.services.attack.burstSpot(E, ang, reach, ult ? ThrowerType.ULT.fgCast : ThrowerType.STATS.range, ThrowerType.STATS.minRange); }
     aimRange(btn) { return [ThrowerType.STATS.minRange, btn === "ult" ? ThrowerType.ULT.fgCast : ThrowerType.STATS.range]; }
     overrideBasic(E, ang, reach, t) { var services = this.services; services.fieldFx.throwPoison(E, ang, reach, false); return true; }
     afterDealtDamage(T, owner, ultKey, t) { var services = this.services; if (ultKey !== "poison") services.status.infectPoison(T, owner, t); }
@@ -3118,7 +3120,7 @@ SinglePassMaterials.enable(THREE);
     isRooted(E, t) { return this.isHammerLeaping(E, t); }
     showAimGuide(E, ult, c) { var services = this.services;
       if (!ult) return false;
-      services.aimGuide.showAimCircle(services.input.aimReach(E, "ult"), BlacksmithType.ULT.bsR);
+      services.aimGuide.showAimArea(E, this.skillSpot(E, E.angle, services.input.aimReach(E, "ult")), BlacksmithType.ULT.bsR + AimGuide.EDGE_HIT);
       return true;
     }
     aimRange(btn) { return [BlacksmithType.ULT.bsMin, BlacksmithType.ULT.bsCast]; }
@@ -3126,9 +3128,9 @@ SinglePassMaterials.enable(THREE);
     botUltSpot(B, target, td, t) { var services = this.services; return services.brain.leadSpot(target, services.dashMoves.hammerLeapMs(td) / 1000, t); }
     get hasSkillClip() { return true; }
     playSkillClip(v, E, t) { var services = this.services; services.fighterMotion.playOnce(v, "Melee_1H_Attack_Jump_Chop", ModelTuning.JUMP_CHOP_LAND_SEC * 1000 / Math.max(1, E.ultUntil - (E.leapAt || t)), t); }
+    skillSpot(E, ang, reach) { var services = this.services, landing = services.attack.burstSpot(E, ang, reach, BlacksmithType.ULT.bsCast, BlacksmithType.ULT.bsMin); services.physics.resolve(landing); return landing; }
     cast(E, ang, reach, t) { var services = this.services;
-      var landing = services.attack.burstSpot(E, ang, reach, BlacksmithType.ULT.bsCast, BlacksmithType.ULT.bsMin);
-      services.physics.resolve(landing);
+      var landing = this.skillSpot(E, ang, reach);
       E.angle = Math.atan2(landing.y - E.y, landing.x - E.x);
       var leapMs = services.dashMoves.hammerLeapMs(MathKit.hyp(landing.x - E.x, landing.y - E.y));
       E.leapAt = t;
@@ -3164,7 +3166,7 @@ SinglePassMaterials.enable(THREE);
     get hasSkillClip() { return true; }
     playSkillClip(v, E, t) { var services = this.services; services.fighterMotion.playOnce(v, "Ranged_Magic_Spellcasting_Long", 2.6, t); }
     cast(E, ang, reach, t) { var services = this.services;
-      var holeSpot = services.attack.burstSpot(E, ang, reach, PriestType.ULT.bhCast, PriestType.ULT.bhMin);
+      var holeSpot = this.skillSpot(E, ang, reach);
       E.angle = Math.atan2(holeSpot.y - E.y, holeSpot.x - E.x);
       E.ultUntil = t + 450;
       E.skillDur = PriestType.ULT.bhDelay + PriestType.ULT.bhDur;
@@ -3173,10 +3175,11 @@ SinglePassMaterials.enable(THREE);
       services.vision.revealBriefly(E.id, t);
     }
     aimRange(btn) { return [PriestType.ULT.bhMin, PriestType.ULT.bhCast]; }
+    skillSpot(E, ang, reach) { return this.services.attack.burstSpot(E, ang, reach, PriestType.ULT.bhCast, PriestType.ULT.bhMin); }
     botUltRange() { return PriestType.ULT.bhCast; }
     showAimGuide(E, ult, c) { var services = this.services;
       if (!ult) return false;
-      services.aimGuide.showAimCircle(services.input.aimReach(E, "ult"), PriestType.ULT.bhR);
+      services.aimGuide.showAimArea(E, this.skillSpot(E, E.angle, services.input.aimReach(E, "ult")), PriestType.ULT.bhR + AimGuide.HALF_IN);
       return true;
     }
     ultDesc() { var services = this.services;
@@ -3301,7 +3304,7 @@ SinglePassMaterials.enable(THREE);
     showAimGuide(E, ult, c) { var services = this.services;
       if (ult) {
         var ex = Math.cos(E.angle), ey = Math.sin(E.angle), el = services.physics.rayCast(E.x + ex * 20, E.y + ey * 20, ex, ey, HitmanType.ULT.exRange, HitmanType.ULT.exPr) + 20;
-        services.aimGuide.showAimStrip(18, Math.max(1, el - 18), 18);
+        services.aimGuide.showShotLine(el, HitmanType.ULT.exRange + 20, HitmanType.ULT.exPr);
       } else services.aimGuide.showAimStrip(0, services.dashMoves.dashReach(E, E.angle, c.dashRange) + ArenaSize.BODY_R, c.dashWidth);
       return true;
     }
@@ -3601,18 +3604,18 @@ SinglePassMaterials.enable(THREE);
     aimRange(btn) { return [DruidType.ULT.drMin, DruidType.ULT.drCast]; }
     showAimGuide(E, ult, c) { var services = this.services;
       if (!ult) return false;
-      services.aimGuide.showAimCircle(services.input.aimReach(E, "ult"), DruidType.ULT.drR * 1.15);
+      services.aimGuide.showAimSquare(E, this.skillSpot(E, E.angle, services.input.aimReach(E, "ult")), DruidType.ULT.drR);
       return true;
     }
     ultSpotTooFar(reach) { return reach > DruidType.ULT.drCast; }
+    skillSpot(E, ang, reach) { var services = this.services; return services.groves.snapToTiles(reach == null ? { x: E.x, y: E.y } : services.attack.burstSpot(E, ang, reach, DruidType.ULT.drCast, DruidType.ULT.drMin)); }
     botUltRange() { return DruidType.ULT.drCast; }
     botUltSpot(B, target, td, t) { return { x: B.x, y: B.y }; }
     get hasSkillClip() { return true; }
     playSkillClip(v, E, t) { var services = this.services; services.fighterMotion.playOnce(v, "Ranged_Magic_Summon", 2.4, t); }
     skillGlow(E, t) { return E.ultUntil > t ? 0x1E4A12 : 0; }
     cast(E, ang, reach, t) { var services = this.services;
-      var spot = reach == null ? { x: E.x, y: E.y } : services.attack.burstSpot(E, ang, reach, DruidType.ULT.drCast, DruidType.ULT.drMin);
-      spot = services.groves.snapToTiles(spot);
+      var spot = this.skillSpot(E, ang, reach);
       E.angle = Math.atan2(spot.y - E.y, spot.x - E.x) || E.angle;
       E.ultUntil = t + DruidType.ULT.drCastMs;
       E.skillDur = DruidType.ULT.drDur;
@@ -3652,14 +3655,14 @@ SinglePassMaterials.enable(THREE);
     aimRange(btn) { return [GargantuaType.ULT.gaMin, GargantuaType.ULT.gaCast]; }
     showAimGuide(E, ult, c) { var services = this.services;
       if (!ult) return false;
-      services.aimGuide.showAimCircle(services.input.aimReach(E, "ult"), GargantuaType.ULT.gaR);
+      services.aimGuide.showAimArea(E, this.skillSpot(E, E.angle, services.input.aimReach(E, "ult")), GargantuaType.ULT.gaR + AimGuide.HALF_IN);
       return true;
     }
     botUltRange() { return GargantuaType.ULT.gaCast; }
     botUltSpot(B, target, td, t) { var services = this.services; return services.brain.leadSpot(target, services.dashMoves.hammerLeapMs(td) / 1000, t); }
+    skillSpot(E, ang, reach) { var services = this.services, landing = services.attack.burstSpot(E, ang, reach, GargantuaType.ULT.gaCast, GargantuaType.ULT.gaMin); services.physics.resolve(landing); return landing; }
     cast(E, ang, reach, t) { var services = this.services;
-      var landing = services.attack.burstSpot(E, ang, reach, GargantuaType.ULT.gaCast, GargantuaType.ULT.gaMin);
-      services.physics.resolve(landing);
+      var landing = this.skillSpot(E, ang, reach);
       E.angle = Math.atan2(landing.y - E.y, landing.x - E.x);
       var leapMs = services.dashMoves.hammerLeapMs(MathKit.hyp(landing.x - E.x, landing.y - E.y));
       E.leapAt = t;
@@ -3694,14 +3697,17 @@ SinglePassMaterials.enable(THREE);
     cannotAttack(E, t) { return false; }
     aimRange(btn) { return btn === "ult" ? [AstrologerType.ULT.agMin, AstrologerType.ULT.agCast] : [AstrologerType.ULT.sfMin, this.data.range]; }
     showAimGuide(E, ult, c) { var services = this.services;
-      services.aimGuide.showAimCircle(services.input.aimReach(E, services.input.aim.btn), ult ? AstrologerType.ULT.agR : AstrologerType.ULT.sfR);
+      var reach = services.input.aimReach(E, services.input.aim.btn);
+      services.aimGuide.showAimArea(E, ult ? this.skillSpot(E, E.angle, reach) : this.starSpot(E, E.angle, reach), (ult ? AstrologerType.ULT.agR : AstrologerType.ULT.sfR) + AimGuide.HALF_IN);
       return true;
     }
     botUltRange() { return AstrologerType.ULT.agCast; }
+    skillSpot(E, ang, reach) { return this.services.attack.burstSpot(E, ang, reach, AstrologerType.ULT.agCast, AstrologerType.ULT.agMin); }
+    starSpot(E, ang, reach) { return this.services.attack.burstSpot(E, ang, reach, AstrologerType.STATS.range, AstrologerType.ULT.sfMin); }
     botUltSpot(B, target, td, t) { var services = this.services; return services.brain.ultAimSpot(B, target, td, t); }
     overrideBasic(E, ang, reach, t) { var services = this.services; services.starfall.fall(E, ang, reach, t); return true; }
     cast(E, ang, reach, t) { var services = this.services;
-      var spot = services.attack.burstSpot(E, ang, reach, AstrologerType.ULT.agCast, AstrologerType.ULT.agMin);
+      var spot = this.skillSpot(E, ang, reach);
       E.angle = Math.atan2(spot.y - E.y, spot.x - E.x);
       E.ultUntil = t + 450;
       E.skillDur = AstrologerType.ULT.agDur;
@@ -3747,7 +3753,7 @@ SinglePassMaterials.enable(THREE);
     aimRange(btn) { return [GiantType.ULT.gjMin, GiantType.ULT.gjCast]; }
     showAimGuide(E, ult, c) { var services = this.services;
       if (!ult) return false;
-      services.aimGuide.showAimCircle(services.input.aimReach(E, "ult"), GiantType.ULT.gjR);
+      services.aimGuide.showAimArea(E, this.skillSpot(E, E.angle, services.input.aimReach(E, "ult")), GiantType.ULT.gjR + AimGuide.HALF_IN);
       return true;
     }
     botUltRange() { return GiantType.ULT.gjCast; }
@@ -3759,9 +3765,9 @@ SinglePassMaterials.enable(THREE);
       services.giant.mace(E, T, t);
       return true;
     }
+    skillSpot(E, ang, reach) { var services = this.services, landing = services.attack.burstSpot(E, ang, reach, GiantType.ULT.gjCast, GiantType.ULT.gjMin); services.physics.resolve(landing); return landing; }
     cast(E, ang, reach, t) { var services = this.services;
-      var landing = services.attack.burstSpot(E, ang, reach, GiantType.ULT.gjCast, GiantType.ULT.gjMin);
-      services.physics.resolve(landing);
+      var landing = this.skillSpot(E, ang, reach);
       E.angle = Math.atan2(landing.y - E.y, landing.x - E.x);
       var leapMs = services.dashMoves.hammerLeapMs(MathKit.hyp(landing.x - E.x, landing.y - E.y));
       E.leapAt = t;
@@ -3815,10 +3821,10 @@ SinglePassMaterials.enable(THREE);
     showAimGuide(E, ult, c) { var services = this.services;
       if (!ult) return false;
       var dx = Math.cos(E.angle), dy = Math.sin(E.angle), len = services.physics.rayCast(E.x + dx * WraithType.CHAIN_MUZZLE, E.y + dy * WraithType.CHAIN_MUZZLE, dx, dy, WraithType.ULT.hkRange - WraithType.CHAIN_MUZZLE, WraithType.ULT.hkPr) + WraithType.CHAIN_MUZZLE;
-      services.aimGuide.showAimStrip(18, Math.max(1, len - 18), WraithType.ULT.hkPr * 2);
+      services.aimGuide.showShotLine(len, WraithType.ULT.hkRange, WraithType.ULT.hkPr);
       return true;
     }
-    ultAimShot() { return { len: WraithType.ULT.hkRange, halfWidth: WraithType.ULT.hkPr }; }
+    ultAimShot() { return { len: WraithType.ULT.hkRange, pr: WraithType.ULT.hkPr }; }
     skillShotSpec() { return { count: 1, gap: 0, sp: WraithType.ULT.hkSpeed, dmg: WraithType.ULT.hkDmg, pr: WraithType.ULT.hkPr, range: WraithType.ULT.hkRange - WraithType.CHAIN_MUZZLE, ultKey: "hook" }; }
     ultLeadSeconds(dist) { return dist / WraithType.ULT.hkSpeed; }
     botUltRange() { return WraithType.ULT.hkRange; }
@@ -4826,12 +4832,12 @@ SinglePassMaterials.enable(THREE);
     bodyAlpha(E, t, alpha) { return this.services.phantomView.isReturning(E, t) ? Math.min(alpha, PhantomType.RETURN_ALPHA) : alpha; }
     launchHandOf(model) { return model.getObjectByName("handslotr"); }
     showAimGuide(E, ult, c) { var services = this.services;
-      if (ult) { services.aimGuide.showAimStrip(0, services.dashMoves.dashReach(E, E.angle, PhantomType.ULT.phLen) + ArenaSize.BODY_R, PhantomType.ULT.phWidth); return true; }
+      if (ult) { services.aimGuide.showStrikeLine(services.dashMoves.dashReach(E, E.angle, PhantomType.ULT.phLen), PhantomType.ULT.phWidth); return true; }
       var dx = Math.cos(E.angle), dy = Math.sin(E.angle), len = services.physics.rayCast(E.x + dx * 20, E.y + dy * 20, dx, dy, c.range, c.wallR) + 20;
       services.aimGuide.showAimStrip(18, Math.max(1, len - 18), c.pr * 2);
       return true;
     }
-    ultAimShot() { return { len: PhantomType.ULT.phLen, halfWidth: PhantomType.ULT.phWidth / 2 }; }
+    ultAimShot() { return { len: PhantomType.ULT.phLen, pr: PhantomType.ULT.phWidth / 2 }; }
     botUltRange() { return PhantomType.ULT.phLen; }
     botUltAllowed(B, target) { return this.services.phantomStrike.botWorthIt(B, target); }
     botAct(B, target, enemies, t) { return this.services.phantomStrike.busy(B, t); }
@@ -4913,7 +4919,7 @@ SinglePassMaterials.enable(THREE);
     }
     onLeapLand(E, t) { this.services.match.game.forceNet = true; return true; }
     showAimGuide(E, ult, c) { var services = this.services;
-      if (ult) { services.aimGuide.showAimStrip(ShielderType.ULT.sgAhead - ShielderType.ULT.sgDepth, ShielderType.ULT.sgDepth, ShielderType.ULT.sgWidth); return true; }
+      if (ult) { services.aimGuide.showStrikeLine(services.melee.lineReach(E.x, E.y, E.angle, ShielderType.ULT.sgPushLen), ShielderType.ULT.sgWidth); return true; }
       return this.isGuarding(E, services.clock.now());
     }
     addMarkers(v, root, body) { ShieldStanceClips.ensure(this.services); v.guardArc = ShieldPlateMarker.attach(this.services, root, v.team); }
@@ -6450,7 +6456,7 @@ SinglePassMaterials.enable(THREE);
       return Math.round(ThrowerType.ULT.plFlightMin + (ThrowerType.ULT.plFlight - ThrowerType.ULT.plFlightMin) * far);
     }
     throwPoison(E, ang, reach, ult) { var services = this.services;
-      var t = services.clock.now(), c = ThrowerType.STATS, spot = services.attack.burstSpot(E, ang, reach, ult ? ThrowerType.ULT.fgCast : c.range, c.minRange);
+      var t = services.clock.now(), c = ThrowerType.STATS, spot = E.type.potionSpot(E, ang, reach, ult);
       var flightMs = services.fieldFx.potionFlightMs(MathKit.hyp(spot.x - E.x, spot.y - E.y));
       E.angle = Math.atan2(spot.y - E.y, spot.x - E.x); E.atkAt = t;
       services.vision.revealBriefly(E.id, t);
@@ -7771,7 +7777,7 @@ SinglePassMaterials.enable(THREE);
   class StarfallSystem {
     constructor(services) { this.services = services; }
     fall(E, ang, reach, t) { var services = this.services;
-      var spot = services.attack.burstSpot(E, ang, reach, AstrologerType.STATS.range, AstrologerType.ULT.sfMin);
+      var spot = E.type.starSpot(E, ang, reach);
       E.angle = Math.atan2(spot.y - E.y, spot.x - E.x); E.atkAt = t;
       services.vision.revealBriefly(E.id, t);
       E.starShots = (E.starShots || 0) + 1;
@@ -12039,11 +12045,26 @@ SinglePassMaterials.enable(THREE);
   class AimGuide {
     static AIM_Y = 8;
     static AIM_BACK_PAD = 5;
-    constructor(services) { this.services = services; this.group = null; this.strip = null; this.sector = null; this.circle = null; this.lanes = []; }
-    aimPart(geo) { var services = this.services;
-      var back = services.arenaView.flatMesh(geo, services.matlib.aimBackMat), front = services.arenaView.flatMesh(geo, services.matlib.aimMat);
+    static EDGE_HIT = ArenaSize.BODY_R;
+    static HALF_IN = ArenaSize.BODY_R * 0.5;
+    constructor(services) { this.services = services; this.group = null; this.strip = null; this.sector = null; this.circle = null; this.square = null; this.squareRoot = null; this.lanes = []; }
+    toLocal(E, spot) { var dx = spot.x - E.x, dy = spot.y - E.y, ca = Math.cos(E.angle), sa = Math.sin(E.angle); return { x: dx * ca + dy * sa, z: -dx * sa + dy * ca }; }
+    showAimArea(E, spot, radius) { var at = this.toLocal(E, spot);
+      this.showAimCircle(at.x, radius);
+      this.circle.front.position.z = this.circle.back.position.z = at.z;
+    }
+    showAimSquare(E, spot, half) { var at = this.toLocal(E, spot), pad = AimGuide.AIM_BACK_PAD;
+      this.squareRoot.position.set(at.x, 0, at.z); this.squareRoot.rotation.y = E.angle;
+      this.square.front.visible = this.square.back.visible = true;
+      this.square.front.position.x = -half; this.square.front.scale.set(half * 2, half * 2, 1);
+      this.square.back.position.x = -half - pad; this.square.back.scale.set(half * 2 + pad * 2, half * 2 + pad * 2, 1);
+    }
+    showStrikeLine(len, width) { var r = AimGuide.EDGE_HIT; this.showAimStrip(-r, len + r * 2, width + r * 2); }
+    showShotLine(reach, fullReach, pr) { var r = AimGuide.EDGE_HIT, tail = reach >= fullReach - 1 ? pr + r : 0; this.showAimStrip(18, Math.max(1, reach - 18 + tail), (pr + r) * 2); }
+    aimPart(geo, parent) { var services = this.services;
+      var back = services.arenaView.flatMesh(geo, services.matlib.aimBackMat), front = services.arenaView.flatMesh(geo, services.matlib.aimMat), into = parent || services.aimGuide.group;
       back.position.y = front.position.y = AimGuide.AIM_Y; back.renderOrder = 8; front.renderOrder = 9;
-      services.aimGuide.group.add(back); services.aimGuide.group.add(front);
+      into.add(back); into.add(front);
       return { front: front, back: back };
     }
     showAimStrip(x0, len, width) { var services = this.services;
@@ -12055,7 +12076,9 @@ SinglePassMaterials.enable(THREE);
       this.lanes.forEach(function (part, i) {
         part.front.visible = part.back.visible = lens[i] > 0;
         part.front.position.set(0, part.front.position.y, TsunamiLanes.laneOffset(i)); part.back.position.set(0, part.back.position.y, TsunamiLanes.laneOffset(i));
-        part.front.scale.set(lens[i], ArenaSize.TILE - 4, 1); part.back.scale.set(lens[i], ArenaSize.TILE, 1);
+        var r = AimGuide.EDGE_HIT;
+        part.front.position.x = -r; part.back.position.x = -r - AimGuide.AIM_BACK_PAD;
+        part.front.scale.set(lens[i] + r * 2, ArenaSize.TILE + r * 2, 1); part.back.scale.set(lens[i] + r * 2 + AimGuide.AIM_BACK_PAD * 2, ArenaSize.TILE + r * 2 + AimGuide.AIM_BACK_PAD * 2, 1);
       });
     }
     showAimSector(radius, arc) { var services = this.services;
@@ -12066,6 +12089,7 @@ SinglePassMaterials.enable(THREE);
     showAimCircle(x, radius) { var services = this.services;
       services.aimGuide.circle.front.visible = services.aimGuide.circle.back.visible = true;
       services.aimGuide.circle.front.position.x = services.aimGuide.circle.back.position.x = x;
+      services.aimGuide.circle.front.position.z = services.aimGuide.circle.back.position.z = 0;
       services.aimGuide.circle.front.scale.setScalar(radius); services.aimGuide.circle.back.scale.setScalar(radius + AimGuide.AIM_BACK_PAD);
     }
     updateAimGuide() { var services = this.services;
@@ -12075,13 +12099,15 @@ SinglePassMaterials.enable(THREE);
       var ult = services.input.aim.btn === "ult", c = services.charTypes.statsOf(services.match.me.char);
       services.aimGuide.group.position.set(services.match.me.x, 0, services.match.me.y); services.aimGuide.group.rotation.y = -services.match.me.angle;
       services.matlib.aimMat.color.set(ult ? 0xFF503C : 0xffffff);
-      [services.aimGuide.strip, services.aimGuide.sector, services.aimGuide.circle].concat(services.aimGuide.lanes).forEach(function (p) { p.front.visible = p.back.visible = false; });
+      [services.aimGuide.strip, services.aimGuide.sector, services.aimGuide.circle, services.aimGuide.square].concat(services.aimGuide.lanes).forEach(function (p) { p.front.visible = p.back.visible = false; });
       var aimType = services.charTypes.of(services.match.me.char);
       if (aimType.showAimGuide(services.match.me, ult, c)) {
       } else if (c.stab && !ult) {
         var lungeLen = services.dashMoves.dashReach(services.match.me, services.match.me.angle, services.dashMoves.lungeRange(services.match.me, services.clock.now()));
         services.aimGuide.showAimStrip(0, lungeLen, ArenaSize.BODY_R * 2);
         services.aimGuide.showAimCircle(lungeLen, c.range + ArenaSize.BODY_R);
+      } else if (c.width && ult) {
+        services.aimGuide.showStrikeLine(services.melee.lineReach(services.match.me.x, services.match.me.y, services.match.me.angle, LancerType.ULT.lnLen), LancerType.ULT.lnW);
       } else if (c.width) {
         services.aimGuide.showAimStrip(0, services.melee.lineReach(services.match.me.x, services.match.me.y, services.match.me.angle, ult ? LancerType.ULT.lnLen : c.range) + ArenaSize.BODY_R, ult ? LancerType.ULT.lnW : c.width);
       } else if (c.arc && !ult && !c.throwRange) {
@@ -12092,16 +12118,19 @@ SinglePassMaterials.enable(THREE);
           var tx = Math.cos(services.match.me.angle), ty = Math.sin(services.match.me.angle), tl = services.physics.rayCast(services.match.me.x + tx * 20, services.match.me.y + ty * 20, tx, ty, c.throwRange, 6) + 20;
           services.aimGuide.showAimStrip(18, Math.max(1, tl - 18), 12);
         }
+      } else if (ult) {
+        var shot = aimType.ultAimShot(), sx = Math.cos(services.match.me.angle), sy = Math.sin(services.match.me.angle);
+        services.aimGuide.showShotLine(services.physics.rayCast(services.match.me.x + sx * 20, services.match.me.y + sy * 20, sx, sy, shot.len, shot.pr) + 20, shot.len + 20, shot.pr);
       } else {
-        var ultShot = ult ? aimType.ultAimShot() : null;
-        var len = ult ? ultShot.len : c.range + (services.match.me.isOvercharged(services.clock.now()) ? StormbowType.ULT.ocRangeBonus : 0), wx = Math.cos(services.match.me.angle), wy = Math.sin(services.match.me.angle), hw = ult ? ultShot.halfWidth : 8;
+        var len = c.range + (services.match.me.isOvercharged(services.clock.now()) ? StormbowType.ULT.ocRangeBonus : 0), wx = Math.cos(services.match.me.angle), wy = Math.sin(services.match.me.angle);
         len = services.physics.rayCast(services.match.me.x + wx * 20, services.match.me.y + wy * 20, wx, wy, len, 6) + 20;
-        services.aimGuide.showAimStrip(18, Math.max(1, len - 18), hw * 2);
+        services.aimGuide.showAimStrip(18, Math.max(1, len - 18), 16);
       }
     }
     build() { var services = this.services;
       services.aimGuide.group = new THREE.Group(); services.aimGuide.group.visible = false; services.stage.scene.add(services.aimGuide.group);
       services.aimGuide.strip = services.aimGuide.aimPart(services.geo.strip); services.aimGuide.sector = services.aimGuide.aimPart(services.models.sectorGeo(100, 1)); services.aimGuide.circle = services.aimGuide.aimPart(services.geo.disc);
+      services.aimGuide.squareRoot = new THREE.Group(); services.aimGuide.group.add(services.aimGuide.squareRoot); services.aimGuide.square = services.aimGuide.aimPart(services.geo.strip, services.aimGuide.squareRoot);
       for (var lane = 0; lane < MarinaType.ULT.mrLanes; lane++) services.aimGuide.lanes.push(services.aimGuide.aimPart(services.geo.strip));
     }
   }
