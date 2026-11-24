@@ -5073,6 +5073,21 @@ SinglePassMaterials.enable(THREE);
       lamp.position.copy(this.drop.set(0, -ArcaLantern.RING_TOP * lamp.scale.y, 0).applyQuaternion(lamp.quaternion));
     }
   }
+  class ArcaStaffTip {
+    constructor(services) { this.services = services; this.local = null; }
+    localTip() { var services = this.services, staff = services.models.kit.weapons[ArcaType.MODEL.right];
+      if (this.local || !staff) return this.local;
+      var box = new THREE.Box3().setFromObject(staff), mid = box.getCenter(new THREE.Vector3());
+      this.local = new THREE.Vector3(mid.x, box.max.y, mid.z);
+      return this.local;
+    }
+    worldTip(v, out) { var model = v.activeForm ? v.activeForm.model : v.root, tip = this.localTip();
+      if (v.arcaStaffModel !== model) { v.arcaStaffModel = model; v.arcaStaff = model.getObjectByName("mainhand"); }
+      if (!tip || !v.arcaStaff) return false;
+      v.arcaStaff.localToWorld(out.copy(tip));
+      return true;
+    }
+  }
   class ArcaType extends MagicShooterType {
     static TONES = { ember: 0xE0701E, chestnut: 0x4A2412, gold: 0xF2C14E, lantern: 0xFFB347, spark: "#FFC266" };
     static MELEE = { color: ArcaType.TONES.lantern, spark: ArcaType.TONES.spark };
@@ -5128,7 +5143,7 @@ SinglePassMaterials.enable(THREE);
     passiveDesc() { var services = this.services; return "이동을 방해받는 적(둔화·기절·끌림 등)에게 주는 피해 " + services.skilltext.pctOf(this.data.impededBonus) + "% 증가"; }
     ultDesc() { var services = this.services, u = ArcaType.ULT;
       return "지정한 곳에 " + services.skilltext.secs(u.akDur) + "간 유지되는 반경 " + u.akR + "의 결계를 펼침. 펼쳐질 때 안에 있던 적은 " + u.akDmg + "의 피해를 입고 갇혀 " + services.skilltext.slowPct(u.akSlowMul) +
-             "되며 밖으로 나갈 수 없음. 갇힌 적이 결계 끝에 닿으면 " + u.akEdgeDmg + "의 피해를 입고 " + services.skilltext.secs(u.akStunMs) + "간 기절한 뒤 결계 가운데로 끌려감. 결계에 묶인 적이 있으면 기본 공격이 묶인 적 모두에게 자동으로 적중";
+             "되며 밖으로 나갈 수 없음. 갇힌 적이 결계 끝에 닿으면 " + u.akEdgeDmg + "의 피해를 입고 " + services.skilltext.secs(u.akStunMs) + "간 기절하며 결계 가운데로 끌려감. 결계에 묶인 적이 있으면 기본 공격이 묶인 적 모두에게 자동으로 적중";
     }
   }
   class CharacterRegistry {
@@ -6124,7 +6139,7 @@ SinglePassMaterials.enable(THREE);
     add(e, now) { var services = this.services, self = this;
       if (now >= this.endOf(e)) return;
       services.field.barriers = services.field.barriers.filter(function (b) { if (b.e.owner !== e.owner) return true; self.dropEntry(b); return false; });
-      services.field.barriers.push({ e: e, vis: null, deployed: false, bound: {}, lost: {}, edges: {}, jolts: {} });
+      services.field.barriers.push({ e: e, vis: null, deployed: false, bound: {}, lost: {}, edges: {}, jolts: {}, strikeMs: 0 });
     }
     entryOf(owner, bid) { var services = this.services;
       for (var i = 0; i < services.field.barriers.length; i++) { var b = services.field.barriers[i]; if (b.e.owner === owner && b.e.createdAt === bid) return b; }
@@ -6195,7 +6210,7 @@ SinglePassMaterials.enable(THREE);
       R.edgeAt = t;
       services.damage.damage(T, u.akEdgeDmg, R.owner, false, "barrier", { stunMs: u.akStunMs });
       if (!T.alive) return;
-      R.pull = { from: t + u.akStunMs, ms: u.akPullMs, sx: null, sy: null };
+      R.pull = { from: t, ms: u.akPullMs, sx: null, sy: null };
       services.session.room.ref.child("effects").push({ type: "barrierEdge", owner: R.owner, bid: R.bid, tgt: T.id, from: R.pull.from, ms: u.akPullMs, u: 0, createdAt: t });
     }
     stepPull(T, R, t) { var services = this.services, P = R.pull;
@@ -6218,6 +6233,7 @@ SinglePassMaterials.enable(THREE);
     strikeBound(E, ang, t) { var services = this.services, ids = this.boundFoes(E, t), b = this.activeOf(E.id, t);
       if (!ids.length) return false;
       E.atkAt = t;
+      if (MathKit.hyp(b.e.x - E.x, b.e.y - E.y) > 1) { ang = Math.atan2(b.e.y - E.y, b.e.x - E.x); E.angle = ang; }
       services.session.room.ref.child("meleeHits").push({ team: E.team, owner: E.id, x: b.e.x, y: b.e.y, angle: MathKit.r1(ang), binds: ids, dmg: E.type.data.dmg, createdAt: t });
       services.vision.revealBriefly(E.id, t);
       if (services.targets.hear(E)) services.sound.sfx("orb");
@@ -11282,7 +11298,7 @@ SinglePassMaterials.enable(THREE);
       if (n < 2) return;
       var sideX = len ? -dz / len : 0, sideZ = len ? dx / len : 0;
       for (var i = 0; i < n; i++) {
-        var k = i / (n - 1), arc = Math.sin(Math.PI * k), shake = wobble ? wobble * arc * Math.sin(nowMs / 22 + i * 0.9) : 0, fling = scatter * (14 + (i * 7) % 11 * 2) * ((i % 3) - 1);
+        var k = i / (n - 1), arc = Math.sin(Math.PI * k), shake = wobble ? wobble * arc * Math.sin(nowMs / 22 - i * 0.9) : 0, fling = scatter * (14 + (i * 7) % 11 * 2) * ((i % 3) - 1);
         this.placeScaled(this.used + i, fx + dx * k + sideX * (shake + fling), fy + dy * k - sag * arc + scatter * (i % 4) * 7, fz + dz * k + sideZ * (shake + fling),
                          dx, dy - sag * Math.PI * Math.cos(Math.PI * k), dz, 1 - scatter);
       }
@@ -11294,18 +11310,24 @@ SinglePassMaterials.enable(THREE);
     static RISE_MS = GameTime.gameMs(0.35);
     static FALL_MS = GameTime.gameMs(0.4);
     static LOST_MS = GameTime.gameMs(0.35);
-    static JOLT_MS = 260;
+    static JOLT_MS = 460;
+    static STRIKE_MS = 460;
+    static STRIKE_HOLD = 0.55;
+    static BEAM_GROW = 0.2;
+    static BEAM_CORE = 2.2;
+    static BEAM_GLOW = 6;
+    static ANCHOR_FLARE = 0.7;
     static WALL_HEIGHT = 62;
     static FLOOR_Y = 1.6;
     static ANCHOR_Y = 7;
     static ANCHOR_SIZE = 7;
     static CHAIN_FROM_Y = 9;
     static REST_SAG = 12;
-    static JOLT_WOBBLE = 4.5;
+    static JOLT_WOBBLE = 6.5;
     static PULL_WOBBLE = 1.4;
     static FEET_RING = 0.9;
     static FLECKS = 36;
-    static TONES = { warn: 0xFF4A3A, deep: 0x5A2410, light: 0xFFB347, gold: 0xF2C14E, fleck: 0xFFD98A, chain: 0xE8963A };
+    static TONES = { warn: 0xFF4A3A, deep: 0x5A2410, light: 0xFFB347, gold: 0xF2C14E, fleck: 0xFFD98A, chain: 0xE8963A, hot: 0xFF1E12, beamCore: 0xFFE2A0, beamGlow: 0xFF8A24 };
     static SHARED = null;
     static FLOOR_FRAGMENT = `
       uniform sampler2D uTex; uniform float uTime; uniform float uShow; uniform float uRise; uniform float uWarn; uniform vec3 uDeep; uniform vec3 uLight; uniform vec3 uGold; uniform vec3 uWarnColor; varying vec2 vPolar;
@@ -11351,10 +11373,21 @@ SinglePassMaterials.enable(THREE);
       return B.SHARED || (B.SHARED = {
         floor: GolemGaleView.polarGrid(GolemGaleView.RINGS, function (pos, c, s, along) { pos.push(c * along, 0, s * along); }),
         wall: GolemGaleView.polarGrid(GolemGaleView.WALL_ROWS, function (pos, c, s, along) { pos.push(c, along, s); }),
-        flecks: SeededPoints.geometry(B.FLECKS, 53)
+        flecks: SeededPoints.geometry(B.FLECKS, 53),
+        beam: new THREE.CylinderGeometry(1, 1, 1, 10, 1, true).translate(0, 0.5, 0)
       });
     }
-    constructor(services) { this.services = services; this.free = []; this.spot = new THREE.Vector3(); this.size = new THREE.Vector3(); this.turn = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2); this.matrix = new THREE.Matrix4(); }
+    constructor(services) { this.services = services; this.free = []; this.spot = new THREE.Vector3(); this.size = new THREE.Vector3(); this.turn = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2); this.matrix = new THREE.Matrix4();
+      this.staffTip = new ArcaStaffTip(services); this.beamFrom = new THREE.Vector3(); this.beamDir = new THREE.Vector3(); this.up = new THREE.Vector3(0, 1, 0); this.hot = new THREE.Color(BarrierView.TONES.hot); }
+    buildBeam() { var B = BarrierView, S = B.shared(), beam = new THREE.Group();
+      var coreMat = new THREE.MeshBasicMaterial({ color: B.TONES.beamCore, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
+      var glowMat = new THREE.MeshBasicMaterial({ color: B.TONES.beamGlow, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
+      var core = new THREE.Mesh(S.beam, coreMat), glow = new THREE.Mesh(S.beam, glowMat);
+      core.scale.set(B.BEAM_CORE, 1, B.BEAM_CORE); glow.scale.set(B.BEAM_GLOW, 1, B.BEAM_GLOW);
+      core.frustumCulled = glow.frustumCulled = false; core.renderOrder = 8; glow.renderOrder = 7;
+      beam.add(glow); beam.add(core); beam.visible = false;
+      return { group: beam, coreMat: coreMat, glowMat: glowMat };
+    }
     buildVis() { var services = this.services, B = BarrierView, S = B.shared(), group = new THREE.Group(), T = B.TONES, ringCount = MatchRules.TEAM_MAX + 1;
       var uniforms = { uTex: { value: WaterNoise.texture() }, uTime: { value: 0 }, uShow: { value: 0 }, uRise: { value: 0 }, uWarn: { value: 0 }, uScatter: { value: 0 }, uR: { value: ArcaType.ULT.akR }, uHeight: { value: B.WALL_HEIGHT }, uPixelScale: { value: 400 },
                        uDeep: { value: new THREE.Color(T.deep) }, uLight: { value: new THREE.Color(T.light) }, uGold: { value: new THREE.Color(T.gold) }, uWarnColor: { value: new THREE.Color(T.warn) }, uFleck: { value: new THREE.Color(T.fleck) } };
@@ -11366,11 +11399,13 @@ SinglePassMaterials.enable(THREE);
       var links = new BarrierChainLinks(services.geo.chainLink, chainMat, MatchRules.TEAM_MAX), rings = new THREE.InstancedMesh(services.geo.chainWrap, ringMat, ringCount);
       rings.frustumCulled = false; rings.count = 0;
       floor.position.y = B.FLOOR_Y; floor.frustumCulled = wall.frustumCulled = false; floor.renderOrder = 4; wall.renderOrder = 5; links.mesh.renderOrder = rings.renderOrder = 6;
-      group.add(floor); group.add(wall); group.add(flecks); group.add(links.mesh); group.add(rings);
-      return { group: group, uniforms: uniforms, flecks: flecks, links: links, rings: rings, chainMat: chainMat, ringMat: ringMat };
+      var beam = this.buildBeam();
+      group.add(floor); group.add(wall); group.add(flecks); group.add(links.mesh); group.add(rings); group.add(beam.group);
+      return { group: group, uniforms: uniforms, flecks: flecks, links: links, rings: rings, chainMat: chainMat, ringMat: ringMat, beam: beam };
     }
     warmSample() { var vis = this.buildVis(), B = BarrierView;
       vis.uniforms.uShow.value = 1;
+      vis.beam.group.visible = true; vis.beam.group.position.set(40, 30, 0); vis.beam.group.scale.set(1, 40, 1); vis.beam.coreMat.opacity = vis.beam.glowMat.opacity = 0.5;
       vis.links.begin(); vis.links.addLine(0, B.CHAIN_FROM_Y, 0, 60, 40, 0, B.REST_SAG, 0, 0, 0); vis.links.finish();
       this.placeRing(vis.rings, 0, 0, 0, B.ANCHOR_Y, B.ANCHOR_SIZE); vis.rings.count = 1; vis.rings.instanceMatrix.needsUpdate = true;
       return vis.group;
@@ -11387,7 +11422,24 @@ SinglePassMaterials.enable(THREE);
       if (services.targets.hear(T)) services.sound.sfx("chain");
     }
     onBindStrike(d) { var services = this.services, now = Date.now();
-      services.field.barriers.forEach(function (b) { if (b.e.owner === d.owner) d.binds.forEach(function (id) { b.jolts[id] = now; }); });
+      services.field.barriers.forEach(function (b) { if (b.e.owner !== d.owner) return; b.strikeMs = now; d.binds.forEach(function (id) { b.jolts[id] = now; }); });
+    }
+    strikeHeat(b, nowMs) { var B = BarrierView, k = b.strikeMs ? (nowMs - b.strikeMs) / B.STRIKE_MS : 1;
+      if (k < 0 || k >= 1) return { k: 1, heat: 0 };
+      return { k: k, heat: k < B.STRIKE_HOLD ? 1 : (1 - k) / (1 - B.STRIKE_HOLD) };
+    }
+    renderBeam(b, s, fall, nowMs) { var services = this.services, B = BarrierView, vis = b.vis, beam = vis.beam, e = b.e, shooter = services.fighterView.fighters[e.owner];
+      beam.group.visible = false;
+      if (!s.heat || !shooter || !shooter.root.visible || !this.staffTip.worldTip(shooter, this.beamFrom)) return;
+      var scale = vis.group.scale.x, from = this.beamFrom.set((this.beamFrom.x - e.x) / scale, this.beamFrom.y / scale, (this.beamFrom.z - e.y) / scale);
+      var dir = this.beamDir.set(-from.x, B.CHAIN_FROM_Y - from.y, -from.z), len = dir.length();
+      if (len < 1) return;
+      var width = (1 - s.k * 0.45) * (1 + 0.12 * Math.sin(nowMs / 28));
+      beam.group.visible = true;
+      beam.group.position.copy(from);
+      beam.group.quaternion.setFromUnitVectors(this.up, dir.multiplyScalar(1 / len));
+      beam.group.scale.set(width, len * Math.min(1, s.k / B.BEAM_GROW), width);
+      beam.coreMat.opacity = 0.95 * s.heat * fall; beam.glowMat.opacity = 0.5 * s.heat * fall;
     }
     render(b, t, nowMs) { var services = this.services, B = BarrierView, e = b.e, start = e.createdAt + e.delay, end = start + e.dur;
       if (!b.vis) { b.vis = this.free.pop() || this.buildVis(); b.vis.uniforms.uR.value = e.r; services.stage.scene.add(b.vis.group); }
@@ -11396,18 +11448,20 @@ SinglePassMaterials.enable(THREE);
       u.uTime.value = (nowMs % 100000) / 1000; u.uPixelScale.value = WaterNoise.pixelScale(services);
       if (t < start) {
         u.uWarn.value = 1; u.uShow.value = 1; u.uRise.value = MathKit.clamp((t - e.createdAt) / e.delay, 0, 1); u.uHeight.value = 0;
-        vis.group.scale.setScalar(1); vis.flecks.visible = false; vis.links.mesh.count = 0; vis.rings.count = 0;
+        vis.group.scale.setScalar(1); vis.flecks.visible = false; vis.links.mesh.count = 0; vis.rings.count = 0; vis.beam.group.visible = false;
         return;
       }
-      var rise = MathKit.clamp((t - start) / B.RISE_MS, 0.001, 1), fall = MathKit.clamp((end - t) / B.FALL_MS, 0, 1);
+      var rise = MathKit.clamp((t - start) / B.RISE_MS, 0.001, 1), fall = MathKit.clamp((end - t) / B.FALL_MS, 0, 1), s = this.strikeHeat(b, nowMs);
       u.uWarn.value = 0; u.uRise.value = rise; u.uShow.value = fall; u.uHeight.value = B.WALL_HEIGHT * rise * rise * (3 - 2 * rise); u.uScatter.value = 1 - fall;
       vis.group.scale.setScalar(1 + (1 - fall) * 0.08);
       vis.flecks.visible = true;
       vis.chainMat.opacity = vis.ringMat.opacity = fall;
-      this.renderChains(b, t, nowMs);
+      vis.chainMat.color.setHex(B.TONES.chain).lerp(this.hot, s.heat); vis.ringMat.color.setHex(B.TONES.gold).lerp(this.hot, s.heat);
+      this.renderChains(b, t, nowMs, s.heat);
+      this.renderBeam(b, s, fall, nowMs);
     }
-    renderChains(b, t, nowMs) { var services = this.services, B = BarrierView, e = b.e, vis = b.vis, view = this, rings = 1;
-      this.placeRing(vis.rings, 0, 0, 0, B.ANCHOR_Y, B.ANCHOR_SIZE);
+    renderChains(b, t, nowMs, heat) { var services = this.services, B = BarrierView, e = b.e, vis = b.vis, view = this, rings = 1;
+      this.placeRing(vis.rings, 0, 0, 0, B.ANCHOR_Y, B.ANCHOR_SIZE * (1 + B.ANCHOR_FLARE * heat));
       vis.links.begin();
       Object.keys(b.bound).concat(Object.keys(b.lost)).forEach(function (id) {
         var T = services.targets.ent(id), shown = services.fighterView.fighters[id], lostAt = b.lost[id];

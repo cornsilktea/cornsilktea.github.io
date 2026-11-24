@@ -9081,14 +9081,15 @@ class ArcaTests {
   }
   registerEdge() {
     var self = this, api = this.api, run = this.kit.run, G = ArcaTests.GROUP, U = api.ULT, cx = this.cx;
-    run(G, "갇힌 적이 걸어서 끝에 닿으면 " + self.boosted(U.akEdgeDmg) + " 피해·" + api.secs(U.akStunMs) + " 기절 뒤 가운데로 끌려가고, 결계 밖으로 나가지 않는가", function (done) {
-      var W = self.scene([self.foe("f", cx + 40)]), f = W.ent("f"), bad = [], maxD = 0, stunAt = 0, stunLen = 0, pullSeen = false;
+    run(G, "갇힌 적이 걸어서 끝에 닿으면 " + self.boosted(U.akEdgeDmg) + " 피해·" + api.secs(U.akStunMs) + " 기절과 함께 가운데로 끌려가고, 결계 밖으로 나가지 않는가", function (done) {
+      var W = self.scene([self.foe("f", cx + 40)]), f = W.ent("f"), bad = [], maxD = 0, stunAt = 0, stunLen = 0, pullSeen = false, centeredAt = 0;
       self.deploy(W);
       var afterDeploy = self.lost(f);
       W.step(3000, self.kit.FRAME, function (t) {
         maxD = Math.max(maxD, self.dist(f));
-        if (!stunAt && api.stunned(f, t)) { stunAt = t; stunLen = f.stunUntil - t; }
+        if (!stunAt && api.stunned(f, t)) { stunAt = t; stunLen = f.stunUntil - t; if (!api.BARRIERS.pulling(f, t)) bad.push("기절하는 순간 끌림이 시작되지 않음"); }
         if (api.BARRIERS.pulling(f, t)) pullSeen = true;
+        if (stunAt && !centeredAt && self.dist(f) <= 6) { centeredAt = t; if (!api.stunned(f, t)) bad.push("기절이 끝난 뒤에야 가운데 도착"); }
         if (!stunAt) f.x += 5;
       });
       if (maxD > self.inner() + 1) bad.push("결계 밖으로 나감: 중심에서 " + Math.round(maxD) + " (한계 " + self.inner() + ")");
