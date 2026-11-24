@@ -5159,7 +5159,7 @@ class ResultCollector {
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : map + " 맵 한 줄 벽: " + shown.join(" · "));
   });
   new PhantomTests(api, { world: world, run: run, FRAME: FRAME }).register();
-  new ShielderTests(api, { world: world, run: run, FRAME: FRAME }).register();
+  new ShielderTests(api, { world: world, run: run, runAsync: runAsync, FRAME: FRAME }).register();
   run(AUTO, "AI 6명 60초 난전 — 숲 맵 + 방패병 고정 (시드 2045)", function (done) {
     var r = autoMelee("forest", 60, 2045, "shielder"), kinds = Object.keys(r.issues);
     var roster = r.list.map(function (e) { return api.CHARS[e.char].name; }).join("·");
@@ -5228,6 +5228,7 @@ class ShielderTests {
     this.registerArea();
     this.registerCast();
     this.registerJump();
+    this.registerLook();
     this.registerCard();
   }
 
@@ -5410,6 +5411,30 @@ class ShielderTests {
       if (!bash || bash.v.width !== C.width || bash.v.len !== C.range) bad.push("밀치기 띠 " + (bash && bash.v.len + "·" + bash.v.width));
       if (self.lost(W2.ent("fo")) !== C.dmg) bad.push("밀치기 피해 " + self.lost(W2.ent("fo")));
       self.verdict(done, bad, "대상 없음 → 점프·대기 없음, 밀치기 " + C.range + "·" + C.width + " 띠 " + C.dmg);
+    });
+  }
+
+  registerLook() {
+    var self = this, api = this.api, runAsync = this.kit.runAsync, G = ShielderTests.GROUP;
+    runAsync(G, "모습: 양손에 방패, 방패 중에는 팔은 방패 자세·다리는 걸으면 걷기 / 서면 방패 자세, 방패가 끝나면 다리 겹침이 사라지는가", async function (done) {
+      var probe = self.withShield([]).ent("sh");
+      for (var wait = 0; wait < 40 && !api.FIGHTER_VIEW.makeVis(probe, new api.THREE.Group()).kit; wait++) await new Promise(function (r) { setTimeout(r, 100); });
+      var bad = [], M = api.CHAR_TYPES.of("shielder").constructor.MODEL, W = self.withShield([self.foe("fo", 0, 400)]), S = W.ent("sh");
+      if (M.right !== M.left || !/shield/.test(M.right)) bad.push("양손 방패가 아님 " + M.right + "·" + M.left);
+      var v = api.FIGHTER_VIEW.makeVis(S, new api.THREE.Group());
+      if (!v.kit) { done("info", "모델을 4초 안에 못 읽어 모션 확인을 건너뜀"); return; }
+      var clips = v.clips, upper = clips.Shield_GuardUpper, legs = clips.Shield_WalkLegs;
+      var legBone = function (tr) { return /^(root|hips|upperleg|lowerleg|foot|toes)/.test(tr.name); };
+      if (!upper || upper.tracks.some(legBone) || !legs || !legs.tracks.every(legBone)) bad.push("팔·다리 나눈 클립이 이상함");
+      var frame = function (n, move) { for (var i = 0; i < n; i++) { if (move) { S.x += 1; S.mv = true; } else S.mv = false; W.frame(16); api.FIGHTER_MOTION.animate(v, S, W.t(), 0.016, false); } };
+      self.raise(W);
+      frame(30, true);
+      if (v.curName !== "Shield_GuardUpper" || v.legsKind !== "walk") bad.push("이동 중 " + v.curName + "·" + v.legsKind);
+      frame(30, false);
+      if (v.curName !== "Shield_GuardUpper" || v.legsKind !== "stand") bad.push("멈춤 " + v.curName + "·" + v.legsKind);
+      W.step(api.ULT.sgDur); frame(10, true);
+      if (v.legsKind !== null || v.curName === "Shield_GuardUpper") bad.push("방패 끝난 뒤 " + v.curName + "·" + v.legsKind);
+      self.verdict(done, bad, "양손 " + M.right + ", 이동 걷기·멈춤 방패 자세, 끝나면 원래대로");
     });
   }
 

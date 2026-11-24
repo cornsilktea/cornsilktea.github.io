@@ -4869,7 +4869,7 @@ SinglePassMaterials.enable(THREE);
   }
   class ShielderType extends CharacterType {
     static MELEE = { color: 0xCFE2F2, spark: "#CFE6FF" };
-    static MODEL = { file: "Knight", right: "hammer_A", rightScale: 0.8, left: "shield_square_color", leftScale: 1.6,
+    static MODEL = { file: "Knight", right: "shield_square_color", rightScale: 1.6, rightTurn: Math.PI, left: "shield_square_color", leftScale: 1.6,
                recolor: [[0, 3, 1, "#6F8294", "#34404D"], [1, 0, 1, "#6F8294", "#34404D"], [2, 2, 1, "#6F8294", "#34404D"], [1, 1, 1, "#D7A75E", "#7E5527"], [1, 2, 2, "#C3CCD6", "#6D7A88"]] };
     static ULT = {
       sgDur: GameTime.gameMs(5), sgWidth: 300, sgAhead: 70, sgDepth: 36, sgHeight: 42, sgMoveMul: 0.6, sgJumpR: 400,
@@ -4887,7 +4887,7 @@ SinglePassMaterials.enable(THREE);
     isRooted(E, t) { return this.isHammerLeaping(E, t); }
     skillSpeed(E, t) { return this.isGuarding(E, t) ? this.data.speed * ShielderType.ULT.sgMoveMul : null; }
     rangeRingOf(E, t) { return this.isGuarding(E, t) ? ShielderType.ULT.sgJumpR : 0; }
-    latePose(E, t) { return this.isGuarding(E, t) ? [ShielderType.GUARD_CLIP, 1] : null; }
+    latePose(E, t) { return this.isGuarding(E, t) ? [ShieldStanceClips.UPPER, 1] : null; }
     attackClip(v, E, t) { return [ShielderType.BASH_CLIP, 2.4]; }
     get botFrontLeash() { return BannerBearerType.BOT_LEASH; }
     botUltRange() { return ShielderType.ULT.sgBotFoeR; }
@@ -4911,10 +4911,11 @@ SinglePassMaterials.enable(THREE);
       if (ult) { services.aimGuide.showAimStrip(ShielderType.ULT.sgAhead - ShielderType.ULT.sgDepth, ShielderType.ULT.sgDepth, ShielderType.ULT.sgWidth); return true; }
       return this.isGuarding(E, services.clock.now());
     }
-    addMarkers(v, root, body) { v.guardArc = ShieldPlateMarker.attach(this.services, root, v.team); }
+    addMarkers(v, root, body) { ShieldStanceClips.ensure(this.services); v.guardArc = ShieldPlateMarker.attach(this.services, root, v.team); }
     renderMarkers(v, E, t, nowMs) { if (v.guardArc) v.guardArc.update(this.isGuarding(E, t), nowMs, E.guardAng); }
     locksFacing(E, t) { return this.isGuarding(E, t); }
     poseHeldProp(v, E, t) { var services = this.services;
+      if (v.kit) ShieldStanceClips.stepLegs(services, v, E, this.isGuarding(E, t), t);
       if (!v.kit || E.blockShownAt === v.blockSeen) return;
       v.blockSeen = E.blockShownAt;
       if (E.alive && Date.now() - E.blockShownAt < 300 && !E.isHammerLeaping(t)) services.fighterMotion.playOnce(v, ShielderType.BLOCK_CLIP, 2.6, t);
@@ -4948,6 +4949,38 @@ SinglePassMaterials.enable(THREE);
     ultDesc() { var services = this.services, u = ShielderType.ULT;
       return services.skilltext.secs(u.sgDur) + "간 조준한 방향 앞에 폭 " + u.sgWidth + "의 방패를 세워 그 방패에 닿는 공격을 막음(뒤의 아군도 보호). 그동안 이동속도 " + services.skilltext.pctOf(1 - u.sgMoveMul) +
              "% 감소, 기본 공격 대신 " + services.skilltext.secs(this.data.guardJumpCd) + "마다 반경 " + u.sgJumpR + " 안 가장 가까운 아군에게 점프";
+    }
+  }
+  class ShieldStanceClips {
+    static UPPER = "Shield_GuardUpper";
+    static LEGS = { stand: "Shield_GuardLegs", walk: "Shield_WalkLegs", run: "Shield_RunLegs" };
+    static SOURCE = { stand: ShielderType.GUARD_CLIP, walk: "Walking_A", run: "Running_A" };
+    static LOWER_BONES = ["root", "hips", "upperlegl", "upperlegr", "lowerlegl", "lowerlegr", "footl", "footr", "toesl", "toesr"];
+    static WALK_FROM = 15;
+    static RUN_FROM = 150;
+    static FADE = 0.15;
+    static isLower(track) { return ShieldStanceClips.LOWER_BONES.indexOf(track.name.split(".")[0]) >= 0; }
+    static part(clip, name, lower) { return new THREE.AnimationClip(name, clip.duration, clip.tracks.filter(function (tr) { return ShieldStanceClips.isLower(tr) === lower; })); }
+    static ensure(services) {
+      var clips = services.models.kit.clips, S = ShieldStanceClips;
+      if (clips[S.UPPER] || !clips[ShielderType.GUARD_CLIP]) return;
+      clips[S.UPPER] = S.part(clips[ShielderType.GUARD_CLIP], S.UPPER, false);
+      Object.keys(S.LEGS).forEach(function (k) { clips[S.LEGS[k]] = S.part(clips[S.SOURCE[k]], S.LEGS[k], true); });
+    }
+    static legsKind(v, E, t) {
+      if (!E.mv || E.isHammerLeaping(t)) return "stand";
+      return v.speed > ShieldStanceClips.RUN_FROM ? "run" : v.speed > ShieldStanceClips.WALK_FROM ? "walk" : "stand";
+    }
+    static legsSpeed(v, kind) { return kind === "run" ? MathKit.clamp(v.speed / 260, 0.7, 1.6) : kind === "walk" ? MathKit.clamp(v.speed / 110, 0.6, 1.4) : 1; }
+    static stepLegs(services, v, E, on, t) {
+      var S = ShieldStanceClips, kind = on ? S.legsKind(v, E, t) : null;
+      if (kind === v.legsKind) { if (v.legsAction) v.legsAction.timeScale = S.legsSpeed(v, kind); return; }
+      if (v.legsAction) v.legsAction.fadeOut(S.FADE);
+      v.legsKind = kind; v.legsAction = null;
+      if (!kind) return;
+      var a = services.fighterMotion.clipAction(v, S.LEGS[kind]);
+      a.reset(); a.setLoop(THREE.LoopRepeat, Infinity); a.timeScale = S.legsSpeed(v, kind); a.setEffectiveWeight(1); a.fadeIn(S.FADE); a.play();
+      v.legsAction = a;
     }
   }
   class ShieldPlateMarker {
@@ -14230,7 +14263,7 @@ SinglePassMaterials.enable(THREE);
       HUD: services.hud, LIVE_BOARD: services.liveBoard, END_BANNER: services.endBanner, SPEC_FOLLOW: services.specFollow, KILL_FEED: services.killfeed, RESULT_BOARD: services.resultBoard,SOUND: services.sound, BACKEND: services.backend, TIMESCALE: services.timescale, THREE: THREE, CAMERA_RIG: services.cameraRig, ARENA_VIEW: services.arenaView, PROPS: services.props, PROP_THEMES: services.propThemes, camera: services.stage.camera, overlay: Canvases.overlay, QA: services.quality, PIX_MIN: Environment.PIX_MIN, PIX_START: Environment.PIX_START, SCENERY: services.arenaView.scenery,
       setDb: function (fake) { var before = services.backend.db; services.backend.db = fake; return before; },
       setTestLink: function (flag) { var before = services.backend.isTestLink; services.backend.isTestLink = flag; return before; },
-      MAP_X0: ArenaSize.MAP_X0, MAP_Y0: ArenaSize.MAP_Y0, TSUNAMI_LANES: services.tsunamiLanes, TsunamiLanes: TsunamiLanes, MARINA_STREAMS: services.marinaStreams, MARINA_BOT: services.marinaBot, TridentProp: TridentProp, HOOK_PATH: services.hookPath, HOOK_PULL: services.hookPull, HOOK_VIEW: services.hookView, playersNow: function () { return services.session.players; }, HAMMER_STRIKES: services.hammerStrikes, HammerBasicBlast: HammerBasicBlast, BANNER_AURA: services.bannerAura, BANNER_LEDGER: services.bannerLedger, BannerCreditLedger: BannerCreditLedger, makeBannerGlow: function (d) { return new BannerStrikeGlow(services, d); }, BannerStrikeGlow: BannerStrikeGlow, BannerBearerRig: BannerBearerRig, DraggedChain: DraggedChain, WraithChainRig: WraithChainRig, ChainSlamBurst: ChainSlamBurst, FIGHTER_VIEW: services.fighterView, GEO: services.geo, FRAME_RENDERER: services.frameRenderer, stage: services.stage, CHAR_TYPES: services.charTypes, SHIELD_WALLS: services.shieldWalls, AUTO_AIM: services.autoAim, AUTO_AIM_ERR: AutoAim.AUTO_AIM_ERR, AUTO_AIM_LEAD: AutoAim.AUTO_AIM_LEAD, FullscreenKeeper: FullscreenKeeper, DRAFT_AI: services.draftAi,
+      MAP_X0: ArenaSize.MAP_X0, MAP_Y0: ArenaSize.MAP_Y0, TSUNAMI_LANES: services.tsunamiLanes, TsunamiLanes: TsunamiLanes, MARINA_STREAMS: services.marinaStreams, MARINA_BOT: services.marinaBot, TridentProp: TridentProp, HOOK_PATH: services.hookPath, HOOK_PULL: services.hookPull, HOOK_VIEW: services.hookView, playersNow: function () { return services.session.players; }, HAMMER_STRIKES: services.hammerStrikes, HammerBasicBlast: HammerBasicBlast, BANNER_AURA: services.bannerAura, BANNER_LEDGER: services.bannerLedger, BannerCreditLedger: BannerCreditLedger, makeBannerGlow: function (d) { return new BannerStrikeGlow(services, d); }, BannerStrikeGlow: BannerStrikeGlow, BannerBearerRig: BannerBearerRig, DraggedChain: DraggedChain, WraithChainRig: WraithChainRig, ChainSlamBurst: ChainSlamBurst, FIGHTER_VIEW: services.fighterView, FIGHTER_MOTION: services.fighterMotion, GEO: services.geo, FRAME_RENDERER: services.frameRenderer, stage: services.stage, CHAR_TYPES: services.charTypes, SHIELD_WALLS: services.shieldWalls, AUTO_AIM: services.autoAim, AUTO_AIM_ERR: AutoAim.AUTO_AIM_ERR, AUTO_AIM_LEAD: AutoAim.AUTO_AIM_LEAD, FullscreenKeeper: FullscreenKeeper, DRAFT_AI: services.draftAi,
       MOCK_DRAFT: services.mockDraft, MOCK_DRAFT_VIEW: services.mockDraftView,
       DRAFT: services.draft, DRAFT_VIEW: services.draftView, DRAFT_STEPS: Draft.STEPS, DRAFT_STEP_MS: Draft.STEP_MS, DRAFT_AI_MS: Draft.AI_MS, DRAFT_AI_TRADE_MS: Draft.AI_TRADE_MS, DRAFT_ABSENT_WAIT_MS: Draft.ABSENT_WAIT_MS, NO_BAN: Draft.NO_BAN,
       STATS: services.stats, STATS_PATH: MatchStats.path, STATS_PATCHES: StatsPatches, STATS_PENDING: MatchStats.PENDING, STATS_SETTLE_MS: MatchStats.SETTLE_MS, STATS_HOLD_MAX_MS: MatchStats.HOLD_MAX_MS,
