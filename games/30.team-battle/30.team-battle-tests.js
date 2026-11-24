@@ -5182,6 +5182,19 @@ class PhantomTests {
     });
   }
   verdict(done, bad, okText) { done(bad.length ? "fail" : "pass", bad.length ? bad.slice(0, 6).join(" / ") : okText); }
+  wallHugSpot() {
+    var api = this.api, C = api.CHARS.phantom, B = api.BOUND, R = api.BODY_R, dirs = [0, Math.PI / 2, Math.PI, -Math.PI / 2];
+    for (var y = B.t + R + 2; y < B.b - R; y += 10) for (var x = B.l + R + 2; x < B.r - R; x += 10) {
+      if (!this.canStand(x, y)) continue;
+      for (var i = 0; i < dirs.length; i++) {
+        var dx = Math.round(Math.cos(dirs[i])), dy = Math.round(Math.sin(dirs[i])), sx = x + dx * 20, sy = y + dy * 20;
+        if (api.rayCast(sx, sy, dx, dy, C.throwRange, C.pr) > 60 || api.rayCast(sx, sy, dx, dy, C.throwRange, C.wallR) < C.throwRange) continue;
+        var side = Math.min(api.rayCast(x, y, -dy, dx, 200, 0), api.rayCast(x, y, dy, -dx, 200, 0));
+        return { x: x, y: y, ang: dirs[i], side: side };
+      }
+    }
+    return null;
+  }
 
   register() {
     this.registerBasic();
@@ -5222,21 +5235,29 @@ class PhantomTests {
       shown.push("해골 → 원뿔");
       self.verdict(done, bad, shown.join(" / "));
     });
-    run(G, "공격 간격: 근접 뒤 " + api.secs(C.meleeCd) + "·검기 뒤 " + api.secs(C.waveCd) + " 이고, 첫 공격은 대기 없이 나가는가", function (done) {
+    run(G, "공격 간격: 베기·검기 모두 " + api.secs(C.cd) + " 이고, 첫 공격은 대기 없이 나가는가", function (done) {
       var bad = [], W = self.solo([{ id: "near", x: X, y: Y + 120 }]), P = W.ent("ph"), T = W.ent("near");
       if (P.cdUntil > W.t()) bad.push("시작 대기 " + (P.cdUntil - W.t()));
       api.fireBasic(P, Math.PI / 2);
-      if (P.cdUntil - W.t() !== C.meleeCd) bad.push("근접 뒤 " + (P.cdUntil - W.t()));
+      if (P.cdUntil - W.t() !== C.cd) bad.push("베기 뒤 " + (P.cdUntil - W.t()));
       T.x = X; T.y = Y + 320;
-      W.step(C.meleeCd);
+      W.step(C.cd);
       api.fireBasic(P, Math.PI / 2);
-      if (P.cdUntil - W.t() !== C.waveCd) bad.push("검기 뒤 " + (P.cdUntil - W.t()));
-      T.x = X; T.y = Y + 120;
-      W.step(C.waveCd - 30);
-      if (!(P.cdUntil > W.t())) bad.push("검기 뒤 " + api.secs(C.waveCd) + " 전에 대기가 끝남");
-      W.step(40);
-      if (P.cdUntil > W.t()) bad.push("검기 뒤 " + api.secs(C.waveCd) + " 가 지나도 대기 중");
-      self.verdict(done, bad, "근접 " + api.secs(C.meleeCd) + " · 검기 " + api.secs(C.waveCd));
+      if (P.cdUntil - W.t() !== C.cd) bad.push("검기 뒤 " + (P.cdUntil - W.t()));
+      self.verdict(done, bad, "베기·검기 " + api.secs(C.cd));
+    });
+    run(G, "검기: 벽에 붙어 벽을 따라 쏴도(판정 폭 " + C.pr + ") 막히지 않고 사거리 " + C.throwRange + " 까지 날아가는가", function (done) {
+      var spot = self.wallHugSpot();
+      if (!spot) { self.verdict(done, ["벽 옆 자리를 못 찾음"], ""); return; }
+      var W = self.scene([{ id: "ph", team: "blue", char: "phantom", x: spot.x, y: spot.y, slot: 1 }]), P = W.ent("ph"), n = W.log.length;
+      api.fireBasic(P, spot.ang);
+      W.step(50);
+      var dist = null, shots = api.MATCH.remoteShots || {};
+      Object.keys(shots).forEach(function (k) { if (shots[k].d.owner === "ph") dist = shots[k].dist; });
+      var bad = [];
+      if (!self.pushes(W, "shots", n).length) bad.push("검기가 나가지 않음");
+      else if (dist == null || dist < C.throwRange - 1) bad.push("벽 옆에서 " + (dist == null ? "?" : Math.round(dist)) + " 만 날아감");
+      self.verdict(done, bad, "(" + Math.round(spot.x) + "," + Math.round(spot.y) + ") 벽까지 옆으로 " + Math.round(spot.side) + ", 날아간 거리 " + Math.round(dist));
     });
   }
 
@@ -5403,9 +5424,9 @@ class PhantomTests {
 
   registerCard() {
     var api = this.api, run = this.kit.run, G = PhantomTests.GROUP;
-    run(G, "카드: 공격 35 / 20·공격 간격 0.7 / 1.1·사거리 150 / 280 이고 설명 숫자가 수치에서 나오는가", function (done) {
+    run(G, "카드: 공격 30 / 20·공격 간격 1.1·사거리 150 / 450 이고 설명 숫자가 수치에서 나오는가", function (done) {
       var html = api.statTable("phantom"), bad = [], C = api.CHARS.phantom, U = api.ULT;
-      [C.dmg + " / " + C.throwDmg, api.num(C.meleeCd / api.timeScale() / 1000) + " / " + api.num(C.waveCd / api.timeScale() / 1000) + "초", C.range + " / " + C.throwRange].forEach(function (want) { if (html.indexOf(want) < 0) bad.push("표에 " + want + " 없음"); });
+      [C.dmg + " / " + C.throwDmg, api.num(C.cd / api.timeScale() / 1000) + "초", C.range + " / " + C.throwRange].forEach(function (want) { if (html.indexOf(want) < 0) bad.push("표에 " + want + " 없음"); });
       var ult = api.ultDesc("phantom");
       [api.secs(U.phWind), String(U.phLen), String(U.phDmg), api.secs(U.phAfterStunMs), api.secs(U.phStay)].forEach(function (want) { if (ult.indexOf(want) < 0) bad.push("스킬 설명에 " + want + " 없음"); });
       if (/\.$/.test(ult) || /\.$/.test(api.passiveDesc("phantom"))) bad.push("설명 끝에 마침표");
