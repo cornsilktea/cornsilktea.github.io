@@ -4872,7 +4872,7 @@ SinglePassMaterials.enable(THREE);
     static MODEL = { file: "Knight", right: "shield_square_color", rightScale: 1.6, rightPos: [0, 0, 0.28], left: "shield_square_color", leftScale: 1.6, leftPos: [0, 0, 0.28],
                recolor: [[0, 3, 1, "#6F8294", "#34404D"], [1, 0, 1, "#6F8294", "#34404D"], [2, 2, 1, "#6F8294", "#34404D"], [1, 1, 1, "#D7A75E", "#7E5527"], [1, 2, 2, "#C3CCD6", "#6D7A88"]] };
     static ULT = {
-      sgDur: GameTime.gameMs(5), sgWidth: 240, sgAhead: 70, sgDepth: 36, sgHeight: 42, sgPushLen: 150, sgPush: 150, sgSlideMs: GameTime.gameMs(0.15), sgJumpR: 400,
+      sgDur: GameTime.gameMs(5), sgWidth: 240, sgAhead: 70, sgDepth: 36, sgHeight: 42, sgPushLen: 150, sgPush: 150, sgPushDmg: 30, sgSlideMs: GameTime.gameMs(0.15), sgJumpR: 400,
       sgJumpMinMs: GameTime.gameMs(0.25), sgJumpMaxMs: GameTime.gameMs(0.55), sgLandGap: 6, sgBotFoeR: 450, sgBotThreatR: 420
     };
     static STATS = { name: "방패병", role: "fighter", icon: "🧱", hp: 450, speed: GameTime.gameSpeed(150), cd: GameTime.gameMs(1.6), dmg: 20, range: 150, width: 200,
@@ -4902,7 +4902,7 @@ SinglePassMaterials.enable(THREE);
     }
     pushAhead(E, t) { var services = this.services, u = ShielderType.ULT, len = Math.round(services.melee.lineReach(E.x, E.y, E.guardAng, u.sgPushLen));
       services.session.room.ref.child("meleeHits").push({ team: E.team, owner: E.id, x: MathKit.r1(E.x), y: MathKit.r1(E.y), angle: Math.round(E.guardAng * 1000) / 1000, len: len, width: u.sgWidth, radius: len,
-                                        dmg: 0, u: 1, slam: 1, kb: u.sgPush, kbAlong: 1, guardPush: 1, createdAt: t });
+                                        dmg: u.sgPushDmg, u: 1, slam: 1, kb: u.sgPush, kbAlong: 1, guardPush: 1, createdAt: t });
       services.vision.revealBriefly(E.id, t);
     }
     drawsOwnStrike(d) { return !!d.guardPush; }
@@ -4955,7 +4955,7 @@ SinglePassMaterials.enable(THREE);
       return "앞쪽 길이 " + c.range + "·폭 " + c.width + "의 지역을 방패로 밀쳐 " + c.dmg + "의 피해";
     }
     ultDesc() { var services = this.services, u = ShielderType.ULT;
-      return "지정한 방향으로 적을 " + u.sgPush + " 밀어내고 " + services.skilltext.secs(u.sgDur) + "간 맞은 공격이 사라지는 방패를 세움. 방패 지속 중 기본 공격 사용 시 가장 가까운 아군에게 도약";
+      return "지정한 방향으로 적을 " + u.sgPush + " 밀어내며 " + u.sgPushDmg + "의 피해를 주고 " + services.skilltext.secs(u.sgDur) + "간 맞은 공격이 사라지는 방패를 세움. 방패 지속 중 기본 공격 사용 시 가장 가까운 아군에게 도약";
     }
     passiveDesc() { var services = this.services; return "받는 피해 " + services.skilltext.pctOf(this.data.takenCut) + "% 감소"; }
   }

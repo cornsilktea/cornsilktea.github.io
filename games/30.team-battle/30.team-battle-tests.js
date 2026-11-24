@@ -5391,10 +5391,11 @@ class ShielderTests {
       var moved = function (id) { var E = W.ent(id); return { dx: E.x - start[id].x, dy: E.y - start[id].y }; };
       ["in", "near"].forEach(function (id) { var m = moved(id); if (Math.abs(m.dy - U.sgPush) > 6 || Math.abs(m.dx) > 6) bad.push(id + " 밀린 거리 " + m.dx.toFixed(0) + "," + m.dy.toFixed(0)); });
       ["far", "side", "back", "al"].forEach(function (id) { var m = moved(id); if (Math.hypot(m.dx, m.dy) > 1) bad.push(id + " 가 움직임 " + m.dx.toFixed(0) + "," + m.dy.toFixed(0)); });
-      if (self.lost(W.ent("in"))) bad.push("밀어내기에 피해가 있음");
+      ["in", "near"].forEach(function (id) { if (self.lost(W.ent(id)) !== U.sgPushDmg) bad.push(id + " 피해 " + self.lost(W.ent(id))); });
+      ["far", "side", "back", "al"].forEach(function (id) { if (self.lost(W.ent(id))) bad.push(id + " 가 피해를 입음"); });
       var push = W.log.filter(function (p) { return p.path === "meleeHits" && p.v.owner === "sh" && p.v.guardPush; });
       if (push.length !== 1) bad.push("밀어내기 신호 " + push.length + "번");
-      self.verdict(done, bad, "앞 120·60 의 적 " + U.sgPush + " 밀림, 밖·옆·뒤·아군 그대로");
+      self.verdict(done, bad, "앞 120·60 의 적 " + U.sgPush + " 밀림·" + U.sgPushDmg + " 피해, 밖·옆·뒤·아군 그대로");
     });
   }
 
@@ -5479,7 +5480,7 @@ class ShielderTests {
     var self = this, api = this.api, run = this.kit.run, G = ShielderTests.GROUP, U = api.ULT, C = api.CHARS.shielder;
     run(G, "카드: 능력치와 스킬 설명 숫자가 수치 표에서 나오는가", function (done) {
       var bad = [], text = api.ultDesc("shielder"), basic = api.basicDesc("shielder");
-      [api.secs(U.sgDur) + "간", String(U.sgPush) + " 밀어", "가장 가까운 아군"].forEach(function (k) { if (text.indexOf(k) < 0) bad.push("스킬 설명에 " + k + " 없음"); });
+      [api.secs(U.sgDur) + "간", String(U.sgPush) + " 밀어", U.sgPushDmg + "의 피해", "가장 가까운 아군"].forEach(function (k) { if (text.indexOf(k) < 0) bad.push("스킬 설명에 " + k + " 없음"); });
       [String(C.range), String(C.width), String(C.dmg)].forEach(function (k) { if (basic.indexOf(k) < 0) bad.push("기본 공격 설명에 " + k + " 없음"); });
       if (C.hp !== 450 || C.dmg !== 20 || C.range !== 150 || C.width !== 200 || Math.abs(api.secs(C.cd).replace("초", "") - 1.6) > 1e-9) bad.push("능력치 " + C.hp + "·" + C.dmg + "·" + C.range + "·" + api.secs(C.cd));
       var pas = api.passiveDesc("shielder");
