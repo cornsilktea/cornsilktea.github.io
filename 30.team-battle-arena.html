@@ -4869,10 +4869,10 @@ SinglePassMaterials.enable(THREE);
   }
   class ShielderType extends CharacterType {
     static MELEE = { color: 0xCFE2F2, spark: "#CFE6FF" };
-    static MODEL = { file: "Knight", right: "shield_square_color", rightScale: 1.6, rightTurn: Math.PI, left: "shield_square_color", leftScale: 1.6,
+    static MODEL = { file: "Knight", right: "shield_square_color", rightScale: 1.6, rightPos: [0, 0, 0.28], left: "shield_square_color", leftScale: 1.6, leftPos: [0, 0, 0.28],
                recolor: [[0, 3, 1, "#6F8294", "#34404D"], [1, 0, 1, "#6F8294", "#34404D"], [2, 2, 1, "#6F8294", "#34404D"], [1, 1, 1, "#D7A75E", "#7E5527"], [1, 2, 2, "#C3CCD6", "#6D7A88"]] };
     static ULT = {
-      sgDur: GameTime.gameMs(5), sgWidth: 300, sgAhead: 70, sgDepth: 36, sgHeight: 42, sgMoveMul: 0.6, sgJumpR: 400,
+      sgDur: GameTime.gameMs(5), sgWidth: 240, sgAhead: 70, sgDepth: 36, sgHeight: 42, sgMoveMul: 0.6, sgJumpR: 400,
       sgJumpMinMs: GameTime.gameMs(0.25), sgJumpMaxMs: GameTime.gameMs(0.55), sgLandGap: 6, sgBotFoeR: 450, sgBotThreatR: 420
     };
     static STATS = { name: "방패병", role: "fighter", icon: "🧱", hp: 400, speed: GameTime.gameSpeed(150), cd: GameTime.gameMs(1.6), dmg: 20, range: 150, width: 200,
@@ -4985,10 +4985,10 @@ SinglePassMaterials.enable(THREE);
   }
   class ShieldPlateMarker {
     static FLOOR_Y = 6;
-    static TINT = { blue: 0xAFD6FF, red: 0xFFC2B4 };
-    static FLOOR_OPACITY = 0.3;
-    static WALL_OPACITY = 0.42;
-    static EDGE_OPACITY = 0.9;
+    static TINT = { blue: 0x4FA3FF, red: 0xFF6A55 };
+    static FLOOR_OPACITY = 0.45;
+    static WALL_OPACITY = 0.62;
+    static EDGE_OPACITY = 1;
     static EDGE = 3;
     static geos(services) {
       var u = ShielderType.ULT, cache = services.matlib.sector;
@@ -8966,11 +8966,11 @@ SinglePassMaterials.enable(THREE);
           if (spec.recolor) services.modelStyle.recolorSkin(m, spec.recolor);
           if (spec.wear) services.modelStyle.wearPart(m, services.models.kit.chars[spec.wear.from], spec.wear.part, spec.wear.recolor);
           if (spec.right || spec.rightBuilt) {
-            var held = spec.rightBuilt ? TridentProp.build() : services.models.kit.weapons[spec.right].clone(); held.name = "mainhand"; if (spec.rightRecolor) services.modelStyle.recolorProp(held, spec.rightRecolor); if (spec.rightScale) held.scale.setScalar(spec.rightScale); if (spec.rightTurn) held.rotation.y = spec.rightTurn; if (spec.rightTilt) held.rotation.z = spec.rightTilt; if (spec.rightRot) held.rotation.set(spec.rightRot[0], spec.rightRot[1], spec.rightRot[2]);
+            var held = spec.rightBuilt ? TridentProp.build() : services.models.kit.weapons[spec.right].clone(); held.name = "mainhand"; if (spec.rightRecolor) services.modelStyle.recolorProp(held, spec.rightRecolor); if (spec.rightScale) held.scale.setScalar(spec.rightScale); if (spec.rightTurn) held.rotation.y = spec.rightTurn; if (spec.rightTilt) held.rotation.z = spec.rightTilt; if (spec.rightRot) held.rotation.set(spec.rightRot[0], spec.rightRot[1], spec.rightRot[2]); if (spec.rightPos) held.position.fromArray(spec.rightPos);
             if (spec.muzzle) { var muzzle = new THREE.Object3D(); muzzle.name = "muzzle"; muzzle.position.fromArray(spec.muzzle); held.add(muzzle); }
             m.getObjectByName("handslotr").add(held);
           }
-          if (spec.left) { var offhand = services.models.kit.weapons[spec.left].clone(); offhand.name = "offhand"; if (spec.leftRecolor) services.modelStyle.recolorProp(offhand, spec.leftRecolor); if (spec.leftTurn) offhand.rotation.y = spec.leftTurn; if (spec.leftRot) offhand.rotation.set(spec.leftRot[0], spec.leftRot[1], spec.leftRot[2]); if (spec.leftScale) offhand.scale.setScalar(spec.leftScale); m.getObjectByName("handslotl").add(offhand); }
+          if (spec.left) { var offhand = services.models.kit.weapons[spec.left].clone(); offhand.name = "offhand"; if (spec.leftRecolor) services.modelStyle.recolorProp(offhand, spec.leftRecolor); if (spec.leftTurn) offhand.rotation.y = spec.leftTurn; if (spec.leftRot) offhand.rotation.set(spec.leftRot[0], spec.leftRot[1], spec.leftRot[2]); if (spec.leftScale) offhand.scale.setScalar(spec.leftScale); if (spec.leftPos) offhand.position.fromArray(spec.leftPos); m.getObjectByName("handslotl").add(offhand); }
           if (spec.ponytail) services.modelStyle.attachPonytail(m, spec.ponytail);
           if (spec.halo) services.modelStyle.attachHalo(m, spec.halo);
           (spec.hide || []).forEach(function (part) { var o = m.getObjectByName(part); if (o) o.visible = false; });

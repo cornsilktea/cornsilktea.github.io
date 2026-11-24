@@ -5247,10 +5247,10 @@ class ShielderTests {
       if (self.lost(A2) || self.lost(S2)) bad.push("관통 검기가 맞음 아군 " + self.lost(A2) + "·방패병 " + self.lost(S2));
       self.verdict(done, bad, "화살 " + cut + "발 멈춤, 막은 피해 " + S.blocked + ", 관통 검기도 멈춤");
     });
-    run(G, "투사체: 옆·뒤에서 오면 맞고, 방패 폭 안인 앞 60° 는 막고 방패 끝 밖인 75° 는 맞는가", function (done) {
+    run(G, "투사체: 옆·뒤에서 오면 맞고, 방패 폭 안인 앞 50° 는 막고 방패 끝 밖인 70° 는 맞는가", function (done) {
       var bad = [], shown = [];
       var deg = Math.PI / 180, D = ShielderTests.DOWN;
-      [[0, "오른쪽", true], [-D, "뒤", true], [D + 60 * deg, "앞 60°", false], [D + 75 * deg, "앞 75°", true], [D - 60 * deg, "앞 -60°", false]].forEach(function (c) {
+      [[0, "오른쪽", true], [-D, "뒤", true], [D + 50 * deg, "앞 50°", false], [D + 70 * deg, "앞 70°", true], [D - 50 * deg, "앞 -50°", false]].forEach(function (c) {
         var ang = c[0];
         var x = Math.cos(ang) * 250, y = Math.sin(ang) * 250;
         var W = self.withShield([self.foe("rg", x, y, { char: "ranger" })]), S = self.raise(W), R = W.ent("rg");
