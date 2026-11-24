@@ -5403,9 +5403,9 @@ class PhantomTests {
 
   registerCard() {
     var api = this.api, run = this.kit.run, G = PhantomTests.GROUP;
-    run(G, "카드: 공격 35(20)·공격 간격 0.7(1.1)·사거리 150(400) 이고 설명 숫자가 수치에서 나오는가", function (done) {
+    run(G, "카드: 공격 35 / 20·공격 간격 0.7 / 1.1·사거리 150 / 280 이고 설명 숫자가 수치에서 나오는가", function (done) {
       var html = api.statTable("phantom"), bad = [], C = api.CHARS.phantom, U = api.ULT;
-      [C.dmg + "(" + C.throwDmg + ")", api.num(C.meleeCd / api.timeScale() / 1000) + "(" + api.num(C.waveCd / api.timeScale() / 1000) + ")초", C.range + "(" + C.throwRange + ")"].forEach(function (want) { if (html.indexOf(want) < 0) bad.push("표에 " + want + " 없음"); });
+      [C.dmg + " / " + C.throwDmg, api.num(C.meleeCd / api.timeScale() / 1000) + " / " + api.num(C.waveCd / api.timeScale() / 1000) + "초", C.range + " / " + C.throwRange].forEach(function (want) { if (html.indexOf(want) < 0) bad.push("표에 " + want + " 없음"); });
       var ult = api.ultDesc("phantom");
       [api.secs(U.phWind), String(U.phLen), String(U.phDmg), api.secs(U.phAfterStunMs), api.secs(U.phStay)].forEach(function (want) { if (ult.indexOf(want) < 0) bad.push("스킬 설명에 " + want + " 없음"); });
       if (/\.$/.test(ult) || /\.$/.test(api.passiveDesc("phantom"))) bad.push("설명 끝에 마침표");
@@ -7122,7 +7122,7 @@ class MarinaTests {
       [ULT.mrHeal + " 회복", C.dmg + "의 피해", "한 번 더"].forEach(function (w) { if (pas.indexOf(w) < 0) bad.push("패시브 설명에 없음: " + w); });
       if (/\.$/.test(ult) || /\.$/.test(pas)) bad.push("마침표로 끝남");
       if ((ult + pas + basic).indexOf("undefined") >= 0 || (ult + pas + basic).indexOf("NaN") >= 0) bad.push("값이 비어 있음");
-      if (table.indexOf(C.dmg + "(" + ULT.mrHeal + ")") < 0) bad.push("통계표 평균 피해");
+      if (table.indexOf(C.dmg + " / " + ULT.mrHeal) < 0) bad.push("통계표 평균 피해");
       if (C.role !== "caster" || !C.heals || !C.noAim || !C.ultAim) bad.push("표시값");
       if (C.width || C.arc) bad.push("근접으로 분류됨");
       self.verdict(done, bad, "설명 숫자 확인");

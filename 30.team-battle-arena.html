@@ -1753,8 +1753,8 @@ SinglePassMaterials.enable(THREE);
       var c = services.charTypes.statsOf(k), type = services.charTypes.of(k);
       function pair(a, b) { return b == null ? String(a) : a + " / " + b; }
       var times = c.shots || c.hits || c.ticks || 1, hit = services.skilltext.num(c.dmg) + (times > 1 ? "*" + times : "");
-      var dmg = !c.dmg ? "-" : c.dashDmg ? services.skilltext.num(c.dashDmg) + "(" + services.skilltext.num(c.dmg) + ")"
-              : type.statDamageText(c) || pair(hit, c.throwDmg || type.statSkillDamage(c)) + (c.heal ? "(" + c.heal + ")" : "");
+      var dmg = !c.dmg ? "-" : c.dashDmg ? pair(services.skilltext.num(c.dashDmg), services.skilltext.num(c.dmg))
+              : type.statDamageText(c) || pair(hit, c.throwDmg || type.statSkillDamage(c)) + (c.heal ? " / " + c.heal : "");
       var altCd = type.statAltCooldown(c);
       var cdText = type.statCooldownText(c), rangeText = type.statRangeText(c);
       var rateRow = cdText ? "<tr><th>공격 간격</th><td>" + cdText + "초</td></tr>" : services.clock.scale !== 1 ? "<tr><th>공격 간격</th><td>" + pair(services.skilltext.num(c.cd / services.clock.scale / 1000), altCd == null ? null : services.skilltext.num(altCd / services.clock.scale / 1000)) + "초</td></tr>"
@@ -4038,7 +4038,7 @@ SinglePassMaterials.enable(THREE);
     }
     playSkillClip(v, E, t) { this.services.fighterMotion.playOnce(v, TridentSlamPose.CLIP, (TridentSlamPose.IMPACT_SEC - TridentSlamPose.FROM_SEC) * 1000 / MarinaType.ULT.mrWindMs, t, null, TridentSlamPose.FROM_SEC); }
     poseHeldProp(v, E, t) { TridentSlamPose.apply(v, E, t); }
-    statDamageText(c) { var services = this.services, heal = services.skilltext.num(MarinaType.ULT.mrHeal); return services.skilltext.num(c.dmg) + "(" + heal + ")"; }
+    statDamageText(c) { var services = this.services, heal = services.skilltext.num(MarinaType.ULT.mrHeal); return services.skilltext.num(c.dmg) + " / " + heal; }
     cast(E, ang, reach, t) { var services = this.services, u = MarinaType.ULT;
       var x = MathKit.r1(E.x), y = MathKit.r1(E.y), angle = TsunamiLanes.exactAngle(ang);
       E.angle = ang;
@@ -4767,8 +4767,9 @@ SinglePassMaterials.enable(THREE);
       phStay: GameTime.gameMs(4), phBackSpeed: GameTime.gameSpeed(1000), phMinSweepMs: 40
     };
     static STATS = { name: "팬텀", role: "assassin", icon: "👻", hp: 150, speed: GameTime.gameSpeed(175), cd: GameTime.gameMs(0.7), meleeCd: GameTime.gameMs(0.7), waveCd: GameTime.gameMs(1.1),
-               dmg: 35, range: 150, arc: Math.PI * 100 / 180, throwDmg: 20, throwRange: 400, pSpeed: GameTime.gameSpeed(700), pr: 10,
+               dmg: 35, range: 150, arc: Math.PI * 100 / 180, throwDmg: 20, throwRange: 280, pSpeed: GameTime.gameSpeed(350), pr: 30,
                gust: { add: 15 / MatchRules.GAME_SPEED, ms: GameTime.gameMs(4), max: 4 }, ultName: "잔영섬", ultAim: true };
+    static SWORD_WAVE = { arc: Math.PI * 0.72, glowR: 40, glowThick: 15, coreR: 37, coreThick: 7, afterGap: 11, lead: 6 };
     static WIND_CLIP = "Melee_2H_Idle";
     static WIND_HOLD_SPEED = 0.05;
     static SWEEP_CLIP = "Melee_2H_Attack_Slice";
@@ -4827,12 +4828,11 @@ SinglePassMaterials.enable(THREE);
     botUltRange() { return PhantomType.ULT.phLen; }
     botUltAllowed(B, target) { return this.services.phantomStrike.botWorthIt(B, target); }
     botAct(B, target, enemies, t) { return this.services.phantomStrike.busy(B, t); }
-    projectileMesh(g, d) { var services = this.services;
-      var glow = new THREE.Mesh(services.models.crescentGeo(22, Math.PI * 0.85), services.models.glowMat("phantomWaveGlow", 0x7FE3D8, 0.55)); glow.rotation.x = -Math.PI / 2; glow.position.x = -14; g.add(glow);
-      var edge = new THREE.Mesh(services.models.crescentGeo(16, Math.PI * 0.8), services.models.basicMat("phantomWaveEdge", 0xEFFFFC, 0.95)); edge.rotation.x = -Math.PI / 2; edge.position.x = -9; g.add(edge);
-      var tail = new THREE.Mesh(services.geo.trail, services.models.glowMat("trail-phantom", 0x9FEDE4, 0.3)); tail.position.x = -18; tail.scale.set(56, 2.6, 2.6); g.add(tail);
-      [[-30, 5], [-44, -6], [-58, 3]].forEach(function (p, i) {
-        var puff = new THREE.Mesh(services.geo.ball, services.models.glowMat("phantomWaveMist", 0x6FB8B0, 0.22)); puff.position.set(p[0], 0, p[1]); puff.scale.setScalar(7 - i * 1.5); g.add(puff);
+    projectileMesh(g, d) { var services = this.services, W = PhantomType.SWORD_WAVE;
+      [[W.coreR, W.glowThick, "phantomWaveAfter", 0x4E8F8C, 0.3, -W.afterGap, 0.5], [W.glowR, W.glowThick, "phantomWaveGlow", 0xA9EEE6, 0.55, 0, 1], [W.coreR, W.coreThick, "phantomWaveEdge", 0xF4FFFD, 0.95, 0, 1.5]].forEach(function (L) {
+        var mat = services.models.basicMat(L[2], L[3], L[4]); mat.depthWrite = false;
+        var mesh = new THREE.Mesh(services.models.bladeCrescentGeo(L[0], W.arc, L[1]), mat);
+        mesh.rotation.x = -Math.PI / 2; mesh.position.set(W.lead - L[0] + L[5], L[6], 0); mesh.renderOrder = 4; g.add(mesh);
       });
     }
     dressPortrait(m) { var services = this.services, clip = services.models.kit.clips[PhantomType.WIND_CLIP];
@@ -4840,9 +4840,9 @@ SinglePassMaterials.enable(THREE);
       var mix = new THREE.AnimationMixer(m); mix.clipAction(clip).play(); mix.update(0.3); m.updateMatrixWorld(true);
     }
     attackClip(v, E, t) { return this.foeInReach(E, t) ? ["Melee_1H_Attack_Slice_Horizontal", 2.2] : ["Melee_1H_Attack_Slice_Diagonal", 2.0]; }
-    statDamageText(c) { return c.dmg + "(" + c.throwDmg + ")"; }
-    statCooldownText(c) { var services = this.services; return services.skilltext.num(c.meleeCd / services.clock.scale / 1000) + "(" + services.skilltext.num(c.waveCd / services.clock.scale / 1000) + ")"; }
-    statRangeText(c) { return c.range + "(" + c.throwRange + ")"; }
+    statDamageText(c) { return c.dmg + " / " + c.throwDmg; }
+    statCooldownText(c) { var services = this.services; return services.skilltext.num(c.meleeCd / services.clock.scale / 1000) + " / " + services.skilltext.num(c.waveCd / services.clock.scale / 1000); }
+    statRangeText(c) { return c.range + " / " + c.throwRange; }
     ultDesc() { var services = this.services, u = PhantomType.ULT;
       return services.skilltext.secs(u.phWind) + " 뒤 잔상을 남기고 앞으로 " + u.phLen + " 돌진. 닿은 적은 " + u.phDmg + "의 피해와 " + services.skilltext.secs(u.phAfterStunMs) + "간 기절, 도착 지점으로 딸려 감. " + services.skilltext.secs(u.phStay) + " 뒤 잔상 자리로 돌아감";
     }
@@ -8557,6 +8557,17 @@ SinglePassMaterials.enable(THREE);
     crescentGeo(radius, arc) { var services = this.services;
       var k = Math.round(radius) + ":" + arc.toFixed(3);
       return services.matlib.crescent[k] || (services.matlib.crescent[k] = new THREE.RingGeometry(radius * 0.7, radius, 28, 1, -arc / 2, arc));
+    }
+    bladeCrescentGeo(radius, arc, thick) { var services = this.services, k = "blade:" + Math.round(radius) + ":" + arc.toFixed(3) + ":" + thick;
+      if (services.matlib.crescent[k]) return services.matlib.crescent[k];
+      var steps = 24, pos = [], index = [];
+      for (var i = 0; i <= steps; i++) {
+        var u = i / steps, a = -arc / 2 + arc * u, t = thick * Math.pow(Math.sin(u * Math.PI), 0.8), c = Math.cos(a), s = Math.sin(a);
+        pos.push(c * radius, s * radius, 0, c * (radius - t), s * (radius - t), 0);
+        if (i < steps) { var o = i * 2; index.push(o, o + 2, o + 1, o + 1, o + 2, o + 3); }
+      }
+      var geo = new THREE.BufferGeometry(); geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); geo.setIndex(index);
+      return services.matlib.crescent[k] = geo;
     }
     basicMat(key, color, opacity) { var services = this.services;
       return services.matlib.mats[key] || (services.matlib.mats[key] = new THREE.MeshBasicMaterial({ color: color, transparent: opacity < 1, opacity: opacity }));
