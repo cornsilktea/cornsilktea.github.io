@@ -7912,7 +7912,7 @@ class EngineerDruidTests {
       if (lostWith(-Math.round(reach * 2.3))) bad.push("너무 멀리 벗어난 적이 맞음");
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "정면 " + C.dmg + " 한 번, 옆 " + wide + " 까지 명중, " + Math.round(reach * 2.3) + " 밖은 빗나감");
     });
-    run(G, "드루이드 스킬: 지정한 곳에 부쉬가 생겨 안의 아군만 1초당 " + ULT.drHeal + " 회복하고, 지속시간이 끝나면 사라지는가", function (done) {
+    run(G, "드루이드 스킬: 지정한 곳에 부쉬가 생겨 안의 아군만 1초당 " + ULT.drHeal + " 회복하고, " + api.secs(ULT.drDur) + " 뒤 사라지는가", function (done) {
       var bad = [], W = self.druidWorld([
         { id: "in", team: "blue", char: "guardian", x: 200 + 200 + 40, y: y },
         { id: "out", team: "blue", char: "guardian", x: 200 + 200 + ULT.drR + 90, y: y },
@@ -7921,16 +7921,18 @@ class EngineerDruidTests {
       dr.gauge = api.GAUGE_MAX; a.hp = 300; b.hp = 300; foe.hp = foe.maxHp - 200;
       api.useUlt(dr, 0, 200); W.frame(FRAME);
       var groves = api.FIELD.groves;
-      if (groves.length !== 1 || groves[0].e.x !== 400) bad.push("부쉬가 지정한 곳에 생기지 않음");
+      if (groves.length !== 1 || Math.abs(groves[0].e.x - 400) > api.TILE / 2) bad.push("부쉬가 지정한 곳에 생기지 않음");
       if (dr.gauge !== 0) bad.push("스킬 뒤 게이지 " + dr.gauge);
       if (a.hp !== 300 + ULT.drHeal) bad.push("첫 회복 " + a.hp + " (기대 " + (300 + ULT.drHeal) + ")");
       W.step(ULT.drTick + 60);
       if (a.hp !== 300 + ULT.drHeal * 2) bad.push("두 번째 회복 " + a.hp + " (기대 " + (300 + ULT.drHeal * 2) + ")");
       if (b.hp !== 300) bad.push("부쉬 밖 아군이 회복됨 " + b.hp);
       if (foe.hp !== foe.maxHp - 200) bad.push("적이 회복됨");
-      W.step(180000);
-      if (api.FIELD.groves.length !== 1) bad.push("3분이 지났는데 부쉬가 사라짐");
-      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "안의 아군만 " + ULT.drHeal + "씩 회복, 적·밖 아군 제외, 3분 뒤에도 유지");
+      W.step(ULT.drDur - ULT.drTick - 400);
+      if (api.FIELD.groves.length !== 1) bad.push("지속시간 전에 부쉬가 사라짐");
+      W.step(800);
+      if (api.FIELD.groves.length !== 0) bad.push(api.secs(ULT.drDur) + "이 지났는데 부쉬가 남음");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "안의 아군만 " + ULT.drHeal + "씩 회복, 적·밖 아군 제외, " + api.secs(ULT.drDur) + " 뒤 사라짐");
     });
     run(G, "드루이드 스킬: 부쉬 안의 유닛은 풀숲처럼 밖의 적 눈에 안 보이고, 같은 부쉬 안의 적에게는 보이는가", function (done) {
       var bad = [], W = self.druidWorld([
@@ -7951,34 +7953,29 @@ class EngineerDruidTests {
       var g = api.FIELD.groves[0].e, h = ULT.drR;
       if (!api.inBush(g.x + h - 2, g.y + h - 2)) bad.push("모서리 안쪽이 부쉬가 아님");
       if (api.inBush(g.x + h + 4, g.y)) bad.push("가장자리 바깥이 부쉬임");
-      if (g.dur < 600000) bad.push("지속시간이 게임 끝까지가 아님");
+      if (g.dur !== ULT.drDur) bad.push("지속시간 " + g.dur + " (기대 " + ULT.drDur + ")");
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "정사각형 한 변 " + h * 2);
     });
-    run(G, "드루이드 패시브: 자신의 부쉬 안에서 1초마다 체력 " + ULT.drSelfHeal + " 회복하고 게이지가 " + ULT.drSelfGauge + " 차오르며, 밖에서는 아무 일도 없는가", function (done) {
+    run(G, "드루이드 패시브: 부쉬와 상관없이 1초마다 스킬 게이지가 " + ULT.drSelfGauge + " 차오르고 체력은 회복하지 않는가", function (done) {
       var bad = [], W = self.druidWorld([]), dr = W.ent("dr"), tick = api.TIMESCALE.regenTickMs;
-      dr.gauge = api.GAUGE_MAX; api.useUlt(dr, 0); W.frame(FRAME);
-      if (api.FIELD.groves.length !== 1) bad.push("부쉬가 자신의 자리에 안 생김");
-      dr.hp = dr.maxHp - 90; var hp0 = dr.hp;
+      dr.hp = dr.maxHp - 40; var h0 = dr.hp;
+      if (api.inBush(dr.x, dr.y)) bad.push("시험 준비 실패: 부쉬 안");
       W.step(tick * 3 + 100);
-      var gain = dr.hp - hp0, wantGain = 3 * ULT.drSelfHeal;
       if (dr.gauge !== 3 * ULT.drSelfGauge) bad.push("게이지 " + dr.gauge + " (기대 " + 3 * ULT.drSelfGauge + ")");
-      if (gain !== Math.min(90, wantGain)) bad.push("회복 " + gain + " (기대 " + Math.min(90, wantGain) + ", 부쉬 스킬 회복과 겹쳐 받지 않고 패시브 " + ULT.drSelfHeal + " 한 번)");
-      dr.x = 200 + ULT.drR + 80; dr.hp = dr.maxHp - 40; var g1 = dr.gauge, h1 = dr.hp;
-      W.step(tick * 3 + 100);
-      if (dr.hp !== h1 || dr.gauge !== g1) bad.push("부쉬 밖에서도 회복·게이지가 오름");
-      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "자신의 부쉬 안: 초당 " + ULT.drSelfHeal + " 회복·게이지 +" + ULT.drSelfGauge + ", 밖: 변화 없음");
+      if (dr.hp !== h0) bad.push("체력이 회복됨 " + (dr.hp - h0));
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "부쉬 밖에서 3초에 게이지 +" + 3 * ULT.drSelfGauge + ", 체력 그대로");
     });
-    run(G, "드루이드 패시브: 맵의 부쉬(풀숲) 안에서도 1초마다 체력 회복·게이지 +1 이 되는가", function (done) {
-      var bad = [], tiles = api.bushTiles(), spot = tiles.length ? tiles[0][0] : null;
-      if (!spot) { done("info", "이 맵에 풀숲이 없어 확인하지 못함"); return; }
-      var W = self.druidWorld([]), dr = W.ent("dr"), tick = api.TIMESCALE.regenTickMs;
-      dr.x = spot.x; dr.y = spot.y; dr.hp = dr.maxHp - 60; var hp0 = dr.hp;
-      if (!api.inBush(dr.x, dr.y)) bad.push("시험 준비 실패: 풀숲이 아님");
-      W.step(tick * 2 + 100);
-      var self10 = ULT.drSelfHeal;
-      if (dr.hp - hp0 !== 2 * self10) bad.push("회복 " + (dr.hp - hp0) + " (기대 " + 2 * self10 + ")");
-      if (dr.gauge !== 2 * ULT.drSelfGauge) bad.push("게이지 " + dr.gauge + " (기대 " + 2 * ULT.drSelfGauge + ")");
-      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "풀숲 안 초당 " + self10 + " 회복·게이지 +1");
+    run(G, "드루이드 스킬: 자신도 부쉬 안에서 1초당 " + ULT.drHeal + " 회복하고, 부쉬가 있는 동안 게이지가 차지 않다가 사라지면 다시 차는가", function (done) {
+      var bad = [], W = self.druidWorld([]), dr = W.ent("dr"), tick = api.TIMESCALE.regenTickMs;
+      dr.gauge = api.GAUGE_MAX; dr.hp = dr.maxHp - 100; var h0 = dr.hp;
+      api.useUlt(dr, 0); W.frame(self.kit.FRAME);
+      W.step(tick * 3 + 100);
+      if (dr.hp - h0 !== 4 * ULT.drHeal) bad.push("회복 " + (dr.hp - h0) + " (기대 " + 4 * ULT.drHeal + ")");
+      if (dr.gauge !== 0) bad.push("부쉬가 있는 동안 게이지 " + dr.gauge);
+      W.step(ULT.drDur + tick * 2);
+      if (api.FIELD.groves.length) bad.push("부쉬가 남음");
+      if (dr.gauge < ULT.drSelfGauge) bad.push("부쉬가 사라진 뒤 게이지가 차지 않음 " + dr.gauge);
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "자신 " + 4 * ULT.drHeal + " 회복, 부쉬 중 게이지 0, 끝난 뒤 " + dr.gauge);
     });
   }
 }
