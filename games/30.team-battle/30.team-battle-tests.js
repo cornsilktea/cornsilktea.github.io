@@ -5183,7 +5183,8 @@ class PhantomTests {
   }
   verdict(done, bad, okText) { done(bad.length ? "fail" : "pass", bad.length ? bad.slice(0, 6).join(" / ") : okText); }
   waveDamageAt(gap) { var C = this.api.CHARS.phantom, bands = (C.dmg - C.farDmg) / C.dmgStep;
-    return C.dmg - C.dmgStep * Math.min(bands, Math.floor(Math.min(1, gap / C.range) * (bands + 1)));
+    if (gap <= C.fullDmgReach) return C.dmg;
+    return C.dmg - C.dmgStep * Math.min(bands, 1 + Math.floor(Math.min(1, (gap - C.fullDmgReach) / (C.range - C.fullDmgReach)) * bands));
   }
   waveDamage(P, T) { return this.waveDamageAt(Math.max(0, Math.hypot(T.x - Math.round(P.x), T.y - Math.round(P.y)) - T.hitR)); }
   wallHugSpot() {
@@ -5212,7 +5213,7 @@ class PhantomTests {
     var self = this, api = this.api, run = this.kit.run, G = PhantomTests.GROUP, C = api.CHARS.phantom, X = PhantomTests.X, Y = PhantomTests.Y;
     run(G, "기본 공격: 근접 없이 항상 검기이고, 피해는 거리에 따라 " + C.dmg + "에서 " + C.farDmg + "까지 " + C.dmgStep + " 단위로 줄며, 은신 적·해골 병사도 맞는가", function (done) {
       var bad = [], shown = [];
-      [60, 130, 200, 270, 340, 420].forEach(function (d) {
+      [60, 120, 160, 230, 290, 360, 440].forEach(function (d) {
         var W = self.solo([{ id: "foe", x: X, y: Y + d }]), P = W.ent("ph"), T = W.ent("foe"), n = W.log.length, want = self.waveDamage(P, T);
         api.fireBasic(P, Math.PI / 2);
         if (self.pushes(W, "meleeHits", n).length || self.pushes(W, "shots", n).length !== 1) bad.push(d + " 에서 검기가 아님");
