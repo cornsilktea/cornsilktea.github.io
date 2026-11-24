@@ -5378,7 +5378,7 @@ class ShielderTests {
   registerPush() {
     var self = this, api = this.api, run = this.kit.run, G = ShielderTests.GROUP, U = api.ULT;
     run(G, "세울 때 밀어내기: 앞쪽 길이 " + U.sgPushLen + " 안의 적만 시전 방향으로 " + U.sgPush + " 밀리고, 그 밖·옆·뒤의 적과 아군은 그대로인가", function (done) {
-      var bad = [], W = self.withShield([self.foe("in", 0, 150), self.foe("near", 30, 60), self.foe("far", 0, 300), self.foe("side", 200, 80), self.foe("back", 0, -100), self.ally("al", -60, 120)]), start = {};
+      var bad = [], W = self.withShield([self.foe("in", 0, 120), self.foe("near", 30, 60), self.foe("far", 0, 260), self.foe("side", 200, 80), self.foe("back", 0, -100), self.ally("al", -60, 120)]), start = {};
       ["in", "near", "far", "side", "back", "al"].forEach(function (id) { var E = W.ent(id); start[id] = { x: E.x, y: E.y }; });
       var S = self.raise(W), n = W.log.length;
       W.step(api.ULT.gdKbMs + 200);
@@ -5388,7 +5388,7 @@ class ShielderTests {
       if (self.lost(W.ent("in"))) bad.push("밀어내기에 피해가 있음");
       var push = W.log.filter(function (p) { return p.path === "meleeHits" && p.v.owner === "sh" && p.v.guardPush; });
       if (push.length !== 1) bad.push("밀어내기 신호 " + push.length + "번");
-      self.verdict(done, bad, "앞 150·60 의 적 " + U.sgPush + " 밀림, 밖·옆·뒤·아군 그대로");
+      self.verdict(done, bad, "앞 120·60 의 적 " + U.sgPush + " 밀림, 밖·옆·뒤·아군 그대로");
     });
   }
 
