@@ -5,7 +5,7 @@
      users/<uid>/stats/teambattle   { g, w, l, bg, bw, rg, rw, m, ids/<matchKey>, c/<캐릭터> }
        g 유효한 판 수 · w 승 · l 패 · bg/bw 블루 판·승 · rg/rw 레드 판·승 · m MVP 수
        c/<캐릭터> = { n 판, w 승, bg, bw, rg, rw, m MVP 횟수, kn 킬·데스·어시스트 평균 분모,
-                      k·d·a 평균 킬·데스·어시스트, dmg·hl·bl 평균 피해·회복·막은 피해, st·sl 평균 기절·둔화(초),
+                      k·d·a 평균 킬·데스·어시스트, dmg·hl·bl 평균 피해·회복·막은 피해, st·sl 평균 기절·둔화(초), swn·sw 둔화 점수(초 × 둔화율)를 센 판 수·평균(2026-11-24 추가, 화면은 sl 대신 이것을 보인다),
                       scn·sc 평균 환산점수의 판 수·평균(2026-10-28 추가 — 그 전 판은 없어서 n 과 따로 센다),
                       skn·sk·skb 스킬 비율을 센 판 수·그 판들의 평균 스킬 피해·평균 전체 피해(2026-11-04 추가, 비율은 sk ÷ skb) }
        ids = 최근에 올린 경기 열쇠(같은 판을 두 번 올리지 않게, 최근 AccountKeyLedger.KEEP 개만)
@@ -72,7 +72,7 @@ interface RecentMatchEntry extends AccountRecentHeadEntry {
 interface AccountCharNode {
   n: number; w: number; bg: number; bw: number; rg: number; rw: number; m: number;
   kn: number; k: number; d: number; a: number; dmg: number; hl: number; bl: number; st: number; sl: number;
-  scn: number; sc: number; skn: number; sk: number; skb: number;
+  scn: number; sc: number; skn: number; sk: number; skb: number; swn: number; sw: number;
 }
 
 interface AccountStatsNode {
@@ -106,7 +106,7 @@ interface ClassStatsRow {
 interface AccountLegacyCharRow {
   picks: number; wins: number; draws: number; mvpCount: number; scPicks: number; mvpScore: number;
   kills: number; deaths: number; assist: number; kdPicks: number; asPicks: number; ccPicks: number;
-  dmg: number; heal: number; block: number; stun: number; slow: number; skill: number; skillBase: number;
+  dmg: number; heal: number; block: number; stun: number; slow: number; skill: number; skillBase: number; swPicks: number; slowScore: number;
 }
 
 class TeamBattleRates extends AccountRates {
@@ -245,7 +245,7 @@ class AccountStatsMath {
   }
 
   static emptyChar(): AccountCharNode {
-    return { n: 0, w: 0, bg: 0, bw: 0, rg: 0, rw: 0, m: 0, kn: 0, k: 0, d: 0, a: 0, dmg: 0, hl: 0, bl: 0, st: 0, sl: 0, scn: 0, sc: 0, skn: 0, sk: 0, skb: 0 };
+    return { n: 0, w: 0, bg: 0, bw: 0, rg: 0, rw: 0, m: 0, kn: 0, k: 0, d: 0, a: 0, dmg: 0, hl: 0, bl: 0, st: 0, sl: 0, scn: 0, sc: 0, skn: 0, sk: 0, skb: 0, swn: 0, sw: 0 };
   }
 
   static normalize(raw: unknown): AccountStatsNode {
@@ -320,7 +320,9 @@ class AccountStatsMath {
       sc: AccountNumbers.runningAverage(before.sc, before.scn, TeamBattleScore.of(line)),
       skn: before.skn + (skillKnown ? 1 : 0),
       sk: skillKnown ? AccountNumbers.runningAverage(before.sk, before.skn, Math.max(0, Number(line.skillDmg) || 0)) : before.sk,
-      skb: skillKnown ? AccountNumbers.runningAverage(before.skb, before.skn, dealt) : before.skb
+      skb: skillKnown ? AccountNumbers.runningAverage(before.skb, before.skn, dealt) : before.skb,
+      swn: before.swn + 1,
+      sw: AccountNumbers.runningAverage(before.sw, before.swn, Math.max(0, Number(line.slowWeight) || 0))
     };
   }
 }
@@ -334,7 +336,7 @@ class AccountStatsTable {
       rows[id] = {
         picks: c.n, wins: c.w, draws: 0, mvpCount: c.m, scPicks: c.scn, mvpScore: c.sc,
         kills: c.k, deaths: c.d, assist: c.a, kdPicks: c.kn, asPicks: c.kn, ccPicks: c.n,
-        dmg: c.dmg, heal: c.hl, block: c.bl, stun: c.st, slow: c.sl, skill: c.sk, skillBase: c.skb
+        dmg: c.dmg, heal: c.hl, block: c.bl, stun: c.st, slow: c.sl, skill: c.sk, skillBase: c.skb, swPicks: c.swn, slowScore: c.sw
       };
     });
     return rows;
@@ -360,7 +362,7 @@ interface TeamBattleTableChar {
 class TeamBattleMyStatsTable {
   private static readonly COLUMNS: ReadonlyArray<readonly [string, string]> = [
     ["승률", "승리 수 / 판 수"], ["MVP", "MVP 횟수 / 판 수"], ["KDA", "(킬 + 어시스트) / 데스"],
-    ["평균 피해량", "(스킬 비율)"], ["평균 회복량", ""], ["평균 막은 피해", ""], ["평균 기절", ""], ["평균 둔화", ""], ["평균 MVP 점수", ""]
+    ["평균 피해량", "(스킬 비율)"], ["평균 회복량", ""], ["평균 막은 피해", ""], ["평균 기절", ""], ["평균 둔화 점수", "초 × 둔화율"], ["평균 MVP 점수", ""]
   ];
   private static readonly COLUMN_COUNT = TeamBattleMyStatsTable.COLUMNS.length + 1;
   private static readonly EMPTY = "아직 집계된 경기가 없어요.";
@@ -396,7 +398,7 @@ class TeamBattleMyStatsTable {
       + "<td>" + (char.heals ? Math.round(Number(row.heal) || 0) : "-") + "</td>"
       + "<td>" + (blockedKnown && char.blocks ? Math.round(Number(row.block) || 0) : "-") + "</td>"
       + "<td>" + (blockedKnown ? (Number(row.stun) || 0).toFixed(1) + "초" : "-") + "</td>"
-      + "<td>" + (blockedKnown ? (Number(row.slow) || 0).toFixed(1) + "초" : "-") + "</td>"
+      + "<td>" + (Number(row.swPicks) > 0 ? (Number(row.slowScore) || 0).toFixed(1) : "-") + "</td>"
       + "<td>" + (Number(row.scPicks) > 0 ? Math.round(Number(row.mvpScore) || 0) : "-") + "</td>";
   }
 

@@ -209,15 +209,15 @@ export function createSim(api) {
     results.forEach(function (g) {
       if (mapId && g.map !== mapId) return;
       g.chars.forEach(function (c) {
-        var a = acc[c.char] || (acc[c.char] = { n: 0, w: 0, d: 0, dmg: 0, skill: 0, heal: 0, blk: 0, taken: 0, stun: 0, slow: 0, k: 0, de: 0, as: 0, mvp: 0 });
+        var a = acc[c.char] || (acc[c.char] = { n: 0, w: 0, d: 0, dmg: 0, skill: 0, heal: 0, blk: 0, taken: 0, stun: 0, slow: 0, slowScore: 0, k: 0, de: 0, as: 0, mvp: 0 });
         a.n++; if (g.winner === "draw") a.d++; else if (g.winner === c.team) a.w++;
-        a.dmg += c.dmg; a.skill += c.skillDmg; a.heal += c.heal; a.blk += c.blocked; a.taken += c.taken; a.stun += c.stun; a.slow += c.slow;
+        a.dmg += c.dmg; a.skill += c.skillDmg; a.heal += c.heal; a.blk += c.blocked; a.taken += c.taken; a.stun += c.stun; a.slow += c.slow; a.slowScore += c.slowWeight || 0;
         a.k += c.kills; a.de += c.deaths; a.as += c.assists; a.mvp += c.mvp;
       });
     });
     return Object.keys(acc).map(function (id) {
       var a = acc[id], ch = api.CHARS[id], decided = a.n - a.d, row = { id: id, name: ch.name, role: ch.role, n: a.n, draws: a.d, win: decided ? Math.round(a.w / decided * 10000) / 10000 : 0 };
-      ["dmg", "skill", "heal", "blk", "taken", "stun", "slow", "k", "de", "as", "mvp"].forEach(function (key) { row[key] = Math.round(a[key] / a.n * 1000) / 1000; });
+      ["dmg", "skill", "heal", "blk", "taken", "stun", "slow", "slowScore", "k", "de", "as", "mvp"].forEach(function (key) { row[key] = Math.round(a[key] / a.n * 1000) / 1000; });
       return row;
     }).sort(function (x, y) { return y.win - x.win; });
   }
@@ -414,7 +414,7 @@ class ReportRenderer {
       ["blk", "막은 피해", function (v) { return Math.round(v); }],
       ["taken", "받은 피해", function (v) { return Math.round(v); }],
       ["stun", "기절(초)", function (v) { return fixed(v, 1); }],
-      ["slow", "둔화(초)", function (v) { return fixed(v, 1); }],
+      ["slowScore", "둔화 점수", function (v) { return fixed(v, 1); }],
       ["k", "처치", function (v) { return fixed(v, 2); }],
       ["de", "죽음", function (v) { return fixed(v, 2); }],
       ["as", "어시스트", function (v) { return fixed(v, 2); }],
@@ -515,7 +515,7 @@ class ReportRenderer {
     }, this).join("");
     var tab1 = this.totalsCards(D.totals, optCard) + "<h2>캐릭터별 메인 통계</h2>" + this.statTable(D.rows) +
     "<h2>팀 구성별 승률</h2><div class=\"wrap\" style=\"max-width:420px\"><table><thead><tr><th>팀 구성</th><th>팀 수</th><th>승률(무승부 제외)</th></tr></thead><tbody>" + comboRows + "</tbody></table></div>" +
-    "<p class=\"note\">숫자는 모두 무승부 판을 포함한 한 판(90초) 평균입니다. 승률만 무승부 판을 분모에서 뺍니다(승리 ÷ (판 수 - 무승부 판)). 기절·둔화는 적에게 건 시간. " +
+    "<p class=\"note\">숫자는 모두 무승부 판을 포함한 한 판(90초) 평균입니다. 승률만 무승부 판을 분모에서 뺍니다(승리 ÷ (판 수 - 무승부 판)). 기절은 적에게 건 시간(초), 둔화 점수는 적에게 건 둔화 시간(초) × 둔화율의 합(50% 2초 = 1.0). " +
     "스킬 피해(비중)은 입힌 피해 중 평범한 기본 공격이 아닌 피해(스킬·패시브·소환수·설치물·스킬로 강화된 기본 공격)와 그 비율로, 게임 통계의 스킬 비율과 같은 기준입니다. 받은 피해는 방어·보호막 등을 뺀 뒤 실제로 줄어든 체력의 양이고(해골 병사가 맞은 피해는 네크로의 막은 피해). 제목을 누르면 정렬됩니다.</p>";
     var tab2 = D.roleOrder.map(function (role) {
       var rows = D.rows.filter(function (r) { return r.role === role; });

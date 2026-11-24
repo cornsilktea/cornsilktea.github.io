@@ -74,7 +74,9 @@ class TeamBattleStatsReverter {
             sc: un(before.sc, before.scn, TeamBattleScore.of(line)),
             skn: down(before.skn, skillKnown),
             sk: skillKnown ? un(before.sk, before.skn, Math.max(0, Number(line.skillDmg) || 0)) : before.sk,
-            skb: skillKnown ? un(before.skb, before.skn, dealt) : before.skb
+            skb: skillKnown ? un(before.skb, before.skn, dealt) : before.skb,
+            swn: down(before.swn, before.swn > 0),
+            sw: before.swn > 0 ? un(before.sw, before.swn, Math.max(0, Number(line.slowWeight) || 0)) : before.sw
         };
     }
 }

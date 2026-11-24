@@ -2251,6 +2251,7 @@ class ResultCollector {
         db.paths.push(path);
         var cur = db.store[path] === undefined ? null : JSON.parse(JSON.stringify(db.store[path])), out = fn(cur);
         if (out === undefined) return Promise.resolve({ committed: false });
+        if (db.rejectSlowScore && Object.keys(out).some(function (k) { return out[k] && out[k].swPicks !== undefined; })) return Promise.reject(new Error("PERMISSION_DENIED"));
         if (db.rejectSkill && Object.keys(out).some(function (k) { return out[k] && out[k].skPicks !== undefined; })) return Promise.reject(new Error("PERMISSION_DENIED"));
         if (db.rejectDraws && Object.keys(out).some(function (k) { return out[k] && out[k].draws !== undefined; })) return Promise.reject(new Error("PERMISSION_DENIED"));
         db.store[path] = out;
@@ -2301,7 +2302,7 @@ class ResultCollector {
     Object.keys(over || {}).forEach(function (k) { room[k] = over[k]; });
     return room;
   }
-  function battleStats(n) { return { dmg: 100 * n + 3.3, heal: 10 * n, blocked: 5 * n + 0.04, stunDealt: 2 * n, slowDealt: n, assists: n, kills: n + 1, deaths: n }; }
+  function battleStats(n) { return { dmg: 100 * n + 3.3, heal: 10 * n, blocked: 5 * n + 0.04, stunDealt: 2 * n, slowDealt: n, slowWeight: 0.3 * n, assists: n, kills: n + 1, deaths: n }; }
   run(STATSG, "저장 시도 조건: 방이 바뀌었거나 끝나지 않았거나 승패가 없거나 남지 않은 사람이 있으면 저장 안 하고 사유를 남기는가", function (done) {
     withStatsEnv(function () {
       var bad = [], F = statsFixture(), db = fakeDb();
@@ -2327,7 +2328,7 @@ class ResultCollector {
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "조건이 어긋나면 저장하지 않고, 정상 경기만 " + db.paths[0] + " 에 저장함");
     });
   });
-  run(STATSG, "통계 행 만들기와 평균 갱신: 두 경기를 저장하면 픽·승·피해·회복·막은 피해·기절·둔화·어시스트·킬·죽음이 평균으로 쌓이는가", function (done) {
+  run(STATSG, "통계 행 만들기와 평균 갱신: 두 경기를 저장하면 픽·승·피해·회복·막은 피해·기절·둔화·둔화 점수·어시스트·킬·죽음이 평균으로 쌓이는가", function (done) {
     withStatsEnv(function () {
       var bad = [], F = statsFixture(), L = api.CHAR_LIST, db = fakeDb(), key = api.STATS_PATH;
       api.setDb(db);
@@ -2347,6 +2348,8 @@ class ResultCollector {
       var want = { dmg: round1((a.dmg + b.dmg) / 2), heal: round1((a.heal + b.heal) / 2), block: round1((a.blocked + b.blocked) / 2), stun: round1((a.stunDealt + b.stunDealt) / 2),
                    slow: round1((a.slowDealt + b.slowDealt) / 2), assist: round1((a.assists + b.assists) / 2), kills: round1((a.kills + b.kills) / 2), deaths: round1((a.deaths + b.deaths) / 2) };
       Object.keys(want).forEach(function (k) { if (c0[k] !== want[k]) bad.push(L[0] + " " + k + " " + c0[k] + " (기대 " + want[k] + ")"); });
+      var wantScore = Math.round((a.slowWeight + b.slowWeight) / 2 * 100) / 100;
+      if (c0.slowScore !== wantScore || c0.swPicks !== 2) bad.push("둔화 점수 " + c0.slowScore + "·" + c0.swPicks + " (기대 " + wantScore + "·2)");
       if (c0.ccPicks !== 2 || c0.asPicks !== 2 || c0.kdPicks !== 2) bad.push("평균 분모 ccPicks·asPicks·kdPicks " + c0.ccPicks + "·" + c0.asPicks + "·" + c0.kdPicks);
       if (c5.picks !== 2 || c5.dmg !== 0 || c5.kills !== 0) bad.push("전투 기록이 없는 선수(레드 3)는 0 으로 쌓여야 함: " + JSON.stringify(c5));
       if (s[L[8]].bans !== 2 || s[L[8]].picks !== 0) bad.push("밴 횟수 " + s[L[8]].bans + " (기대 2, 없는 캐릭터 밴은 무시)");
@@ -5050,8 +5053,8 @@ class ResultCollector {
     });
     var t = strict.store[key];
     if (!t || t.matches !== 1 || (t[L[0]] && t[L[0]].draws !== undefined)) bad.push("draws 없이 저장돼야 함: " + JSON.stringify(t && t[L[0]]));
-    if (strict.paths.length !== 3) bad.push("저장 시도 " + strict.paths.length + "번 (기대 3: 스킬·draws 포함 → 스킬 없이 → draws 없이)");
-    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "draws 거부 → draws 없이 세 번째 시도로 저장");
+    if (strict.paths.length !== 4) bad.push("저장 시도 " + strict.paths.length + "번 (기대 4: 둔화 점수·스킬·draws 포함 → 둔화 점수 없이 → 스킬 없이 → draws 없이)");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "draws 거부 → draws 없이 네 번째 시도로 저장");
   });
   runAsync(STATSG, "저장 규칙에 스킬 비율 칸이 아직 없어 거부되면 스킬 값 없이 다시 저장하는가", async function (done) {
     var bad = [], F, L = api.CHAR_LIST, key = api.STATS_PATH, strict = fakeDb();
@@ -5064,8 +5067,22 @@ class ResultCollector {
     });
     var t = strict.store[key], withSkill = t ? L.filter(function (k) { return t[k] && t[k].skPicks !== undefined; }) : [];
     if (!t || t.matches !== 1 || withSkill.length) bad.push("스킬 없이 저장돼야 함: " + JSON.stringify(withSkill));
+    if (strict.paths.length !== 3) bad.push("저장 시도 " + strict.paths.length + "번 (기대 3)");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "스킬 거부 → 스킬 없이 세 번째 시도로 저장");
+  });
+  runAsync(STATSG, "저장 규칙에 둔화 점수 칸이 아직 없어 거부되면 둔화 점수 없이 다시 저장하는가", async function (done) {
+    var bad = [], F, L = api.CHAR_LIST, key = api.STATS_PATH, strict = fakeDb();
+    strict.rejectSlowScore = true;
+    await withStatsEnvAsync(async function () {
+      F = statsFixture(); api.setDb(strict);
+      var room = endedRoom(F); api.bindRoom(room, F.players);
+      STATS.save(room, F.players);
+      await sleep(20);
+    });
+    var t = strict.store[key], withScore = t ? L.filter(function (k) { return t[k] && t[k].swPicks !== undefined; }) : [], withSkill = t ? L.filter(function (k) { return t[k] && t[k].skPicks !== undefined; }) : [];
+    if (!t || t.matches !== 1 || withScore.length || !withSkill.length) bad.push("둔화 점수만 빼고 저장돼야 함: 점수 " + withScore.length + "·스킬 " + withSkill.length);
     if (strict.paths.length !== 2) bad.push("저장 시도 " + strict.paths.length + "번 (기대 2)");
-    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "스킬 거부 → 스킬 없이 두 번째 시도로 저장");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "둔화 점수 거부 → 둔화 점수만 빼고 두 번째 시도로 저장");
   });
   runAsync(STATSVG, "통계 창 불러오기: 열면 현재 패치 통계를 보여 주고, 오른쪽 위 패치 버튼으로 이전 패치를 고르며, 연결이 없거나 실패하면 안내하는가", async function (done) {
     var bad = [], L = HUMAN_CHARS, P = api.STATS_PATCHES, now = P.current.id, old = P.LIST[0].id, tree = {};

@@ -234,7 +234,7 @@
       <div id="endStats" hidden></div>
       <div id="endStreak" class="mk-notice"></div>
       <div class="scoreRow"><div class="sb">블루팀<b id="endBlue">0</b></div><div class="sr">레드팀<b id="endRed">0</b></div></div>
-      <div class="boardWrap"><table class="board"><thead><tr><th>팀</th><th class="nm">닉네임</th><th class="nm">직업</th><th>처치</th><th>쓰러짐</th><th>어시스트</th><th>입힌 피해</th><th>회복</th><th>막은 피해</th><th>기절</th><th>둔화</th><th>환산점수<button id="btnScoreHelp" class="scoreHelp" type="button" aria-label="환산점수 계산식">?</button></th></tr></thead><tbody id="boardBody"></tbody></table></div>
+      <div class="boardWrap"><table class="board"><thead><tr><th>팀</th><th class="nm">닉네임</th><th class="nm">직업</th><th>처치</th><th>쓰러짐</th><th>어시스트</th><th>입힌 피해</th><th>회복</th><th>막은 피해</th><th>기절</th><th>둔화 점수</th><th>환산점수<button id="btnScoreHelp" class="scoreHelp" type="button" aria-label="환산점수 계산식">?</button></th></tr></thead><tbody id="boardBody"></tbody></table></div>
       <div id="endMvp" class="mvpBox"></div>
       <div class="endBtns"><button id="btnAgain" class="primary" type="button">다시하기</button><button id="btnLeaveEnd" type="button">방 나가기</button></div>
     </div>
@@ -245,13 +245,14 @@
   <div class="modalBox statsBox">
     <div class="statsTop"><h3>캐릭터 통계</h3><div class="statsTopBtns"><button id="btnStatsRefresh" class="mini" type="button">새로고침</button><div class="patchPick"><button id="btnStatsPatch" class="mini" type="button">패치</button><div id="statsPatchMenu" class="patchMenu" hidden></div></div><button id="btnStatsClose" class="mini" type="button">닫기</button></div></div>
     <div id="statsMsg" class="statsMsg"></div>
-    <div class="boardWrap"><table class="board statsTable"><thead><tr><th class="nm">캐릭터</th><th>승률<small>승리 수 / 픽 수</small></th><th>밴픽률<small>(밴 + 픽) / 게임 수</small></th><th>KDA<small>(킬 + 어시스트) / 데스</small></th><th>평균 피해량<small>(스킬 비율)</small></th><th>평균 회복량</th><th>평균 막은 피해</th><th>평균 기절</th><th>평균 둔화</th><th>평균 MVP 점수</th></tr></thead><tbody id="statsBody"></tbody></table></div>
+    <div class="boardWrap"><table class="board statsTable"><thead><tr><th class="nm">캐릭터</th><th>승률<small>승리 수 / 픽 수</small></th><th>밴픽률<small>(밴 + 픽) / 게임 수</small></th><th>KDA<small>(킬 + 어시스트) / 데스</small></th><th>평균 피해량<small>(스킬 비율)</small></th><th>평균 회복량</th><th>평균 막은 피해</th><th>평균 기절</th><th>평균 둔화 점수<small>초 × 둔화율</small></th><th>평균 MVP 점수</th></tr></thead><tbody id="statsBody"></tbody></table></div>
     <ul class="statsNotes">
       <li>AI 없이 학생 6명이 3대3으로 끝까지 마친 대회모드 경기만 집계합니다.</li>
       <li>밸런스 패치마다 통계를 따로 모읍니다. 오른쪽 위 패치 버튼으로 이전 패치의 통계도 볼 수 있습니다.</li>
       <li>시간이 끝났을 때 킬 수가 같으면 연장전을 하고, 연장전에서 먼저 처치한 팀이 이깁니다. 연장전이 생기기 전(2026-10-22)의 무승부 경기는 승리로 세지 않습니다.</li>
       <li>한 경기에서 같은 캐릭터는 1명만 고를 수 있으므로 밴픽률은 그 캐릭터가 밴되거나 나온 판의 비율입니다.</li>
       <li>막은 피해·기절·둔화·킬·데스·어시스트·밴은 이 항목이 추가된 뒤의 경기만으로 셉니다.</li>
+      <li>둔화 점수: 적에게 새로 건 둔화 시간(초) × 둔화율의 합입니다. 예) 50% 둔화 2초 = 1.0, 20% 둔화 2초 = 0.4. 2026-11-24 이후 경기만 셉니다.</li>
       <li>어시스트: 내가 피해나 해로운 효과(기절·둔화·넉백·끌어당김)를 준 적이 5초 안에 쓰러지거나, 내가 회복·은신(눈보라)을 준 아군이 5초 안에 적을 처치하면 1회(처치한 사람은 제외, 한 처치에 1번만).</li>
     </ul>
   </div>
@@ -287,7 +288,7 @@
     <div id="rmTitle" class="rmTitle"></div>
     <div id="rmWhen" class="rmWhen"></div>
     <div class="scoreRow"><div class="sb">블루팀<b id="rmBlue">0</b></div><div class="sr">레드팀<b id="rmRed">0</b></div></div>
-    <div class="boardWrap"><table class="board"><thead><tr><th>팀</th><th class="nm">닉네임</th><th class="nm">직업</th><th>처치</th><th>쓰러짐</th><th>어시스트</th><th>입힌 피해</th><th>회복</th><th>막은 피해</th><th>기절</th><th>둔화</th><th>환산점수</th></tr></thead><tbody id="rmBoardBody"></tbody></table></div>
+    <div class="boardWrap"><table class="board"><thead><tr><th>팀</th><th class="nm">닉네임</th><th class="nm">직업</th><th>처치</th><th>쓰러짐</th><th>어시스트</th><th>입힌 피해</th><th>회복</th><th>막은 피해</th><th>기절</th><th>둔화 점수</th><th>환산점수</th></tr></thead><tbody id="rmBoardBody"></tbody></table></div>
     <div id="rmMvp" class="mvpBox"></div>
     <div class="endBtns"><button id="btnRmResultClose" type="button">닫기</button></div>
   </div>
@@ -1840,7 +1841,7 @@ SinglePassMaterials.enable(THREE);
         "<td>" + (picks && c.heals ? Math.round(+d.heal || 0) : "-") + "</td>" +
         "<td>" + (ccPicks && c.blocks ? Math.round(+d.block || 0) : "-") + "</td>" +
         "<td>" + (ccPicks ? (+d.stun || 0).toFixed(1) + "초" : "-") + "</td>" +
-        "<td>" + (ccPicks ? (+d.slow || 0).toFixed(1) + "초" : "-") + "</td>";
+        "<td>" + (+d.swPicks ? (+d.slowScore || 0).toFixed(1) : "-") + "</td>";
     }
     charRowsHtml(s, columns, cellsOf) { var services = this.services;
       var lastRole = null, h = "";
@@ -8432,11 +8433,11 @@ SinglePassMaterials.enable(THREE);
       var rows = Object.keys(r.roster || {}).map(function (id) {
         var e = services.targets.ent(id) || services.netstate.stateOf(ps[id]);
         return { c: r.roster[id].c, win: r.winner === r.roster[id].team, draw: r.winner === "draw", dmg: +e.dmg || 0, skill: +e.skillDmg || 0, heal: +e.heal || 0,
-                 blocked: +e.blocked || 0, stun: +e.stunDealt || 0, slow: +e.slowDealt || 0, assists: +e.assists || 0, kills: +e.kills || 0, deaths: +e.deaths || 0,
+                 blocked: +e.blocked || 0, stun: +e.stunDealt || 0, slow: +e.slowDealt || 0, slowScore: +e.slowWeight || 0, assists: +e.assists || 0, kills: +e.kills || 0, deaths: +e.deaths || 0,
                  mvp: services.resultBoard.mvpScore(e) };
       });
       var banned = (r.bans || []).filter(function (c) { return services.charTypes.statsOf(c); });
-      function addStats(countSelectableGames, countDraws, countSkill) {
+      function addStats(countSelectableGames, countDraws, countSkill, countSlowScore) {
         return services.backend.db.ref(MatchStats.path).transaction(function (cur) {
           cur = cur || {};
           var matchesBefore = +cur.matches || 0;
@@ -8463,6 +8464,11 @@ SinglePassMaterials.enable(THREE);
             st.stun = MathKit.r1(((+st.stun || 0) * ccN + w.stun) / (ccN + 1));
             st.slow = MathKit.r1(((+st.slow || 0) * ccN + w.slow) / (ccN + 1));
             st.ccPicks = ccN + 1;
+            if (countSlowScore) {
+              var swN = +st.swPicks || 0;
+              st.slowScore = Math.round(((+st.slowScore || 0) * swN + w.slowScore) / (swN + 1) * 100) / 100;
+              st.swPicks = swN + 1;
+            }
             var asN = +st.asPicks || 0;
             st.assist = MathKit.r1(((+st.assist || 0) * asN + w.assists) / (asN + 1));
             st.asPicks = asN + 1;
@@ -8488,7 +8494,7 @@ SinglePassMaterials.enable(THREE);
           return cur;
         });
       }
-      addStats(true, true, true).catch(function () { return addStats(true, true, false); }).catch(function () { return addStats(true, false, false); }).catch(function () { return addStats(false, false, false); }).then(function (res) {
+      addStats(true, true, true, true).catch(function () { return addStats(true, true, true, false); }).catch(function () { return addStats(true, true, false); }).catch(function () { return addStats(true, false, false); }).catch(function () { return addStats(false, false, false); }).then(function (res) {
         services.stats.setNote(r, res && res.committed ? "이 경기는 통계에 반영됐어요" : "통계 저장이 취소됐어요. 다시 경기하면 반영돼요");
       }).catch(function (err) {
         services.stats.setNote(r, "통계 저장에 실패했어요(" + ((err && err.code) || err) + "). 데이터베이스 규칙 게시를 확인해 주세요");
@@ -12808,12 +12814,13 @@ SinglePassMaterials.enable(THREE);
           "<td>" + E.kills + "</td><td>" + E.deaths + "</td><td>" + (E.assists || 0) + "</td><td>" + Math.round(E.dmg) + "</td>" +
           "<td>" + (services.charTypes.statsOf(E.char).heals ? Math.round(E.heal) : "-") + "</td>" +
           "<td>" + (services.charTypes.statsOf(E.char).blocks ? Math.round(E.blocked || 0) : "-") + "</td>" +
-          "<td>" + services.resultBoard.secText(E.stunDealt) + "</td><td>" + services.resultBoard.secText(E.slowDealt) + "</td>" +
+          "<td>" + services.resultBoard.secText(E.stunDealt) + "</td><td>" + services.resultBoard.scoreText(E.slowWeight) + "</td>" +
           '<td class="sc">' + services.resultBoard.mvpScore(E) + "</td></tr>";
       });
       return rows;
     }
     secText(v) { var services = this.services; return v > 0 ? services.netstate.oneDecimal(v) + "초" : "-"; }
+    scoreText(v) { return v > 0 ? (Math.round(v * 10) / 10).toFixed(1) : "-"; }
     mvpScore(E) { var services = this.services;
       return E.kills * 100 + (E.assists || 0) * ResultBoard.MVP_ASSIST + Math.round(E.dmg) + Math.round(Math.round(E.heal || 0) * ResultBoard.MVP_HEAL) + Math.round(E.blocked || 0)
         + Math.round(services.netstate.oneDecimal(E.stunDealt) * ResultBoard.MVP_STUN_PER_SEC) + Math.round(services.netstate.twoDecimals(E.slowWeight) * ResultBoard.MVP_SLOW_PER_SEC) - E.deaths * 100;
