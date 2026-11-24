@@ -1164,6 +1164,7 @@ SinglePassMaterials.enable(THREE);
         var prev = services.session.room.status; services.session.room.status = st; services.arenaView.syncArena();
         var keepSpecResult = st === "lobby" && prev === "ended" && services.screens.now === "game" && services.flow.isSpec();
         if (!keepSpecResult) services.flow.releaseSpecResult();
+        if (st !== "ended" && !keepSpecResult) Dom.show(Dom.$("endOv"), false);
         if (st === "lobby") { services.match.game = null; services.match.me = null; services.match.bots = {}; if (keepSpecResult) services.flow.holdSpecResult(); else services.screens.showScreen("lobby"); services.lobby.playersChanged(); }
         else if (st === "draft") { services.match.game = null; services.match.me = null; services.match.bots = {}; if (prev !== "draft") services.draft.view = null; services.screens.showScreen("draft"); services.draftView.renderDraft(); }
         else services.screens.showScreen("game");
@@ -1518,6 +1519,7 @@ SinglePassMaterials.enable(THREE);
       var guardHome = document.querySelector("[data-guard-home]");
       if (guardHome) guardHome.style.display = k === "game" || k === "draft" ? "none" : "";
       if (k === "game") services.cameraRig.resize();
+      if (k === "game" && prev !== "game" && services.session.room) services.loop.staleCover.set(!services.flow.specHeld && services.loop.staleCover.waitingFor(services.session.room, services.match.game));
       if (k !== prev || (k !== "lobby" && k !== "start")) services.cards.setCharZoom(false);
       if (k === "start" || k === "lobby" || k === "party") services.lobby.placeCharBox(k);
       if (k !== "start" && k !== "lobby") { Dom.show(Dom.$("statsModal"), false); AccountWindows.closeAll(); }
@@ -1848,7 +1850,7 @@ SinglePassMaterials.enable(THREE);
       services.charTypes.list.forEach(function (k) {
         var c = services.charTypes.statsOf(k);
         if (c.role !== lastRole) { lastRole = c.role; h += '<tr class="grp"><td colspan="' + columns + '">' + RoleKinds.TABLE[c.role].icon + " " + RoleKinds.TABLE[c.role].name + "</td></tr>"; }
-        h += '<tr><td class="nm">' + c.icon + " " + Dom.esc(c.name) + "</td>" + cellsOf(s[k] || {}, c, k) + "</tr>";
+        h += '<tr><td class="nm"><span class="nmIcon">' + c.icon + "</span>" + Dom.esc(c.name) + "</td>" + cellsOf(s[k] || {}, c, k) + "</tr>";
       });
       return h;
     }
@@ -4778,7 +4780,7 @@ SinglePassMaterials.enable(THREE);
                rightRecolor: [[1, 2, 2, "#E4FFFB", "#7FD8CF"], [0, 3, 1, "#D8FBF6", "#6FC9C0"], [1, 1, 1, "#D8FBF6", "#6FC9C0"], [2, 0, 1, "#D8FBF6", "#6FC9C0"],
                               [0, 4, 1, "#3A3F45", "#1E2226"], [0, 5, 2, "#3A3F45", "#1E2226"], [1, 5, 2, "#3A3F45", "#1E2226"], [1, 4, 1, "#AEB7BC", "#6C767C"], [1, 7, 1, "#3A3F45", "#1E2226"], [0, 7, 1, "#4A5056", "#24282C"]] };
     static ULT = {
-      phWind: GameTime.gameMs(0.9), phLen: 500, phWidth: 150, phSpeed: GameTime.gameSpeed(2000), phDmg: 30, phAfterStunMs: GameTime.gameMs(0.5),
+      phWind: GameTime.gameMs(0.9), phLen: 500, phWallR: 10, phWidth: 150, phSpeed: GameTime.gameSpeed(2000), phDmg: 30, phAfterStunMs: GameTime.gameMs(0.5),
       phStay: GameTime.gameMs(4), phBackSpeed: GameTime.gameSpeed(1000), phMinSweepMs: 40
     };
     static STATS = { name: "팬텀", role: "assassin", icon: "👻", hp: 130, speed: GameTime.gameSpeed(175), cd: GameTime.gameMs(1.1),
@@ -4832,7 +4834,7 @@ SinglePassMaterials.enable(THREE);
     bodyAlpha(E, t, alpha) { return this.services.phantomView.isReturning(E, t) ? Math.min(alpha, PhantomType.RETURN_ALPHA) : alpha; }
     launchHandOf(model) { return model.getObjectByName("handslotr"); }
     showAimGuide(E, ult, c) { var services = this.services;
-      if (ult) { services.aimGuide.showStrikeLine(services.dashMoves.dashReach(E, E.angle, PhantomType.ULT.phLen), PhantomType.ULT.phWidth); return true; }
+      if (ult) { services.aimGuide.showStrikeLine(services.dashMoves.dashReach(E, E.angle, PhantomType.ULT.phLen, PhantomType.ULT.phWallR), PhantomType.ULT.phWidth); return true; }
       var dx = Math.cos(E.angle), dy = Math.sin(E.angle), len = services.physics.rayCast(E.x + dx * 20, E.y + dy * 20, dx, dy, c.range, c.wallR) + 20;
       services.aimGuide.showAimStrip(18, Math.max(1, len - 18), c.pr * 2);
       return true;
@@ -5895,7 +5897,7 @@ SinglePassMaterials.enable(THREE);
       E.phantom = { stage: "wind", ang: ang, x: E.x, y: E.y, fireAt: t + u.phWind };
       E.ultUntil = t + u.phWind;
       E.skillDur = u.phStay; E.skillUntil = t + u.phWind + this.dashMsOf(u.phLen) + u.phStay;
-      var reach = services.dashMoves.dashReach(E, ang, u.phLen);
+      var reach = services.dashMoves.dashReach(E, ang, u.phLen, u.phWallR);
       services.session.room.ref.child("meleeHits").push({ team: E.team, owner: E.id, x: MathKit.r1(E.x), y: MathKit.r1(E.y), angle: ang, len: Math.max(1, Math.round(reach)), width: u.phWidth, dmg: 0, wind: u.phWind, zone: 1, createdAt: t });
       services.vision.revealBriefly(E.id, t);
     }
@@ -5910,7 +5912,7 @@ SinglePassMaterials.enable(THREE);
       this.launch(E, P, t);
     }
     launch(E, P, t) { var services = this.services, u = PhantomType.ULT, ang = P.ang, dx = Math.cos(ang), dy = Math.sin(ang);
-      var reach = services.dashMoves.dashReach(E, ang, u.phLen);
+      var reach = services.dashMoves.dashReach(E, ang, u.phLen, u.phWallR);
       var tx = MathKit.clamp(E.x + dx * reach, ArenaSize.BOUND.l + ArenaSize.BODY_R, ArenaSize.BOUND.r - ArenaSize.BODY_R), ty = MathKit.clamp(E.y + dy * reach, ArenaSize.BOUND.t + ArenaSize.BODY_R, ArenaSize.BOUND.b - ArenaSize.BODY_R);
       reach = MathKit.hyp(tx - E.x, ty - E.y);
       var ms = Math.max(1, Math.round(this.dashMsOf(reach))), back = t + ms + u.phStay;
@@ -6018,7 +6020,7 @@ SinglePassMaterials.enable(THREE);
       for (var i = 0; i < parts; i++) { T.x += dx / parts; T.y += dy / parts; services.physics.resolve(T); }
     }
     botWorthIt(B, target) { var services = this.services, u = PhantomType.ULT, t = services.clock.now(), ang = Math.atan2(target.y - B.y, target.x - B.x);
-      var reach = services.dashMoves.dashReach(B, ang, u.phLen), line = { x: B.x, y: B.y, angle: ang, len: reach, width: u.phWidth };
+      var reach = services.dashMoves.dashReach(B, ang, u.phLen, u.phWallR), line = { x: B.x, y: B.y, angle: ang, len: reach, width: u.phWidth };
       var caught = services.targets.everyone(t).filter(function (o) { return o && o.alive && o.team !== B.team && !o.isProtected(t) && services.vision.visibleTo(o, B, t) && services.melee.inLine(o, line); });
       return caught.some(function (o) { return !o.minion; });
     }
@@ -7635,8 +7637,8 @@ SinglePassMaterials.enable(THREE);
   }
   class DashMoves {
     constructor(services) { this.services = services; }
-    dashReach(E, ang, len) { var services = this.services;
-      var dx = Math.cos(ang), dy = Math.sin(ang), pad = ArenaSize.BODY_R - 1, best = services.physics.rayObst(E.x, E.y, dx, dy, pad);
+    dashReach(E, ang, len, wallPad) { var services = this.services;
+      var dx = Math.cos(ang), dy = Math.sin(ang), pad = wallPad == null ? ArenaSize.BODY_R - 1 : wallPad, best = services.physics.rayObst(E.x, E.y, dx, dy, pad);
       for (var i = 0; i < services.arenaMap.water.length; i++) best = Math.min(best, services.physics.rayRect(E.x, E.y, dx, dy, services.arenaMap.water[i], pad));
       if (dx > 1e-9) best = Math.min(best, (ArenaSize.BOUND.r - ArenaSize.BODY_R - E.x) / dx);
       if (dx < -1e-9) best = Math.min(best, (ArenaSize.BOUND.l + ArenaSize.BODY_R - E.x) / dx);
@@ -14160,8 +14162,14 @@ SinglePassMaterials.enable(THREE);
       if (fpsMeter) { var rect = fpsMeter.getBoundingClientRect(); this.box.style.top = Math.max(rect.bottom, fpsTail ? fpsTail.getBoundingClientRect().bottom : 0) + "px"; this.box.style.right = "auto"; this.box.style.left = Math.max(FramePhaseMeter.EDGE_PX, Math.min(rect.left, window.innerWidth - this.box.offsetWidth - FramePhaseMeter.EDGE_PX)) + "px"; }
     }
   }
+  class StaleMatchCover {
+    static BODY_CLASS = "tb-stale";
+    constructor() { this.on = false; }
+    set(on) { if (on === this.on) return; this.on = on; document.body.classList.toggle(StaleMatchCover.BODY_CLASS, on); }
+    waitingFor(room, game) { return !game || (!!room.startAt && game.startAt !== room.startAt); }
+  }
   class GameLoop {
-    constructor(services) { this.services = services; this.lastFrame = Date.now(); }
+    constructor(services) { this.services = services; this.lastFrame = Date.now(); this.staleCover = new StaleMatchCover(); }
     start() { var services = this.services; requestAnimationFrame(function () { services.loop.frame(); }); }
     frame() { var services = this.services;
       requestAnimationFrame(function () { services.loop.frame(); });
@@ -14170,11 +14178,12 @@ SinglePassMaterials.enable(THREE);
       services.netDiag.frame(frameMs);
       services.badConnection.frame();
       services.propThemes.spinMillBlades(dt);
-      if (!services.session.room || services.screens.now !== "game") { services.matchPause.clear(); services.phases.start(frameMs); services.tourView.renderTour(nowMs, dt); services.phases.mark("render"); return; }
+      if (!services.session.room || services.screens.now !== "game") { this.staleCover.set(false); services.matchPause.clear(); services.phases.start(frameMs); services.tourView.renderTour(nowMs, dt); services.phases.mark("render"); return; }
       var st = services.session.room.status;
       if ((st === "countdown" || st === "playing" || st === "ended") && services.session.room.startAt && (!services.match.game || services.match.game.startAt !== services.session.room.startAt)) {
-        if (services.session.players[services.session.myId] && (services.session.players[services.session.myId].slot || services.flow.isSpec())) services.flow.initGame(); else return;
+        if (services.session.players[services.session.myId] && (services.session.players[services.session.myId].slot || services.flow.isSpec())) services.flow.initGame(); else { this.staleCover.set(true); return; }
       }
+      this.staleCover.set(!services.flow.specHeld && this.staleCover.waitingFor(services.session.room, services.match.game));
       if (!services.match.game) return;
       services.phases.start(frameMs);
       var t = services.clock.now();

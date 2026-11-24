@@ -267,7 +267,7 @@ class TeamBattleMyStatsTable {
                 lastGroup = char.group;
                 html += '<tr class="grp"><td colspan="' + TeamBattleMyStatsTable.COLUMN_COUNT + '">' + AccountHtml.esc(char.group) + "</td></tr>";
             }
-            html += '<tr><td class="nm">' + AccountHtml.esc(char.icon + " " + char.name) + "</td>" + TeamBattleMyStatsTable.cellsHtml(row, char) + "</tr>";
+            html += '<tr><td class="nm"><span style="display:inline-block;width:1.6em;text-align:center">' + AccountHtml.esc(char.icon) + "</span>" + AccountHtml.esc(char.name) + "</td>" + TeamBattleMyStatsTable.cellsHtml(row, char) + "</tr>";
         });
         return html || '<tr><td colspan="' + TeamBattleMyStatsTable.COLUMN_COUNT + '">' + TeamBattleMyStatsTable.EMPTY + "</td></tr>";
     }

@@ -227,6 +227,7 @@
   #btnPause:disabled { opacity: .5; cursor: default; }
   body.matchPaused #btnPause { background: #D97B4F; border-color: #D97B4F; color: #fff; }
   body.matchPaused #cv { filter: grayscale(1); }
+  body.tb-stale #cv, body.tb-stale #ov, body.tb-stale #scrGame { visibility: hidden; }
   #pauseOv { position: absolute; top: 42%; left: 50%; transform: translate(-50%, -50%); z-index: 6; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 14px 40px 16px; border-radius: 12px; background: rgba(14,20,17,.8); border-top: 3px solid #D97B4F; color: #F4F1E8; pointer-events: none; text-align: center; }
   #pauseOv[hidden] { display: none; }
   #pauseOv b { font-size: 44px; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; }
@@ -527,6 +528,7 @@
   .statsMsg { font-size: 14px; font-weight: 700; color: var(--sg-ink-soft); line-height: 1.5; margin-bottom: 8px; }
   .statsTable th small { display: block; font-size: 10px; font-weight: 400; }
   .statsTable td { text-align: center; }
+  .statsTable .nmIcon { display: inline-block; width: 1.6em; text-align: center; }
   .statsTable td small { display: block; font-size: 11px; font-weight: 400; color: #A3B0A6; }
   .statsTable tr.grp td { text-align: left; font-size: 13px; color: #FFB38A; background: rgba(217,123,79,.12); border-bottom-color: rgba(217,123,79,.5); }
   .statsNotes { margin: 0 0 0 18px; font-size: 13px; line-height: 1.6; color: var(--sg-ink-soft); }

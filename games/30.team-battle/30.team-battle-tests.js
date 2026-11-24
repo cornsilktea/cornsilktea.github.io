@@ -1086,7 +1086,7 @@ class ResultCollector {
           if (E.gauge < 0 || E.gauge > api.GAUGE_MAX) flag("게이지 범위 이탈", E, t, "gauge " + E.gauge);
           if (!E.alive) return;
           if (E.stunUntil - t > maxStun + 20) flag("기절이 너무 김", E, t, Math.round(E.stunUntil - t) + "ms");
-          var ghostBack = !!(E.phantom && E.phantom.stage === "back");
+          var ghostBack = !!(E.phantom && (E.phantom.stage === "back" || E.phantom.stage === "dash"));
           if (!E.leap && !ghostBack) { var why = blockedAt(E.x, E.y); if (why) flag(why, E, t); }
           if (E.dash && t - E.dash.at > (E.dash.ms || api.CHARS[E.char].dashMs) + (api.CHARS[E.char].finishDelay || 0) + 200) flag("돌진이 안 끝남", E, t);
           if (E.leap && t - E.leap.at > api.ULT.bsLeapMaxMs + 200) flag("도약이 안 끝남", E, t);
