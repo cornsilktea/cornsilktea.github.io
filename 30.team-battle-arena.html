@@ -2637,6 +2637,7 @@ SinglePassMaterials.enable(THREE);
     stepSkill(E, t) {}
     bodyAlpha(E, t, alpha) { return alpha; }
     shotTouches(p, a, b, T) { return null; }
+    shotDamage(d, T) { return d.dmg; }
     get hasSkillClip() { return false; }
     poseHeldProp(v, E, t) {}
     launchHandOf(model) { return model.getObjectByName("muzzle"); }
@@ -4768,7 +4769,7 @@ SinglePassMaterials.enable(THREE);
       phStay: GameTime.gameMs(4), phBackSpeed: GameTime.gameSpeed(1000), phMinSweepMs: 40
     };
     static STATS = { name: "팬텀", role: "assassin", icon: "👻", hp: 150, speed: GameTime.gameSpeed(175), cd: GameTime.gameMs(1.1),
-               dmg: 30, range: 150, arc: Math.PI * 100 / 180, throwDmg: 20, throwRange: 450, pSpeed: GameTime.gameSpeed(350), pr: 100, wallR: 10, pierce: true,
+               dmg: 40, farDmg: 15, dmgStep: 5, range: 450, pSpeed: GameTime.gameSpeed(350), pr: 100, wallR: 10, pierce: true,
                gust: { add: 15 / MatchRules.GAME_SPEED, ms: GameTime.gameMs(4), max: 4 }, ultName: "잔영섬", ultAim: true };
     static SWORD_WAVE = { arc: Math.PI * 0.72, glowR: 116, glowThick: 28, coreR: 110, coreThick: 11, afterGap: 20, lead: 10 };
     static WAVE_SWING = { clip: "Melee_1H_Attack_Slice_Horizontal", speed: 2.2, from: 0.17, release: 0.23 };
@@ -4801,13 +4802,11 @@ SinglePassMaterials.enable(THREE);
       if (h.ps) { this.addGust(owner, h.ps, t); return; }
       if (h.b && h.s && h.s !== owner.gustSwing) { owner.gustSwing = h.s; this.addGust(owner, 1, t); }
     }
-    foeInReach(E, t) { var services = this.services, reach = this.data.range;
-      return services.targets.everyone(t).some(function (o) { return o && o.alive && o.team !== E.team && services.vision.visibleTo(o, E, t) && MathKit.hyp(o.x - E.x, o.y - E.y) <= reach + o.hitR; });
-    }
-    overrideBasic(E, ang, reach, t) { var services = this.services;
-      if (this.foeInReach(E, t)) services.melee.swing(E, ang, false);
-      else services.projectiles.emitShots(E, ang, false);
-      return true;
+    overrideBasic(E, ang, reach, t) { this.services.projectiles.emitShots(E, ang, false); return true; }
+    shotDamage(d, T) { var c = this.data;
+      if (d.isSkill) return d.dmg;
+      var gap = Math.max(0, MathKit.hyp(T.x - d.castX, T.y - d.castY) - T.hitR), bands = Math.round((c.dmg - c.farDmg) / c.dmgStep);
+      return c.dmg - c.dmgStep * Math.min(bands, Math.floor(MathKit.clamp(gap / c.range, 0, 1) * (bands + 1)));
     }
     cast(E, ang, reach, t) { this.services.phantomStrike.cast(E, ang, t); }
     drawsOwnStrike(d) { return !!d.ph; }
@@ -4820,8 +4819,7 @@ SinglePassMaterials.enable(THREE);
     launchHandOf(model) { return model.getObjectByName("handslotr"); }
     showAimGuide(E, ult, c) { var services = this.services;
       if (ult) { services.aimGuide.showAimStrip(0, services.dashMoves.dashReach(E, E.angle, PhantomType.ULT.phLen) + ArenaSize.BODY_R, PhantomType.ULT.phWidth); return true; }
-      if (this.foeInReach(E, services.clock.now())) { services.aimGuide.showAimSector(c.range + ArenaSize.BODY_R, c.arc); return true; }
-      var dx = Math.cos(E.angle), dy = Math.sin(E.angle), len = services.physics.rayCast(E.x + dx * 20, E.y + dy * 20, dx, dy, c.throwRange, c.wallR) + 20;
+      var dx = Math.cos(E.angle), dy = Math.sin(E.angle), len = services.physics.rayCast(E.x + dx * 20, E.y + dy * 20, dx, dy, c.range, c.wallR) + 20;
       services.aimGuide.showAimStrip(18, Math.max(1, len - 18), c.pr * 2);
       return true;
     }
@@ -4847,8 +4845,7 @@ SinglePassMaterials.enable(THREE);
       var front = W.lead - R + Math.sqrt(R * R - Math.min(reach, R) * Math.min(reach, R)), along = rx * dx + ry * dy - front, span = (b.x - a.x) * dx + (b.y - a.y) * dy;
       return along >= -T.hitR && along <= span + T.hitR;
     }
-    statDamageText(c) { return c.dmg + " / " + c.throwDmg; }
-    statRangeText(c) { return c.range + " / " + c.throwRange; }
+    statDamageText(c) { return c.farDmg + "~" + c.dmg; }
     ultDesc() { var services = this.services, u = PhantomType.ULT;
       return services.skilltext.secs(u.phWind) + " 뒤 잔상을 남기고 앞으로 " + u.phLen + " 돌진. 닿은 적은 " + u.phDmg + "의 피해와 " + services.skilltext.secs(u.phAfterStunMs) + "간 기절, 도착 지점으로 딸려 감. " + services.skilltext.secs(u.phStay) + " 뒤 잔상 자리로 돌아감";
     }
@@ -4856,7 +4853,7 @@ SinglePassMaterials.enable(THREE);
       return "적중 시 " + services.skilltext.secs(g.ms) + "간 이동속도 " + services.skilltext.shownSpeed(g.add) + " 증가, 최대 " + g.max + "번 중첩. 기본 공격은 한 번에 1번, 스킬은 맞힌 적 수만큼 쌓이고 쌓일 때마다 지속시간 초기화";
     }
     basicDesc() { var services = this.services, c = this.data;
-      return "반경 " + c.range + " 안에 보이는 적이 있으면 앞쪽을 베어 " + c.dmg + "의 피해, 없으면 사거리 " + c.throwRange + "의 검기가 적을 꿰뚫고 날아가며 닿은 적마다 " + c.throwDmg + "의 피해(벽에는 막힘). 공격 간격은 " + services.skilltext.secs(c.cd);
+      return "사거리 " + c.range + "의 검기가 적을 꿰뚫고 날아가며 닿은 적마다 거리에 따라 " + c.dmg + "~" + c.farDmg + "의 피해(가까울수록 크고 " + c.dmgStep + " 단위로 줄어듦, 벽에는 막힘). 공격 간격 " + services.skilltext.secs(c.cd);
     }
   }
   class CharacterRegistry {
@@ -7027,7 +7024,8 @@ SinglePassMaterials.enable(THREE);
       fx = ownerType.projectileEffect(d, T, immune, fx);
       var dancer = ownerType.isBladeThrower;
       var ownBonusSum = services.projectiles.damageBonusSum(d, T);
-      services.damage.damage(T, Math.round(d.dmg * (1 + ownBonusSum)), d.owner, ownerType.basicHitMark(d), d.isSkill ? d.ultKey : (d.countsAsSkill ? "skill" : null), fx, undefined, undefined, ownBonusSum ? { base: d.dmg, rate: 1 + ownBonusSum } : null, d.overcharged);
+      var baseDmg = ownerType.shotDamage(d, T);
+      services.damage.damage(T, Math.round(baseDmg * (1 + ownBonusSum)), d.owner, ownerType.basicHitMark(d), d.isSkill ? d.ultKey : (d.countsAsSkill ? "skill" : null), fx, undefined, undefined, ownBonusSum ? { base: baseDmg, rate: 1 + ownBonusSum } : null, d.overcharged);
       if (dancer) services.bladeSpins.bladeSpin(p, T.x, T.y);
       if (d.ultKey === "execute" && !immune) { services.session.room.ref.child("hits/" + d.owner).push({ d: 0, b: 0, t: services.clock.now(), tp: { x: MathKit.r1(T.x), y: MathKit.r1(T.y) } }); services.fxView.executeFx(T.x, T.y); }
       ownerType.afterProjectileHit(d, T, immune);

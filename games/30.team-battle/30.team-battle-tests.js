@@ -5182,13 +5182,17 @@ class PhantomTests {
     });
   }
   verdict(done, bad, okText) { done(bad.length ? "fail" : "pass", bad.length ? bad.slice(0, 6).join(" / ") : okText); }
+  waveDamageAt(gap) { var C = this.api.CHARS.phantom, bands = (C.dmg - C.farDmg) / C.dmgStep;
+    return C.dmg - C.dmgStep * Math.min(bands, Math.floor(Math.min(1, gap / C.range) * (bands + 1)));
+  }
+  waveDamage(P, T) { return this.waveDamageAt(Math.max(0, Math.hypot(T.x - Math.round(P.x), T.y - Math.round(P.y)) - T.hitR)); }
   wallHugSpot() {
     var api = this.api, C = api.CHARS.phantom, B = api.BOUND, R = api.BODY_R, dirs = [0, Math.PI / 2, Math.PI, -Math.PI / 2];
     for (var y = B.t + R + 2; y < B.b - R; y += 10) for (var x = B.l + R + 2; x < B.r - R; x += 10) {
       if (!this.canStand(x, y)) continue;
       for (var i = 0; i < dirs.length; i++) {
         var dx = Math.round(Math.cos(dirs[i])), dy = Math.round(Math.sin(dirs[i])), sx = x + dx * 20, sy = y + dy * 20;
-        if (api.rayCast(sx, sy, dx, dy, C.throwRange, C.pr) > 60 || api.rayCast(sx, sy, dx, dy, C.throwRange, C.wallR) < C.throwRange) continue;
+        if (api.rayCast(sx, sy, dx, dy, C.range, C.pr) > 60 || api.rayCast(sx, sy, dx, dy, C.range, C.wallR) < C.range) continue;
         var side = Math.min(api.rayCast(x, y, -dy, dx, 200, 0), api.rayCast(x, y, dy, -dx, 200, 0));
         return { x: x, y: y, ang: dirs[i], side: side };
       }
@@ -5206,55 +5210,54 @@ class PhantomTests {
 
   registerBasic() {
     var self = this, api = this.api, run = this.kit.run, G = PhantomTests.GROUP, C = api.CHARS.phantom, X = PhantomTests.X, Y = PhantomTests.Y;
-    run(G, "기본 공격: 사거리 " + C.range + " 안에 보이는 적(해골 병사 포함)이 있으면 원뿔 베기 " + C.dmg + ", 없으면 검기 " + C.throwDmg + " 이고 보이지 않는 적은 세지 않는가", function (done) {
+    run(G, "기본 공격: 근접 없이 항상 검기이고, 피해는 거리에 따라 " + C.dmg + "에서 " + C.farDmg + "까지 " + C.dmgStep + " 단위로 줄며, 은신 적·해골 병사도 맞는가", function (done) {
       var bad = [], shown = [];
-      var W = self.solo([{ id: "near", x: X, y: Y + 120 }]), P = W.ent("ph"), T = W.ent("near"), n = W.log.length;
-      api.fireBasic(P, Math.PI / 2);
-      if (self.pushes(W, "meleeHits", n).length !== 1 || self.pushes(W, "shots", n).length) bad.push("가까운 적에게 원뿔이 아님");
-      if (self.lost(T) !== C.dmg) bad.push("원뿔 피해 " + self.lost(T));
-      shown.push("120 → 원뿔 " + self.lost(T));
-      W = self.solo([{ id: "far", x: X, y: Y + 300 }]); P = W.ent("ph"); T = W.ent("far"); n = W.log.length;
-      api.fireBasic(P, Math.PI / 2);
-      if (self.pushes(W, "shots", n).length !== 1 || self.pushes(W, "meleeHits", n).length) bad.push("먼 적에게 검기가 아님");
-      W.step(800);
-      if (self.lost(T) !== C.throwDmg) bad.push("검기 피해 " + self.lost(T));
-      shown.push("300 → 검기 " + self.lost(T));
-      W = self.solo([{ id: "hid", char: "rogue", x: X, y: Y + 140 }]); P = W.ent("ph"); T = W.ent("hid"); n = W.log.length;
+      [60, 130, 200, 270, 340, 420].forEach(function (d) {
+        var W = self.solo([{ id: "foe", x: X, y: Y + d }]), P = W.ent("ph"), T = W.ent("foe"), n = W.log.length, want = self.waveDamage(P, T);
+        api.fireBasic(P, Math.PI / 2);
+        if (self.pushes(W, "meleeHits", n).length || self.pushes(W, "shots", n).length !== 1) bad.push(d + " 에서 검기가 아님");
+        W.step(2000);
+        if (self.lost(T) !== want) bad.push(d + " 피해 " + self.lost(T) + " (기대 " + want + ")");
+        shown.push(d + "→" + self.lost(T));
+      });
+      var seen = {}; for (var g = 0; g <= C.range; g += 5) seen[self.waveDamageAt(g)] = 1;
+      var levels = Object.keys(seen).map(Number).sort(function (a, b) { return b - a; }), wantLevels = [];
+      for (var v = C.dmg; v >= C.farDmg; v -= C.dmgStep) wantLevels.push(v);
+      if (levels.join(",") !== wantLevels.join(",")) bad.push("피해 단계 " + levels.join(","));
+      var W = self.solo([{ id: "hid", char: "rogue", x: X, y: Y + 140 }]), P = W.ent("ph"), T = W.ent("hid");
       T.stealthUntil = W.t() + api.ULT.asDur;
-      api.fireBasic(P, Math.PI / 2);
-      if (self.pushes(W, "shots", n).length !== 1) bad.push("은신한 적을 보고 원뿔을 씀");
-      shown.push("은신 140 → 검기");
+      api.fireBasic(P, Math.PI / 2); W.step(1500);
+      if (!self.lost(T)) bad.push("은신한 적이 검기에 안 맞음");
       W = self.scene([{ id: "ph", team: "blue", char: "phantom", x: X, y: Y, slot: 1 }, { id: "nc", char: "necro", x: X + 300, y: Y + 600, slot: 1, gauge: api.GAUGE_MAX }]); P = W.ent("ph");
       var nc = W.ent("nc");
       api.useUlt(nc, Math.PI / 2); W.step(api.ULT.smRiseMs + 50);
       nc.minions.forEach(function (m, i) { m.x = X - 30 + i * 30; m.y = Y + 110; m.cdUntil = Infinity; });
-      n = W.log.length;
-      api.fireBasic(P, Math.PI / 2);
-      if (self.pushes(W, "meleeHits", n).length !== 1) bad.push("해골 병사가 가까이 있어도 원뿔이 아님");
-      if (!nc.minions.some(function (m) { return m.hp < api.ULT.smHp; })) bad.push("원뿔이 해골 병사를 못 맞힘");
-      shown.push("해골 → 원뿔");
+      api.fireBasic(P, Math.PI / 2); W.step(1000);
+      if (!nc.minions.some(function (m) { return m.hp < api.ULT.smHp; })) bad.push("검기가 해골 병사를 못 맞힘");
+      shown.push("단계 " + levels.join("·"));
       self.verdict(done, bad, shown.join(" / "));
     });
-    run(G, "공격 간격: 베기·검기 모두 " + api.secs(C.cd) + " 이고, 첫 공격은 대기 없이 나가는가", function (done) {
+    run(G, "공격 간격: 검기 " + api.secs(C.cd) + " 이고, 첫 공격은 대기 없이 나가는가", function (done) {
       var bad = [], W = self.solo([{ id: "near", x: X, y: Y + 120 }]), P = W.ent("ph"), T = W.ent("near");
       if (P.cdUntil > W.t()) bad.push("시작 대기 " + (P.cdUntil - W.t()));
       api.fireBasic(P, Math.PI / 2);
-      if (P.cdUntil - W.t() !== C.cd) bad.push("베기 뒤 " + (P.cdUntil - W.t()));
+      if (P.cdUntil - W.t() !== C.cd) bad.push("첫 검기 뒤 " + (P.cdUntil - W.t()));
       T.x = X; T.y = Y + 320;
       W.step(C.cd);
       api.fireBasic(P, Math.PI / 2);
       if (P.cdUntil - W.t() !== C.cd) bad.push("검기 뒤 " + (P.cdUntil - W.t()));
-      self.verdict(done, bad, "베기·검기 " + api.secs(C.cd));
+      self.verdict(done, bad, "검기 " + api.secs(C.cd));
     });
-    run(G, "검기: 한 줄로 선 적 셋을 모두 꿰뚫어 " + C.throwDmg + "씩 주고, 질풍·게이지는 한 번만 오르며, 사거리 밖 적은 맞지 않는가", function (done) {
-      var bad = [], W = self.solo([{ id: "a", x: X, y: Y + 200 }, { id: "b", x: X, y: Y + 290 }, { id: "c", x: X, y: Y + 380 }, { id: "far", x: X, y: Y + C.throwRange + 120 }]), P = W.ent("ph");
+    run(G, "검기: 한 줄로 선 적 셋을 모두 꿰뚫어 거리별 피해를 주고, 질풍·게이지는 한 번만 오르며, 사거리 밖 적은 맞지 않는가", function (done) {
+      var bad = [], W = self.solo([{ id: "a", x: X, y: Y + 200 }, { id: "b", x: X, y: Y + 290 }, { id: "c", x: X, y: Y + 380 }, { id: "far", x: X, y: Y + C.range + 120 }]), P = W.ent("ph"), want = {};
+      ["a", "b", "c"].forEach(function (id) { want[id] = self.waveDamage(P, W.ent(id)); });
       api.fireBasic(P, Math.PI / 2);
       W.step(2000);
-      ["a", "b", "c"].forEach(function (id) { if (self.lost(W.ent(id)) !== C.throwDmg) bad.push(id + " 피해 " + self.lost(W.ent(id))); });
+      ["a", "b", "c"].forEach(function (id) { if (self.lost(W.ent(id)) !== want[id]) bad.push(id + " 피해 " + self.lost(W.ent(id)) + " (기대 " + want[id] + ")"); });
       if (self.lost(W.ent("far"))) bad.push("사거리 밖 적이 맞음");
       if (P.gustStacks !== 1) bad.push("질풍 " + P.gustStacks + "회");
       if (P.gauge !== api.roleGauge("phantom")) bad.push("게이지 " + P.gauge + " (기대 " + api.roleGauge("phantom") + ")");
-      self.verdict(done, bad, "세 명 모두 " + C.throwDmg + ", 질풍 1회, 게이지 " + P.gauge);
+      self.verdict(done, bad, "a·b·c " + want.a + "·" + want.b + "·" + want.c + ", 질풍 1회, 게이지 " + P.gauge);
     });
     run(G, "검기: 초승달 앞 끝이 적에게 닿을 때 맞고(그 전엔 안 맞음), 옆으로 " + C.pr + " 안의 적은 초승달 끝이 지나갈 때 맞는가", function (done) {
       var bad = [], shown = [], W = self.solo([{ id: "ahead", x: X, y: Y + 300 }, { id: "wing", x: X + 90, y: Y + 300 }]), P = W.ent("ph"), A = W.ent("ahead"), S = W.ent("wing");
@@ -5277,7 +5280,7 @@ class PhantomTests {
       shown.push("옆 90: " + Math.round(touchWing) + "ms");
       self.verdict(done, bad, shown.join(" / "));
     });
-    run(G, "검기: 벽에 붙어 벽을 따라 쏴도(판정 폭 " + C.pr + ") 막히지 않고 사거리 " + C.throwRange + " 까지 날아가는가", function (done) {
+    run(G, "검기: 벽에 붙어 벽을 따라 쏴도(판정 폭 " + C.pr + ") 막히지 않고 사거리 " + C.range + " 까지 날아가는가", function (done) {
       var spot = self.wallHugSpot();
       if (!spot) { self.verdict(done, ["벽 옆 자리를 못 찾음"], ""); return; }
       var W = self.scene([{ id: "ph", team: "blue", char: "phantom", x: spot.x, y: spot.y, slot: 1 }]), P = W.ent("ph"), n = W.log.length;
@@ -5287,21 +5290,21 @@ class PhantomTests {
       Object.keys(shots).forEach(function (k) { if (shots[k].d.owner === "ph") dist = shots[k].dist; });
       var bad = [];
       if (!self.pushes(W, "shots", n).length) bad.push("검기가 나가지 않음");
-      else if (dist == null || dist < C.throwRange - 1) bad.push("벽 옆에서 " + (dist == null ? "?" : Math.round(dist)) + " 만 날아감");
+      else if (dist == null || dist < C.range - 1) bad.push("벽 옆에서 " + (dist == null ? "?" : Math.round(dist)) + " 만 날아감");
       self.verdict(done, bad, "(" + Math.round(spot.x) + "," + Math.round(spot.y) + ") 벽까지 옆으로 " + Math.round(spot.side) + ", 날아간 거리 " + Math.round(dist));
     });
   }
 
   registerPassive() {
     var self = this, api = this.api, run = this.kit.run, G = PhantomTests.GROUP, C = api.CHARS.phantom, U = api.ULT, X = PhantomTests.X, Y = PhantomTests.Y;
-    run(G, "질풍: 원뿔이 여러 명을 맞혀도 1회, 스킬은 맞힌 수만큼(최대 " + C.gust.max + "), 쌓일 때마다 지속시간이 처음부터인가", function (done) {
+    run(G, "질풍: 검기가 여러 명을 맞혀도 1회, 스킬은 맞힌 수만큼(최대 " + C.gust.max + "), 쌓일 때마다 지속시간이 처음부터인가", function (done) {
       var bad = [], shown = [], base = api.CHARS.phantom.speed;
       var W = self.solo([{ id: "a", x: X - 40, y: Y + 110 }, { id: "b", x: X + 40, y: Y + 110 }, { id: "c", x: X, y: Y + 300 }]), P = W.ent("ph");
-      api.fireBasic(P, Math.PI / 2);
-      if (P.gustStacks !== 1) bad.push("원뿔 2명 적중 뒤 " + P.gustStacks + "회");
+      api.fireBasic(P, Math.PI / 2); W.step(900);
+      if (P.gustStacks !== 1) bad.push("검기 3명 적중 뒤 " + P.gustStacks + "회");
       if (Math.abs(api.speedOf(P) - (base + C.gust.add)) > 0.01) bad.push("이동속도 " + api.speedOf(P).toFixed(1));
-      shown.push("원뿔 2명 → 1회");
-      W.step(C.gust.ms - 600);
+      shown.push("검기 3명 → 1회");
+      W.step(C.gust.ms - 1600);
       var until0 = P.gustUntil;
       W.ent("a").x = X - 400; W.ent("b").x = X + 400;
       P.cdUntil = 0; api.fireBasic(P, Math.PI / 2); W.step(700);
@@ -5447,7 +5450,7 @@ class PhantomTests {
       W = self.solo([{ id: "a", x: X + 300, y: Y + 500 }]); P = W.ent("ph");
       self.castAt(W, P, Math.PI / 2); self.untilArrived(W, P); W.step(U.phStay + 800);
       var A2 = W.ent("a"); A2.x = P.x; A2.y = P.y + 110; P.cdUntil = 0;
-      api.fireBasic(P, Math.PI / 2);
+      api.fireBasic(P, Math.PI / 2); W.step(600);
       if (!(P.gauge > 0)) bad.push("돌아온 뒤에도 게이지가 안 오름");
       self.verdict(done, bad, "쓰러지면 잔상 제거, 돌아온 뒤 게이지 " + P.gauge);
     });
@@ -5455,9 +5458,9 @@ class PhantomTests {
 
   registerCard() {
     var api = this.api, run = this.kit.run, G = PhantomTests.GROUP;
-    run(G, "카드: 공격 30 / 20·공격 간격 1.1·사거리 150 / 450 이고 설명 숫자가 수치에서 나오는가", function (done) {
+    run(G, "카드: 공격 15~40·공격 간격 1.1·사거리 450 이고 설명 숫자가 수치에서 나오는가", function (done) {
       var html = api.statTable("phantom"), bad = [], C = api.CHARS.phantom, U = api.ULT;
-      [C.dmg + " / " + C.throwDmg, api.num(C.cd / api.timeScale() / 1000) + "초", C.range + " / " + C.throwRange].forEach(function (want) { if (html.indexOf(want) < 0) bad.push("표에 " + want + " 없음"); });
+      [C.farDmg + "~" + C.dmg, api.num(C.cd / api.timeScale() / 1000) + "초", "<td>" + C.range + "</td>"].forEach(function (want) { if (html.indexOf(want) < 0) bad.push("표에 " + want + " 없음"); });
       var ult = api.ultDesc("phantom");
       [api.secs(U.phWind), String(U.phLen), String(U.phDmg), api.secs(U.phAfterStunMs), api.secs(U.phStay)].forEach(function (want) { if (ult.indexOf(want) < 0) bad.push("스킬 설명에 " + want + " 없음"); });
       if (/\.$/.test(ult) || /\.$/.test(api.passiveDesc("phantom"))) bad.push("설명 끝에 마침표");
