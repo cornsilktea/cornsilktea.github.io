@@ -2636,6 +2636,7 @@ SinglePassMaterials.enable(THREE);
     cannotCast(E, t) { return false; }
     stepSkill(E, t) {}
     bodyAlpha(E, t, alpha) { return alpha; }
+    shotTouches(p, a, b, T) { return null; }
     get hasSkillClip() { return false; }
     poseHeldProp(v, E, t) {}
     launchHandOf(model) { return model.getObjectByName("muzzle"); }
@@ -4767,7 +4768,7 @@ SinglePassMaterials.enable(THREE);
       phStay: GameTime.gameMs(4), phBackSpeed: GameTime.gameSpeed(1000), phMinSweepMs: 40
     };
     static STATS = { name: "팬텀", role: "assassin", icon: "👻", hp: 150, speed: GameTime.gameSpeed(175), cd: GameTime.gameMs(1.1),
-               dmg: 30, range: 150, arc: Math.PI * 100 / 180, throwDmg: 20, throwRange: 450, pSpeed: GameTime.gameSpeed(350), pr: 100, wallR: 10,
+               dmg: 30, range: 150, arc: Math.PI * 100 / 180, throwDmg: 20, throwRange: 450, pSpeed: GameTime.gameSpeed(350), pr: 100, wallR: 10, pierce: true,
                gust: { add: 15 / MatchRules.GAME_SPEED, ms: GameTime.gameMs(4), max: 4 }, ultName: "잔영섬", ultAim: true };
     static SWORD_WAVE = { arc: Math.PI * 0.72, glowR: 116, glowThick: 28, coreR: 110, coreThick: 11, afterGap: 20, lead: 10 };
     static WAVE_SWING = { clip: "Melee_1H_Attack_Slice_Horizontal", speed: 2.2, from: 0.17, release: 0.23 };
@@ -4839,7 +4840,13 @@ SinglePassMaterials.enable(THREE);
       if (!clip) return;
       var mix = new THREE.AnimationMixer(m); mix.clipAction(clip).play(); mix.update(0.3); m.updateMatrixWorld(true);
     }
-    attackClip(v, E, t) { var W = PhantomType.WAVE_SWING; return this.foeInReach(E, t) ? [W.clip, W.speed] : [W.clip, W.speed, null, W.from]; }
+    attackClip(v, E, t) { var W = PhantomType.WAVE_SWING; return [W.clip, W.speed, null, W.from]; }
+    shotTouches(p, a, b, T) { var W = PhantomType.SWORD_WAVE, R = W.glowR, dx = p.dx, dy = p.dy, rx = T.x - a.x, ry = T.y - a.y;
+      var side = Math.abs(rx * dy - ry * dx), reach = Math.max(0, side - T.hitR);
+      if (side > p.d.pr + T.hitR * 0.5) return false;
+      var front = W.lead - R + Math.sqrt(R * R - Math.min(reach, R) * Math.min(reach, R)), along = rx * dx + ry * dy - front, span = (b.x - a.x) * dx + (b.y - a.y) * dy;
+      return along >= -T.hitR && along <= span + T.hitR;
+    }
     statDamageText(c) { return c.dmg + " / " + c.throwDmg; }
     statRangeText(c) { return c.range + " / " + c.throwRange; }
     ultDesc() { var services = this.services, u = PhantomType.ULT;
@@ -4849,7 +4856,7 @@ SinglePassMaterials.enable(THREE);
       return "적중 시 " + services.skilltext.secs(g.ms) + "간 이동속도 " + services.skilltext.shownSpeed(g.add) + " 증가, 최대 " + g.max + "번 중첩. 기본 공격은 한 번에 1번, 스킬은 맞힌 적 수만큼 쌓이고 쌓일 때마다 지속시간 초기화";
     }
     basicDesc() { var services = this.services, c = this.data;
-      return "반경 " + c.range + " 안에 보이는 적이 있으면 앞쪽을 베어 " + c.dmg + "의 피해, 없으면 사거리 " + c.throwRange + "의 검기로 처음 맞은 적에게 " + c.throwDmg + "의 피해. 공격 간격은 " + services.skilltext.secs(c.cd);
+      return "반경 " + c.range + " 안에 보이는 적이 있으면 앞쪽을 베어 " + c.dmg + "의 피해, 없으면 사거리 " + c.throwRange + "의 검기가 적을 꿰뚫고 날아가며 닿은 적마다 " + c.throwDmg + "의 피해(벽에는 막힘). 공격 간격은 " + services.skilltext.secs(c.cd);
     }
   }
   class CharacterRegistry {
@@ -6936,6 +6943,9 @@ SinglePassMaterials.enable(THREE);
       services.match.remoteShots[id] = { id: id, d: d, dx: dx, dy: dy, sp: sp, dist: dist, life: dist / sp * 1000, lt: {}, dead: false, sparked: false };
     }
     projAt(p, e) { e = MathKit.clamp(e, 0, p.life); return { x: p.d.x + p.dx * p.sp * e / 1000, y: p.d.y + p.dy * p.sp * e / 1000 }; }
+    touches(p, a, b, T) { var services = this.services, own = services.charTypes.of(p.d.ownerCharacterType).shotTouches(p, a, b, T);
+      return own == null ? services.projectiles.segHit(a.x, a.y, b.x, b.y, T.x, T.y, T.hitR + (p.d.pr || 6)) : own;
+    }
     segHit(ax, ay, bx, by, cx, cy, r) {
       var vx = bx - ax, vy = by - ay, L = vx * vx + vy * vy, t = 0;
       if (L > 0) t = MathKit.clamp(((cx - ax) * vx + (cy - ay) * vy) / L, 0, 1);
@@ -6961,7 +6971,7 @@ SinglePassMaterials.enable(THREE);
     shotSpec(c, skill) { var services = this.services;
       var C = services.charTypes.statsOf(c);
       if (skill) return services.charTypes.of(c).skillShotSpec();
-      return { count: C.shots || 1, gap: C.gap || 0, sp: C.pSpeed, dmg: C.throwDmg || C.dmg, pr: C.pr, wallR: C.wallR, range: C.throwRange || C.range, lanes: C.lanes || 1 };
+      return { count: C.shots || 1, gap: C.gap || 0, sp: C.pSpeed, dmg: C.throwDmg || C.dmg, pr: C.pr, wallR: C.wallR, pierce: !!C.pierce, range: C.throwRange || C.range, lanes: C.lanes || 1 };
     }
     stepShots(t) { var services = this.services;
       services.match.shots = services.match.shots.filter(function (v) {
@@ -6982,7 +6992,7 @@ SinglePassMaterials.enable(THREE);
         var side = (lane - (lanes - 1) / 2) * 2 * laneStep;
         services.projectiles.addProj(v.key + "_" + i + (lanes > 1 ? "_" + lane : ""), { team: v.team, owner: v.ev.o, ownerCharacterType: v.char, x: ox + dx * 20 - dy * side, y: oy + dy * 20 + dx * side,
           vx: dx * sp, vy: dy * sp, castX: ox, castY: oy, isSkill: v.skill, countsAsSkill: !!v.ev.sk, overcharged: !v.skill && !!E && E.isOvercharged(v.ev.t), swingAt: v.ev.t, dmg: sv.dmg, ultKey: sv.ultKey, fx: sv.fx, laneHit: laneHit,
-          pr: sv.pr, wallR: sv.wallR, range: sv.range + (!v.skill && E && E.isOvercharged(v.ev.t) ? StormbowType.ULT.ocRangeBonus : 0), createdAt: v.ev.t + i * v.gap });
+          pr: sv.pr, wallR: sv.wallR, pierced: sv.pierce ? {} : null, range: sv.range + (!v.skill && E && E.isOvercharged(v.ev.t) ? StormbowType.ULT.ocRangeBonus : 0), createdAt: v.ev.t + i * v.gap });
       }
       var shooterType = services.charTypes.of(v.char);
       if (v.skill) shooterType.skillShotFx(ox, oy, dx, dy);
@@ -6999,17 +7009,18 @@ SinglePassMaterials.enable(THREE);
         if (e > p.life + 40) return;
         for (var i = 0; i < targets.length; i++) {
           var T = targets[i];
-          if (d.owner === T.id || !T.alive || d.team === T.team || (d.laneHit && d.laneHit[T.id])) continue;
+          if (d.owner === T.id || !T.alive || d.team === T.team || (d.laneHit && d.laneHit[T.id]) || (d.pierced && d.pierced[T.id])) continue;
           var pe = p.lt[T.id]; if (pe === undefined) pe = 0;
           p.lt[T.id] = e;
           var a = services.projectiles.projAt(p, pe), b = services.projectiles.projAt(p, e);
-          if (services.projectiles.segHit(a.x, a.y, b.x, b.y, T.x, T.y, T.hitR + (d.pr || 6))) { services.projectiles.projHit(id, p, T); break; }
+          if (services.projectiles.touches(p, a, b, T)) { services.projectiles.projHit(id, p, T); if (!d.pierced) break; }
         }
       });
     }
     projHit(id, p, T) { var services = this.services;
       var d = p.d;
-      p.dead = true; p.gone = true;
+      if (d.pierced) d.pierced[T.id] = 1;
+      else { p.dead = true; p.gone = true; }
       if (d.laneHit) d.laneHit[T.id] = 1;
       var immune = T.isProtected(), fx = d.fx, seen = !services.match.me || services.match.me.team === T.team || services.vision.visibleTo(T, services.match.me);
       var ownerType = services.charTypes.of(d.ownerCharacterType);
@@ -7038,8 +7049,9 @@ SinglePassMaterials.enable(THREE);
       var list = services.targets.everyone(t);
       for (var i = 0; i < list.length; i++) {
         var T = list[i];
-        if (!T || !T.alive || T.id === d.owner || T.team === d.team) continue;
-        if (services.projectiles.segHit(a.x, a.y, b.x, b.y, T.x, T.y, T.hitR + (d.pr || 6))) {
+        if (!T || !T.alive || T.id === d.owner || T.team === d.team || (p.shownHit && p.shownHit[T.id])) continue;
+        if (services.projectiles.touches(p, a, b, T)) {
+          if (d.pierced) { (p.shownHit = p.shownHit || {})[T.id] = 1; if (!services.match.me || services.match.me.team === T.team || services.vision.visibleTo(T, services.match.me, t)) { services.fxView.spark(T.x, T.y, services.fxView.orbHitColor(d), 1); services.charTypes.of(d.ownerCharacterType).onShotHitShown(d, T); } continue; }
           p.gone = true;
           if (d.ultKey === "execute") services.fxView.executeFx(T.x, T.y);
           if (!services.match.me || services.match.me.team === T.team || services.vision.visibleTo(T, services.match.me, t)) { services.fxView.spark(T.x, T.y, services.fxView.orbHitColor(d), d.ultKey === "giant" ? 2.2 : 1); services.charTypes.of(d.ownerCharacterType).onShotHitShown(d, T); }

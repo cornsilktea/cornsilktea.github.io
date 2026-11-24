@@ -5246,6 +5246,37 @@ class PhantomTests {
       if (P.cdUntil - W.t() !== C.cd) bad.push("검기 뒤 " + (P.cdUntil - W.t()));
       self.verdict(done, bad, "베기·검기 " + api.secs(C.cd));
     });
+    run(G, "검기: 한 줄로 선 적 셋을 모두 꿰뚫어 " + C.throwDmg + "씩 주고, 질풍·게이지는 한 번만 오르며, 사거리 밖 적은 맞지 않는가", function (done) {
+      var bad = [], W = self.solo([{ id: "a", x: X, y: Y + 200 }, { id: "b", x: X, y: Y + 290 }, { id: "c", x: X, y: Y + 380 }, { id: "far", x: X, y: Y + C.throwRange + 120 }]), P = W.ent("ph");
+      api.fireBasic(P, Math.PI / 2);
+      W.step(2000);
+      ["a", "b", "c"].forEach(function (id) { if (self.lost(W.ent(id)) !== C.throwDmg) bad.push(id + " 피해 " + self.lost(W.ent(id))); });
+      if (self.lost(W.ent("far"))) bad.push("사거리 밖 적이 맞음");
+      if (P.gustStacks !== 1) bad.push("질풍 " + P.gustStacks + "회");
+      if (P.gauge !== api.roleGauge("phantom")) bad.push("게이지 " + P.gauge + " (기대 " + api.roleGauge("phantom") + ")");
+      self.verdict(done, bad, "세 명 모두 " + C.throwDmg + ", 질풍 1회, 게이지 " + P.gauge);
+    });
+    run(G, "검기: 초승달 앞 끝이 적에게 닿을 때 맞고(그 전엔 안 맞음), 옆으로 " + C.pr + " 안의 적은 초승달 끝이 지나갈 때 맞는가", function (done) {
+      var bad = [], shown = [], W = self.solo([{ id: "ahead", x: X, y: Y + 300 }, { id: "wing", x: X + 90, y: Y + 300 }]), P = W.ent("ph"), A = W.ent("ahead"), S = W.ent("wing");
+      api.fireBasic(P, Math.PI / 2);
+      var shot = null, shots = api.MATCH.remoteShots || {}, t0 = W.t();
+      W.step(16);
+      Object.keys(shots).forEach(function (k) { if (shots[k].d.owner === "ph") shot = shots[k]; });
+      if (!shot) { self.verdict(done, ["검기가 나가지 않음"], ""); return; }
+      var lead = 10, R = 116, perMs = shot.sp / 1000, startY = shot.d.y;
+      var touchAhead = (A.y - A.hitR - startY - lead) / perMs, wingReach = Math.max(0, 90 - S.hitR), wingFront = lead - R + Math.sqrt(R * R - wingReach * wingReach), touchWing = (S.y - S.hitR - startY - wingFront) / perMs;
+      while (W.t() - t0 < touchAhead - 40) W.step(8);
+      if (self.lost(A)) bad.push("앞 끝이 닿기 " + Math.round(touchAhead - (W.t() - t0)) + "ms 전에 맞음");
+      while (W.t() - t0 < touchAhead + 40) W.step(8);
+      if (!self.lost(A)) bad.push("앞 끝이 닿은 뒤에도 안 맞음");
+      shown.push("정면: 닿는 순간 " + Math.round(touchAhead) + "ms");
+      while (W.t() - t0 < touchWing - 40) W.step(8);
+      if (touchWing - 40 > touchAhead + 40 && self.lost(S)) bad.push("옆 적이 초승달 끝보다 먼저 맞음");
+      while (W.t() - t0 < touchWing + 60) W.step(8);
+      if (!self.lost(S)) bad.push("옆 90 적이 안 맞음");
+      shown.push("옆 90: " + Math.round(touchWing) + "ms");
+      self.verdict(done, bad, shown.join(" / "));
+    });
     run(G, "검기: 벽에 붙어 벽을 따라 쏴도(판정 폭 " + C.pr + ") 막히지 않고 사거리 " + C.throwRange + " 까지 날아가는가", function (done) {
       var spot = self.wallHugSpot();
       if (!spot) { self.verdict(done, ["벽 옆 자리를 못 찾음"], ""); return; }
