@@ -386,6 +386,9 @@ SinglePassMaterials.enable(THREE);
     hookPull;
     phantomStrike;
     phantomView;
+    barriers;
+    barrierBot;
+    barrierView;
     hookView;
     bannerAura;
     bannerLedger;
@@ -2486,13 +2489,13 @@ SinglePassMaterials.enable(THREE);
       this.bursts = []; this.pools = []; this.poolHit = {}; this.lunges = []; this.waves = [];
       this.holes = []; this.storms = []; this.revs = []; this.graces = []; this.domains = [];
       this.curses = {}; this.bladeSpins = []; this.turrets = []; this.groves = []; this.shells = []; this.gales = []; this.stars = [];
-      this.hooks = []; this.hookFlights = []; this.slams = []; this.hammerStrikes = []; this.streams = []; this.tsunamis = []; this.impactBlasts = []; this.hitmanSlashes = []; this.sniperMarks = []; this.phantomSlashes = []; this.phantomCasts = [];
+      this.hooks = []; this.hookFlights = []; this.slams = []; this.hammerStrikes = []; this.streams = []; this.tsunamis = []; this.impactBlasts = []; this.hitmanSlashes = []; this.sniperMarks = []; this.phantomSlashes = []; this.phantomCasts = []; this.barriers = [];
     }
     dropOwnedBy(ownerId) { var services = this.services;
       var field = this, owned = function (item) { return (item.e || item.d).owner === ownerId; };
       [["bursts", services.meteorFall, "drop"], ["pools", services.poolView, "dropPoolVis"], ["lunges", services.effectView, "dropLungeVis"], ["holes", services.poolView, "dropHoleVis"],
        ["storms", services.stormView, "dropStormVis"], ["revs", services.revGraceView, "dropRevVis"], ["graces", services.revGraceView, "dropGraceVis"], ["domains", services.domainView, "dropDomainVis"],
-       ["turrets", services.turrets, "dropVis"], ["groves", services.groves, "dropVis"], ["shells", services.turrets, "dropShellVis"], ["gales", services.galeView, "drop"], ["stars", services.starfallView, "drop"], ["hooks", services.hookView, "dropHook"], ["hookFlights", services.hookView, "dropFlight"], ["slams", services.hookView, "dropSlam"], ["hammerStrikes", services.hammerStrikes, "drop"], ["streams", services.marinaStreamView, "drop"], ["tsunamis", services.tsunamiView, "drop"]
+       ["turrets", services.turrets, "dropVis"], ["groves", services.groves, "dropVis"], ["shells", services.turrets, "dropShellVis"], ["gales", services.galeView, "drop"], ["stars", services.starfallView, "drop"], ["hooks", services.hookView, "dropHook"], ["hookFlights", services.hookView, "dropFlight"], ["slams", services.hookView, "dropSlam"], ["hammerStrikes", services.hammerStrikes, "drop"], ["streams", services.marinaStreamView, "drop"], ["tsunamis", services.tsunamiView, "drop"], ["barriers", services.barriers, "dropEntry"]
       ].forEach(function (row) {
         field[row[0]] = field[row[0]].filter(function (item) {
           if (!owned(item)) return true;
@@ -2521,6 +2524,7 @@ SinglePassMaterials.enable(THREE);
       this.hitmanSlashes.forEach(services.hitmanSlashView.drop.bind(services.hitmanSlashView));
       this.sniperMarks.forEach(services.sniperShots.drop.bind(services.sniperShots));
       this.phantomSlashes.forEach(services.phantomSlashes.drop.bind(services.phantomSlashes));
+      this.barriers.forEach(services.barrierView.drop.bind(services.barrierView));
       services.phantomView.dropAll();
     }
     renderLingering(t, nowMs, dt) { var services = this.services;
@@ -2543,6 +2547,7 @@ SinglePassMaterials.enable(THREE);
       services.sniperShots.render(t, nowMs);
       services.phantomSlashes.render(t, nowMs);
       services.phantomView.render(t, nowMs, dt);
+      this.barriers.forEach(function (b) { services.barrierView.render(b, t, nowMs); });
     }
   }
 
@@ -2647,6 +2652,7 @@ SinglePassMaterials.enable(THREE);
     bodyAlpha(E, t, alpha) { return alpha; }
     shotTouches(p, a, b, T) { return null; }
     shotDamage(d, T) { return d.dmg; }
+    boostDealt(T, amount, t) { return amount; }
     get hasSkillClip() { return false; }
     poseHeldProp(v, E, t) {}
     launchHandOf(model) { return model.getObjectByName("muzzle"); }
@@ -5055,6 +5061,76 @@ SinglePassMaterials.enable(THREE);
       this.edge.scale.y = 1 + 0.35 * Math.sin(nowMs / 140);
     }
   }
+  class ArcaLantern {
+    static RING_TOP = 0.78;
+    constructor() { this.handTurn = new THREE.Quaternion(); this.bodyTurn = new THREE.Quaternion(); this.drop = new THREE.Vector3(); }
+    hang(model, memo) {
+      if (memo.lanternModel !== model) { memo.lanternModel = model; memo.lanternProp = model.getObjectByName("offhand"); }
+      var lamp = memo.lanternProp;
+      if (!lamp || !lamp.parent) return;
+      lamp.parent.getWorldQuaternion(this.handTurn); model.getWorldQuaternion(this.bodyTurn);
+      lamp.quaternion.copy(this.handTurn.invert().multiply(this.bodyTurn));
+      lamp.position.copy(this.drop.set(0, -ArcaLantern.RING_TOP * lamp.scale.y, 0).applyQuaternion(lamp.quaternion));
+    }
+  }
+  class ArcaType extends MagicShooterType {
+    static TONES = { ember: 0xE0701E, chestnut: 0x4A2412, gold: 0xF2C14E, lantern: 0xFFB347, spark: "#FFC266" };
+    static MELEE = { color: ArcaType.TONES.lantern, spark: ArcaType.TONES.spark };
+    static MODEL = { file: "Mage", portraitPlant: true, plantLean: 0.2, plantShrink: 0.68, right: "staff_B", left: "lantern", leftScale: 0.62, hide: ["Mage_Hat", "Mage_Head"],
+               rightRecolor: [[2, 2, 1, "#FFE6A8", "#E0701E"], [1, 2, 1, "#F7D27A", "#B98A2A"]],
+               wear: { from: "rogue", part: "RogueHooded_Head", recolor: [[1, 1, 1, "#6B3519", "#2E140A"], [2, 1, 1, "#C8641E", "#6A2C0C"], [1, 0, 1, "#F2C14E", "#A8761C"]] },
+               recolor: [[1, 0, 2, "#EE8A2C", "#9A460E"], [1, 7, 1, "#4A2614", "#1E0E06"], [1, 2, 1, "#F7D27A", "#B98A2A"], [2, 1, 1, "#F7D27A", "#B98A2A"], [0, 5, 1, "#5A2E16", "#261008"]] };
+    static ULT = {
+      akCast: 450, akMin: 60, akR: 150, akDelay: GameTime.gameMs(0.4), akDur: GameTime.gameMs(5), akDmg: 20, akEdgeDmg: 20, akStunMs: GameTime.gameMs(1),
+      akPullMs: GameTime.gameMs(0.3), akEdgeGapMs: GameTime.gameMs(1), akSlowMul: 0.7
+    };
+    static STATS = { name: "아르카", role: "caster", icon: "🏮", hp: 120, speed: GameTime.gameSpeed(170), cd: GameTime.gameMs(1.4), dmg: 15, range: 350, pSpeed: GameTime.gameSpeed(1000), pr: 9,
+               impededBonus: 0.5, ultName: "결계", ultAim: true };
+    constructor(services, id) { super(services, id); this.lantern = new ArcaLantern(); }
+    get shotName() { return "등불 구슬"; }
+    poseHeldProp(v, E, t) { this.lantern.hang(v.activeForm ? v.activeForm.model : v.root, v); }
+    dressPortrait(m) { m.updateMatrixWorld(true); this.lantern.hang(m, m); m.updateMatrixWorld(true); }
+    aimRange(btn) { return [ArcaType.ULT.akMin, ArcaType.ULT.akCast]; }
+    skillSpot(E, ang, reach) { return this.services.attack.burstSpot(E, ang, reach, ArcaType.ULT.akCast, ArcaType.ULT.akMin); }
+    showAimGuide(E, ult, c) { var services = this.services;
+      if (!ult) return false;
+      services.aimGuide.showAimArea(E, this.skillSpot(E, E.angle, services.input.aimReach(E, "ult")), ArcaType.ULT.akR);
+      return true;
+    }
+    cast(E, ang, reach, t) { var services = this.services;
+      var spot = this.skillSpot(E, ang, reach);
+      E.angle = Math.atan2(spot.y - E.y, spot.x - E.x);
+      E.ultUntil = t + 450;
+      E.skillDur = ArcaType.ULT.akDelay + ArcaType.ULT.akDur;
+      services.barriers.cast(E, spot, t);
+    }
+    overrideBasic(E, ang, reach, t) { return this.services.barriers.strikeBound(E, ang, t); }
+    boostDealt(T, amount, t) { return amount > 0 && this.services.status.isImpeded(T, t) ? Math.round(amount * (1 + this.data.impededBonus)) : amount; }
+    drawsOwnStrike(d) { return !!d.binds; }
+    onStrikeShown(d) { if (d.binds) this.services.barrierView.onBindStrike(d); }
+    wantsBasicNow(B, t) { return t >= B.cdUntil && this.services.barriers.boundFoes(B, t).length > 0; }
+    botUltRange() { return ArcaType.ULT.akCast; }
+    botUltAllowed(B, target) { return this.services.barrierBot.worthIt(B, target, this.services.clock.now()); }
+    botUltSpot(B, target, td, t) { return this.services.barrierBot.spot(B, target, t); }
+    ultLeadSeconds(dist) { return ArcaType.ULT.akDelay / 1000; }
+    ultSpotTooFar(reach) { return reach > ArcaType.ULT.akCast; }
+    hitColor(d) { return ArcaType.TONES.spark; }
+    get tintsHit() { return true; }
+    skillGlow(E, t) { return E.ultUntil > t ? 0x5A2A08 : 0; }
+    playSkillClip(v, E, t) { this.services.fighterMotion.playOnce(v, "Ranged_Magic_Spellcasting_Long", 2.6, t); }
+    projectileMesh(g, d) { var services = this.services, T = ArcaType.TONES;
+      var halo = new THREE.Mesh(services.geo.ball, services.models.glowMat("arcaGlow", T.lantern, 0.42)); halo.scale.setScalar(19); g.add(halo);
+      var orb = new THREE.Mesh(services.geo.ball, services.models.basicMat("arcaOrb", T.ember, 0.92)); orb.scale.setScalar(9.5); g.add(orb);
+      var core = new THREE.Mesh(services.geo.ball, services.models.basicMat("arcaCore", 0xFFF0C2, 1)); core.scale.setScalar(4.5); g.add(core);
+      var tail = new THREE.Mesh(services.geo.trail, services.models.glowMat("trail-arca", T.gold, 0.4)); tail.position.x = -6; tail.scale.set(40, 3, 3); g.add(tail);
+      g.userData.pulse = orb;
+    }
+    passiveDesc() { var services = this.services; return "이동을 방해받는 적(둔화·기절·끌림 등)에게 주는 피해 " + services.skilltext.pctOf(this.data.impededBonus) + "% 증가"; }
+    ultDesc() { var services = this.services, u = ArcaType.ULT;
+      return "지정한 곳에 " + services.skilltext.secs(u.akDur) + "간 유지되는 반경 " + u.akR + "의 결계를 펼침. 펼쳐질 때 안에 있던 적은 " + u.akDmg + "의 피해를 입고 갇혀 " + services.skilltext.slowPct(u.akSlowMul) +
+             "되며 밖으로 나갈 수 없음. 갇힌 적이 결계 끝에 닿으면 " + u.akEdgeDmg + "의 피해를 입고 " + services.skilltext.secs(u.akStunMs) + "간 기절한 뒤 결계 가운데로 끌려감. 결계에 묶인 적이 있으면 기본 공격이 묶인 적 모두에게 자동으로 적중";
+    }
+  }
   class CharacterRegistry {
     constructor(services) { this.services = services;
       this.fallback = new CharacterType(services, "");
@@ -5086,6 +5162,7 @@ SinglePassMaterials.enable(THREE);
         marina: new MarinaType(services, "marina"),
         phantom: new PhantomType(services, "phantom"),
         shielder: new ShielderType(services, "shielder"),
+        arca: new ArcaType(services, "arca"),
         gargantua: new GargantuaType(services, "gargantua"),
         astrologer: new AstrologerType(services, "astrologer"),
         dummy: new DummyType(services, "dummy"),
@@ -5166,7 +5243,7 @@ SinglePassMaterials.enable(THREE);
     skillLeft(t) { return this.skillDur ? MathKit.clamp((this.skillUntil - t) / this.skillDur, 0, 1) : 0; }
     speed() { var services = this.services;
       var t = services.clock.now(), c = services.charTypes.statsOf(this.char), sp = c.speed;
-      if (this.isStunned(t) || this.lance || this.dash || services.status.shoved(this) || this.type.isRooted(this, t)) return 0;
+      if (this.isStunned(t) || this.lance || this.dash || services.status.shoved(this) || this.type.isRooted(this, t) || services.barriers.pulling(this, t)) return 0;
       var skillSpeed = this.type.skillSpeed(this, t);
       if (skillSpeed != null) sp = skillSpeed;
       if (c.haste) sp += this.hasteBonus(t);
@@ -5956,6 +6033,14 @@ SinglePassMaterials.enable(THREE);
       E.phantom = null; E.ultUntil = Math.min(E.ultUntil, t); E.skillUntil = 0; E.skillDur = 0;
       services.match.game.forceNet = true;
     }
+    halt(E, t) { var services = this.services, P = E.phantom;
+      if (!P) return;
+      if (P.stage === "dash") { P.sx = P.tx = E.x; P.sy = P.ty = E.y; return; }
+      if (P.stage !== "back") return;
+      E.phantom = null;
+      services.physics.resolve(E);
+      services.match.game.forceNet = true;
+    }
     alongOf(o, line) { return (o.x - line.x) * Math.cos(line.angle) + (o.y - line.y) * Math.sin(line.angle); }
     gatherSpots(E, line, tx, ty, t) { var services = this.services, self = this, spots = {}, taken = [{ x: tx, y: ty }];
       services.targets.everyone(t).filter(function (o) { return o && o.alive && o.team !== E.team && !o.isProtected(t) && services.melee.inLine(o, line); })
@@ -6025,10 +6110,170 @@ SinglePassMaterials.enable(THREE);
       return caught.some(function (o) { return !o.minion; });
     }
   }
+  class BarrierSystem {
+    static EDGE_SLACK = 0.5;
+    static STEER_ROOM = 30;
+    constructor(services) { this.services = services; }
+    startOf(e) { return e.createdAt + e.delay; }
+    endOf(e) { return e.createdAt + e.delay + e.dur; }
+    cast(E, spot, t) { var services = this.services, u = ArcaType.ULT;
+      services.session.room.ref.child("effects").push({ type: "barrier", team: E.team, owner: E.id, x: Math.round(spot.x), y: Math.round(spot.y), r: u.akR, delay: u.akDelay, dur: u.akDur, createdAt: t });
+      services.vision.revealBriefly(E.id, t);
+      services.match.game.forceNet = true;
+    }
+    add(e, now) { var services = this.services, self = this;
+      if (now >= this.endOf(e)) return;
+      services.field.barriers = services.field.barriers.filter(function (b) { if (b.e.owner !== e.owner) return true; self.dropEntry(b); return false; });
+      services.field.barriers.push({ e: e, vis: null, deployed: false, bound: {}, lost: {}, edges: {}, jolts: {} });
+    }
+    entryOf(owner, bid) { var services = this.services;
+      for (var i = 0; i < services.field.barriers.length; i++) { var b = services.field.barriers[i]; if (b.e.owner === owner && b.e.createdAt === bid) return b; }
+      return null;
+    }
+    onBind(e) { var b = this.entryOf(e.owner, e.bid); if (b && !b.lost[e.tgt]) b.bound[e.tgt] = e.createdAt; }
+    onEdge(e) { var services = this.services, b = this.entryOf(e.owner, e.bid);
+      if (!b) return;
+      b.edges[e.tgt] = { at: e.createdAt, from: e.from, ms: e.ms };
+      services.barrierView.edgeFlash(b, e.tgt);
+    }
+    dropEntry(b) { var services = this.services;
+      services.targets.localTargets().forEach(function (T) { var R = T.barrierTrap; if (R && R.owner === b.e.owner && R.bid === b.e.createdAt) T.barrierTrap = null; });
+      services.barrierView.drop(b);
+    }
+    stepField(t) { var services = this.services, self = this;
+      services.field.barriers = services.field.barriers.filter(function (b) {
+        if (t >= self.endOf(b.e)) { self.dropEntry(b); return false; }
+        Object.keys(b.bound).forEach(function (id) { var T = services.targets.ent(id); if (!T || !T.alive) { delete b.bound[id]; b.lost[id] = t; } });
+        return true;
+      });
+    }
+    stepLocal(t) { var services = this.services, self = this;
+      services.field.barriers.forEach(function (b) { if (!b.deployed && t >= self.startOf(b.e)) { b.deployed = true; self.trapAll(b, t); } });
+      services.targets.localTargets().forEach(function (T) { if (T.barrierTrap) self.keepIn(T, t); });
+    }
+    trapAll(b, t) { var services = this.services, self = this, e = b.e, u = ArcaType.ULT, until = this.endOf(e);
+      services.targets.localTargets().forEach(function (T) {
+        if (T.minion || !T.alive || T.team === e.team || T.isProtected(t)) return;
+        var d = MathKit.hyp(T.x - e.x, T.y - e.y);
+        if (d > e.r) return;
+        T.barrierTrap = { owner: e.owner, bid: e.createdAt, x: e.x, y: e.y, r: e.r, until: until, lim: Math.max(self.innerLimit(T, e.r), d), edgeAt: 0, pull: null };
+        services.status.addSlowCredited(T, u.akSlowMul, until - t, t, e.owner);
+        if (!services.shieldWalls.shrug(T, e.x, e.y, u.akDmg, t)) services.damage.damage(T, u.akDmg, e.owner, false, "barrier");
+        if (T.alive) services.session.room.ref.child("effects").push({ type: "barrierBind", owner: e.owner, bid: e.createdAt, tgt: T.id, u: 0, createdAt: t });
+        services.match.game.forceNet = true;
+      });
+    }
+    innerLimit(T, r) { return Math.max(0, r - T.hitR); }
+    holds(T, t) { var R = T.barrierTrap; return !!R && T.alive && t < R.until; }
+    pulling(T, t) { var R = T.barrierTrap; return !!R && !!R.pull && T.alive && t >= R.pull.from && t < R.until; }
+    keepIn(T, t) { var services = this.services, R = T.barrierTrap;
+      if (!T.alive || t >= R.until) { T.barrierTrap = null; return; }
+      if (R.pull && t >= R.pull.from) { this.stepPull(T, R, t); return; }
+      var dx = T.x - R.x, dy = T.y - R.y, d = MathKit.hyp(dx, dy), inner = this.innerLimit(T, R.r);
+      R.lim = Math.max(inner, Math.min(R.lim, d));
+      if (d <= R.lim + BarrierSystem.EDGE_SLACK) return;
+      this.pinTo(T, R, R.lim);
+      T.mv = false;
+      this.haltMoves(T, t);
+      this.touchEdge(T, R, t);
+      services.match.game.forceNet = true;
+    }
+    pinTo(T, R, lim) { var dx = T.x - R.x, dy = T.y - R.y, d = MathKit.hyp(dx, dy);
+      if (d <= lim || d < 1e-6) return;
+      T.x = R.x + dx / d * lim; T.y = R.y + dy / d * lim;
+    }
+    haltMoves(T, t) { var services = this.services;
+      services.dashMoves.haltDash(T);
+      services.dashMoves.haltLeap(T);
+      services.phantomStrike.halt(T, t);
+      if (T.shove) T.shove = null;
+      if (T.hookPull) services.hookPull.snap(T, T.hookPull, t);
+      if (T.phSweep) T.phSweep = null;
+    }
+    touchEdge(T, R, t) { var services = this.services, u = ArcaType.ULT;
+      if (R.pull || (R.edgeAt && t - R.edgeAt < u.akEdgeGapMs) || T.minion) return;
+      R.edgeAt = t;
+      services.damage.damage(T, u.akEdgeDmg, R.owner, false, "barrier", { stunMs: u.akStunMs });
+      if (!T.alive) return;
+      R.pull = { from: t + u.akStunMs, ms: u.akPullMs, sx: null, sy: null };
+      services.session.room.ref.child("effects").push({ type: "barrierEdge", owner: R.owner, bid: R.bid, tgt: T.id, from: R.pull.from, ms: u.akPullMs, u: 0, createdAt: t });
+    }
+    stepPull(T, R, t) { var services = this.services, P = R.pull;
+      if (P.sx == null) { this.pinTo(T, R, R.lim); P.sx = T.x; P.sy = T.y; }
+      var k = MathKit.clamp((t - P.from) / P.ms, 0, 1);
+      services.phantomStrike.slideTo(T, P.sx + (R.x - P.sx) * k, P.sy + (R.y - P.sy) * k);
+      T.mv = false;
+      services.match.game.forceNet = true;
+      if (k < 1) return;
+      R.pull = null;
+      R.lim = Math.max(this.innerLimit(T, R.r), MathKit.hyp(T.x - R.x, T.y - R.y));
+    }
+    activeOf(owner, t) { var services = this.services, self = this;
+      return services.field.barriers.filter(function (b) { return b.e.owner === owner && b.deployed && t >= self.startOf(b.e) && t < self.endOf(b.e); })[0] || null;
+    }
+    boundFoes(E, t) { var services = this.services, b = this.activeOf(E.id, t);
+      if (!b) return [];
+      return Object.keys(b.bound).filter(function (id) { var T = services.targets.ent(id); return T && T.alive && T.team !== E.team; });
+    }
+    strikeBound(E, ang, t) { var services = this.services, ids = this.boundFoes(E, t), b = this.activeOf(E.id, t);
+      if (!ids.length) return false;
+      E.atkAt = t;
+      services.session.room.ref.child("meleeHits").push({ team: E.team, owner: E.id, x: b.e.x, y: b.e.y, angle: MathKit.r1(ang), binds: ids, dmg: E.type.data.dmg, createdAt: t });
+      services.vision.revealBriefly(E.id, t);
+      if (services.targets.hear(E)) services.sound.sfx("orb");
+      return true;
+    }
+    steerInside(B, mx, my, t) { var R = B.barrierTrap;
+      if (!R || !this.holds(B, t)) return { x: mx, y: my };
+      var dx = B.x - R.x, dy = B.y - R.y, d = MathKit.hyp(dx, dy);
+      if (d < 1 || d < R.lim - BarrierSystem.STEER_ROOM) return { x: mx, y: my };
+      var ux = dx / d, uy = dy / d, out = mx * ux + my * uy;
+      return out <= 0 ? { x: mx, y: my } : { x: mx - ux * out * 1.4, y: my - uy * out * 1.4 };
+    }
+  }
+  class BarrierBotMind {
+    static PAIR_SLACK = 20;
+    static THREAT_R = 300;
+    static WAIT_MS = GameTime.gameMs(6);
+    constructor(services) { this.services = services; }
+    foesSeen(B, t) { var services = this.services;
+      return services.targets.participants().map(function (id) { return services.targets.ent(id); }).filter(function (o) {
+        return o && o.alive && !o.minion && o.team !== B.team && !o.isProtected(t) && services.vision.visibleTo(o, B, t);
+      });
+    }
+    clusterSpot(B, t) { var services = this.services, u = ArcaType.ULT, reach = u.akR - BarrierBotMind.PAIR_SLACK;
+      var spots = this.foesSeen(B, t).map(function (o) { return services.brain.leadSpot(o, u.akDelay / 1000, t); }), picks = spots.slice(), best = null, bestN = 1;
+      spots.forEach(function (a, i) { spots.slice(i + 1).forEach(function (b) { picks.push({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }); }); });
+      picks.forEach(function (c) {
+        if (MathKit.hyp(c.x - B.x, c.y - B.y) > u.akCast) return;
+        var n = spots.filter(function (s) { return MathKit.hyp(s.x - c.x, s.y - c.y) <= reach; }).length;
+        if (n > bestN) { bestN = n; best = c; }
+      });
+      return best;
+    }
+    threatFoe(B, t) { var services = this.services, best = null, bd = BarrierBotMind.THREAT_R;
+      this.foesSeen(B, t).forEach(function (o) { var d = MathKit.hyp(o.x - B.x, o.y - B.y); if (services.catalog.isMelee(o.char) && d < bd) { bd = d; best = o; } });
+      return best;
+    }
+    worthIt(B, target, t) { var k = B.bot || B;
+      if (!k.barrierFullAt) k.barrierFullAt = t;
+      var ok = !!this.clusterSpot(B, t) || !!this.threatFoe(B, t) || t - k.barrierFullAt > BarrierBotMind.WAIT_MS;
+      if (ok) k.barrierFullAt = 0;
+      return ok;
+    }
+    spot(B, target, t) { var services = this.services, threat = this.threatFoe(B, t);
+      return this.clusterSpot(B, t) || (threat ? { x: threat.x, y: threat.y } : services.brain.leadSpot(target, ArcaType.ULT.akDelay / 1000, t));
+    }
+  }
   class StatusEffects {
     constructor(services) { this.services = services; }
     static CC_FLUSH_MS = 500;
     static SHOVE_SUBSTEP = ArenaSize.BODY_R / 2;
+    static HOLE_PULL_HOLD_MS = 120;
+    isImpeded(T, t) { var services = this.services;
+      if (!T || T.minion) return false;
+      return T.isStunned(t) || T.slowMulAt(t) < 1 || !!T.hookPull || !!T.shove || !!T.phSweep || T.holePullAt >= t - StatusEffects.HOLE_PULL_HOLD_MS || services.barriers.holds(T, t);
+    }
     activeSlows(T, t) {
       var list = (T.slows || []).filter(function (s) { return s.until > t; });
       if (!T.slows && T.slowUntil > t) list.push({ mul: T.slowMul || 1, until: T.slowUntil });
@@ -6278,13 +6523,26 @@ SinglePassMaterials.enable(THREE);
     handle(e, now) { this.services.marinaStreams.add(e, now); }
   }
 
+  class BarrierEffect extends EffectHandler {
+    handle(e, now) { this.services.barriers.add(e, now); }
+  }
+
+  class BarrierBindEffect extends EffectHandler {
+    handle(e, now) { this.services.barriers.onBind(e); }
+  }
+
+  class BarrierEdgeEffect extends EffectHandler {
+    handle(e, now) { this.services.barriers.onEdge(e); }
+  }
+
   class EffectIntake {
     constructor(services) {
       this.handlers = new Map([
         ["turret", new TurretEffect(services)], ["grove", new GroveEffect(services)], ["gale", new GaleEffect(services)], ["star", new StarEffect(services)],
         ["pool", new PoolEffect(services)], ["hole", new HoleEffect(services)], ["storm", new StormEffect(services)], ["rev", new RevEffect(services)],
         ["domain", new DomainEffect(services)], ["grace", new GraceEffect(services)], ["strike", new StrikeEffect(services)], ["zap", new ZapEffect(services)],
-        ["tshot", new TurretShotEffect(services)], ["curse", new CurseEffect(services)], ["revCut", new RevCutEffect(services)], ["burst", new BurstEffect(services)], ["hook", new HookEffect(services)], ["marina", new MarinaStreamEffect(services)], ["phantom", new PhantomEffect(services)]
+        ["tshot", new TurretShotEffect(services)], ["curse", new CurseEffect(services)], ["revCut", new RevCutEffect(services)], ["burst", new BurstEffect(services)], ["hook", new HookEffect(services)], ["marina", new MarinaStreamEffect(services)], ["phantom", new PhantomEffect(services)],
+        ["barrier", new BarrierEffect(services)], ["barrierBind", new BarrierBindEffect(services)], ["barrierEdge", new BarrierEdgeEffect(services)]
       ]);
     }
     take(e, now) {
@@ -6360,6 +6618,7 @@ SinglePassMaterials.enable(THREE);
           if (services.shieldWalls.guardsFrom(T, center.x, center.y, t)) return;
           var pull = Math.min(d - gap, pullRate * dt);
           services.status.breakRevelation(T, t);
+          T.holePullAt = t;
           T.x += dx / d * pull; T.y += dy / d * pull;
           services.physics.resolve(T);
           services.match.game.forceNet = true;
@@ -7024,6 +7283,7 @@ SinglePassMaterials.enable(THREE);
       if (services.session.room.status === "ended") return;
       if (T.minion) { services.damage.damageMinion(T, amount, owner, basic, ultKey, gaugeGain); return; }
       if (T.isProtected()) return;
+      amount = services.damage.ownerBoost(T, amount, owner);
       var t = services.clock.now(), boost = services.bannerAura.dealtBoost(T, amount, owner, ownBonus, t, minionSpot), C = services.charTypes.statsOf(T.char);
       if (boost) amount = boost.amount;
       var unguarded = amount;
@@ -7060,6 +7320,9 @@ SinglePassMaterials.enable(THREE);
       services.damage.pushHit(owner, dm - boostedPart, basic, ultKey, killed, gaugeGain, false, skillCredit);
       if (killed) { T.domainBolt = null; T.curse = 0; T.curseBoom = null; services.status.breakRevelation(T, t); services.damage.reportKill(T, owner, t); T.hurtBy = {}; T.helpedBy = {}; }
       if (T === services.match.me || T.bot) services.match.game.forceNet = true;
+    }
+    ownerBoost(T, amount, owner) { var services = this.services, who = services.session.players[owner];
+      return who ? services.charTypes.of(who.characterType).boostDealt(T, amount, services.clock.now()) : amount;
     }
     noteHurt(T, owner, t) { var services = this.services;
       if (owner && owner !== T.id && services.session.players[owner] && services.session.players[owner].team !== T.team) (T.hurtBy || (T.hurtBy = {}))[owner] = t;
@@ -7407,7 +7670,7 @@ SinglePassMaterials.enable(THREE);
     }
     strikeStop(T, d, t) {
       if (!T || T.team === d.team) return null;
-      return d.lanes || d.thruWall ? this.guardsFrom(T, d.x, d.y, t) : this.stops(T, d.x, d.y, d.team, t);
+      return d.lanes || d.thruWall || d.binds ? this.guardsFrom(T, d.x, d.y, t) : this.stops(T, d.x, d.y, d.team, t);
     }
     cutShots(t) { var services = this.services, list = this.active(t), shots = services.match.remoteShots || {}, self = this;
       Object.keys(shots).forEach(function (id) {
@@ -7497,7 +7760,7 @@ SinglePassMaterials.enable(THREE);
       return along >= -br && along <= d.len + br && Math.abs(side) <= d.width / 2 + br;
     }
     inStrike(T, d) { var services = this.services; return services.melee.inStrikeArea(T, d) && !services.shieldWalls.strikeStop(T, d, services.clock.now()); }
-    inStrikeArea(T, d) { var services = this.services; return d.lanes ? TsunamiLanes.hits(T, d, services.melee.waveFront(d, services.clock.now(), MarinaType.WAVE.travel)) : d.stab ? !!d.tgt && T.id === d.tgt : d.len ? services.melee.inLine(T, d) : services.melee.inArc(T, d) && (!!d.thruWall || services.physics.losClear(d.x, d.y, T.x, T.y)); }
+    inStrikeArea(T, d) { var services = this.services; return d.binds ? d.binds.indexOf(T.id) >= 0 : d.lanes ? TsunamiLanes.hits(T, d, services.melee.waveFront(d, services.clock.now(), MarinaType.WAVE.travel)) : d.stab ? !!d.tgt && T.id === d.tgt : d.len ? services.melee.inLine(T, d) : services.melee.inArc(T, d) && (!!d.thruWall || services.physics.losClear(d.x, d.y, T.x, T.y)); }
     lineReach(x, y, ang, len) { var services = this.services; return Math.min(len, services.physics.rayObst(x, y, Math.cos(ang), Math.sin(ang), 2) + ArenaSize.BODY_R); }
     onMelee(key, d) { var services = this.services;
       if (!d) return;
@@ -7727,6 +7990,8 @@ SinglePassMaterials.enable(THREE);
       var k = MathKit.clamp((dist - BlacksmithType.ULT.bsMin) / (BlacksmithType.ULT.bsCast - BlacksmithType.ULT.bsMin), 0, 1);
       return Math.round(BlacksmithType.ULT.bsLeapMinMs + (BlacksmithType.ULT.bsLeapMaxMs - BlacksmithType.ULT.bsLeapMinMs) * k);
     }
+    haltDash(E) { var D = E.dash; if (!D || D.landed) return; D.sx = D.tx = E.x; D.sy = D.ty = E.y; }
+    haltLeap(E) { var L = E.leap; if (!L) return; L.sx = L.tx = E.x; L.sy = L.ty = E.y; }
     leapProgress(t, leapAt, landAt) { return landAt > leapAt ? MathKit.clamp((t - leapAt) / (landAt - leapAt), 0, 1) : 1; }
     stepHammerLeap(E) { var services = this.services;
       var L = E.leap; if (!L) return;
@@ -7847,7 +8112,7 @@ SinglePassMaterials.enable(THREE);
       E.x = sp.x; E.y = sp.y; E.angle = sp.angle; E.mv = false;
       E.hp = E.maxHp; E.alive = true; E.protectUntil = t + services.timescale.respawnProtectMs;
       E.cdUntil = 0; E.pending = null; E.burst = null; E.volley = null; E.slash = null;
-      E.buffUntil = 0; E.slamAt = 0; E.leap = null; E.dash = null; E.shove = null; E.stealthUntil = 0; E.ultUntil = 0; E.skillUntil = 0; E.regenUntil = 0; E.slowUntil = 0; E.slows = null; E.stunUntil = 0; E.lance = null; E.windUntil = 0; E.hookPull = null; E.hookCast = null; E.hookRootUntil = 0; E.phantom = null; E.phSweep = null;
+      E.buffUntil = 0; E.slamAt = 0; E.leap = null; E.dash = null; E.shove = null; E.stealthUntil = 0; E.ultUntil = 0; E.skillUntil = 0; E.regenUntil = 0; E.slowUntil = 0; E.slows = null; E.stunUntil = 0; E.lance = null; E.windUntil = 0; E.hookPull = null; E.hookCast = null; E.hookRootUntil = 0; E.phantom = null; E.phSweep = null; E.barrierTrap = null;
       E.frostStacks = 0; E.frostStackAt = 0; E.revealUntil = 0; E.lastStandUsed = false; E.hasteUntil = 0; E.hasteStacks = 0;
       E.burnUntil = 0; E.burnNext = 0; E.poisonUntil = 0; E.poisonNext = 0; E.rallyUsed = false; E.regenNext = 0; E.shield = !!services.charTypes.statsOf(E.char).respawnShield;
       if (E === services.match.me) services.cameraRig.view.snap = true;
@@ -8286,7 +8551,7 @@ SinglePassMaterials.enable(THREE);
       return new BotThought(target, td, mx, my, previous ? t : t - BotThought.phaseOf(k.seed));
     }
     move(B, thought, dt, t) { var services = this.services;
-      var k = B.bot, mx = thought.mx, my = thought.my;
+      var k = B.bot, held = services.barriers.steerInside(B, thought.mx, thought.my, t), mx = held.x, my = held.y;
       if (k.detour > t) { var rx = -my * k.detourDir, ry = mx * k.detourDir; mx = rx; my = ry; }
       var steer = Math.min(1, dt * BotThought.BOT_STEER_RATE);
       k.vx = (k.vx || 0) + (mx - (k.vx || 0)) * steer; k.vy = (k.vy || 0) + (my - (k.vy || 0)) * steer;
@@ -11004,6 +11269,159 @@ SinglePassMaterials.enable(THREE);
       h.vis.group.position.set(shown ? shown.root.position.x : center.x, 0, shown ? shown.root.position.z : center.y);
       h.vis.group.scale.setScalar(Math.max(0.001, k));
       u.uShow.value = k; u.uRise.value = rise; u.uTime.value = (nowMs % 100000) / 1000; u.uPixelScale.value = WaterNoise.pixelScale(services);
+    }
+  }
+  class BarrierChainLinks extends ChainLinkMesh {
+    static SEGMENT_LINKS = 26;
+    constructor(geometry, material, chains) { super(geometry, material, chains * BarrierChainLinks.SEGMENT_LINKS, ModelTuning.MODEL_SCALE); this.used = 0; this.lines = 0; }
+    begin() { this.used = 0; this.lines = 0; }
+    placeScaled(slot, x, y, z, ax, ay, az, keep) { var s = this.unit * Math.max(0.001, keep); this.size.set(s, s * DraggedChain.LINK_STRETCH, s); this.place(slot, x, y, z, ax, ay, az); }
+    addLine(fx, fy, fz, tx, ty, tz, sag, wobble, scatter, nowMs) {
+      var dx = tx - fx, dy = ty - fy, dz = tz - fz, len = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      var n = Math.min(BarrierChainLinks.SEGMENT_LINKS, this.capacity - this.used, Math.max(2, Math.ceil(len / DraggedChain.PITCH) + 1));
+      if (n < 2) return;
+      var sideX = len ? -dz / len : 0, sideZ = len ? dx / len : 0;
+      for (var i = 0; i < n; i++) {
+        var k = i / (n - 1), arc = Math.sin(Math.PI * k), shake = wobble ? wobble * arc * Math.sin(nowMs / 22 + i * 0.9) : 0, fling = scatter * (14 + (i * 7) % 11 * 2) * ((i % 3) - 1);
+        this.placeScaled(this.used + i, fx + dx * k + sideX * (shake + fling), fy + dy * k - sag * arc + scatter * (i % 4) * 7, fz + dz * k + sideZ * (shake + fling),
+                         dx, dy - sag * Math.PI * Math.cos(Math.PI * k), dz, 1 - scatter);
+      }
+      this.used += n; this.lines++;
+    }
+    finish() { this.mesh.count = this.used; this.mesh.instanceMatrix.needsUpdate = true; }
+  }
+  class BarrierView {
+    static RISE_MS = GameTime.gameMs(0.35);
+    static FALL_MS = GameTime.gameMs(0.4);
+    static LOST_MS = GameTime.gameMs(0.35);
+    static JOLT_MS = 260;
+    static WALL_HEIGHT = 62;
+    static FLOOR_Y = 1.6;
+    static ANCHOR_Y = 7;
+    static ANCHOR_SIZE = 7;
+    static CHAIN_FROM_Y = 9;
+    static REST_SAG = 12;
+    static JOLT_WOBBLE = 4.5;
+    static PULL_WOBBLE = 1.4;
+    static FEET_RING = 0.9;
+    static FLECKS = 36;
+    static TONES = { warn: 0xFF4A3A, deep: 0x5A2410, light: 0xFFB347, gold: 0xF2C14E, fleck: 0xFFD98A, chain: 0xE8963A };
+    static SHARED = null;
+    static FLOOR_FRAGMENT = `
+      uniform sampler2D uTex; uniform float uTime; uniform float uShow; uniform float uRise; uniform float uWarn; uniform vec3 uDeep; uniform vec3 uLight; uniform vec3 uGold; uniform vec3 uWarnColor; varying vec2 vPolar;
+      void main() {
+        float r = vPolar.y, around = vPolar.x;
+        float flow = texture2D(uTex, vec2(around * 3.0 - uTime * 0.12, r * 0.6 + uTime * 0.05)).r;
+        float runes = smoothstep(0.55, 0.85, texture2D(uTex, vec2(around * 6.0 + uTime * 0.2, 0.35)).b) * smoothstep(0.03, 0.0, abs(r - 0.86));
+        float rim = smoothstep(0.03, 0.0, abs(r - 0.985)), inner = smoothstep(0.012, 0.0, abs(r - 0.9));
+        float shock = smoothstep(0.08, 0.0, abs(r - uRise)) * (1.0 - uRise);
+        vec3 live = mix(mix(uDeep, uLight, clamp(flow * 0.6 + runes + shock, 0.0, 1.0)), uGold, max(rim, inner));
+        float liveA = (0.1 + flow * 0.18) * smoothstep(1.0, 0.9, r) + rim * 0.85 + inner * 0.5 + runes * 0.55 + shock * 0.7;
+        float warnA = 0.18 * step(r, uRise) + smoothstep(0.035, 0.0, abs(r - 0.975)) * 0.85;
+        gl_FragColor = vec4(mix(live, uWarnColor, uWarn), min(mix(liveA, warnA, uWarn), 0.92) * uShow);
+        #include <colorspace_fragment>
+      }`;
+    static WALL_VERTEX = `
+      uniform float uR; uniform float uHeight; varying vec2 vWall;
+      void main() {
+        vWall = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position.x * uR, position.y * uHeight, position.z * uR, 1.0);
+      }`;
+    static WALL_FRAGMENT = `
+      uniform sampler2D uTex; uniform float uTime; uniform float uShow; uniform vec3 uDeep; uniform vec3 uLight; uniform vec3 uGold; varying vec2 vWall;
+      void main() {
+        float streak = smoothstep(0.45, 0.8, texture2D(uTex, vec2(vWall.x * 4.0, vWall.y * 0.5 - uTime * 0.35)).b);
+        float fade = (1.0 - vWall.y) * smoothstep(0.0, 0.06, vWall.y), foot = smoothstep(0.12, 0.0, vWall.y);
+        gl_FragColor = vec4(mix(mix(uDeep, uLight, streak), uGold, foot), (0.12 + streak * 0.5 + foot * 0.3) * fade * uShow);
+        #include <colorspace_fragment>
+      }`;
+    static FLECK_VERTEX = `
+      uniform float uR; uniform float uTime; uniform float uPixelScale; uniform float uHeight; uniform float uShow; uniform float uScatter; varying float vFade;
+      void main() {
+        float a = position.x * 6.2832 + uTime * 0.25 * (position.y - 0.5);
+        float age = fract(uTime * (0.3 + position.z * 0.3) + position.y);
+        float reach = uR * (0.95 + 0.06 * position.z + uScatter * 0.5 * position.y);
+        vec3 p = vec3(cos(a) * reach, 4.0 + age * uHeight * (0.6 + position.y * 0.7), sin(a) * reach);
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+        gl_PointSize = (2.5 + 3.5 * position.z) * uPixelScale * projectionMatrix[1][1] / gl_Position.w;
+        vFade = uShow * min(1.0, age * 5.0) * (1.0 - age);
+      }`;
+    static shared() {
+      var B = BarrierView;
+      return B.SHARED || (B.SHARED = {
+        floor: GolemGaleView.polarGrid(GolemGaleView.RINGS, function (pos, c, s, along) { pos.push(c * along, 0, s * along); }),
+        wall: GolemGaleView.polarGrid(GolemGaleView.WALL_ROWS, function (pos, c, s, along) { pos.push(c, along, s); }),
+        flecks: SeededPoints.geometry(B.FLECKS, 53)
+      });
+    }
+    constructor(services) { this.services = services; this.free = []; this.spot = new THREE.Vector3(); this.size = new THREE.Vector3(); this.turn = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2); this.matrix = new THREE.Matrix4(); }
+    buildVis() { var services = this.services, B = BarrierView, S = B.shared(), group = new THREE.Group(), T = B.TONES, ringCount = MatchRules.TEAM_MAX + 1;
+      var uniforms = { uTex: { value: WaterNoise.texture() }, uTime: { value: 0 }, uShow: { value: 0 }, uRise: { value: 0 }, uWarn: { value: 0 }, uScatter: { value: 0 }, uR: { value: ArcaType.ULT.akR }, uHeight: { value: B.WALL_HEIGHT }, uPixelScale: { value: 400 },
+                       uDeep: { value: new THREE.Color(T.deep) }, uLight: { value: new THREE.Color(T.light) }, uGold: { value: new THREE.Color(T.gold) }, uWarnColor: { value: new THREE.Color(T.warn) }, uFleck: { value: new THREE.Color(T.fleck) } };
+      var floor = new THREE.Mesh(S.floor, WaterNoise.softMaterial(uniforms, GolemGaleView.FLOOR_VERTEX, B.FLOOR_FRAGMENT, THREE.DoubleSide));
+      var wall = new THREE.Mesh(S.wall, WaterNoise.softMaterial(uniforms, B.WALL_VERTEX, B.WALL_FRAGMENT, THREE.DoubleSide));
+      floor.material.forceSinglePass = wall.material.forceSinglePass = true;
+      var flecks = SeededPoints.parts(uniforms, B.FLECK_VERTEX, GolemGaleView.FLECK_FRAGMENT, S.flecks, 6);
+      var chainMat = new THREE.MeshBasicMaterial({ color: T.chain, transparent: true }), ringMat = new THREE.MeshBasicMaterial({ color: T.gold, transparent: true });
+      var links = new BarrierChainLinks(services.geo.chainLink, chainMat, MatchRules.TEAM_MAX), rings = new THREE.InstancedMesh(services.geo.chainWrap, ringMat, ringCount);
+      rings.frustumCulled = false; rings.count = 0;
+      floor.position.y = B.FLOOR_Y; floor.frustumCulled = wall.frustumCulled = false; floor.renderOrder = 4; wall.renderOrder = 5; links.mesh.renderOrder = rings.renderOrder = 6;
+      group.add(floor); group.add(wall); group.add(flecks); group.add(links.mesh); group.add(rings);
+      return { group: group, uniforms: uniforms, flecks: flecks, links: links, rings: rings, chainMat: chainMat, ringMat: ringMat };
+    }
+    warmSample() { var vis = this.buildVis(), B = BarrierView;
+      vis.uniforms.uShow.value = 1;
+      vis.links.begin(); vis.links.addLine(0, B.CHAIN_FROM_Y, 0, 60, 40, 0, B.REST_SAG, 0, 0, 0); vis.links.finish();
+      this.placeRing(vis.rings, 0, 0, 0, B.ANCHOR_Y, B.ANCHOR_SIZE); vis.rings.count = 1; vis.rings.instanceMatrix.needsUpdate = true;
+      return vis.group;
+    }
+    prefill(count) { while (this.free.length < count) this.free.push(this.buildVis()); }
+    spareRoots() { return this.free.map(function (vis) { vis.group.position.set(ShaderWarmup.PROBE_SPOT, 0, ShaderWarmup.PROBE_SPOT); return vis.group; }); }
+    drop(b) { var services = this.services; if (!b.vis) return; services.stage.scene.remove(b.vis.group); this.free.push(b.vis); b.vis = null; }
+    placeRing(rings, slot, x, z, y, size) { this.spot.set(x, y, z); this.size.setScalar(size); this.matrix.compose(this.spot, this.turn, this.size); rings.setMatrixAt(slot, this.matrix); }
+    seen(T) { var services = this.services; return !services.match.me || services.match.me.team === T.team || services.vision.visibleTo(T, services.match.me); }
+    edgeFlash(b, id) { var services = this.services, T = services.targets.ent(id), e = b.e;
+      if (!T || !this.seen(T)) return;
+      var dx = T.x - e.x, dy = T.y - e.y, d = MathKit.hyp(dx, dy) || 1;
+      services.fxView.spark(e.x + dx / d * e.r, e.y + dy / d * e.r, ArcaType.TONES.spark, 1.6);
+      if (services.targets.hear(T)) services.sound.sfx("chain");
+    }
+    onBindStrike(d) { var services = this.services, now = Date.now();
+      services.field.barriers.forEach(function (b) { if (b.e.owner === d.owner) d.binds.forEach(function (id) { b.jolts[id] = now; }); });
+    }
+    render(b, t, nowMs) { var services = this.services, B = BarrierView, e = b.e, start = e.createdAt + e.delay, end = start + e.dur;
+      if (!b.vis) { b.vis = this.free.pop() || this.buildVis(); b.vis.uniforms.uR.value = e.r; services.stage.scene.add(b.vis.group); }
+      var vis = b.vis, u = vis.uniforms;
+      vis.group.position.set(e.x, 0, e.y);
+      u.uTime.value = (nowMs % 100000) / 1000; u.uPixelScale.value = WaterNoise.pixelScale(services);
+      if (t < start) {
+        u.uWarn.value = 1; u.uShow.value = 1; u.uRise.value = MathKit.clamp((t - e.createdAt) / e.delay, 0, 1); u.uHeight.value = 0;
+        vis.group.scale.setScalar(1); vis.flecks.visible = false; vis.links.mesh.count = 0; vis.rings.count = 0;
+        return;
+      }
+      var rise = MathKit.clamp((t - start) / B.RISE_MS, 0.001, 1), fall = MathKit.clamp((end - t) / B.FALL_MS, 0, 1);
+      u.uWarn.value = 0; u.uRise.value = rise; u.uShow.value = fall; u.uHeight.value = B.WALL_HEIGHT * rise * rise * (3 - 2 * rise); u.uScatter.value = 1 - fall;
+      vis.group.scale.setScalar(1 + (1 - fall) * 0.08);
+      vis.flecks.visible = true;
+      vis.chainMat.opacity = vis.ringMat.opacity = fall;
+      this.renderChains(b, t, nowMs);
+    }
+    renderChains(b, t, nowMs) { var services = this.services, B = BarrierView, e = b.e, vis = b.vis, view = this, rings = 1;
+      this.placeRing(vis.rings, 0, 0, 0, B.ANCHOR_Y, B.ANCHOR_SIZE);
+      vis.links.begin();
+      Object.keys(b.bound).concat(Object.keys(b.lost)).forEach(function (id) {
+        var T = services.targets.ent(id), shown = services.fighterView.fighters[id], lostAt = b.lost[id];
+        if (!T || (shown && !shown.root.visible)) return;
+        var scatter = lostAt ? MathKit.clamp((t - lostAt) / B.LOST_MS, 0, 1) : 0;
+        if (scatter >= 1) return;
+        var x = (shown ? shown.root.position.x : T.x) - e.x, z = (shown ? shown.root.position.z : T.y) - e.y, chest = HookChainView.CHEST_Y * (T.hitR / ArenaSize.BODY_R);
+        var edge = b.edges[id], taut = !!edge && t >= edge.at && t < edge.from + edge.ms, pulling = taut && t >= edge.from, jolt = b.jolts[id] ? nowMs - b.jolts[id] : Infinity;
+        var wobble = jolt < B.JOLT_MS ? B.JOLT_WOBBLE * (1 - jolt / B.JOLT_MS) : pulling ? B.PULL_WOBBLE : 0;
+        vis.links.addLine(0, B.CHAIN_FROM_Y, 0, x, chest, z, taut ? 0 : B.REST_SAG, wobble, scatter, nowMs);
+        if (!lostAt && rings < vis.rings.instanceMatrix.count) view.placeRing(vis.rings, rings++, x, z, 2, T.hitR * B.FEET_RING);
+      });
+      vis.links.finish();
+      vis.rings.count = rings; vis.rings.instanceMatrix.needsUpdate = true;
     }
   }
   class MeteorFallView {
@@ -13992,6 +14410,7 @@ SinglePassMaterials.enable(THREE);
         function () { return services.stormView.makeStormVis(e); },
         function () { return services.gargantua.make(Object.assign({}, e, { ga: true })); },
         function () { return services.galeView.warmSample(); },
+        function () { return services.barrierView.warmSample(); },
         function () { return services.hookView.warmSample(); },
         function () { return new BannerStrikeGlow(services, { x: P, y: P, angle: 0, len: 120, width: 60, createdAt: 0 }).group; },
         function () { return BannerBearerRig.warmSample(services); },
@@ -14088,6 +14507,7 @@ SinglePassMaterials.enable(THREE);
       services.sniperShots.prefill(sniperCount * 3 + (rangers.blue + rangers.red) * 4);
       services.meteorFall.prefill(mageCount);
       services.galeView.prefill(giantCount);
+      var arcas = this.castersByTeam("arca"); services.barrierView.prefill(arcas.blue + arcas.red);
       services.impactBlasts.prefill(mageCount + (smiths.blue + smiths.red) * 2 + giantCount * 2 + hitmanCount + sniperCount + guardianCount + starCount + knights.blue + knights.red);
       if (clerics.blue + clerics.red) services.revGraceView.prefillBeams(RevGraceView.MAX_BEAMS);
       ["blue", "red"].forEach(function (team) {
@@ -14107,9 +14527,10 @@ SinglePassMaterials.enable(THREE);
       services.stormView.shelf.prefill(frosts);
       services.turrets.shellShelf.prefill(engineers * 8);
     }
-    rehearseFirstUses() { var rehearsal = this.rehearsal, druids = this.castersByTeam("druid"), hitmen = this.castersByTeam("hitman"), stormbows = this.castersByTeam("stormbow"), phantoms = this.castersByTeam("phantom");
+    rehearseFirstUses() { var rehearsal = this.rehearsal, druids = this.castersByTeam("druid"), hitmen = this.castersByTeam("hitman"), stormbows = this.castersByTeam("stormbow"), phantoms = this.castersByTeam("phantom"), arcas = this.castersByTeam("arca");
       rehearsal.finish();
       ["blue", "red"].forEach(function (team) {
+        rehearsal.shots("arca", team, false, arcas[team] * 2);
         rehearsal.shots("druid", team, false, druids[team] * 2);
         rehearsal.shots("hitman", team, true, hitmen[team]);
         rehearsal.shots("phantom", team, false, phantoms[team] * 2);
@@ -14117,7 +14538,7 @@ SinglePassMaterials.enable(THREE);
       if (stormbows.blue + stormbows.red) rehearsal.overcharge();
     }
     warmObjects() { var services = this.services;
-      return (this.kept || []).concat(services.fxView.bladeZones.spareRoots(), services.hammerStrikes.spareRoots(), services.cloudWaves.shelf.spareRoots(), services.gargantua.spareRoots(), services.stormView.shelf.spareRoots(), this.rehearsal.roots, services.fighterView.spareMinionRoots(), services.turrets.spareRoots(), services.groves.spare, services.revGraceView.spareBeamRoots(), services.meteorFall.spareRoots(), services.galeView.spareRoots(), services.impactBlasts.spareRoots(), services.hitmanSlashView.spareRoots(), services.phantomSlashes.spareRoots(), services.phantomView.spareRoots(), services.sniperShots.spareRoots(), services.arenaFx.spareRoots(ShaderWarmup.PROBE_SPOT), services.hookView.spareRoots());
+      return (this.kept || []).concat(services.fxView.bladeZones.spareRoots(), services.hammerStrikes.spareRoots(), services.cloudWaves.shelf.spareRoots(), services.gargantua.spareRoots(), services.stormView.shelf.spareRoots(), this.rehearsal.roots, services.fighterView.spareMinionRoots(), services.turrets.spareRoots(), services.groves.spare, services.revGraceView.spareBeamRoots(), services.meteorFall.spareRoots(), services.galeView.spareRoots(), services.barrierView.spareRoots(), services.impactBlasts.spareRoots(), services.hitmanSlashView.spareRoots(), services.phantomSlashes.spareRoots(), services.phantomView.spareRoots(), services.sniperShots.spareRoots(), services.arenaFx.spareRoots(ShaderWarmup.PROBE_SPOT), services.hookView.spareRoots());
     }
   }
   class FramePhaseMeter {
@@ -14240,6 +14661,7 @@ SinglePassMaterials.enable(THREE);
       services.sniperShots.step(t);
       services.phantomSlashes.step(t);
       services.phantomView.step(t);
+      services.barriers.stepField(t);
       services.bannerLedger.step(t);
       services.world.pruneLocal(t);
     }
@@ -14249,6 +14671,7 @@ SinglePassMaterials.enable(THREE);
       if (services.session.isHost()) Object.keys(services.match.bots || {}).forEach(function (id) { var B = services.match.bots[id]; if (driveBots) services.brain.step(B, dt); if (B.alive) services.attack.stepCombat(B, dt); services.world.stepSkillMotion(B, t, dt); });
       if (services.match.me) services.world.stepSkillMotion(services.match.me, t, dt);
       services.world.stepStatusTicks(t);
+      services.barriers.stepLocal(t);
       services.projectiles.checkProjectiles(t);
       services.bladeSpins.stepBladeDaggers(t);
       services.bladeSpins.stepBladeSpins(t);
@@ -14332,7 +14755,7 @@ SinglePassMaterials.enable(THREE);
       HUD: services.hud, LIVE_BOARD: services.liveBoard, END_BANNER: services.endBanner, SPEC_FOLLOW: services.specFollow, KILL_FEED: services.killfeed, RESULT_BOARD: services.resultBoard,SOUND: services.sound, BACKEND: services.backend, TIMESCALE: services.timescale, THREE: THREE, CAMERA_RIG: services.cameraRig, ARENA_VIEW: services.arenaView, PROPS: services.props, PROP_THEMES: services.propThemes, camera: services.stage.camera, overlay: Canvases.overlay, QA: services.quality, PIX_MIN: Environment.PIX_MIN, PIX_START: Environment.PIX_START, SCENERY: services.arenaView.scenery,
       setDb: function (fake) { var before = services.backend.db; services.backend.db = fake; return before; },
       setTestLink: function (flag) { var before = services.backend.isTestLink; services.backend.isTestLink = flag; return before; },
-      MAP_X0: ArenaSize.MAP_X0, MAP_Y0: ArenaSize.MAP_Y0, TSUNAMI_LANES: services.tsunamiLanes, TsunamiLanes: TsunamiLanes, MARINA_STREAMS: services.marinaStreams, MARINA_BOT: services.marinaBot, TridentProp: TridentProp, HOOK_PATH: services.hookPath, HOOK_PULL: services.hookPull, HOOK_VIEW: services.hookView, playersNow: function () { return services.session.players; }, HAMMER_STRIKES: services.hammerStrikes, HammerBasicBlast: HammerBasicBlast, BANNER_AURA: services.bannerAura, BANNER_LEDGER: services.bannerLedger, BannerCreditLedger: BannerCreditLedger, makeBannerGlow: function (d) { return new BannerStrikeGlow(services, d); }, BannerStrikeGlow: BannerStrikeGlow, BannerBearerRig: BannerBearerRig, DraggedChain: DraggedChain, WraithChainRig: WraithChainRig, ChainSlamBurst: ChainSlamBurst, FIGHTER_VIEW: services.fighterView, FIGHTER_MOTION: services.fighterMotion, GEO: services.geo, FRAME_RENDERER: services.frameRenderer, stage: services.stage, CHAR_TYPES: services.charTypes, SHIELD_WALLS: services.shieldWalls, AUTO_AIM: services.autoAim, AUTO_AIM_ERR: AutoAim.AUTO_AIM_ERR, AUTO_AIM_LEAD: AutoAim.AUTO_AIM_LEAD, FullscreenKeeper: FullscreenKeeper, DRAFT_AI: services.draftAi,
+      MAP_X0: ArenaSize.MAP_X0, MAP_Y0: ArenaSize.MAP_Y0, TSUNAMI_LANES: services.tsunamiLanes, TsunamiLanes: TsunamiLanes, MARINA_STREAMS: services.marinaStreams, MARINA_BOT: services.marinaBot, TridentProp: TridentProp, HOOK_PATH: services.hookPath, HOOK_PULL: services.hookPull, HOOK_VIEW: services.hookView, playersNow: function () { return services.session.players; }, HAMMER_STRIKES: services.hammerStrikes, HammerBasicBlast: HammerBasicBlast, BANNER_AURA: services.bannerAura, BANNER_LEDGER: services.bannerLedger, BannerCreditLedger: BannerCreditLedger, makeBannerGlow: function (d) { return new BannerStrikeGlow(services, d); }, BannerStrikeGlow: BannerStrikeGlow, BannerBearerRig: BannerBearerRig, DraggedChain: DraggedChain, WraithChainRig: WraithChainRig, ChainSlamBurst: ChainSlamBurst, FIGHTER_VIEW: services.fighterView, FIGHTER_MOTION: services.fighterMotion, GEO: services.geo, FRAME_RENDERER: services.frameRenderer, stage: services.stage, CHAR_TYPES: services.charTypes, SHIELD_WALLS: services.shieldWalls, BARRIERS: services.barriers, BARRIER_VIEW: services.barrierView, STATUS: services.status, AUTO_AIM: services.autoAim, AUTO_AIM_ERR: AutoAim.AUTO_AIM_ERR, AUTO_AIM_LEAD: AutoAim.AUTO_AIM_LEAD, FullscreenKeeper: FullscreenKeeper, DRAFT_AI: services.draftAi,
       MOCK_DRAFT: services.mockDraft, MOCK_DRAFT_VIEW: services.mockDraftView,
       DRAFT: services.draft, DRAFT_VIEW: services.draftView, DRAFT_STEPS: Draft.STEPS, DRAFT_STEP_MS: Draft.STEP_MS, DRAFT_AI_MS: Draft.AI_MS, DRAFT_AI_TRADE_MS: Draft.AI_TRADE_MS, DRAFT_ABSENT_WAIT_MS: Draft.ABSENT_WAIT_MS, NO_BAN: Draft.NO_BAN,
       STATS: services.stats, STATS_PATH: MatchStats.path, STATS_PATCHES: StatsPatches, STATS_PENDING: MatchStats.PENDING, STATS_SETTLE_MS: MatchStats.SETTLE_MS, STATS_HOLD_MAX_MS: MatchStats.HOLD_MAX_MS,
@@ -14687,6 +15110,8 @@ SinglePassMaterials.enable(THREE);
       services.hookPath = new HookPath(services);
       services.hookPull = new HookPullSystem(services);
       services.phantomStrike = new PhantomStrikeSystem(services);
+      services.barriers = new BarrierSystem(services);
+      services.barrierBot = new BarrierBotMind(services);
       services.hookView = new HookChainView(services);
       services.hammerStrikes = new HammerStrikeView(services);
       services.bannerAura = new BannerAura(services);
@@ -14724,6 +15149,7 @@ SinglePassMaterials.enable(THREE);
       services.cloudWaves = new CloudWavePool(services);
       services.gargantua = new GargantuaView(services);
       services.galeView = new GolemGaleView(services);
+      services.barrierView = new BarrierView(services);
       services.meteorFall = new MeteorFallView(services);
       services.arenaFx = new ArenaFxViews({ THREE: THREE, noise: function () { return WaterNoise.texture(); }, scene: function () { return services.stage.scene; }, pixelScale: function () { return WaterNoise.pixelScale(services); }, isLite: function () { return services.cameraRig.pix < Environment.PIX_START; }, meteorPath: function () { return { dir: MeteorLook.DIR, top: MeteorLook.TOP }; }, bladeStormRadius: DancerType.ULT.bwR });
       services.impactBlasts = new ImpactBlastView(services);
