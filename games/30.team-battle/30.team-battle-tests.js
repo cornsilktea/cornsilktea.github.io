@@ -1080,20 +1080,21 @@ class ResultCollector {
         for (var i = logStart; i < W.log.length; i++) { var p = W.log[i]; if (p.v.tp) teleported[p.path.split("/")[1]] = 1; }
         list.forEach(function (e) {
           var E = W.ent(e.id), P0 = prev[e.id];
-          prev[e.id] = { x: E.x, y: E.y, alive: E.alive, leap: !!E.leap, dash: !!E.dash, shove: !!E.shove, hook: !!E.hookPull, stunned: api.stunned(E, t - ms), stunUntil: E.stunUntil };
+          prev[e.id] = { x: E.x, y: E.y, alive: E.alive, leap: !!E.leap, dash: !!E.dash, shove: !!E.shove, hook: !!E.hookPull, back: !!(E.phantom && E.phantom.stage === "back"), sweep: !!E.phSweep || !!(E.phantom && (E.phantom.stage === "dash" || E.phantom.stage === "back")), stunned: api.stunned(E, t - ms), stunUntil: E.stunUntil };
           if (!isFinite(E.x) || !isFinite(E.y) || !isFinite(E.hp) || !isFinite(E.gauge)) { flag("숫자 아님(NaN)", E, t); return; }
           if (E.hp < 0 || E.hp > E.maxHp) flag("체력 범위 이탈", E, t, "hp " + E.hp);
           if (E.gauge < 0 || E.gauge > api.GAUGE_MAX) flag("게이지 범위 이탈", E, t, "gauge " + E.gauge);
           if (!E.alive) return;
           if (E.stunUntil - t > maxStun + 20) flag("기절이 너무 김", E, t, Math.round(E.stunUntil - t) + "ms");
-          if (!E.leap) { var why = blockedAt(E.x, E.y); if (why) flag(why, E, t); }
+          var ghostBack = !!(E.phantom && E.phantom.stage === "back");
+          if (!E.leap && !ghostBack) { var why = blockedAt(E.x, E.y); if (why) flag(why, E, t); }
           if (E.dash && t - E.dash.at > (E.dash.ms || api.CHARS[E.char].dashMs) + (api.CHARS[E.char].finishDelay || 0) + 200) flag("돌진이 안 끝남", E, t);
           if (E.leap && t - E.leap.at > api.ULT.bsLeapMaxMs + 200) flag("도약이 안 끝남", E, t);
           if (E.shove && t - E.shove.at > api.ULT.gdKbMs + 200) flag("넉백이 안 끝남", E, t);
           if (!P0 || !P0.alive) return;
           var jump = hyp(E.x - P0.x, E.y - P0.y);
-          if (!E.leap && !P0.leap && !teleported[e.id] && jump > 0.5 && segmentCrossesWall(P0.x, P0.y, E.x, E.y)) flag("벽 통과", E, t, Math.round(jump) + "만큼 이동");
-          if (P0.stunned && P0.stunUntil >= t && api.stunned(E, t) && jump > 0.5 && !E.shove && !P0.shove && !E.dash && !P0.dash && !E.leap && !P0.leap && !E.hookPull && !P0.hook && !teleported[e.id] && !holeActive(t)) flag("기절 중 이동", E, t, Math.round(jump) + "만큼");
+          if (!E.leap && !P0.leap && !ghostBack && !P0.back && !teleported[e.id] && jump > 0.5 && segmentCrossesWall(P0.x, P0.y, E.x, E.y)) flag("벽 통과", E, t, Math.round(jump) + "만큼 이동");
+          if (P0.stunned && P0.stunUntil >= t && api.stunned(E, t) && jump > 0.5 && !E.shove && !P0.shove && !E.dash && !P0.dash && !E.leap && !P0.leap && !E.hookPull && !P0.hook && !E.phSweep && !P0.sweep && !teleported[e.id] && !holeActive(t)) flag("기절 중 이동", E, t, Math.round(jump) + "만큼");
         });
       }
       var ults = W.log.filter(function (p) { return (p.path === "meleeHits" && p.v.u) || (p.path === "effects" && p.v.u !== 0 && p.v.type !== "pool" && p.v.type !== "grace") || (p.path === "shots" && p.v.s); }).length;
@@ -3192,7 +3193,7 @@ class ResultCollector {
 
   run(AIMG, "AI 역할: 기사·창술사·대장장이는 앞, 화염술사·주술사·궁수·뇌전사수·저격수는 뒤, 은신자·자객·결투가는 틈새를 노리는 역할인가", function (done) {
     var want = { knight: "front", lancer: "front", blacksmith: "front", guardian: "front", warrior: "front", mage: "back", shaman: "back", ranger: "back", stormbow: "back", sniper: "back", frost: "back", cleric: "back", necro: "back", thrower: "back",
-                 rogue: "flank", hitman: "flank", duelist: "flank", dancer: "back", engineer: "back", druid: "back", giant: "front", astrologer: "back", wraith: "front", bearer: "front", marina: "back" }, bad = [];
+                 rogue: "flank", hitman: "flank", duelist: "flank", dancer: "back", engineer: "back", druid: "back", giant: "front", astrologer: "back", wraith: "front", bearer: "front", marina: "back", phantom: "flank" }, bad = [];
     Object.keys(want).forEach(function (c) { var got = api.CHAR_TYPES.of(c).botRole; if (got !== want[c]) bad.push(c + " " + got + " (기대 " + want[c] + ")"); });
     api.CHAR_LIST.forEach(function (c) { if (!want[c]) bad.push(c + " 역할이 정해지지 않음"); });
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : Object.keys(want).length + "명 역할이 맞음");
@@ -5120,6 +5121,13 @@ class ResultCollector {
   new DraggedChainTests(api, { run: run }).register();
   new BannerBearerTests(api, { world: world, run: run, recordRef: recordRef }).register();
   new MarinaTests(api, { world: world, run: run }).register();
+  new PhantomTests(api, { world: world, run: run, FRAME: FRAME }).register();
+  run(AUTO, "AI 6명 60초 난전 — 강 맵 + 팬텀 고정 (시드 2044)", function (done) {
+    var r = autoMelee("river", 60, 2044, "phantom"), kinds = Object.keys(r.issues);
+    var roster = r.list.map(function (e) { return api.CHARS[e.char].name; }).join("·");
+    done(kinds.length ? "fail" : "pass", "출전: " + roster + " / 킬 " + r.kills + ", 궁극기 " + r.ults + "번" +
+      (kinds.length ? " / 규칙 위반: " + kinds.map(function (k) { return k + " " + r.issues[k].n + "번 (처음: " + r.issues[k].first + ")"; }).join("; ") : " / 규칙 위반 없음"));
+  });
   run(AUTO, "AI 6명 60초 난전 — 던전 맵 + 마리나 고정 (시드 2043)", function (done) {
     var r = autoMelee("dungeon", 60, 2043, "marina"), kinds = Object.keys(r.issues);
     done(kinds.length ? "fail" : "pass", kinds.length ? kinds.join(" / ") : "문제 없음");
@@ -5144,6 +5152,265 @@ class ResultCollector {
   new AccountStatsTests(api, { run: run, runAsync: runAsync }).register();
   results.pending = Promise.resolve().then(function () { api.finish(api.currentMap()); }).then(drainAsync);
   return results;
+  }
+}
+
+class PhantomTests {
+  static GROUP = "팬텀";
+  static X = 450;
+  static Y = 340;
+  constructor(api, kit) { this.api = api; this.kit = kit; }
+
+  scene(list, map) {
+    this.api.MATCH.stateByKey = {};
+    return this.kit.world(map || "practice", list.map(function (e, i) { return Object.assign({ team: "red", char: "guardian", slot: (i % 3) + 1 }, e); }));
+  }
+  solo(foes, map) {
+    var X = PhantomTests.X, Y = PhantomTests.Y;
+    return this.scene([{ id: "ph", team: "blue", char: "phantom", x: X, y: Y, slot: 1 }].concat(foes || []), map);
+  }
+  lost(E) { return E.maxHp - E.hp; }
+  pushes(W, path, from) { return W.log.slice(from || 0).filter(function (p) { return p.path === path; }); }
+  sweeps(W, from) { return this.pushes(W, "meleeHits", from).filter(function (p) { return p.v.ph; }); }
+  castAt(W, P, ang) { P.gauge = this.api.GAUGE_MAX; this.api.useUlt(P, ang); }
+  untilArrived(W, P) { for (var ms = 0; ms < 3000 && P.phantom && P.phantom.stage !== "free"; ms += this.kit.FRAME) W.frame(this.kit.FRAME); }
+  canStand(x, y) {
+    var R = this.api.BODY_R - 0.01, B = this.api.BOUND, o = this.api.obstacles();
+    if (!isFinite(x) || !isFinite(y) || x < B.l + R || x > B.r - R || y < B.t + R || y > B.b - R) return false;
+    return o.walls.concat(o.water).every(function (q) {
+      return Math.hypot(x - Math.max(q.x - q.w / 2, Math.min(x, q.x + q.w / 2)), y - Math.max(q.y - q.h / 2, Math.min(y, q.y + q.h / 2))) >= R;
+    });
+  }
+  verdict(done, bad, okText) { done(bad.length ? "fail" : "pass", bad.length ? bad.slice(0, 6).join(" / ") : okText); }
+
+  register() {
+    this.registerBasic();
+    this.registerPassive();
+    this.registerSweep();
+    this.registerReturn();
+    this.registerCard();
+  }
+
+  registerBasic() {
+    var self = this, api = this.api, run = this.kit.run, G = PhantomTests.GROUP, C = api.CHARS.phantom, X = PhantomTests.X, Y = PhantomTests.Y;
+    run(G, "기본 공격: 사거리 " + C.range + " 안에 보이는 적(해골 병사 포함)이 있으면 원뿔 베기 " + C.dmg + ", 없으면 검기 " + C.throwDmg + " 이고 보이지 않는 적은 세지 않는가", function (done) {
+      var bad = [], shown = [];
+      var W = self.solo([{ id: "near", x: X, y: Y + 120 }]), P = W.ent("ph"), T = W.ent("near"), n = W.log.length;
+      api.fireBasic(P, Math.PI / 2);
+      if (self.pushes(W, "meleeHits", n).length !== 1 || self.pushes(W, "shots", n).length) bad.push("가까운 적에게 원뿔이 아님");
+      if (self.lost(T) !== C.dmg) bad.push("원뿔 피해 " + self.lost(T));
+      shown.push("120 → 원뿔 " + self.lost(T));
+      W = self.solo([{ id: "far", x: X, y: Y + 300 }]); P = W.ent("ph"); T = W.ent("far"); n = W.log.length;
+      api.fireBasic(P, Math.PI / 2);
+      if (self.pushes(W, "shots", n).length !== 1 || self.pushes(W, "meleeHits", n).length) bad.push("먼 적에게 검기가 아님");
+      W.step(800);
+      if (self.lost(T) !== C.throwDmg) bad.push("검기 피해 " + self.lost(T));
+      shown.push("300 → 검기 " + self.lost(T));
+      W = self.solo([{ id: "hid", char: "rogue", x: X, y: Y + 140 }]); P = W.ent("ph"); T = W.ent("hid"); n = W.log.length;
+      T.stealthUntil = W.t() + api.ULT.asDur;
+      api.fireBasic(P, Math.PI / 2);
+      if (self.pushes(W, "shots", n).length !== 1) bad.push("은신한 적을 보고 원뿔을 씀");
+      shown.push("은신 140 → 검기");
+      W = self.scene([{ id: "ph", team: "blue", char: "phantom", x: X, y: Y, slot: 1 }, { id: "nc", char: "necro", x: X + 300, y: Y + 600, slot: 1, gauge: api.GAUGE_MAX }]); P = W.ent("ph");
+      var nc = W.ent("nc");
+      api.useUlt(nc, Math.PI / 2); W.step(api.ULT.smRiseMs + 50);
+      nc.minions.forEach(function (m, i) { m.x = X - 30 + i * 30; m.y = Y + 110; m.cdUntil = Infinity; });
+      n = W.log.length;
+      api.fireBasic(P, Math.PI / 2);
+      if (self.pushes(W, "meleeHits", n).length !== 1) bad.push("해골 병사가 가까이 있어도 원뿔이 아님");
+      if (!nc.minions.some(function (m) { return m.hp < api.ULT.smHp; })) bad.push("원뿔이 해골 병사를 못 맞힘");
+      shown.push("해골 → 원뿔");
+      self.verdict(done, bad, shown.join(" / "));
+    });
+    run(G, "공격 간격: 근접 뒤 " + api.secs(C.meleeCd) + "·검기 뒤 " + api.secs(C.waveCd) + " 이고, 첫 공격은 대기 없이 나가는가", function (done) {
+      var bad = [], W = self.solo([{ id: "near", x: X, y: Y + 120 }]), P = W.ent("ph"), T = W.ent("near");
+      if (P.cdUntil > W.t()) bad.push("시작 대기 " + (P.cdUntil - W.t()));
+      api.fireBasic(P, Math.PI / 2);
+      if (P.cdUntil - W.t() !== C.meleeCd) bad.push("근접 뒤 " + (P.cdUntil - W.t()));
+      T.x = X; T.y = Y + 320;
+      W.step(C.meleeCd);
+      api.fireBasic(P, Math.PI / 2);
+      if (P.cdUntil - W.t() !== C.waveCd) bad.push("검기 뒤 " + (P.cdUntil - W.t()));
+      T.x = X; T.y = Y + 120;
+      W.step(C.waveCd - 30);
+      if (!(P.cdUntil > W.t())) bad.push("검기 뒤 " + api.secs(C.waveCd) + " 전에 대기가 끝남");
+      W.step(40);
+      if (P.cdUntil > W.t()) bad.push("검기 뒤 " + api.secs(C.waveCd) + " 가 지나도 대기 중");
+      self.verdict(done, bad, "근접 " + api.secs(C.meleeCd) + " · 검기 " + api.secs(C.waveCd));
+    });
+  }
+
+  registerPassive() {
+    var self = this, api = this.api, run = this.kit.run, G = PhantomTests.GROUP, C = api.CHARS.phantom, U = api.ULT, X = PhantomTests.X, Y = PhantomTests.Y;
+    run(G, "질풍: 원뿔이 여러 명을 맞혀도 1회, 스킬은 맞힌 수만큼(최대 " + C.gust.max + "), 쌓일 때마다 지속시간이 처음부터인가", function (done) {
+      var bad = [], shown = [], base = api.CHARS.phantom.speed;
+      var W = self.solo([{ id: "a", x: X - 40, y: Y + 110 }, { id: "b", x: X + 40, y: Y + 110 }, { id: "c", x: X, y: Y + 300 }]), P = W.ent("ph");
+      api.fireBasic(P, Math.PI / 2);
+      if (P.gustStacks !== 1) bad.push("원뿔 2명 적중 뒤 " + P.gustStacks + "회");
+      if (Math.abs(api.speedOf(P) - (base + C.gust.add)) > 0.01) bad.push("이동속도 " + api.speedOf(P).toFixed(1));
+      shown.push("원뿔 2명 → 1회");
+      W.step(C.gust.ms - 600);
+      var until0 = P.gustUntil;
+      W.ent("a").x = X - 400; W.ent("b").x = X + 400;
+      P.cdUntil = 0; api.fireBasic(P, Math.PI / 2); W.step(700);
+      if (P.gustStacks !== 2) bad.push("검기 적중 뒤 " + P.gustStacks + "회");
+      if (!(P.gustUntil > until0) || Math.abs(P.gustUntil - (W.t() - 700 + C.gust.ms)) > 700) bad.push("지속시간이 다시 시작되지 않음");
+      shown.push("검기 → 2회, 지속 갱신");
+      W = self.solo([{ id: "a", x: X - 50, y: Y + 150 }, { id: "b", x: X + 50, y: Y + 250 }, { id: "c", x: X, y: Y + 350 }]); P = W.ent("ph");
+      self.castAt(W, P, Math.PI / 2); self.untilArrived(W, P); W.step(50);
+      if (P.gustStacks !== 3) bad.push("스킬 3명 적중 뒤 " + P.gustStacks + "회");
+      shown.push("스킬 3명 → 3회");
+      W = self.solo([{ id: "a", x: X - 50, y: Y + 150 }, { id: "b", x: X + 50, y: Y + 250 }, { id: "c", x: X, y: Y + 350 }]); P = W.ent("ph");
+      P.gustStacks = 2; P.gustUntil = W.t() + C.gust.ms;
+      self.castAt(W, P, Math.PI / 2); self.untilArrived(W, P); W.step(50);
+      if (P.gustStacks !== C.gust.max) bad.push("2회 + 스킬 3명 = " + P.gustStacks + "회 (최대 " + C.gust.max + ")");
+      if (Math.abs(api.speedOf(P) - (base + C.gust.max * C.gust.add)) > 0.01) bad.push("최대 중첩 이동속도 " + api.speedOf(P).toFixed(1));
+      shown.push("2+3 → " + P.gustStacks + "회");
+      self.verdict(done, bad, shown.join(" / "));
+    });
+  }
+
+  registerSweep() {
+    var self = this, api = this.api, run = this.kit.run, G = PhantomTests.GROUP, U = api.ULT, X = PhantomTests.X, Y = PhantomTests.Y, R = api.BODY_R;
+    run(G, "잔영섬: 준비 " + api.secs(U.phWind) + " 동안 멈춰 있고, 닿은 적은 " + U.phDmg + "의 피해·기절을 받고 도착 지점 둘레에 겹치지 않게 모이며, 기절은 도착 + " + api.secs(U.phAfterStunMs) + " 에 풀리는가", function (done) {
+      var bad = [], W = self.solo([{ id: "a", x: X - 50, y: Y + 150 }, { id: "b", x: X + 50, y: Y + 250 }, { id: "c", x: X, y: Y + 350 }, { id: "off", x: X + 200, y: Y + 250 }]), P = W.ent("ph"), n = W.log.length;
+      var foes = ["a", "b", "c"].map(function (id) { return W.ent(id); });
+      self.castAt(W, P, Math.PI / 2);
+      if (api.speedOf(P) !== 0) bad.push("준비 중 움직일 수 있음");
+      W.step(U.phWind - 20);
+      if (self.sweeps(W, n).length) bad.push("준비가 끝나기 전에 돌진");
+      self.untilArrived(W, P);
+      var hit = self.sweeps(W, n)[0];
+      if (!hit) { self.verdict(done, ["돌진하지 않음"], ""); return; }
+      var arriveAt = hit.v.createdAt + hit.v.ph.ms;
+      if (Math.abs(P.x - X) > 1 || Math.abs(P.y - (Y + U.phLen)) > 1) bad.push("도착 (" + P.x.toFixed(1) + "," + P.y.toFixed(1) + ")");
+      foes.forEach(function (T) { if (self.lost(T) !== U.phDmg) bad.push(T.id + " 피해 " + self.lost(T)); });
+      if (self.lost(W.ent("off"))) bad.push("띠 밖 적이 맞음");
+      W.step(80);
+      foes.forEach(function (T) {
+        if (!self.canStand(T.x, T.y)) bad.push(T.id + " 설 수 없는 곳");
+        if (Math.hypot(T.x - P.x, T.y - P.y) > 4 * (2 * R + 6)) bad.push(T.id + " 도착 지점에서 멂 " + Math.round(Math.hypot(T.x - P.x, T.y - P.y)));
+        if (Math.abs(T.stunUntil - (arriveAt + U.phAfterStunMs)) > 2) bad.push(T.id + " 기절 끝 어긋남 " + Math.round(T.stunUntil - arriveAt));
+      });
+      for (var i = 0; i < foes.length; i++) for (var j = i + 1; j < foes.length; j++) if (Math.hypot(foes[i].x - foes[j].x, foes[i].y - foes[j].y) < 2 * R - 0.5) bad.push(foes[i].id + "·" + foes[j].id + " 겹침");
+      if (self.pushes(W, "effects", n).filter(function (p) { return p.v.type === "phantom"; }).length !== 1) bad.push("잔상 신호가 한 번이 아님");
+      var told = self.pushes(W, "hits/ph", n).filter(function (p) { return p.v.ps; }).length;
+      if (told !== 3) bad.push("적중 알림 " + told + "번");
+      self.verdict(done, bad, foes.map(function (T) { return T.id + " (" + Math.round(T.x) + "," + Math.round(T.y) + ")"; }).join(" · ") + ", 팬텀 (" + Math.round(P.x) + "," + Math.round(P.y) + ")");
+    });
+    run(G, "잔영섬: 해골 병사도 피해·기절을 받고 함께 딸려 가며, 부활 보호 중인 적은 아무 효과가 없는가", function (done) {
+      var bad = [], W = self.scene([{ id: "ph", team: "blue", char: "phantom", x: X, y: Y, slot: 1 }, { id: "nc", char: "necro", x: X + 350, y: Y + 700, slot: 1, gauge: api.GAUGE_MAX }, { id: "safe", x: X, y: Y + 200, slot: 2 }]), P = W.ent("ph"), nc = W.ent("nc"), safe = W.ent("safe");
+      api.useUlt(nc, Math.PI / 2); W.step(U.smRiseMs + 50);
+      var m = nc.minions[0];
+      nc.minions.forEach(function (o, i) { o.x = X + 400 + i * 50; o.y = Y + 700; o.cdUntil = Infinity; });
+      m.x = X; m.y = Y + 300;
+      safe.protectUntil = W.t() + 5000;
+      self.castAt(W, P, Math.PI / 2); self.untilArrived(W, P);
+      var stunned = m.stunUntil > W.t();
+      W.step(80);
+      if (m.hp !== U.smHp - U.phDmg) bad.push("해골 체력 " + m.hp);
+      if (!stunned) bad.push("해골 기절 아님");
+      if (Math.hypot(m.x - P.x, m.y - P.y) > 2 * (2 * R + 6) + 1) bad.push("해골이 딸려 오지 않음 " + Math.round(Math.hypot(m.x - P.x, m.y - P.y)));
+      var before = { x: m.x, y: m.y };
+      W.step(U.phAfterStunMs - 100);
+      if (Math.hypot(m.x - before.x, m.y - before.y) > 0.5) bad.push("기절한 해골이 움직임");
+      if (self.lost(safe) || safe.stunUntil > W.t() || Math.abs(safe.y - (Y + 200)) > 0.5) bad.push("보호 중인 적이 효과를 받음");
+      self.verdict(done, bad, "해골 체력 " + m.hp + ", 도착 지점까지 " + Math.round(Math.hypot(m.x - P.x, m.y - P.y)) + ", 보호 중 무효");
+    });
+    run(G, "잔영섬: 4맵 여러 곳·방향에서 써도 팬텀·모인 적이 벽·물 밖이고 서로 겹치지 않는가", function (done) {
+      var bad = [], tried = 0, rnd = 1;
+      function next() { rnd = (rnd * 16807) % 2147483647; return rnd / 2147483647; }
+      api.MAP_IDS.forEach(function (map) {
+        api.loadMapData(map);
+        for (var k = 0; k < 30; k++) {
+          var x = api.BOUND.l + 60 + next() * (api.BOUND.r - api.BOUND.l - 120), y = api.BOUND.t + 60 + next() * (api.BOUND.b - api.BOUND.t - 120), ang = next() * Math.PI * 2;
+          if (!self.canStand(x, y)) continue;
+          var foes = [];
+          for (var f = 1; f <= 3; f++) {
+            var fx = x + Math.cos(ang) * 110 * f + Math.cos(ang + Math.PI / 2) * (f - 2) * 40, fy = y + Math.sin(ang) * 110 * f + Math.sin(ang + Math.PI / 2) * (f - 2) * 40;
+            if (self.canStand(fx, fy)) foes.push({ id: "f" + f, x: fx, y: fy, slot: f });
+          }
+          if (!foes.length) continue;
+          tried++;
+          var W = self.scene([{ id: "ph", team: "blue", char: "phantom", x: x, y: y, slot: 1 }].concat(foes), map), P = W.ent("ph");
+          self.castAt(W, P, ang); self.untilArrived(W, P); W.step(300);
+          var all = [P].concat(foes.map(function (e) { return W.ent(e.id); }).filter(function (E) { return self.lost(E) > 0; }));
+          all.forEach(function (E) { if (!self.canStand(E.x, E.y)) bad.push(map + " (" + Math.round(x) + "," + Math.round(y) + ") " + E.id + " 설 수 없음"); });
+          for (var i = 1; i < all.length; i++) for (var j = i + 1; j < all.length; j++) if (Math.hypot(all[i].x - all[j].x, all[i].y - all[j].y) < 2 * R - 1) bad.push(map + " " + all[i].id + "·" + all[j].id + " 겹침");
+        }
+      });
+      self.verdict(done, bad, tried + "번 모두 벽·물 밖, 겹침 없음");
+    });
+    run(G, "잔영섬: 준비 중 기절하면 돌진이 취소되고 게이지는 돌아오지 않는가", function (done) {
+      var bad = [], W = self.solo([{ id: "a", x: X, y: Y + 200 }]), P = W.ent("ph"), n = W.log.length;
+      self.castAt(W, P, Math.PI / 2);
+      W.step(U.phWind / 2);
+      api.afflict(P, { stunMs: 300 }, "a");
+      W.step(U.phWind + 400);
+      if (self.sweeps(W, n).length) bad.push("기절했는데 돌진함");
+      if (P.phantom) bad.push("스킬 상태가 남음");
+      if (P.gauge !== 0) bad.push("게이지 " + P.gauge);
+      if (self.lost(W.ent("a"))) bad.push("적이 맞음");
+      P.cdUntil = 0; var atk = P.atkAt; api.fireBasic(P, Math.PI / 2);
+      if (P.atkAt === atk) bad.push("취소 뒤 공격 못 함");
+      self.verdict(done, bad, "취소, 게이지 " + P.gauge);
+    });
+  }
+
+  registerReturn() {
+    var self = this, api = this.api, run = this.kit.run, G = PhantomTests.GROUP, U = api.ULT, X = PhantomTests.X, Y = PhantomTests.Y;
+    run(G, "잔영섬: 도착 " + api.secs(U.phStay) + " 뒤 잔상 자리로 돌아가고, 돌아가는 동안 공격·스킬·이동이 안 되며 기절·넉백에 끊기지 않고 피해는 받는가", function (done) {
+      var bad = [], W = self.solo([{ id: "a", x: X + 300, y: Y + 500 }]), P = W.ent("ph"), A = W.ent("a");
+      self.castAt(W, P, Math.PI / 2); self.untilArrived(W, P);
+      if (!P.phantom || P.phantom.stage !== "free") bad.push("도착 뒤 대기 상태 아님");
+      if (api.speedOf(P) <= 0) bad.push("대기 중 움직일 수 없음");
+      W.step(U.phStay - 60);
+      if (P.phantom.stage !== "free") bad.push(api.secs(U.phStay) + " 전에 돌아감");
+      W.step(100);
+      if (!P.phantom || P.phantom.stage !== "back") { self.verdict(done, ["돌아가기 시작 안 함"], ""); return; }
+      var atk = P.atkAt, hp = P.hp;
+      P.cdUntil = 0; api.fireBasic(P, 0);
+      P.gauge = api.GAUGE_MAX; var gaugeBefore = P.gauge; api.useUlt(P, 0);
+      if (P.atkAt !== atk) bad.push("돌아가는 중 공격됨");
+      if (P.gauge !== gaugeBefore || P.phantom.stage !== "back") bad.push("돌아가는 중 스킬이 나감");
+      if (api.speedOf(P) !== 0) bad.push("돌아가는 중 이동속도 " + api.speedOf(P));
+      api.afflict(P, { stunMs: 2000 }, "a");
+      api.damage(P, 10, "a", false, null);
+      if (P.hp !== hp - 10) bad.push("돌아가는 중 피해 안 받음");
+      W.step(800);
+      if (P.phantom) bad.push("돌아가기가 안 끝남");
+      if (Math.abs(P.x - X) > 1 || Math.abs(P.y - Y) > 1) bad.push("잔상 자리 아님 (" + P.x.toFixed(1) + "," + P.y.toFixed(1) + ")");
+      self.verdict(done, bad, "잔상 자리 (" + Math.round(P.x) + "," + Math.round(P.y) + ") 로 돌아옴");
+    });
+    run(G, "잔영섬: 돌아오기 전에 쓰러지면 잔상이 바로 사라지고 돌아가기도 없으며, 돌아온 뒤에야 게이지가 오르는가", function (done) {
+      var bad = [], W = self.solo([{ id: "a", x: X + 300, y: Y + 500 }]), P = W.ent("ph");
+      self.castAt(W, P, Math.PI / 2); self.untilArrived(W, P);
+      api.damage(P, 10, "a", false, null);
+      if (P.gauge !== 0) bad.push("대기 중 게이지가 오름 " + P.gauge);
+      api.damage(P, P.hp + 50, "a", false, null);
+      W.step(50);
+      if (P.phantom) bad.push("쓰러졌는데 스킬 상태가 남음");
+      var rec = api.FIELD.phantomCasts.filter(function (r) { return r.e.owner === "ph"; })[0];
+      if (rec && !rec.endAt) bad.push("잔상이 남음");
+      W = self.solo([{ id: "a", x: X + 300, y: Y + 500 }]); P = W.ent("ph");
+      self.castAt(W, P, Math.PI / 2); self.untilArrived(W, P); W.step(U.phStay + 800);
+      var A2 = W.ent("a"); A2.x = P.x; A2.y = P.y + 110; P.cdUntil = 0;
+      api.fireBasic(P, Math.PI / 2);
+      if (!(P.gauge > 0)) bad.push("돌아온 뒤에도 게이지가 안 오름");
+      self.verdict(done, bad, "쓰러지면 잔상 제거, 돌아온 뒤 게이지 " + P.gauge);
+    });
+  }
+
+  registerCard() {
+    var api = this.api, run = this.kit.run, G = PhantomTests.GROUP;
+    run(G, "카드: 공격 35(20)·공격 간격 0.7(1.1)·사거리 150(400) 이고 설명 숫자가 수치에서 나오는가", function (done) {
+      var html = api.statTable("phantom"), bad = [], C = api.CHARS.phantom, U = api.ULT;
+      [C.dmg + "(" + C.throwDmg + ")", api.num(C.meleeCd / api.timeScale() / 1000) + "(" + api.num(C.waveCd / api.timeScale() / 1000) + ")초", C.range + "(" + C.throwRange + ")"].forEach(function (want) { if (html.indexOf(want) < 0) bad.push("표에 " + want + " 없음"); });
+      var ult = api.ultDesc("phantom");
+      [api.secs(U.phWind), String(U.phLen), String(U.phDmg), api.secs(U.phAfterStunMs), api.secs(U.phStay)].forEach(function (want) { if (ult.indexOf(want) < 0) bad.push("스킬 설명에 " + want + " 없음"); });
+      if (/\.$/.test(ult) || /\.$/.test(api.passiveDesc("phantom"))) bad.push("설명 끝에 마침표");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : ult);
+    });
   }
 }
 

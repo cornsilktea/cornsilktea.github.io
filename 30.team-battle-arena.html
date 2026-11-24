@@ -383,6 +383,8 @@ SinglePassMaterials.enable(THREE);
     giant;
     hookPath;
     hookPull;
+    phantomStrike;
+    phantomView;
     hookView;
     bannerAura;
     bannerLedger;
@@ -422,6 +424,7 @@ SinglePassMaterials.enable(THREE);
     arenaFx;
     impactBlasts;
     hitmanSlashView;
+    phantomSlashes;
     sniperShots;
     starfallView;
     aimGuide;
@@ -1753,12 +1756,13 @@ SinglePassMaterials.enable(THREE);
       var dmg = !c.dmg ? "-" : c.dashDmg ? services.skilltext.num(c.dashDmg) + "(" + services.skilltext.num(c.dmg) + ")"
               : type.statDamageText(c) || pair(hit, c.throwDmg || type.statSkillDamage(c)) + (c.heal ? "(" + c.heal + ")" : "");
       var altCd = type.statAltCooldown(c);
-      var rateRow = services.clock.scale !== 1 ? "<tr><th>공격 간격</th><td>" + pair(services.skilltext.num(c.cd / services.clock.scale / 1000), altCd == null ? null : services.skilltext.num(altCd / services.clock.scale / 1000)) + "초</td></tr>"
+      var cdText = type.statCooldownText(c), rangeText = type.statRangeText(c);
+      var rateRow = cdText ? "<tr><th>공격 간격</th><td>" + cdText + "초</td></tr>" : services.clock.scale !== 1 ? "<tr><th>공격 간격</th><td>" + pair(services.skilltext.num(c.cd / services.clock.scale / 1000), altCd == null ? null : services.skilltext.num(altCd / services.clock.scale / 1000)) + "초</td></tr>"
                              : "<tr><th>초당 공격</th><td>" + pair(services.skilltext.num(1000 / c.cd), altCd == null ? null : services.skilltext.num(1000 / altCd)) + "회</td></tr>";
       return '<table class="st"><tr><th>HP</th><td>' + c.hp + "</td></tr><tr><th>공격</th><td>" + dmg + "</td></tr>" +
              rateRow +
              "<tr><th>이동속도</th><td>" + pair(services.skilltext.shownSpeed(c.speed), c.ultSpeed == null ? null : services.skilltext.shownSpeed(c.ultSpeed)) + "</td></tr>" +
-             "<tr><th>사거리</th><td>" + pair(Math.round(c.dashRange || c.range), c.throwRange) + "</td></tr><tr><th>스킬</th><td>" + c.ultName + "</td></tr></table>";
+             "<tr><th>사거리</th><td>" + (rangeText || pair(Math.round(c.dashRange || c.range), c.throwRange)) + "</td></tr><tr><th>스킬</th><td>" + c.ultName + "</td></tr></table>";
     }
     roleGaugeText(role, gaugeOnHit) { return "기본 공격 적중 시 게이지 +" + (gaugeOnHit != null ? gaugeOnHit : role.gaugeOnHit) + (role.gaugeOnHurt ? ", 피격 시 +" + role.gaugeOnHurt : ""); }
     gaugeTextOf(k) { var services = this.services; return services.skilltext.roleGaugeText(services.catalog.roleOf(k), services.catalog.gaugeOnHitOf(k)); }
@@ -2478,7 +2482,7 @@ SinglePassMaterials.enable(THREE);
       this.bursts = []; this.pools = []; this.poolHit = {}; this.lunges = []; this.waves = [];
       this.holes = []; this.storms = []; this.revs = []; this.graces = []; this.domains = [];
       this.curses = {}; this.bladeSpins = []; this.turrets = []; this.groves = []; this.shells = []; this.gales = []; this.stars = [];
-      this.hooks = []; this.hookFlights = []; this.slams = []; this.hammerStrikes = []; this.streams = []; this.tsunamis = []; this.impactBlasts = []; this.hitmanSlashes = []; this.sniperMarks = [];
+      this.hooks = []; this.hookFlights = []; this.slams = []; this.hammerStrikes = []; this.streams = []; this.tsunamis = []; this.impactBlasts = []; this.hitmanSlashes = []; this.sniperMarks = []; this.phantomSlashes = []; this.phantomCasts = [];
     }
     dropOwnedBy(ownerId) { var services = this.services;
       var field = this, owned = function (item) { return (item.e || item.d).owner === ownerId; };
@@ -2512,6 +2516,8 @@ SinglePassMaterials.enable(THREE);
       this.impactBlasts.forEach(services.impactBlasts.drop.bind(services.impactBlasts));
       this.hitmanSlashes.forEach(services.hitmanSlashView.drop.bind(services.hitmanSlashView));
       this.sniperMarks.forEach(services.sniperShots.drop.bind(services.sniperShots));
+      this.phantomSlashes.forEach(services.phantomSlashes.drop.bind(services.phantomSlashes));
+      services.phantomView.dropAll();
     }
     renderLingering(t, nowMs, dt) { var services = this.services;
       this.pools.forEach(function (pl) { services.poolView.renderPool(pl, t, nowMs); });
@@ -2531,6 +2537,8 @@ SinglePassMaterials.enable(THREE);
       services.impactBlasts.render(t, nowMs);
       services.hitmanSlashView.render(t, nowMs);
       services.sniperShots.render(t, nowMs);
+      services.phantomSlashes.render(t, nowMs);
+      services.phantomView.render(t, nowMs, dt);
     }
   }
 
@@ -2622,6 +2630,12 @@ SinglePassMaterials.enable(THREE);
     statDamageText(c) { return null; }
     statSkillDamage(c) { return null; }
     statAltCooldown(c) { return null; }
+    statCooldownText(c) { return null; }
+    statRangeText(c) { return null; }
+    locksGauge(E, t) { return false; }
+    cannotCast(E, t) { return false; }
+    stepSkill(E, t) {}
+    bodyAlpha(E, t, alpha) { return alpha; }
     get hasSkillClip() { return false; }
     poseHeldProp(v, E, t) {}
     launchHandOf(model) { return model.getObjectByName("muzzle"); }
@@ -4739,6 +4753,106 @@ SinglePassMaterials.enable(THREE);
       });
     }
   }
+  class PhantomType extends CharacterType {
+    static MELEE = { color: 0xBFF5EE, spark: "#CFFAF4" };
+    static MODEL = { file: "Ranger", right: "sword_2handed", rightScale: 0.8, hide: ["Ranger_Head", "Ranger_Quiver"],
+               wear: { from: "rogue", part: "RogueHooded_Head", recolor: [[1, 1, 1, "#EEF4F5", "#8FA4AE"], [2, 1, 1, "#DCE7EA", "#6F8590"], [1, 0, 1, "#141A1E", "#020304"], [0, 0, 2, "#2A343C", "#10161A"], [0, 5, 2, "#2A343C", "#10161A"], [0, 2, 1, "#D2FFF9", "#86F0E5"]] },
+               recolor: [[0, 5, 2, "#E9F1F2", "#5B6E7A"], [1, 0, 1, "#C9F4EE", "#4E8F8C"], [0, 3, 1, "#C3D2D6", "#56676F"], [0, 7, 1, "#7C8C95", "#36434C"],
+                         [0, 1, 1, "#D5E1E3", "#8C9FA5"], [2, 7, 1, "#BFC9CD", "#76838A"], [2, 3, 1, "#4A5862", "#212A31"], [1, 7, 1, "#3C4A54", "#1C242B"], [1, 1, 1, "#3C4A54", "#1C242B"],
+                         [0, 2, 1, "#161C20", "#030506"], [2, 1, 1, "#C9F4EE", "#4E8F8C"], [0, 0, 1, "#CBD8DC", "#90A3A9"]],
+               rightRecolor: [[1, 2, 2, "#E4FFFB", "#7FD8CF"], [0, 3, 1, "#D8FBF6", "#6FC9C0"], [1, 1, 1, "#D8FBF6", "#6FC9C0"], [2, 0, 1, "#D8FBF6", "#6FC9C0"],
+                              [0, 4, 1, "#3A3F45", "#1E2226"], [0, 5, 2, "#3A3F45", "#1E2226"], [1, 5, 2, "#3A3F45", "#1E2226"], [1, 4, 1, "#AEB7BC", "#6C767C"], [1, 7, 1, "#3A3F45", "#1E2226"], [0, 7, 1, "#4A5056", "#24282C"]] };
+    static ULT = {
+      phWind: GameTime.gameMs(0.7), phLen: 500, phWidth: 150, phSpeed: GameTime.gameSpeed(2000), phDmg: 35, phAfterStunMs: GameTime.gameMs(0.5),
+      phStay: GameTime.gameMs(4), phBackSpeed: GameTime.gameSpeed(1000), phMinSweepMs: 40, phBotAllyReach: 350
+    };
+    static STATS = { name: "팬텀", role: "assassin", icon: "👻", hp: 150, speed: GameTime.gameSpeed(175), cd: GameTime.gameMs(0.7), meleeCd: GameTime.gameMs(0.7), waveCd: GameTime.gameMs(1.1),
+               dmg: 35, range: 150, arc: Math.PI * 100 / 180, throwDmg: 20, throwRange: 400, pSpeed: GameTime.gameSpeed(700), pr: 10,
+               gust: { add: 15 / MatchRules.GAME_SPEED, ms: GameTime.gameMs(4), max: 4 }, ultName: "잔영섬", ultAim: true };
+    static WIND_CLIP = "Melee_2H_Idle";
+    static WIND_HOLD_SPEED = 0.05;
+    static SWEEP_CLIP = "Melee_2H_Attack_Slice";
+    static SWEEP_FROM_SEC = 0.28;
+    static SWEEP_CUT_SEC = 0.38;
+    static SWEEP_TO_SEC = 0.48;
+    static GLOW = 0x1E5A55;
+    static RETURN_ALPHA = 0.42;
+    get startsSkillTimer() { return false; }
+    get shotName() { return "검기"; }
+    get shotSound() { return "star"; }
+    isRooted(E, t) { return this.services.phantomStrike.busy(E, t); }
+    cannotAttack(E, t) { return this.services.phantomStrike.busy(E, t); }
+    locksGauge(E, t) { return !!E.phantom; }
+    cannotCast(E, t) { return !!E.phantom; }
+    stepSkill(E, t) { this.services.phantomStrike.stepOwner(E, t); }
+    speedBonus(E, t) { return this.gustBonus(E, t); }
+    gustBonus(E, t) { var g = this.data.gust; return E.gustUntil > t ? Math.min(g.max, E.gustStacks || 0) * g.add : 0; }
+    gustStacks(E, t) { return E.gustUntil > t ? E.gustStacks || 0 : 0; }
+    addGust(E, count, t) { var g = this.data.gust;
+      E.gustStacks = Math.min(g.max, this.gustStacks(E, t) + count);
+      E.gustUntil = t + g.ms;
+    }
+    basicHitMark(d) { return d.isSkill ? false : d.swingAt; }
+    onHitLate(owner, h) { var t = this.services.clock.now();
+      if (!owner.alive) return;
+      if (h.ps) { this.addGust(owner, h.ps, t); return; }
+      if (h.b && h.s && h.s !== owner.gustSwing) { owner.gustSwing = h.s; this.addGust(owner, 1, t); }
+    }
+    foeInReach(E, t) { var services = this.services, reach = this.data.range;
+      return services.targets.everyone(t).some(function (o) { return o && o.alive && o.team !== E.team && services.vision.visibleTo(o, E, t) && MathKit.hyp(o.x - E.x, o.y - E.y) <= reach + o.hitR; });
+    }
+    overrideBasic(E, ang, reach, t) { var services = this.services, c = this.data, near = this.foeInReach(E, t);
+      E.cdDur = near ? c.meleeCd : c.waveCd; E.cdUntil = t + E.cdDur;
+      if (near) services.melee.swing(E, ang, false);
+      else services.projectiles.emitShots(E, ang, false);
+      return true;
+    }
+    cast(E, ang, reach, t) { this.services.phantomStrike.cast(E, ang, t); }
+    drawsOwnStrike(d) { return !!d.ph; }
+    onStrikeShown(d) { if (d.ph) this.services.phantomView.onSweepShown(d); }
+    afterStrike(T, d) { if (d.ph) this.services.phantomStrike.sweep(T, d); }
+    skillGlow(E, t) { return E.ultUntil > t || this.services.phantomView.isReturning(E, t) ? PhantomType.GLOW : 0; }
+    earlyPose(E, t) { return E.ultUntil > t ? [PhantomType.WIND_CLIP, PhantomType.WIND_HOLD_SPEED] : null; }
+    poseHeldProp(v, E, t) { this.services.phantomView.poseSweep(v, E, t); }
+    bodyAlpha(E, t, alpha) { return this.services.phantomView.isReturning(E, t) ? Math.min(alpha, PhantomType.RETURN_ALPHA) : alpha; }
+    launchHandOf(model) { return model.getObjectByName("handslotr"); }
+    showAimGuide(E, ult, c) { var services = this.services;
+      if (ult) { services.aimGuide.showAimStrip(0, services.dashMoves.dashReach(E, E.angle, PhantomType.ULT.phLen) + ArenaSize.BODY_R, PhantomType.ULT.phWidth); return true; }
+      if (this.foeInReach(E, services.clock.now())) { services.aimGuide.showAimSector(c.range + ArenaSize.BODY_R, c.arc); return true; }
+      var dx = Math.cos(E.angle), dy = Math.sin(E.angle), len = services.physics.rayCast(E.x + dx * 20, E.y + dy * 20, dx, dy, c.throwRange, c.pr) + 20;
+      services.aimGuide.showAimStrip(18, Math.max(1, len - 18), c.pr * 2);
+      return true;
+    }
+    ultAimShot() { return { len: PhantomType.ULT.phLen, halfWidth: PhantomType.ULT.phWidth / 2 }; }
+    botUltRange() { return PhantomType.ULT.phLen; }
+    botUltAllowed(B, target) { return this.services.phantomStrike.botWorthIt(B, target); }
+    botAct(B, target, enemies, t) { return this.services.phantomStrike.busy(B, t); }
+    projectileMesh(g, d) { var services = this.services;
+      var glow = new THREE.Mesh(services.models.crescentGeo(22, Math.PI * 0.85), services.models.glowMat("phantomWaveGlow", 0x7FE3D8, 0.55)); glow.rotation.x = -Math.PI / 2; glow.position.x = -14; g.add(glow);
+      var edge = new THREE.Mesh(services.models.crescentGeo(16, Math.PI * 0.8), services.models.basicMat("phantomWaveEdge", 0xEFFFFC, 0.95)); edge.rotation.x = -Math.PI / 2; edge.position.x = -9; g.add(edge);
+      var tail = new THREE.Mesh(services.geo.trail, services.models.glowMat("trail-phantom", 0x9FEDE4, 0.3)); tail.position.x = -18; tail.scale.set(56, 2.6, 2.6); g.add(tail);
+      [[-30, 5], [-44, -6], [-58, 3]].forEach(function (p, i) {
+        var puff = new THREE.Mesh(services.geo.ball, services.models.glowMat("phantomWaveMist", 0x6FB8B0, 0.22)); puff.position.set(p[0], 0, p[1]); puff.scale.setScalar(7 - i * 1.5); g.add(puff);
+      });
+    }
+    dressPortrait(m) { var services = this.services, clip = services.models.kit.clips[PhantomType.WIND_CLIP];
+      if (!clip) return;
+      var mix = new THREE.AnimationMixer(m); mix.clipAction(clip).play(); mix.update(0.3); m.updateMatrixWorld(true);
+    }
+    attackClip(v, E, t) { return this.foeInReach(E, t) ? ["Melee_1H_Attack_Slice_Horizontal", 2.2] : ["Melee_1H_Attack_Slice_Diagonal", 2.0]; }
+    statDamageText(c) { return c.dmg + "(" + c.throwDmg + ")"; }
+    statCooldownText(c) { var services = this.services; return services.skilltext.num(c.meleeCd / services.clock.scale / 1000) + "(" + services.skilltext.num(c.waveCd / services.clock.scale / 1000) + ")"; }
+    statRangeText(c) { return c.range + "(" + c.throwRange + ")"; }
+    ultDesc() { var services = this.services, u = PhantomType.ULT;
+      return services.skilltext.secs(u.phWind) + " 뒤 잔상을 남기고 앞으로 " + u.phLen + " 돌진. 닿은 적은 " + u.phDmg + "의 피해와 " + services.skilltext.secs(u.phAfterStunMs) + "간 기절, 도착 지점으로 딸려 감. " + services.skilltext.secs(u.phStay) + " 뒤 잔상 자리로 돌아감";
+    }
+    passiveDesc() { var services = this.services, g = this.data.gust;
+      return "적중 시 " + services.skilltext.secs(g.ms) + "간 이동속도 " + services.skilltext.shownSpeed(g.add) + " 증가, 최대 " + g.max + "번 중첩. 기본 공격은 한 번에 1번, 스킬은 맞힌 적 수만큼 쌓이고 쌓일 때마다 지속시간 초기화";
+    }
+    basicDesc() { var services = this.services, c = this.data;
+      return "반경 " + c.range + " 안에 보이는 적이 있으면 앞쪽을 베어 " + c.dmg + "의 피해, 없으면 사거리 " + c.throwRange + "의 검기로 처음 맞은 적에게 " + c.throwDmg + "의 피해. 공격 간격은 베기 뒤 " + services.skilltext.secs(c.meleeCd) + ", 검기 뒤 " + services.skilltext.secs(c.waveCd);
+    }
+  }
   class CharacterRegistry {
     constructor(services) { this.services = services;
       this.fallback = new CharacterType(services, "");
@@ -4768,6 +4882,7 @@ SinglePassMaterials.enable(THREE);
         wraith: new WraithType(services, "wraith"),
         bearer: new BannerBearerType(services, "bearer"),
         marina: new MarinaType(services, "marina"),
+        phantom: new PhantomType(services, "phantom"),
         gargantua: new GargantuaType(services, "gargantua"),
         astrologer: new AstrologerType(services, "astrologer"),
         dummy: new DummyType(services, "dummy"),
@@ -4817,7 +4932,7 @@ SinglePassMaterials.enable(THREE);
     isProtected(t) { var services = this.services; return this.alive && this.protectUntil > (t || services.clock.now()); }
     isStealthed(t) { var services = this.services; t = t || services.clock.now(); return this.stealthUntil > t && t >= this.stealthUntil - RogueType.ULT.asDur; }
     hasSkillActive(t) { var services = this.services; return this.skillUntil > (t || services.clock.now()); }
-    isGaugeLocked(t) { return this.hasSkillActive(t); }
+    isGaugeLocked(t) { var services = this.services; return this.hasSkillActive(t) || (!this.minion && this.type.locksGauge(this, t || services.clock.now())); }
     get type() { var services = this.services; return services.charTypes.of(this.char); }
     isLancerWinding(t) { var services = this.services; return this.type.isLancerWinding(this, t || services.clock.now()); }
     isHammerWinding(t) { var services = this.services; return !!this.lance && this.windUntil > (t || services.clock.now()); }
@@ -5287,7 +5402,7 @@ SinglePassMaterials.enable(THREE);
       if (E.minions.length !== before) services.match.game.forceNet = true;
       E.minions.forEach(function (m) {
         m.mv = false;
-        if (!services.minions.minionReady(m, t)) return;
+        if (!services.minions.minionReady(m, t) || m.isStunned(t)) return;
         var foe = services.minions.minionFoe(m, t);
         if (!foe) {
           var home = MathKit.hyp(E.x - m.x, E.y - m.y);
@@ -5564,6 +5679,151 @@ SinglePassMaterials.enable(THREE);
       services.targets.localTargets().forEach(function (T) { if (T.hookPull) T.hookPull = null; if (T.hookCast) T.hookCast = null; if (T.hookRootUntil) T.hookRootUntil = 0; });
     }
   }
+  class PhantomStrikeSystem {
+    static GATHER_GAP = 6;
+    static MAX_RINGS = 4;
+    static STAGE_STEPS = { wind: "stepWind", dash: "stepDash", free: "stepFree", back: "stepBack" };
+    constructor(services) { this.services = services; }
+    busy(E, t) { var P = E.phantom; return !!P && P.stage !== "free"; }
+    exactAngle(a) { return Math.round(a * 1000) / 1000; }
+    dashMsOf(len) { return len / PhantomType.ULT.phSpeed * 1000; }
+    cast(E, ang, t) { var services = this.services, u = PhantomType.ULT;
+      ang = this.exactAngle(ang);
+      E.angle = ang; E.pending = null; E.slash = null; E.lance = null; E.windUntil = 0; E.dash = null;
+      E.phantom = { stage: "wind", ang: ang, x: E.x, y: E.y, fireAt: t + u.phWind };
+      E.ultUntil = t + u.phWind;
+      E.skillDur = u.phStay; E.skillUntil = t + u.phWind + this.dashMsOf(u.phLen) + u.phStay;
+      var reach = services.dashMoves.dashReach(E, ang, u.phLen);
+      services.session.room.ref.child("meleeHits").push({ team: E.team, owner: E.id, x: MathKit.r1(E.x), y: MathKit.r1(E.y), angle: ang, len: Math.max(1, Math.round(reach)), width: u.phWidth, dmg: 0, wind: u.phWind, zone: 1, createdAt: t });
+      services.vision.revealBriefly(E.id, t);
+    }
+    stepOwner(E, t) {
+      var P = E.phantom; if (!P) return;
+      if (!E.alive) { E.phantom = null; E.gustUntil = 0; return; }
+      this[PhantomStrikeSystem.STAGE_STEPS[P.stage]](E, P, t);
+    }
+    stepWind(E, P, t) { var services = this.services;
+      if (E.isStunned(t) || E.shove || E.hookPull || E.phSweep || MathKit.hyp(E.x - P.x, E.y - P.y) > MeleeSystem.LANCE_SLIP) { this.cancel(E, t); return; }
+      if (t < P.fireAt) return;
+      this.launch(E, P, t);
+    }
+    launch(E, P, t) { var services = this.services, u = PhantomType.ULT, ang = P.ang, dx = Math.cos(ang), dy = Math.sin(ang);
+      var reach = services.dashMoves.dashReach(E, ang, u.phLen);
+      var tx = MathKit.clamp(E.x + dx * reach, ArenaSize.BOUND.l + ArenaSize.BODY_R, ArenaSize.BOUND.r - ArenaSize.BODY_R), ty = MathKit.clamp(E.y + dy * reach, ArenaSize.BOUND.t + ArenaSize.BODY_R, ArenaSize.BOUND.b - ArenaSize.BODY_R);
+      reach = MathKit.hyp(tx - E.x, ty - E.y);
+      var ms = Math.max(1, Math.round(this.dashMsOf(reach))), back = t + ms + u.phStay;
+      var line = { x: MathKit.r1(E.x), y: MathKit.r1(E.y), angle: ang, len: Math.max(1, Math.round(reach)), width: u.phWidth };
+      var spots = this.gatherSpots(E, line, tx, ty, t), arrive = { tx: MathKit.r1(tx), ty: MathKit.r1(ty), ms: ms };
+      if (Object.keys(spots).length) arrive.s = spots;
+      services.session.room.ref.child("meleeHits").push(Object.assign({ team: E.team, owner: E.id, dmg: u.phDmg, u: 1, ph: arrive, createdAt: t }, line));
+      services.session.room.ref.child("effects").push({ type: "phantom", owner: E.id, team: E.team, x: line.x, y: line.y, tx: arrive.tx, ty: arrive.ty, angle: ang, ms: ms, back: back, createdAt: t });
+      E.phantom = { stage: "dash", ang: ang, x: P.x, y: P.y, sx: E.x, sy: E.y, tx: tx, ty: ty, at: t, ms: ms, backAt: back };
+      E.skillUntil = back; E.skillDur = u.phStay;
+      E.mv = false;
+      services.vision.revealBriefly(E.id, t);
+      if (services.targets.hear(E)) services.sound.sfx("swing");
+      services.match.game.forceNet = true;
+    }
+    stepDash(E, P, t) { var services = this.services, k = MathKit.clamp((t - P.at) / P.ms, 0, 1);
+      E.x = P.sx + (P.tx - P.sx) * k; E.y = P.sy + (P.ty - P.sy) * k;
+      E.mv = false; E.shove = null; E.hookPull = null; E.phSweep = null;
+      if (k < 1) return;
+      services.physics.resolve(E);
+      P.stage = "free";
+      services.match.game.forceNet = true;
+    }
+    stepFree(E, P, t) { if (t >= P.backAt) this.startBack(E, P, t); }
+    startBack(E, P, t) { var services = this.services;
+      P.stage = "back"; P.bx = E.x; P.by = E.y; P.from = t;
+      P.backMs = Math.max(1, MathKit.hyp(P.x - E.x, P.y - E.y) / PhantomType.ULT.phBackSpeed * 1000);
+      E.pending = null; E.slash = null; E.volley = null; E.lance = null; E.windUntil = 0; E.dash = null;
+      services.match.game.forceNet = true;
+    }
+    stepBack(E, P, t) { var services = this.services, k = MathKit.clamp((t - P.from) / P.backMs, 0, 1);
+      E.x = P.bx + (P.x - P.bx) * k; E.y = P.by + (P.y - P.by) * k;
+      E.mv = false; E.shove = null; E.hookPull = null; E.phSweep = null; E.dash = null;
+      if (k < 1) return;
+      E.x = P.x; E.y = P.y;
+      services.physics.resolve(E);
+      E.phantom = null;
+      services.match.game.forceNet = true;
+    }
+    cancel(E, t) { var services = this.services;
+      E.phantom = null; E.ultUntil = Math.min(E.ultUntil, t); E.skillUntil = 0; E.skillDur = 0;
+      services.match.game.forceNet = true;
+    }
+    alongOf(o, line) { return (o.x - line.x) * Math.cos(line.angle) + (o.y - line.y) * Math.sin(line.angle); }
+    gatherSpots(E, line, tx, ty, t) { var services = this.services, self = this, spots = {}, taken = [{ x: tx, y: ty }];
+      services.targets.everyone(t).filter(function (o) { return o && o.alive && o.team !== E.team && !o.isProtected(t) && services.melee.inLine(o, line); })
+        .sort(function (a, b) { return self.alongOf(a, line) - self.alongOf(b, line); })
+        .forEach(function (o) { var p = self.freeSpot(tx, ty, line.angle, taken); taken.push(p); spots[o.id] = [MathKit.r1(p.x), MathKit.r1(p.y)]; });
+      return spots;
+    }
+    spacing() { return ArenaSize.BODY_R * 2 + PhantomStrikeSystem.GATHER_GAP; }
+    ringOffsets(radius) {
+      var step = 2 * Math.asin(Math.min(1, this.spacing() / 2 / radius)), out = [0];
+      for (var a = step; a <= Math.PI + 1e-6; a += step) out.push(a, -a);
+      return out;
+    }
+    spotFits(x, y, cx, cy, taken) { var services = this.services, gap = this.spacing() - 0.5;
+      return services.physics.bodyFitsAt(x, y) && services.physics.losClear(cx, cy, x, y) && taken.every(function (p) { return MathKit.hyp(p.x - x, p.y - y) >= gap; });
+    }
+    freeSpot(cx, cy, ang, taken) { var services = this.services, self = this;
+      for (var pass = 0; pass < 2; pass++) {
+        for (var ring = 1; ring <= PhantomStrikeSystem.MAX_RINGS; ring++) {
+          var radius = this.spacing() * ring, offsets = this.ringOffsets(radius);
+          for (var i = 0; i < offsets.length; i++) {
+            if ((Math.abs(offsets[i]) > Math.PI / 2 + 1e-6) !== (pass === 1)) continue;
+            var x = cx + Math.cos(ang + offsets[i]) * radius, y = cy + Math.sin(ang + offsets[i]) * radius;
+            if (self.spotFits(x, y, cx, cy, taken)) return { x: x, y: y };
+          }
+        }
+      }
+      return services.physics.nearestOpenSpot(cx, cy);
+    }
+    spareSpot(d, T) { var ph = d.ph, taken = [{ x: ph.tx, y: ph.ty }];
+      Object.keys(ph.s || {}).forEach(function (id) { if (id !== T.id) taken.push({ x: ph.s[id][0], y: ph.s[id][1] }); });
+      return this.freeSpot(ph.tx, ph.ty, d.angle, taken);
+    }
+    sweep(T, d) { var services = this.services, u = PhantomType.ULT, t = services.clock.now(), ph = d.ph;
+      services.session.room.ref.child("hits/" + d.owner).push({ d: 0, b: 0, t: t, ps: 1 });
+      if (!T.alive) return;
+      var along = MathKit.clamp(this.alongOf(T, d), 0, d.len), touchAt = d.createdAt + along / d.len * ph.ms;
+      var from = Math.max(t, touchAt), to = Math.max(d.createdAt + ph.ms, from + u.phMinSweepMs);
+      var spot = ph.s && ph.s[T.id] ? { x: ph.s[T.id][0], y: ph.s[T.id][1] } : this.spareSpot(d, T);
+      var stunMs = to - t + u.phAfterStunMs;
+      if (T.minion) T.stunUntil = Math.max(T.stunUntil || 0, t + stunMs);
+      else services.status.afflict(T, { stunMs: stunMs }, d.owner);
+      if (T.leap) return;
+      T.shove = null; T.dash = null; T.hookPull = null;
+      T.phSweep = { sx: T.x, sy: T.y, ex: spot.x, ey: spot.y, from: from, to: to, owner: d.owner };
+      if (!T.minion) T.revealUntil = Math.max(T.revealUntil || 0, to);
+      services.match.game.forceNet = true;
+    }
+    stepSweep(T, t) { var services = this.services, S = T.phSweep;
+      if (!S) return;
+      if (!T.alive || T.shove || T.hookPull) { T.phSweep = null; return; }
+      T.mv = false;
+      if (t < S.from) return;
+      var k = MathKit.clamp((t - S.from) / (S.to - S.from), 0, 1);
+      this.slideTo(T, S.sx + (S.ex - S.sx) * k, S.sy + (S.ey - S.sy) * k);
+      if (k < 1) return;
+      T.phSweep = null;
+      services.physics.resolve(T);
+      services.match.game.forceNet = true;
+    }
+    slideTo(T, gx, gy) { var services = this.services, dx = gx - T.x, dy = gy - T.y, parts = Math.max(1, Math.ceil(MathKit.hyp(dx, dy) / (ArenaSize.BODY_R / 2)));
+      for (var i = 0; i < parts; i++) { T.x += dx / parts; T.y += dy / parts; services.physics.resolve(T); }
+    }
+    botWorthIt(B, target) { var services = this.services, u = PhantomType.ULT, t = services.clock.now(), ang = Math.atan2(target.y - B.y, target.x - B.x);
+      var reach = services.dashMoves.dashReach(B, ang, u.phLen), line = { x: B.x, y: B.y, angle: ang, len: reach, width: u.phWidth };
+      var caught = services.targets.everyone(t).filter(function (o) { return o && o.alive && o.team !== B.team && !o.isProtected(t) && services.vision.visibleTo(o, B, t) && services.melee.inLine(o, line); });
+      if (caught.length >= 2) return true;
+      if (!caught.length) return false;
+      var ex = B.x + Math.cos(ang) * reach, ey = B.y + Math.sin(ang) * reach;
+      return services.targets.fighters().some(function (a) { return a && a !== B && a.alive && a.team === B.team && MathKit.hyp(a.x - ex, a.y - ey) <= u.phBotAllyReach; });
+    }
+  }
   class StatusEffects {
     constructor(services) { this.services = services; }
     static CC_FLUSH_MS = 500;
@@ -5823,7 +6083,7 @@ SinglePassMaterials.enable(THREE);
         ["turret", new TurretEffect(services)], ["grove", new GroveEffect(services)], ["gale", new GaleEffect(services)], ["star", new StarEffect(services)],
         ["pool", new PoolEffect(services)], ["hole", new HoleEffect(services)], ["storm", new StormEffect(services)], ["rev", new RevEffect(services)],
         ["domain", new DomainEffect(services)], ["grace", new GraceEffect(services)], ["strike", new StrikeEffect(services)], ["zap", new ZapEffect(services)],
-        ["tshot", new TurretShotEffect(services)], ["curse", new CurseEffect(services)], ["revCut", new RevCutEffect(services)], ["burst", new BurstEffect(services)], ["hook", new HookEffect(services)], ["marina", new MarinaStreamEffect(services)]
+        ["tshot", new TurretShotEffect(services)], ["curse", new CurseEffect(services)], ["revCut", new RevCutEffect(services)], ["burst", new BurstEffect(services)], ["hook", new HookEffect(services)], ["marina", new MarinaStreamEffect(services)], ["phantom", new PhantomEffect(services)]
       ]);
     }
     take(e, now) {
@@ -6576,7 +6836,7 @@ SinglePassMaterials.enable(THREE);
       var dm = Math.min(amount, T.hp), killed = false;
       T.taken = (T.taken || 0) + dm;
       T.hp -= dm; if (!noHurtGauge && !T.isGaugeLocked()) T.gauge = Math.min(MatchRules.GAUGE_MAX, T.gauge + services.catalog.roleOf(T.char).gaugeOnHurt);
-      if (T.hp <= 0) { killed = true; T.hp = 0; T.alive = false; T.deaths++; T.diedAt = services.clock.now(); T.burst = null; T.volley = null; T.slash = null; T.regenUntil = 0; T.skillUntil = 0; T.slowUntil = 0; T.slows = null; T.stunUntil = 0; T.lance = null; T.windUntil = 0; T.hookPull = null; T.hookCast = null; T.hookRootUntil = 0; T.frostStacks = 0; T.hasteUntil = 0; T.hasteStacks = 0; T.burnUntil = 0; T.burnNext = 0; T.poisonUntil = 0; T.poisonNext = 0; T.regenNext = 0; if (T === services.match.me) { services.sound.sfx("down"); services.input.reset(); } }
+      if (T.hp <= 0) { killed = true; T.hp = 0; T.alive = false; T.deaths++; T.diedAt = services.clock.now(); T.burst = null; T.volley = null; T.slash = null; T.regenUntil = 0; T.skillUntil = 0; T.slowUntil = 0; T.slows = null; T.stunUntil = 0; T.lance = null; T.windUntil = 0; T.hookPull = null; T.hookCast = null; T.hookRootUntil = 0; T.phSweep = null; T.frostStacks = 0; T.hasteUntil = 0; T.hasteStacks = 0; T.burnUntil = 0; T.burnNext = 0; T.poisonUntil = 0; T.poisonNext = 0; T.regenNext = 0; if (T === services.match.me) { services.sound.sfx("down"); services.input.reset(); } }
       else {
         if (T === services.match.me) services.sound.sfx("hit");
         services.status.afflict(T, fx, owner);
@@ -7198,7 +7458,7 @@ SinglePassMaterials.enable(THREE);
       E.x = sp.x; E.y = sp.y; E.angle = sp.angle; E.mv = false;
       E.hp = E.maxHp; E.alive = true; E.protectUntil = t + services.timescale.respawnProtectMs;
       E.cdUntil = 0; E.pending = null; E.burst = null; E.volley = null; E.slash = null;
-      E.buffUntil = 0; E.slamAt = 0; E.leap = null; E.dash = null; E.shove = null; E.stealthUntil = 0; E.ultUntil = 0; E.skillUntil = 0; E.regenUntil = 0; E.slowUntil = 0; E.slows = null; E.stunUntil = 0; E.lance = null; E.windUntil = 0; E.hookPull = null; E.hookCast = null; E.hookRootUntil = 0;
+      E.buffUntil = 0; E.slamAt = 0; E.leap = null; E.dash = null; E.shove = null; E.stealthUntil = 0; E.ultUntil = 0; E.skillUntil = 0; E.regenUntil = 0; E.slowUntil = 0; E.slows = null; E.stunUntil = 0; E.lance = null; E.windUntil = 0; E.hookPull = null; E.hookCast = null; E.hookRootUntil = 0; E.phantom = null; E.phSweep = null;
       E.frostStacks = 0; E.frostStackAt = 0; E.revealUntil = 0; E.lastStandUsed = false; E.hasteUntil = 0; E.hasteStacks = 0;
       E.burnUntil = 0; E.burnNext = 0; E.poisonUntil = 0; E.poisonNext = 0; E.rallyUsed = false; E.regenNext = 0; E.shield = !!services.charTypes.statsOf(E.char).respawnShield;
       if (E === services.match.me) services.cameraRig.view.snap = true;
@@ -7238,7 +7498,7 @@ SinglePassMaterials.enable(THREE);
       return { x: MathKit.clamp(E.x + Math.cos(ang) * reach, ArenaSize.BOUND.l, ArenaSize.BOUND.r), y: MathKit.clamp(E.y + Math.sin(ang) * reach, ArenaSize.BOUND.t, ArenaSize.BOUND.b) };
     }
     useUlt(E, ang, reach) { var services = this.services;
-      if (E.gauge < MatchRules.GAUGE_MAX || !E.alive || E.isStunned()) return;
+      if (E.gauge < MatchRules.GAUGE_MAX || !E.alive || E.isStunned() || E.type.cannotCast(E, services.clock.now())) return;
       E.gauge = 0;
       var t = services.clock.now();
       var type = services.charTypes.of(E.char);
@@ -8335,7 +8595,7 @@ SinglePassMaterials.enable(THREE);
         ModelKit.modelChars(services).concat(["minion"]).forEach(function (c) {
           var m = services.models.kit.chars[c], spec = services.charTypes.modelOf(c) || ModelKit.MINION_MODEL;
           if (spec.recolor) services.modelStyle.recolorSkin(m, spec.recolor);
-          if (spec.wear) services.modelStyle.wearPart(m, services.models.kit.chars[spec.wear.from], spec.wear.part);
+          if (spec.wear) services.modelStyle.wearPart(m, services.models.kit.chars[spec.wear.from], spec.wear.part, spec.wear.recolor);
           if (spec.right || spec.rightBuilt) {
             var held = spec.rightBuilt ? TridentProp.build() : services.models.kit.weapons[spec.right].clone(); held.name = "mainhand"; if (spec.rightRecolor) services.modelStyle.recolorProp(held, spec.rightRecolor); if (spec.rightScale) held.scale.setScalar(spec.rightScale); if (spec.rightTurn) held.rotation.y = spec.rightTurn; if (spec.rightTilt) held.rotation.z = spec.rightTilt; if (spec.rightRot) held.rotation.set(spec.rightRot[0], spec.rightRot[1], spec.rightRot[2]);
             if (spec.muzzle) { var muzzle = new THREE.Object3D(); muzzle.name = "muzzle"; muzzle.position.fromArray(spec.muzzle); held.add(muzzle); }
@@ -8480,8 +8740,9 @@ SinglePassMaterials.enable(THREE);
       prop.traverse(function (o) { if (o.isMesh) o.material = o.material.clone(); });
       services.modelStyle.recolorSkin(prop, swatches);
     }
-    wearPart(root, donor, partName) {
+    wearPart(root, donor, partName, swatches) {
       var part = donor.getObjectByName(partName).clone();
+      if (swatches) this.recolorProp(part, swatches);
       part.bind(new THREE.Skeleton(part.skeleton.bones.map(function (b) { return root.getObjectByName(b.name); }), part.skeleton.boneInverses), part.bindMatrix);
       part.visible = true;
       root.getObjectByProperty("isSkinnedMesh", true).parent.add(part);
@@ -11047,6 +11308,251 @@ SinglePassMaterials.enable(THREE);
     }
     render(t, nowMs) { HitmanSlashShaders.ribbon().uniforms.uTime.value = (nowMs % 100000) / 1000; super.render(t, nowMs); }
   }
+  class PhantomShaders {
+    static TONES = { deep: 0x1F4F56, blade: 0x8FEDE2, core: 0xF2FFFD };
+    static WAKE_FRAGMENT = `
+      uniform sampler2D uTex; uniform float uHead; uniform float uFade; uniform float uSeed; uniform float uLen; uniform vec3 uDeep; uniform vec3 uBlade; uniform vec3 uCore; varying vec2 vP;
+      void main() {
+        if (vP.x > uHead) discard;
+        float n = texture2D(uTex, vec2(vP.x * uLen / 220.0 + uSeed, vP.y * 0.8 + uSeed)).g;
+        float across = 1.0 - smoothstep(0.12, 0.5, abs(vP.y) + (n - 0.5) * 0.22);
+        float behind = clamp(1.0 - (uHead - vP.x) * uLen / 360.0, 0.0, 1.0);
+        vec3 color = mix(mix(uDeep, uBlade, n), uCore, behind * across * 0.6);
+        gl_FragColor = vec4(color, across * (0.18 + 0.5 * behind) * (0.55 + 0.45 * n) * uFade);
+        #include <colorspace_fragment>
+      }`;
+    static SCAR_FRAGMENT = `
+      uniform sampler2D uTex; uniform float uHead; uniform float uFade; uniform float uSeed; uniform float uLen; uniform vec3 uDeep; uniform vec3 uBlade; uniform vec3 uCore; varying vec2 vP;
+      void main() {
+        if (vP.x > uHead) discard;
+        float n = texture2D(uTex, vec2(vP.x * uLen / 160.0 + uSeed, vP.y * 0.6 + uSeed * 0.7)).r;
+        float taper = sin(clamp(vP.x, 0.0, 1.0) * 3.1416), thin = 0.05 + 0.13 * taper;
+        float line = smoothstep(thin, thin * 0.2, abs(vP.y + (n - 0.5) * 0.12));
+        float halo = smoothstep(0.5, 0.0, abs(vP.y)) * 0.3 * taper;
+        float lose = (1.0 - uFade) * 1.25 - 0.1, keep = smoothstep(lose, lose + 0.2, n);
+        vec3 color = mix(mix(uDeep, uBlade, max(line, halo)), uCore, line * 0.7);
+        gl_FragColor = vec4(color, max(line, halo) * keep * (0.35 + 0.65 * uFade));
+        #include <colorspace_fragment>
+      }`;
+    static FLASH_FRAGMENT = `
+      uniform float uHead; uniform float uFade; uniform vec3 uBlade; uniform vec3 uCore; varying vec2 vP;
+      void main() {
+        if (length(vP) > 1.0) discard;
+        float along = (vP.x + vP.y) * 0.7071, across = (vP.x - vP.y) * 0.7071, thin = 0.12 * (1.0 - abs(along));
+        float line = smoothstep(thin, thin * 0.2, abs(across)) * step(abs(along), uHead);
+        gl_FragColor = vec4(mix(uBlade, uCore, line), line * uFade);
+        #include <colorspace_fragment>
+      }`;
+  }
+  class PhantomWake extends ShaderMark {
+    static HOLD_SEC = 0.25;
+    constructor(d, scale) { super(d.createdAt); this.d = d; this.travelSec = d.ph.ms / scale / 1000; }
+    get partName() { return "wake"; }
+    get lifeSec() { return this.travelSec + PhantomWake.HOLD_SEC; }
+    place(vis) { var d = this.d, length = d.len + ArenaSize.BODY_R;
+      vis.group.position.set(d.x, 4, d.y); vis.group.rotation.y = -d.angle;
+      vis.wake.scale.set(length, 1, d.width * 0.55); vis.uniforms.uLen.value = length;
+    }
+    paint(vis, sec) { vis.uniforms.uHead.value = Math.min(1, sec / this.travelSec); vis.uniforms.uFade.value = MathKit.clamp((this.lifeSec - sec) / PhantomWake.HOLD_SEC, 0, 1); }
+  }
+  class PhantomScar extends ShaderMark {
+    static DELAY_SEC = 0.1;
+    static DRAW_SEC = 0.08;
+    static HOLD_SEC = 1;
+    static MIST_SEC = 0.55;
+    static WIDTH = 34;
+    constructor(d, scale) { super(d.createdAt + d.ph.ms + PhantomScar.DELAY_SEC * 1000 * scale); this.d = d; }
+    get partName() { return "scar"; }
+    get lifeSec() { return PhantomScar.DRAW_SEC + PhantomScar.HOLD_SEC + PhantomScar.MIST_SEC; }
+    place(vis) { var d = this.d, length = d.len + ArenaSize.BODY_R;
+      vis.group.position.set(d.x, 1.6, d.y); vis.group.rotation.y = -d.angle;
+      vis.scar.scale.set(length, 1, PhantomScar.WIDTH); vis.uniforms.uLen.value = length;
+    }
+    paint(vis, sec) { var S = PhantomScar;
+      vis.uniforms.uHead.value = Math.min(1, sec / S.DRAW_SEC);
+      vis.uniforms.uFade.value = 1 - MathKit.clamp((sec - S.DRAW_SEC - S.HOLD_SEC) / S.MIST_SEC, 0, 1);
+    }
+  }
+  class PhantomFlash extends ShaderMark {
+    static SIZE = 38;
+    static LIFE_SEC = 0.28;
+    constructor(x, y, at) { super(at); this.x = x; this.y = y; }
+    get partName() { return "flash"; }
+    get lifeSec() { return PhantomFlash.LIFE_SEC; }
+    place(vis) { vis.group.position.set(this.x, 5, this.y); vis.group.rotation.y = 0; vis.flash.scale.set(PhantomFlash.SIZE, 1, PhantomFlash.SIZE); }
+    paint(vis, sec) { var k = Math.min(1, sec / PhantomFlash.LIFE_SEC); vis.uniforms.uHead.value = Math.min(1, k * 3); vis.uniforms.uFade.value = 1 - k * k; }
+  }
+  class PhantomSlashView extends ShaderMarkView {
+    get fieldName() { return "phantomSlashes"; }
+    get partSpecs() { var S = PhantomShaders; return { wake: { shape: "line", fragment: S.WAKE_FRAGMENT }, scar: { shape: "line", fragment: S.SCAR_FRAGMENT }, flash: { shape: "flat", fragment: S.FLASH_FRAGMENT } }; }
+    buildVis() { var vis = super.buildVis(), T = PhantomShaders.TONES;
+      vis.uniforms.uDeep.value.set(T.deep); vis.uniforms.uBlade.value.set(T.blade); vis.uniforms.uCore.value.set(T.core);
+      return vis;
+    }
+    warmSample() { var vis = this.warmVis(); vis.parts.forEach(function (part) { part.visible = true; }); return vis.group; }
+    sweep(d, flashes) { var services = this.services, scale = services.clock.scale, view = this;
+      this.add(new PhantomWake(d, scale));
+      this.add(new PhantomScar(d, scale));
+      flashes.forEach(function (f) { view.add(new PhantomFlash(f.x, f.y, f.at)); });
+    }
+  }
+  class PhantomMist {
+    static MAX = 96;
+    static TONE = 0x5E9C96;
+    constructor(services) { this.services = services; this.mesh = null; this.puffs = []; this.next = 0; this.matrix = new THREE.Matrix4(); this.color = new THREE.Color(); }
+    build() { var services = this.services;
+      if (this.mesh || !services.cameraRig.renderer) return this.mesh;
+      var mat = new THREE.MeshBasicMaterial({ color: 0xFFFFFF, transparent: true, opacity: 0.55, depthWrite: false, blending: THREE.AdditiveBlending });
+      this.mesh = new THREE.InstancedMesh(services.geo.ball, mat, PhantomMist.MAX);
+      this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage); this.mesh.frustumCulled = false; this.mesh.renderOrder = 4;
+      for (var i = 0; i < PhantomMist.MAX; i++) { this.puffs.push({ life: 0 }); this.mesh.setMatrixAt(i, this.matrix.makeScale(0, 0, 0)); this.mesh.setColorAt(i, this.color.setRGB(0, 0, 0)); }
+      services.stage.scene.add(this.mesh);
+      return this.mesh;
+    }
+    emit(x, y, h, size, rise, lifeMs, strength, nowMs) {
+      if (!this.build()) return;
+      var p = this.puffs[this.next], seed = (nowMs * 0.37 + this.next * 1.7) % 6.283;
+      this.next = (this.next + 1) % PhantomMist.MAX;
+      Object.assign(p, { x: x + Math.cos(seed) * size * 0.4, y: y + Math.sin(seed) * size * 0.4, h: h, size: size, rise: rise, life: lifeMs, born: nowMs, strength: strength, drift: seed });
+    }
+    update(nowMs) {
+      if (!this.mesh) return;
+      var self = this;
+      this.puffs.forEach(function (p, i) {
+        var k = p.life ? (nowMs - p.born) / p.life : 1;
+        if (k >= 1 || k < 0) { if (p.life) { p.life = 0; self.mesh.setMatrixAt(i, self.matrix.makeScale(0, 0, 0)); } return; }
+        var s = p.size * (0.6 + 0.9 * k), fade = Math.sin(Math.PI * k) * p.strength;
+        self.matrix.makeScale(s, s * 0.7, s).setPosition(p.x + Math.cos(p.drift) * 8 * k, p.h + p.rise * k, p.y + Math.sin(p.drift) * 8 * k);
+        self.mesh.setMatrixAt(i, self.matrix);
+        self.mesh.setColorAt(i, self.color.setHex(PhantomMist.TONE).multiplyScalar(fade));
+      });
+      this.mesh.instanceMatrix.needsUpdate = true;
+      if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;
+    }
+    clear() { var self = this; if (!this.mesh) return; this.puffs.forEach(function (p, i) { p.life = 0; self.mesh.setMatrixAt(i, self.matrix.makeScale(0, 0, 0)); }); this.mesh.instanceMatrix.needsUpdate = true; }
+  }
+  class PhantomEchoForm {
+    static TIME = { value: 0 };
+    static WOBBLE = 0.018;
+    static COLOR = 0xD6FBF6;
+    static POSE_SEC = 0.3;
+    static ghostMaterial() {
+      var mat = new THREE.MeshBasicMaterial({ color: PhantomEchoForm.COLOR, transparent: true, opacity: 0, depthWrite: false });
+      mat.onBeforeCompile = function (sh) {
+        sh.uniforms.uTime = PhantomEchoForm.TIME;
+        sh.vertexShader = "uniform float uTime;\n" + sh.vertexShader.replace("#include <begin_vertex>", "#include <begin_vertex>\n#ifdef USE_SKINNING\ntransformed += objectNormal * " + PhantomEchoForm.WOBBLE.toFixed(3) + " * sin(uTime * 7.0 + position.y * 9.0 + position.x * 5.0);\n#endif");
+      };
+      mat.customProgramCacheKey = function () { return "phantomEcho"; };
+      return mat;
+    }
+    static build(services) {
+      var model = SkeletonUtils.clone(services.models.kit.chars.phantom), mat = PhantomEchoForm.ghostMaterial(), clip = services.models.kit.clips[PhantomType.WIND_CLIP];
+      SharedSkeleton.unify(model);
+      model.rotation.y = Math.PI / 2; model.scale.setScalar(ModelTuning.MODEL_SCALE);
+      model.traverse(function (o) { if (o.isMesh) { o.material = mat; o.frustumCulled = false; o.renderOrder = 6; } });
+      if (clip) { var mix = new THREE.AnimationMixer(model); mix.clipAction(clip).play(); mix.update(PhantomEchoForm.POSE_SEC); }
+      var group = new THREE.Group(); group.add(model);
+      return { group: group, mat: mat };
+    }
+  }
+  class PhantomEffect extends EffectHandler {
+    handle(e, now) { this.services.phantomView.onCast(e, now); }
+  }
+  class PhantomView {
+    static FADE_IN_SEC = 0.15;
+    static FADE_OUT_SEC = 0.4;
+    static ECHO_ALPHA = 0.6;
+    static ABSORB_DIST = 24;
+    static BACK_SLACK_MS = 900;
+    static FOOT_MIST_MS = 140;
+    static ECHO_MIST_MS = 110;
+    static TRAIL_MIST_MS = 40;
+    constructor(services) { this.services = services; this.free = []; this.live = new Set(); this.mist = new PhantomMist(services); this.mistAt = {}; }
+    get casts() { return this.services.field.phantomCasts; }
+    set casts(list) { this.services.field.phantomCasts = list; }
+    recordOf(owner) { var list = this.casts; for (var i = list.length - 1; i >= 0; i--) if (list[i].e.owner === owner) return list[i]; return null; }
+    onCast(e, now) { var services = this.services;
+      if (now > e.back + PhantomView.BACK_SLACK_MS) return;
+      this.casts.forEach(function (r) { if (r.e.owner === e.owner && !r.endAt) r.endAt = now; });
+      this.casts.push({ e: e, vis: null, endAt: 0, absorbed: false });
+    }
+    isReturning(E, t) { var rec = this.recordOf(E.id); return !!rec && !rec.endAt && E.alive && t >= rec.e.back; }
+    step(t) { var services = this.services, view = this, scale = services.clock.scale;
+      this.casts = this.casts.filter(function (r) {
+        if (!r.endAt) {
+          var E = services.targets.ent(r.e.owner);
+          if (!E || (!E.alive && t > r.e.createdAt)) r.endAt = t;
+          else if (t >= r.e.back && MathKit.hyp(E.x - r.e.x, E.y - r.e.y) <= PhantomView.ABSORB_DIST) { r.endAt = t; r.absorbed = true; }
+          else if (t > r.e.back + PhantomView.BACK_SLACK_MS) r.endAt = t;
+        }
+        if (r.endAt && t > r.endAt + PhantomView.FADE_OUT_SEC * 1000 * scale) { view.release(r); return false; }
+        return true;
+      });
+    }
+    onSweepShown(d) { var services = this.services, t = services.clock.now(), flashes = [], self = this;
+      services.targets.fightersAndMinions().forEach(function (T) {
+        if (!T || !T.alive || T.team === d.team || T.isProtected(t) || !services.melee.inLine(T, d)) return;
+        var along = MathKit.clamp((T.x - d.x) * Math.cos(d.angle) + (T.y - d.y) * Math.sin(d.angle), 0, d.len);
+        flashes.push({ x: T.x, y: T.y, at: d.createdAt + along / d.len * d.ph.ms });
+      });
+      services.phantomSlashes.sweep(d, flashes);
+    }
+    poseSweep(v, E, t) { var services = this.services, rec = this.recordOf(E.id), S = PhantomType;
+      if (!rec || !v.kit) return;
+      var e = rec.e, clips = v.clips || services.models.kit.clips, clip = clips[S.SWEEP_CLIP];
+      if (!clip) return;
+      if (v.sweepSeen !== e.createdAt && t >= e.createdAt && t < e.createdAt + e.ms) {
+        v.sweepSeen = e.createdAt;
+        services.fighterMotion.playOnce(v, S.SWEEP_CLIP, (S.SWEEP_TO_SEC - S.SWEEP_FROM_SEC) * 1000 / e.ms, t, null, S.SWEEP_FROM_SEC);
+        v.once.sweepEnd = e.createdAt + e.ms;
+      }
+      if (v.once && v.once.name === S.SWEEP_CLIP && v.once.sweepEnd && t >= v.once.sweepEnd) {
+        v.once.ts = 1; v.once.until = t + (clip.duration - S.SWEEP_TO_SEC) * 1000 - 90; v.once.sweepEnd = 0;
+      }
+    }
+    take() { var services = this.services;
+      if (!services.models.kit.ready || !services.models.kit.chars.phantom) return null;
+      var vis = this.free.pop() || PhantomEchoForm.build(services);
+      services.stage.scene.add(vis.group); this.live.add(vis);
+      return vis;
+    }
+    release(r) { if (!r.vis) return; if (r.vis.group.parent) r.vis.group.parent.remove(r.vis.group); this.live.delete(r.vis); this.free.push(r.vis); r.vis = null; }
+    prefill(count) { var services = this.services; if (!services.models.kit.ready || !services.models.kit.chars.phantom) return; while (this.free.length < count) this.free.push(PhantomEchoForm.build(services)); }
+    spareRoots() { return this.free.map(function (vis) { vis.group.position.set(ShaderWarmup.PROBE_SPOT, 0, ShaderWarmup.PROBE_SPOT); vis.mat.opacity = PhantomView.ECHO_ALPHA; return vis.group; }); }
+    warmSample() { var services = this.services;
+      this.mist.build();
+      if (!services.models.kit.chars.phantom) return this.mist.mesh;
+      var vis = PhantomEchoForm.build(services); vis.mat.opacity = PhantomView.ECHO_ALPHA; this.free.push(vis);
+      return vis.group;
+    }
+    dropAll() { var view = this; this.casts.forEach(function (r) { view.release(r); }); this.live.forEach(function (vis) { if (vis.group.parent) vis.group.parent.remove(vis.group); view.free.push(vis); }); this.live.clear(); this.mist.clear(); }
+    echoAlpha(r, t, nowMs) { var scale = this.services.clock.scale, since = (t - r.e.createdAt) / scale / 1000, k = MathKit.clamp(since / PhantomView.FADE_IN_SEC, 0, 1);
+      if (r.endAt) k *= 1 - MathKit.clamp((t - r.endAt) / scale / 1000 / PhantomView.FADE_OUT_SEC, 0, 1);
+      return PhantomView.ECHO_ALPHA * k * (0.82 + 0.18 * Math.sin(nowMs / 90 + r.e.createdAt));
+    }
+    puffEvery(key, nowMs, gap) { if (nowMs - (this.mistAt[key] || 0) < gap) return false; this.mistAt[key] = nowMs; return true; }
+    render(t, nowMs, dt) { var services = this.services, view = this, used = new Set();
+      PhantomEchoForm.TIME.value = (nowMs % 100000) / 1000;
+      this.casts.forEach(function (r) {
+        if (!r.vis) r.vis = view.take();
+        if (!r.vis) return;
+        used.add(r.vis);
+        var grow = r.absorbed && r.endAt ? 1 + 0.25 * MathKit.clamp((t - r.endAt) / services.clock.scale / 1000 / PhantomView.FADE_OUT_SEC, 0, 1) : 1;
+        r.vis.group.position.set(r.e.x, 0, r.e.y); r.vis.group.rotation.y = -r.e.angle; r.vis.group.scale.setScalar(grow);
+        r.vis.mat.opacity = view.echoAlpha(r, t, nowMs);
+        if (!r.endAt && view.puffEvery("echo" + r.e.owner, nowMs, PhantomView.ECHO_MIST_MS)) view.mist.emit(r.e.x, r.e.y, 6, 13, 46, 1100, 0.32, nowMs);
+        if (r.endAt && !r.burst) { r.burst = true; for (var i = 0; i < 6; i++) view.mist.emit(r.e.x, r.e.y, 10 + i * 8, 16, 40, 700, 0.4, nowMs + i); }
+      });
+      this.live.forEach(function (vis) { if (!used.has(vis)) { if (vis.group.parent) vis.group.parent.remove(vis.group); view.live.delete(vis); view.free.push(vis); } });
+      services.targets.participants().forEach(function (id) {
+        var E = services.targets.ent(id), v = services.fighterView.fighters[id];
+        if (!E || !E.alive || E.char !== "phantom" || !v || !v.root.visible) return;
+        if (view.isReturning(E, t)) { if (view.puffEvery("trail" + id, nowMs, PhantomView.TRAIL_MIST_MS)) view.mist.emit(E.x, E.y, 30, 14, 20, 600, 0.45, nowMs); }
+        else if (view.puffEvery("foot" + id, nowMs, PhantomView.FOOT_MIST_MS)) view.mist.emit(E.x, E.y, 3, 10, 16, 900, 0.22, nowMs);
+      });
+      this.mist.update(nowMs);
+    }
+  }
   class SniperShotShaders {
     static TONES = { deep: 0x6A2A08, blade: 0xFFB347, core: 0xFFF4D8, far: 0xFFD34D };
     static TAIL_FRAGMENT = `
@@ -11782,6 +12288,7 @@ SinglePassMaterials.enable(THREE);
         if (v.chainRig) v.chainRig.update(E, t, dt);
         if (v.bannerRig) v.bannerRig.update(E, t, nowMs);
         services.bannerAura.renderFollower(v, E, t, nowMs);
+        alpha = services.charTypes.of(E.char).bodyAlpha(E, t, alpha);
         v.mats.forEach(function (m) { m.opacity = alpha; });
         var glow = services.frameRenderer.glowOf(E, t);
         v.glowMats.forEach(function (m) { m.emissive.setHex(glow); });
@@ -13071,6 +13578,8 @@ SinglePassMaterials.enable(THREE);
         function () { return services.meteorFall.warmSample(); },
         function () { return services.impactBlasts.warmSample(); },
         function () { return services.hitmanSlashView.warmSample(); },
+        function () { return services.phantomSlashes.warmSample(); },
+        function () { return services.phantomView.warmSample(); },
         function () { return services.sniperShots.warmSample(); },
         function () { return services.poolView.makeHoleVis(e); },
         function () { return services.poolView.makeBottleVis(); },
@@ -13166,6 +13675,7 @@ SinglePassMaterials.enable(THREE);
       var snipers = this.castersByTeam("sniper"), sniperCount = snipers.blue + snipers.red, guardians = this.castersByTeam("guardian"), guardianCount = guardians.blue + guardians.red;
       var rogues = this.castersByTeam("rogue"), rangers = this.castersByTeam("ranger"), knights = this.castersByTeam("knight"), throwers = this.castersByTeam("thrower"), shamans = this.castersByTeam("shaman"), stargazers = this.castersByTeam("astrologer"), throwerCount = throwers.blue + throwers.red, starCount = (stargazers.blue + stargazers.red) * 2;
       var wraiths = this.castersByTeam("wraith"); services.hookView.prefill(wraiths.blue + wraiths.red);
+      var phantoms = this.castersByTeam("phantom"); services.phantomSlashes.prefill((phantoms.blue + phantoms.red) * 5); services.phantomView.prefill(phantoms.blue + phantoms.red);
       this.prefillReusedFx();
       this.rehearseFirstUses();
       services.arenaFx.prefillForMatch({ toxicPools: throwerCount * (ThrowerType.ULT.plMax + 1), domains: shamans.blue + shamans.red, starfalls: starCount, stealthBursts: rogues.blue + rogues.red });
@@ -13193,16 +13703,17 @@ SinglePassMaterials.enable(THREE);
       services.stormView.shelf.prefill(frosts);
       services.turrets.shellShelf.prefill(engineers * 8);
     }
-    rehearseFirstUses() { var rehearsal = this.rehearsal, druids = this.castersByTeam("druid"), hitmen = this.castersByTeam("hitman"), stormbows = this.castersByTeam("stormbow");
+    rehearseFirstUses() { var rehearsal = this.rehearsal, druids = this.castersByTeam("druid"), hitmen = this.castersByTeam("hitman"), stormbows = this.castersByTeam("stormbow"), phantoms = this.castersByTeam("phantom");
       rehearsal.finish();
       ["blue", "red"].forEach(function (team) {
         rehearsal.shots("druid", team, false, druids[team] * 2);
         rehearsal.shots("hitman", team, true, hitmen[team]);
+        rehearsal.shots("phantom", team, false, phantoms[team] * 2);
       });
       if (stormbows.blue + stormbows.red) rehearsal.overcharge();
     }
     warmObjects() { var services = this.services;
-      return (this.kept || []).concat(services.fxView.bladeZones.spareRoots(), services.hammerStrikes.spareRoots(), services.cloudWaves.shelf.spareRoots(), services.gargantua.spareRoots(), services.stormView.shelf.spareRoots(), this.rehearsal.roots, services.fighterView.spareMinionRoots(), services.turrets.spareRoots(), services.groves.spare, services.revGraceView.spareBeamRoots(), services.meteorFall.spareRoots(), services.galeView.spareRoots(), services.impactBlasts.spareRoots(), services.hitmanSlashView.spareRoots(), services.sniperShots.spareRoots(), services.arenaFx.spareRoots(ShaderWarmup.PROBE_SPOT), services.hookView.spareRoots());
+      return (this.kept || []).concat(services.fxView.bladeZones.spareRoots(), services.hammerStrikes.spareRoots(), services.cloudWaves.shelf.spareRoots(), services.gargantua.spareRoots(), services.stormView.shelf.spareRoots(), this.rehearsal.roots, services.fighterView.spareMinionRoots(), services.turrets.spareRoots(), services.groves.spare, services.revGraceView.spareBeamRoots(), services.meteorFall.spareRoots(), services.galeView.spareRoots(), services.impactBlasts.spareRoots(), services.hitmanSlashView.spareRoots(), services.phantomSlashes.spareRoots(), services.phantomView.spareRoots(), services.sniperShots.spareRoots(), services.arenaFx.spareRoots(ShaderWarmup.PROBE_SPOT), services.hookView.spareRoots());
     }
   }
   class FramePhaseMeter {
@@ -13315,6 +13826,8 @@ SinglePassMaterials.enable(THREE);
       services.impactBlasts.step(t);
       services.hitmanSlashView.step(t);
       services.sniperShots.step(t);
+      services.phantomSlashes.step(t);
+      services.phantomView.step(t);
       services.bannerLedger.step(t);
       services.world.pruneLocal(t);
     }
@@ -13350,12 +13863,13 @@ SinglePassMaterials.enable(THREE);
       services.dashMoves.stepHammerLeap(E);
       services.melee.stepLance(E);
       services.hookPull.stepCast(E, t);
+      E.type.stepSkill(E, t);
       services.dashMoves.stepDash(E);
       services.minions.stepMinions(E, dt, t);
       services.damage.payKillGaugeOwed(E, t);
     }
     stepStatusTicks(t) { var services = this.services;
-      services.targets.localTargets().forEach(function (T) { services.status.stepShove(T, t); services.hookPull.stepPull(T, t); if (!T.minion) { services.bannerAura.stepHelp(T, t); services.status.stepBurn(T, t); services.status.stepPoison(T, t); services.status.stepRally(T, t); services.domainFx.stepDomainBolt(T, t); services.domainFx.stepCurse(T, t); T.type.stepPassive(T, t); } });
+      services.targets.localTargets().forEach(function (T) { services.status.stepShove(T, t); services.hookPull.stepPull(T, t); services.phantomStrike.stepSweep(T, t); if (!T.minion) { services.bannerAura.stepHelp(T, t); services.status.stepBurn(T, t); services.status.stepPoison(T, t); services.status.stepRally(T, t); services.domainFx.stepDomainBolt(T, t); services.domainFx.stepCurse(T, t); T.type.stepPassive(T, t); } });
     }
   }
 
@@ -13759,6 +14273,7 @@ SinglePassMaterials.enable(THREE);
       services.giant = new GiantSystem(services);
       services.hookPath = new HookPath(services);
       services.hookPull = new HookPullSystem(services);
+      services.phantomStrike = new PhantomStrikeSystem(services);
       services.hookView = new HookChainView(services);
       services.hammerStrikes = new HammerStrikeView(services);
       services.bannerAura = new BannerAura(services);
@@ -13800,6 +14315,8 @@ SinglePassMaterials.enable(THREE);
       services.arenaFx = new ArenaFxViews({ THREE: THREE, noise: function () { return WaterNoise.texture(); }, scene: function () { return services.stage.scene; }, pixelScale: function () { return WaterNoise.pixelScale(services); }, isLite: function () { return services.cameraRig.pix < Environment.PIX_START; }, meteorPath: function () { return { dir: MeteorLook.DIR, top: MeteorLook.TOP }; }, bladeStormRadius: DancerType.ULT.bwR });
       services.impactBlasts = new ImpactBlastView(services);
       services.hitmanSlashView = new HitmanSlashView(services);
+      services.phantomSlashes = new PhantomSlashView(services);
+      services.phantomView = new PhantomView(services);
       services.sniperShots = new SniperShotView(services);
       services.starfallView = new StarfallView(services);
       services.aimGuide = new AimGuide(services);
