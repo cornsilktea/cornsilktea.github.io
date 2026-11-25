@@ -9627,7 +9627,7 @@ class HunterTests {
       var bad = [], basic = api.basicDesc("hunter"), pas = api.passiveDesc("hunter"), ult = api.ultDesc("hunter"), table = api.statTable("hunter");
       var wantBasic = "이동 방향으로 " + C.roll.dist + " 구른 뒤 가장 가까운 적을 쫓는 볼트로 " + C.dmg + "의 피해. 멈춰 있으면 조준 반대쪽으로 구름";
       var wantUlt = api.secs(U.hnDur) + "간 공격속도 " + Math.round((C.cd / U.hnCd - 1) * 100) + "%·공격력 " + Math.round(U.hnDmgRate * 100) + "%·이동속도 " + api.shownSpeed(U.hnSpeed) + " 증가. 지속 중 구르는 동안 은신";
-      var wantPas = "처치 관여 시 " + api.secs(H.ms) + "간 공격력 " + Math.round(H.dmgRate * 100) + "%·이동속도 " + api.shownSpeed(H.speed) + " 증가";
+      var wantPas = "기본 공격시 진행 방향으로 " + C.roll.dist + "만큼 구른 후 가장 가까운 적에게 유도 화살 발사. 처치 관여 시 " + api.secs(H.ms) + "간 공격력 " + Math.round(H.dmgRate * 100) + "%·이동속도 " + api.shownSpeed(H.speed) + " 증가";
       if (basic !== wantBasic) bad.push("기본 공격 '" + basic + "'");
       if (ult !== wantUlt) bad.push("스킬 '" + ult + "'");
       if (pas !== wantPas) bad.push("패시브 '" + pas + "'");

@@ -5293,7 +5293,7 @@ SinglePassMaterials.enable(THREE);
       return services.skilltext.secs(u.hnDur) + "간 공격속도 " + Math.round((c.cd / u.hnCd - 1) * 100) + "%·공격력 " + Math.round(u.hnDmgRate * 100) + "%·이동속도 " + services.skilltext.shownSpeed(u.hnSpeed) + " 증가. 지속 중 구르는 동안 은신";
     }
     passiveDesc() { var services = this.services, h = this.data.hunt;
-      return "처치 관여 시 " + services.skilltext.secs(h.ms) + "간 공격력 " + Math.round(h.dmgRate * 100) + "%·이동속도 " + services.skilltext.shownSpeed(h.speed) + " 증가";
+      return "기본 공격시 진행 방향으로 " + this.data.roll.dist + "만큼 구른 후 가장 가까운 적에게 유도 화살 발사. 처치 관여 시 " + services.skilltext.secs(h.ms) + "간 공격력 " + Math.round(h.dmgRate * 100) + "%·이동속도 " + services.skilltext.shownSpeed(h.speed) + " 증가";
     }
   }
   class CharacterRegistry {
