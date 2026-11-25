@@ -3793,8 +3793,8 @@ SinglePassMaterials.enable(THREE);
       services.fighterMotion.playOnce(v, "Melee_2H_Slam", MathKit.clamp(GiantType.SLAM_IMPACT_SEC * 1000 / leapMs, 1, 4.5), t);
     }
     ultDesc() { var services = this.services;
-      return "지정한 곳(최대 " + GiantType.ULT.gjCast + ")으로 점프해 " + services.skilltext.secs(GiantType.ULT.gjDur) + "간 골렘으로 변신하며 체력 " + GiantType.ULT.gjHeal + " 회복. 자신을 중심으로 반경 " + GiantType.ULT.gjR + "에 하늘빛 폭풍이 일어 적은 1초당 " + GiantType.ULT.gjTickDmg +
-             "의 피해. 변신 중 기본 공격은 반경 " + GiantType.ULT.gjMaceRange + " 안의 가장 가까운 적 1명을 철퇴로 쳐 " + GiantType.ULT.gjMaceDmg + "의 피해";
+      return "체력을 " + GiantType.ULT.gjHeal + " 회복하고 지정한 곳으로 점프한 뒤 " + services.skilltext.secs(GiantType.ULT.gjDur) + "간 골렘으로 변신. 지속 시간 동안 반경 " + GiantType.ULT.gjR + "에 1초당 " + GiantType.ULT.gjTickDmg +
+             "의 피해를 입히고, 기본 공격 시 " + GiantType.ULT.gjMaceRange + " 안의 가장 가까운 적을 자동 조준";
     }
     passiveDesc() { var services = this.services;
       return "골렘 변신 중 받는 피해 " + services.skilltext.pctOf(1 - GiantType.ULT.gjDef) + "% 감소";
