@@ -4787,13 +4787,13 @@ SinglePassMaterials.enable(THREE);
                rightRecolor: [[1, 2, 2, "#E4FFFB", "#7FD8CF"], [0, 3, 1, "#D8FBF6", "#6FC9C0"], [1, 1, 1, "#D8FBF6", "#6FC9C0"], [2, 0, 1, "#D8FBF6", "#6FC9C0"],
                               [0, 4, 1, "#3A3F45", "#1E2226"], [0, 5, 2, "#3A3F45", "#1E2226"], [1, 5, 2, "#3A3F45", "#1E2226"], [1, 4, 1, "#AEB7BC", "#6C767C"], [1, 7, 1, "#3A3F45", "#1E2226"], [0, 7, 1, "#4A5056", "#24282C"]] };
     static ULT = {
-      phWind: GameTime.gameMs(0.9), phLen: 500, phWallR: 10, phWidth: 150, phSpeed: GameTime.gameSpeed(2000), phDmg: 30, phAfterStunMs: GameTime.gameMs(0.5),
+      phWind: GameTime.gameMs(0.9), phLen: 500, phWallR: 10, phWidth: 120, phSpeed: GameTime.gameSpeed(2000), phDmg: 30, phAfterStunMs: GameTime.gameMs(0.5),
       phStay: GameTime.gameMs(4), phBackSpeed: GameTime.gameSpeed(1000), phMinSweepMs: 40
     };
-    static STATS = { name: "팬텀", role: "assassin", icon: "👻", hp: 130, speed: GameTime.gameSpeed(175), cd: GameTime.gameMs(1.1),
-               dmg: 40, farDmg: 15, dmgStep: 5, fullDmgReach: 100, range: 450, pSpeed: GameTime.gameSpeed(350), pr: 100, wallR: 10, pierce: true,
+    static STATS = { name: "팬텀", role: "assassin", icon: "👻", hp: 130, speed: GameTime.gameSpeed(175), cd: GameTime.gameMs(1.4),
+               dmg: 35, farDmg: 15, dmgStep: 5, fullDmgReach: 100, range: 450, pSpeed: GameTime.gameSpeed(350), pr: 75, wallR: 10, pierce: true,
                gust: { add: 15 / MatchRules.GAME_SPEED, ms: GameTime.gameMs(4), max: 4 }, ultName: "잔영섬", ultAim: true };
-    static SWORD_WAVE = { arc: Math.PI * 0.72, glowR: 116, glowThick: 28, coreR: 110, coreThick: 11, afterGap: 20, lead: 10 };
+    static SWORD_WAVE = { arc: Math.PI * 0.72, glowR: 87, glowThick: 24, coreR: 82, coreThick: 11, afterGap: 20, lead: 10 };
     static WAVE_SWING = { clip: "Melee_1H_Attack_Slice_Horizontal", speed: 2.2, from: 0.17, release: 0.23 };
     static WIND_CLIP = "Melee_2H_Idle";
     static WIND_HOLD_SPEED = 0.05;
