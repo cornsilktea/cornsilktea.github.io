@@ -5830,6 +5830,7 @@ SinglePassMaterials.enable(THREE);
   class MinionSystem {
     static SURROUND_GAP = 44;
     static SLOT_ARRIVE = 3;
+    static MIN_WALK = 0.001;
     static SLOT_LEAVE = 18;
     static SPREAD_GAP = 36;
     static SPREAD_EASE = 0.35;
@@ -5908,6 +5909,7 @@ SinglePassMaterials.enable(THREE);
       return best;
     }
     walkMinion(m, E, dx, dy, d, dt, t, limit) { var services = this.services;
+      if (!(d > MinionSystem.MIN_WALK)) { m.mv = m.walkUntil > t; return; }
       var mx = dx / d, my = dy / d;
       if (m.detour > t) { var rx = -my * m.detourDir; my = mx * m.detourDir; mx = rx; }
       var ox = m.x, oy = m.y, step = Math.min(limit == null ? Infinity : limit, (NecroType.ULT.smSpeed + services.bannerAura.speedBonusFor(m, t)) * dt);
