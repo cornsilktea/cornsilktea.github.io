@@ -5179,7 +5179,7 @@ class ResultCollector {
   });
   new PhantomTests(api, { world: world, run: run, FRAME: FRAME }).register();
   new ShielderTests(api, { world: world, run: run, runAsync: runAsync, FRAME: FRAME }).register();
-  new ArcaTests(api, { world: world, run: run, FRAME: FRAME, OPEN_Y: OPEN_Y, blockedAt: blockedAt, singleRowWall: singleRowWall }).register();
+  new ArcaTests(api, { world: world, run: run, runAsync: runAsync, FRAME: FRAME, OPEN_Y: OPEN_Y, blockedAt: blockedAt, singleRowWall: singleRowWall }).register();
   run(AUTO, "AI 6명 60초 난전 — 던전 맵 + 아르카 고정 (시드 2046)", function (done) {
     var r = autoMelee("dungeon", 60, 2046, "arca"), kinds = Object.keys(r.issues);
     var roster = r.list.map(function (e) { return api.CHARS[e.char].name; }).join("·");
@@ -9275,6 +9275,17 @@ class ArcaTests {
       W.step(U.akDur);
       if (api.FIELD.barriers.length || b.vis || group.parent) bad.push("결계가 끝나도 그림이 남음");
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "사슬 2개(InstancedMesh 1개), 쓰러진 적 사슬 사라짐, 끝나면 그림 회수");
+    });
+    this.kit.runAsync(G, "발사 지점: 아르카 투사체·빛줄기는 지팡이 끝에서 나가고, 시전 동작이 있는가 (다른 캐릭터의 발사 지점도 목록으로)", async function (done) {
+      var W = self.scene([]), ak = W.ent("ak");
+      for (var wait = 0; wait < 40 && !api.FIGHTER_VIEW.makeVis(ak, new api.THREE.Group()).kit; wait++) await new Promise(function (r) { setTimeout(r, 100); });
+      var v = api.FIGHTER_VIEW.makeVis(ak, new api.THREE.Group()), bad = [];
+      if (!v.kit) { done("info", "모델을 4초 안에 못 읽어 건너뜀"); return; }
+      var hand = v.launchHand, staff = v.root.getObjectByName("mainhand");
+      if (!hand || hand.parent !== staff) bad.push("발사 지점이 지팡이에 없음(" + (hand ? hand.name : "없음") + ")");
+      if (!api.CHAR_TYPES.of("arca").hasSkillClip) bad.push("시전 동작 없음");
+      var fromBody = api.CHAR_LIST.filter(function (c) { if (!api.CHARS[c] || /bot/.test(c)) return false; var e = self.kit.world("forest", [{ id: "p", team: "blue", char: c, x: 200, y: self.y }]).ent("p"), pv = api.FIGHTER_VIEW.makeVis(e, new api.THREE.Group()); return pv.kit && !pv.launchHand; });
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "아르카는 지팡이 끝 고정점·시전 동작 있음. 손·총구 고정점 없이 몸에서 나가는 캐릭터: " + (fromBody.join(", ") || "없음"));
     });
     run(G, "카드: 패시브·스킬 설명과 능력치 표가 수치에서 만들어지는가", function (done) {
       var bad = [], text = api.ultDesc("arca"), pas = api.passiveDesc("arca"), table = api.statTable("arca"), C = api.CHARS.arca;

@@ -5075,12 +5075,19 @@ SinglePassMaterials.enable(THREE);
     }
   }
   class ArcaStaffTip {
+    static ANCHOR_NAME = "arcaStaffTip";
     constructor(services) { this.services = services; this.local = null; }
     localTip() { var services = this.services, staff = services.models.kit.weapons[ArcaType.MODEL.right];
       if (this.local || !staff) return this.local;
       var box = new THREE.Box3().setFromObject(staff), mid = box.getCenter(new THREE.Vector3());
       this.local = new THREE.Vector3(mid.x, box.max.y, mid.z);
       return this.local;
+    }
+    anchorOn(model) { var staff = model.getObjectByName("mainhand"), tip = this.localTip();
+      if (!staff || !tip) return null;
+      var anchor = staff.getObjectByName(ArcaStaffTip.ANCHOR_NAME);
+      if (!anchor) { anchor = new THREE.Object3D(); anchor.name = ArcaStaffTip.ANCHOR_NAME; anchor.position.copy(tip); staff.add(anchor); }
+      return anchor;
     }
     worldTip(v, out) { var model = v.activeForm ? v.activeForm.model : v.root, tip = this.localTip();
       if (v.arcaStaffModel !== model) { v.arcaStaffModel = model; v.arcaStaff = model.getObjectByName("mainhand"); }
@@ -5102,8 +5109,10 @@ SinglePassMaterials.enable(THREE);
     };
     static STATS = { name: "아르카", role: "caster", icon: "🏮", hp: 120, speed: GameTime.gameSpeed(170), cd: GameTime.gameMs(1.4), dmg: 15, range: 350, pSpeed: GameTime.gameSpeed(1000), pr: 9,
                impededBonus: 0.5, ultName: "결계", ultAim: true };
-    constructor(services, id) { super(services, id); this.lantern = new ArcaLantern(); }
+    constructor(services, id) { super(services, id); this.lantern = new ArcaLantern(); this.staffTip = new ArcaStaffTip(services); }
     get shotName() { return "등불 구슬"; }
+    launchHandOf(model) { return this.staffTip.anchorOn(model); }
+    get hasSkillClip() { return true; }
     poseHeldProp(v, E, t) { this.lantern.hang(v.activeForm ? v.activeForm.model : v.root, v); }
     dressPortrait(m) { m.updateMatrixWorld(true); this.lantern.hang(m, m); m.updateMatrixWorld(true); }
     aimRange(btn) { return [ArcaType.ULT.akMin, ArcaType.ULT.akCast]; }
@@ -5133,7 +5142,7 @@ SinglePassMaterials.enable(THREE);
     hitColor(d) { return ArcaType.TONES.spark; }
     get tintsHit() { return true; }
     skillGlow(E, t) { return E.ultUntil > t ? 0x5A2A08 : 0; }
-    playSkillClip(v, E, t) { this.services.fighterMotion.playOnce(v, "Ranged_Magic_Spellcasting_Long", 2.6, t); }
+    playSkillClip(v, E, t) { var services = this.services; services.fighterMotion.playOnce(v, "Ranged_Magic_Shoot", services.models.kit.clips.Ranged_Magic_Shoot.duration * 1000 / ArcaType.ULT.akDelay, t); }
     projectileMesh(g, d) { var services = this.services, T = ArcaType.TONES;
       var halo = new THREE.Mesh(services.geo.ball, services.models.glowMat("arcaGlow", T.lantern, 0.42)); halo.scale.setScalar(19); g.add(halo);
       var orb = new THREE.Mesh(services.geo.ball, services.models.basicMat("arcaOrb", T.ember, 0.92)); orb.scale.setScalar(9.5); g.add(orb);
@@ -11327,6 +11336,8 @@ SinglePassMaterials.enable(THREE);
     static BEAM_CORE = 2.2;
     static BEAM_GLOW = 6;
     static ANCHOR_FLARE = 0.7;
+    static CAST_HIT = 0.5;
+    static CAST_FLARE = 1.6;
     static WALL_HEIGHT = 62;
     static FLOOR_Y = 1.6;
     static ANCHOR_Y = 7;
@@ -11438,29 +11449,36 @@ SinglePassMaterials.enable(THREE);
       if (k < 0 || k >= 1) return { k: 1, heat: 0 };
       return { k: k, heat: k < B.STRIKE_HOLD ? 1 : (1 - k) / (1 - B.STRIKE_HOLD) };
     }
-    renderBeam(b, s, fall, nowMs) { var services = this.services, B = BarrierView, vis = b.vis, beam = vis.beam, e = b.e, shooter = services.fighterView.fighters[e.owner];
+    renderBeam(b, s, fall, nowMs) { this.drawBeam(b, Math.min(1, s.k / BarrierView.BEAM_GROW), s.k, s.heat * fall, nowMs); }
+    drawBeam(b, reach, thin, glow, nowMs) { var services = this.services, B = BarrierView, vis = b.vis, beam = vis.beam, e = b.e, shooter = services.fighterView.fighters[e.owner];
       beam.group.visible = false;
-      if (!s.heat || !shooter || !shooter.root.visible || !this.staffTip.worldTip(shooter, this.beamFrom)) return;
+      if (!(glow > 0) || !(reach > 0) || !shooter || !shooter.root.visible || !this.staffTip.worldTip(shooter, this.beamFrom)) return;
       var scale = vis.group.scale.x, from = this.beamFrom.set((this.beamFrom.x - e.x) / scale, this.beamFrom.y / scale, (this.beamFrom.z - e.y) / scale);
       var dir = this.beamDir.set(-from.x, B.CHAIN_FROM_Y - from.y, -from.z), len = dir.length();
       if (len < 1) return;
-      var width = (1 - s.k * 0.45) * (1 + 0.12 * Math.sin(nowMs / 28));
+      var width = (1 - thin * 0.45) * (1 + 0.12 * Math.sin(nowMs / 28));
       beam.group.visible = true;
       beam.group.position.copy(from);
       beam.group.quaternion.setFromUnitVectors(this.up, dir.multiplyScalar(1 / len));
-      beam.group.scale.set(width, len * Math.min(1, s.k / B.BEAM_GROW), width);
-      beam.coreMat.opacity = 0.95 * s.heat * fall; beam.glowMat.opacity = 0.5 * s.heat * fall;
+      beam.group.scale.set(width, len * reach, width);
+      beam.coreMat.opacity = 0.95 * glow; beam.glowMat.opacity = 0.5 * glow;
     }
+    castPhase(e, t) { return MathKit.clamp((t - e.createdAt) / e.delay, 0, 1); }
+    renderCast(b, t, nowMs) { var B = BarrierView, vis = b.vis, u = vis.uniforms, p = this.castPhase(b.e, t), hit = MathKit.clamp((p - B.CAST_HIT) / (1 - B.CAST_HIT), 0, 1);
+      u.uWarn.value = 1; u.uShow.value = hit > 0 ? 1 : 0; u.uRise.value = hit; u.uHeight.value = 0;
+      vis.group.scale.setScalar(1); vis.flecks.visible = false; vis.links.mesh.count = 0;
+      vis.rings.count = 0;
+      if (hit > 0) { this.placeRing(vis.rings, 0, 0, 0, B.ANCHOR_Y, B.ANCHOR_SIZE * (1 + B.CAST_FLARE * (1 - hit))); vis.rings.count = 1; vis.rings.instanceMatrix.needsUpdate = true; }
+      vis.ringMat.opacity = 1; vis.ringMat.color.setHex(B.TONES.gold).lerp(this.hot, 1 - hit);
+      this.drawBeam(b, Math.min(1, p / B.CAST_HIT), 0, 1, nowMs);
+    }
+    castAfterglow(b, t) { return MathKit.clamp(1 - (t - b.e.createdAt - b.e.delay) / BarrierView.RISE_MS, 0, 1); }
     render(b, t, nowMs) { var services = this.services, B = BarrierView, e = b.e, start = e.createdAt + e.delay, end = start + e.dur;
       if (!b.vis) { b.vis = this.free.pop() || this.buildVis(); b.vis.uniforms.uR.value = e.r; services.stage.scene.add(b.vis.group); }
       var vis = b.vis, u = vis.uniforms;
       vis.group.position.set(e.x, 0, e.y);
       u.uTime.value = (nowMs % 100000) / 1000; u.uPixelScale.value = WaterNoise.pixelScale(services);
-      if (t < start) {
-        u.uWarn.value = 1; u.uShow.value = 1; u.uRise.value = MathKit.clamp((t - e.createdAt) / e.delay, 0, 1); u.uHeight.value = 0;
-        vis.group.scale.setScalar(1); vis.flecks.visible = false; vis.links.mesh.count = 0; vis.rings.count = 0; vis.beam.group.visible = false;
-        return;
-      }
+      if (t < start) { this.renderCast(b, t, nowMs); return; }
       var rise = MathKit.clamp((t - start) / B.RISE_MS, 0.001, 1), fall = MathKit.clamp((end - t) / B.FALL_MS, 0, 1), s = this.strikeHeat(b, nowMs);
       u.uWarn.value = 0; u.uRise.value = rise; u.uShow.value = fall; u.uHeight.value = B.WALL_HEIGHT * rise * rise * (3 - 2 * rise); u.uScatter.value = 1 - fall;
       vis.group.scale.setScalar(1 + (1 - fall) * 0.08);
@@ -11468,7 +11486,8 @@ SinglePassMaterials.enable(THREE);
       vis.chainMat.opacity = vis.ringMat.opacity = fall;
       vis.chainMat.color.setHex(B.TONES.chain).lerp(this.hot, s.heat); vis.ringMat.color.setHex(B.TONES.gold).lerp(this.hot, s.heat);
       this.renderChains(b, t, nowMs, s.heat);
-      this.renderBeam(b, s, fall, nowMs);
+      var glow = this.castAfterglow(b, t);
+      if (!s.heat && glow > 0) this.drawBeam(b, 1, 1 - glow, glow * fall, nowMs); else this.renderBeam(b, s, fall, nowMs);
     }
     renderChains(b, t, nowMs, heat) { var services = this.services, B = BarrierView, e = b.e, vis = b.vis, view = this, rings = 1;
       this.placeRing(vis.rings, 0, 0, 0, B.ANCHOR_Y, B.ANCHOR_SIZE * (1 + B.ANCHOR_FLARE * heat));
