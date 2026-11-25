@@ -9276,7 +9276,7 @@ class ArcaTests {
       if (api.FIELD.barriers.length || b.vis || group.parent) bad.push("결계가 끝나도 그림이 남음");
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "사슬 2개(InstancedMesh 1개), 쓰러진 적 사슬 사라짐, 끝나면 그림 회수");
     });
-    this.kit.runAsync(G, "발사 지점: 아르카 투사체·빛줄기는 지팡이 끝에서 나가고, 시전 동작이 있는가 (다른 캐릭터의 발사 지점도 목록으로)", async function (done) {
+    this.kit.runAsync(G, "발사 지점: 아르카·마법사 투사체가 무기 끝에서 나가고, 아르카·화염술사·점성술사에 시전 동작이 있는가 (몸에서 쏘는 캐릭터 목록도)", async function (done) {
       var W = self.scene([]), ak = W.ent("ak");
       for (var wait = 0; wait < 40 && !api.FIGHTER_VIEW.makeVis(ak, new api.THREE.Group()).kit; wait++) await new Promise(function (r) { setTimeout(r, 100); });
       var v = api.FIGHTER_VIEW.makeVis(ak, new api.THREE.Group()), bad = [];
@@ -9284,8 +9284,18 @@ class ArcaTests {
       var hand = v.launchHand, staff = v.root.getObjectByName("mainhand");
       if (!hand || hand.parent !== staff) bad.push("발사 지점이 지팡이에 없음(" + (hand ? hand.name : "없음") + ")");
       if (!api.CHAR_TYPES.of("arca").hasSkillClip) bad.push("시전 동작 없음");
+      var reach = [];
+      ["mage", "frost", "druid", "necro", "marina", "astrologer"].forEach(function (c) {
+        var M = api.CHAR_TYPES.of(c).constructor.MODEL, e = self.kit.world("forest", [{ id: "p", team: "blue", char: c, x: 200, y: self.y }]).ent("p"), pv = api.FIGHTER_VIEW.makeVis(e, new api.THREE.Group());
+        if (!pv.launchHand || pv.launchHand.parent !== pv.root.getObjectByName(M.launchTip)) { bad.push(c + " 발사 지점이 무기(" + M.launchTip + ") 끝에 없음"); return; }
+        pv.root.updateMatrixWorld(true);
+        var tipAt = pv.launchHand.getWorldPosition(new api.THREE.Vector3()), gripAt = pv.launchHand.parent.getWorldPosition(new api.THREE.Vector3());
+        reach.push(c + " " + Math.round(tipAt.distanceTo(gripAt)));
+        if (!(tipAt.distanceTo(gripAt) > 10)) bad.push(c + " 끝점이 손에서 떨어져 있지 않음(" + Math.round(tipAt.distanceTo(gripAt)) + ")");
+      });
+      ["mage", "astrologer"].forEach(function (c) { if (!api.CHAR_TYPES.of(c).hasSkillClip) bad.push(c + " 시전 동작 없음"); });
       var fromBody = api.CHAR_LIST.filter(function (c) { if (!api.CHARS[c] || /bot/.test(c)) return false; var e = self.kit.world("forest", [{ id: "p", team: "blue", char: c, x: 200, y: self.y }]).ent("p"), pv = api.FIGHTER_VIEW.makeVis(e, new api.THREE.Group()); return pv.kit && !pv.launchHand; });
-      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "아르카는 지팡이 끝 고정점·시전 동작 있음. 손·총구 고정점 없이 몸에서 나가는 캐릭터: " + (fromBody.join(", ") || "없음"));
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "아르카·화염술사·얼음술사·드루이드·네크로·마리나·점성술사는 무기 끝 고정점(손에서 끝까지 " + reach.join(", ") + "), 시전 동작 있음. 손·총구 고정점 없이 몸에서 나가는 캐릭터: " + (fromBody.join(", ") || "없음"));
     });
     run(G, "카드: 패시브·스킬 설명과 능력치 표가 수치에서 만들어지는가", function (done) {
       var bad = [], text = api.ultDesc("arca"), pas = api.passiveDesc("arca"), table = api.statTable("arca"), C = api.CHARS.arca;

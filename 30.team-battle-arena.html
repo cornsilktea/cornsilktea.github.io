@@ -2656,7 +2656,7 @@ SinglePassMaterials.enable(THREE);
     boostDealt(T, amount, t) { return amount; }
     get hasSkillClip() { return false; }
     poseHeldProp(v, E, t) {}
-    launchHandOf(model) { return model.getObjectByName("muzzle"); }
+    launchHandOf(model) { return model.getObjectByName("muzzle") || HeldTipAnchor.on(model, (this.constructor.MODEL || {}).launchTip); }
     addMarkers(v, root, body) {}
     playSkillClip(v, E, t) {}
     earlyPose(E, t) { return null; }
@@ -2836,7 +2836,7 @@ SinglePassMaterials.enable(THREE);
     }
   }
   class MageType extends MagicShooterType {
-    static MODEL = { file: "Mage", portraitPlant: true, plantLean: 0.2, plantShrink: 0.68, right: "staff", recolor: [[1, 0, 2, "#D8342E", "#6A0E10"], [1, 7, 1, "#4A1012", "#1E0507"], [1, 2, 1, "#FF9A3A", "#C8401A"], [2, 1, 1, "#FF9A3A", "#C8401A"]],
+    static MODEL = { file: "Mage", launchTip: "mainhand", portraitPlant: true, plantLean: 0.2, plantShrink: 0.68, right: "staff", recolor: [[1, 0, 2, "#D8342E", "#6A0E10"], [1, 7, 1, "#4A1012", "#1E0507"], [1, 2, 1, "#FF9A3A", "#C8401A"], [2, 1, 1, "#FF9A3A", "#C8401A"]],
                rightRecolor: [[2, 6, 1, "#FFD27A", "#E0341E"]] };
     static ULT = {
       mbDelay: GameTime.gameMs(1), mbR: 250, mbDmg: 110, mbDmgMin: 75, mbCast: 550, mbMin: 60, mbStunMs: GameTime.gameMs(1.7),
@@ -2862,6 +2862,7 @@ SinglePassMaterials.enable(THREE);
       g.userData.pulse = orb;
     }
     skillGlow(E, t) { return E.ultUntil > t ? 0x661000 : 0; }
+    get hasSkillClip() { return true; }
     playSkillClip(v, E, t) { var services = this.services; services.fighterMotion.playOnce(v, "Ranged_Magic_Spellcasting_Long", 2.6, t); }
     get shotName() { return "불꽃 구슬"; }
     get startsSkillTimer() { return true; }
@@ -2930,7 +2931,7 @@ SinglePassMaterials.enable(THREE);
   }
   class NecroType extends MagicShooterType {
     static MELEE = { color: 0xB07CFF, spark: "#C9A6FF" };
-    static MODEL = { file: "Necromancer", portraitPlant: true, plantTurn: Math.PI / 2, right: "Skeleton_Scythe" };
+    static MODEL = { file: "Necromancer", launchTip: "mainhand", portraitPlant: true, plantTurn: Math.PI / 2, right: "Skeleton_Scythe" };
     static ULT = {
       smCount: 2, smAhead: ArenaSize.KEY * 1, smSide: 38, smHp: 90, smSpeed: GameTime.gameSpeed(180), smGauge: 0.5, smDmg: 14, smCd: 800, smRange: 80,
       smArc: Math.PI * 0.6, smDur: GameTime.gameMs(10), smMax: 4, smFollow: ArenaSize.KEY * 1.5, smRiseMs: 1100, smCorpseMs: 1400
@@ -3401,7 +3402,7 @@ SinglePassMaterials.enable(THREE);
     }
   }
   class FrostType extends MagicShooterType {
-    static MODEL = { file: "Mage", portraitPlant: true, plantLean: 0.2, plantShrink: 0.68, right: "staff_A", left: "spellbook_closed",
+    static MODEL = { file: "Mage", launchTip: "mainhand", portraitPlant: true, plantLean: 0.2, plantShrink: 0.68, right: "staff_A", left: "spellbook_closed",
                recolor: [[1, 0, 1, "#F2F6FA", "#C9D6E2"], [1, 1, 1, "#8FD8F0", "#4FA9D9"], [1, 2, 1, "#8FD8F0", "#4FA9D9"], [2, 1, 1, "#8FD8F0", "#4FA9D9"], [0, 5, 1, "#F2F6FA", "#C9D6E2"]] };
     static ULT = {
       frSlowMs: GameTime.gameMs(2), frSlowMul: 0.7, frSlowStep: 0.3, frFreezeMs: GameTime.gameMs(1), frFreezeMaxHpRate: 0.2, frBzHides: true, frBzR: 300,
@@ -3598,7 +3599,7 @@ SinglePassMaterials.enable(THREE);
     }
   }
   class DruidType extends MagicShooterType {
-    static MODEL = { file: "Druid", portraitPlant: true, right: "druid_staff" };
+    static MODEL = { file: "Druid", launchTip: "mainhand", portraitPlant: true, right: "druid_staff" };
     static ULT = {
       drR: 175, drDur: GameTime.gameMs(10), drTick: GameTime.gameMs(1), drHeal: 20, drCast: 450, drMin: 60, drSelfGauge: 1, drRiseMs: 350, drCastMs: 500
     };
@@ -3691,7 +3692,7 @@ SinglePassMaterials.enable(THREE);
     }
   }
   class AstrologerType extends GargantuaType {
-    static MODEL = { file: "Mage", left: "spellbook_open", leftTurn: Math.PI, hide: ["Mage_Hat"],
+    static MODEL = { file: "Mage", launchTip: "offhand", left: "spellbook_open", leftTurn: Math.PI, hide: ["Mage_Hat"],
                   halo: { on: "Mage_Head", color: 0xD9A8FF, r: 0.42, tube: 0.035, stars: 3, starSize: 0.075, rise: 0.14, tilt: 0.3 },
                   recolor: [[1, 0, 2, "#2E2038", "#0A060F"], [1, 2, 1, "#C58BFF", "#6A2BC4"], [2, 1, 1, "#C58BFF", "#6A2BC4"], [0, 5, 1, "#C58BFF", "#6A2BC4"]],
                   leftRecolor: [[1, 2, 1, "#C58BFF", "#6A2BC4"], [2, 1, 1, "#C58BFF", "#6A2BC4"]] };
@@ -3723,6 +3724,7 @@ SinglePassMaterials.enable(THREE);
       services.gargantuaSys.summon(E, spot, t);
     }
     skillGlow(E, t) { return E.ultUntil > t ? 0x2A1060 : 0; }
+    get hasSkillClip() { return true; }
     playSkillClip(v, E, t) { var services = this.services; services.fighterMotion.playOnce(v, "Ranged_Magic_Spellcasting_Long", 2.6, t); }
     attackClip(v, E, t) { return ["Ranged_Magic_Shoot", 1.8]; }
     passiveDesc() { var services = this.services; return AstrologerType.ULT.sfStunEvery + "번째 기본 공격마다 별똥별에 맞은 적을 " + services.skilltext.secs(AstrologerType.ULT.sfStunMs) + "간 기절"; }
@@ -4034,7 +4036,7 @@ SinglePassMaterials.enable(THREE);
   }
   class MarinaType extends MagicShooterType {
     static MELEE = { color: 0x2FA8B8, spark: "#2FA8B8" };
-    static MODEL = { file: "Mage", portraitPlant: true, plantAtHand: true, rightBuilt: "trident", rightScale: 1.2, rightRot: [0.4, -0.2, 0.95], hide: ["Mage_Hat"],
+    static MODEL = { file: "Mage", launchTip: "mainhand", portraitPlant: true, plantAtHand: true, rightBuilt: "trident", rightScale: 1.2, rightRot: [0.4, -0.2, 0.95], hide: ["Mage_Hat"],
                 recolor: [[1, 0, 1, "#1C7F8C", "#0F4A5C"], [1, 1, 1, "#173A63", "#0B1F3C"], [1, 2, 1, "#38B6C8", "#1B6F86"], [2, 1, 1, "#173A63", "#0B1F3C"], [0, 5, 1, "#38B6C8", "#1B6F86"]] };
     static ULT = {
       mrFlyMs: GameTime.gameMs(0.3), mrHeal: 12, mrChainR: 300, mrDmg: 30, mrKb: 150, mrStunMs: GameTime.gameMs(0.5), mrWaveHeal: 10, mrLanes: 6, mrLen: 600,
@@ -5074,20 +5076,35 @@ SinglePassMaterials.enable(THREE);
       lamp.position.copy(this.drop.set(0, -ArcaLantern.RING_TOP * lamp.scale.y, 0).applyQuaternion(lamp.quaternion));
     }
   }
+  class HeldTipAnchor {
+    static NAME = "launchTip";
+    static on(model, holder) {
+      var held = holder && model.getObjectByName(holder);
+      if (!held) return null;
+      var anchor = held.getObjectByName(HeldTipAnchor.NAME);
+      if (!anchor) { anchor = new THREE.Object3D(); anchor.name = HeldTipAnchor.NAME; anchor.position.copy(HeldTipAnchor.localTop(held)); held.add(anchor); }
+      return anchor;
+    }
+    static localTop(held) {
+      held.updateMatrixWorld(true);
+      var toHeld = new THREE.Matrix4().copy(held.matrixWorld).invert(), box = new THREE.Box3(), part = new THREE.Box3(), rel = new THREE.Matrix4();
+      held.traverse(function (o) {
+        if (!o.isMesh || !o.geometry) return;
+        if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
+        box.union(part.copy(o.geometry.boundingBox).applyMatrix4(rel.multiplyMatrices(toHeld, o.matrixWorld)));
+      });
+      if (box.isEmpty()) return new THREE.Vector3();
+      var mid = box.getCenter(new THREE.Vector3());
+      return mid.set(mid.x, box.max.y, mid.z);
+    }
+  }
   class ArcaStaffTip {
-    static ANCHOR_NAME = "arcaStaffTip";
     constructor(services) { this.services = services; this.local = null; }
     localTip() { var services = this.services, staff = services.models.kit.weapons[ArcaType.MODEL.right];
       if (this.local || !staff) return this.local;
       var box = new THREE.Box3().setFromObject(staff), mid = box.getCenter(new THREE.Vector3());
       this.local = new THREE.Vector3(mid.x, box.max.y, mid.z);
       return this.local;
-    }
-    anchorOn(model) { var staff = model.getObjectByName("mainhand"), tip = this.localTip();
-      if (!staff || !tip) return null;
-      var anchor = staff.getObjectByName(ArcaStaffTip.ANCHOR_NAME);
-      if (!anchor) { anchor = new THREE.Object3D(); anchor.name = ArcaStaffTip.ANCHOR_NAME; anchor.position.copy(tip); staff.add(anchor); }
-      return anchor;
     }
     worldTip(v, out) { var model = v.activeForm ? v.activeForm.model : v.root, tip = this.localTip();
       if (v.arcaStaffModel !== model) { v.arcaStaffModel = model; v.arcaStaff = model.getObjectByName("mainhand"); }
@@ -5099,7 +5116,7 @@ SinglePassMaterials.enable(THREE);
   class ArcaType extends MagicShooterType {
     static TONES = { ember: 0xE0701E, chestnut: 0x4A2412, gold: 0xF2C14E, lantern: 0xFFB347, spark: "#FFC266" };
     static MELEE = { color: ArcaType.TONES.lantern, spark: ArcaType.TONES.spark };
-    static MODEL = { file: "Mage", portraitPlant: true, plantLean: 0.2, plantShrink: 0.68, right: "staff_B", left: "lantern", leftScale: 0.62, hide: ["Mage_Hat", "Mage_Head"],
+    static MODEL = { file: "Mage", launchTip: "mainhand", portraitPlant: true, plantLean: 0.2, plantShrink: 0.68, right: "staff_B", left: "lantern", leftScale: 0.62, hide: ["Mage_Hat", "Mage_Head"],
                rightRecolor: [[2, 2, 1, "#FFE6A8", "#E0701E"], [1, 2, 1, "#F7D27A", "#B98A2A"]],
                wear: { from: "rogue", part: "RogueHooded_Head", recolor: [[1, 1, 1, "#6B3519", "#2E140A"], [2, 1, 1, "#C8641E", "#6A2C0C"], [1, 0, 1, "#F2C14E", "#A8761C"]] },
                recolor: [[1, 0, 2, "#EE8A2C", "#9A460E"], [1, 7, 1, "#4A2614", "#1E0E06"], [1, 2, 1, "#F7D27A", "#B98A2A"], [2, 1, 1, "#F7D27A", "#B98A2A"], [0, 5, 1, "#5A2E16", "#261008"]] };
@@ -5109,9 +5126,8 @@ SinglePassMaterials.enable(THREE);
     };
     static STATS = { name: "아르카", role: "caster", icon: "🏮", hp: 120, speed: GameTime.gameSpeed(170), cd: GameTime.gameMs(1.4), dmg: 15, range: 350, pSpeed: GameTime.gameSpeed(1000), pr: 9,
                impededBonus: 0.5, ultName: "결계", ultAim: true };
-    constructor(services, id) { super(services, id); this.lantern = new ArcaLantern(); this.staffTip = new ArcaStaffTip(services); }
+    constructor(services, id) { super(services, id); this.lantern = new ArcaLantern(); }
     get shotName() { return "등불 구슬"; }
-    launchHandOf(model) { return this.staffTip.anchorOn(model); }
     get hasSkillClip() { return true; }
     poseHeldProp(v, E, t) { this.lantern.hang(v.activeForm ? v.activeForm.model : v.root, v); }
     dressPortrait(m) { m.updateMatrixWorld(true); this.lantern.hang(m, m); m.updateMatrixWorld(true); }
