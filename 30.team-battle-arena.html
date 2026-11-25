@@ -5143,8 +5143,8 @@ SinglePassMaterials.enable(THREE);
     }
     passiveDesc() { var services = this.services; return "이동을 방해받는 적(둔화·기절·끌림 등)에게 주는 피해 " + services.skilltext.pctOf(this.data.impededBonus) + "% 증가"; }
     ultDesc() { var services = this.services, u = ArcaType.ULT;
-      return "지정한 곳에 " + services.skilltext.secs(u.akDur) + "간 유지되는 반경 " + u.akR + "의 결계를 펼침. 펼쳐질 때 안에 있던 적은 " + u.akDmg + "의 피해를 입고 갇혀 " + services.skilltext.slowPct(u.akSlowMul) +
-             "되며 밖으로 나갈 수 없음. 갇힌 적이 결계 끝에 닿으면 " + u.akEdgeDmg + "의 피해를 입고 " + services.skilltext.secs(u.akStunMs) + "간 기절하며 결계 가운데로 끌려감. 결계에 묶인 적이 있으면 기본 공격이 묶인 적 모두에게 자동으로 적중";
+      return "지정한 곳에 " + services.skilltext.secs(u.akDur) + "간 결계 형성. 결계에 갇힌 적은 " + u.akDmg + "의 피해를 입고 지속 시간 동안 " + services.skilltext.slowPct(u.akSlowMul) +
+             ". 갇힌 적이 결계 끝에 닿으면 " + services.skilltext.secs(u.akStunMs) + "간 기절하고 중심으로 끌려감. 결계에 묶인 적이 있는 경우, 기본 공격이 결계의 모든 적에게 피해를 입힘";
     }
   }
   class CharacterRegistry {
@@ -6129,6 +6129,7 @@ SinglePassMaterials.enable(THREE);
   class BarrierSystem {
     static EDGE_SLACK = 0.5;
     static STEER_ROOM = 30;
+    static BIND_WAIT_MS = GameTime.gameMs(0.6);
     constructor(services) { this.services = services; }
     startOf(e) { return e.createdAt + e.delay; }
     endOf(e) { return e.createdAt + e.delay + e.dur; }
@@ -6160,8 +6161,16 @@ SinglePassMaterials.enable(THREE);
       services.field.barriers = services.field.barriers.filter(function (b) {
         if (t >= self.endOf(b.e)) { self.dropEntry(b); return false; }
         Object.keys(b.bound).forEach(function (id) { var T = services.targets.ent(id); if (!T || !T.alive) { delete b.bound[id]; b.lost[id] = t; } });
+        if (self.holdsNobody(b, t)) { self.dropEntry(b); self.releaseCaster(b, t); return false; }
         return true;
       });
+    }
+    holdsNobody(b, t) { var services = this.services, e = b.e;
+      if (!b.deployed || t < this.startOf(e) + BarrierSystem.BIND_WAIT_MS || Object.keys(b.bound).length) return false;
+      return !services.targets.localTargets().some(function (T) { var R = T.barrierTrap; return R && R.owner === e.owner && R.bid === e.createdAt && T.alive; });
+    }
+    releaseCaster(b, t) { var services = this.services, E = services.targets.localTargets().filter(function (o) { return o.id === b.e.owner; })[0];
+      if (E && E.skillUntil > t) { E.skillUntil = t; services.match.game.forceNet = true; }
     }
     stepLocal(t) { var services = this.services, self = this;
       services.field.barriers.forEach(function (b) { if (!b.deployed && t >= self.startOf(b.e)) { b.deployed = true; self.trapAll(b, t); } });

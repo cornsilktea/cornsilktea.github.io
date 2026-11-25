@@ -9070,9 +9070,10 @@ class ArcaTests {
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "중심을 향한 방패: 갇힘·피해 0·즉발 0, 등진 방패병: 갇힘·" + cut(self.boosted(U.akDmg)) + "·" + cut(self.boosted(api.CHARS.arca.dmg)) + "(방패병 패시브 10% 감소 뒤)");
     });
     run(G, "나중에 들어온 적은 자유롭게 드나들고 갇힘·둔화·피해가 없는가", function (done) {
-      var W = self.scene([self.foe("late", 900)]), late = W.ent("late"), bad = [];
+      var W = self.scene([self.foe("late", 900), self.foe("held", cx, 40)]), late = W.ent("late"), bad = [];
       self.deploy(W);
       late.x = cx; W.step(300);
+      if (!api.FIELD.barriers.length) bad.push("갇힌 적이 있는데 결계가 사라짐");
       if (late.barrierTrap || self.lost(late) || late.slowMulAt(W.t()) !== 1) bad.push("들어오자 영향 받음");
       late.x = cx + U.akR + 60; W.frame(self.kit.FRAME);
       if (Math.abs(late.x - (cx + U.akR + 60)) > 1) bad.push("밖으로 나가지 못함 x " + Math.round(late.x));
@@ -9238,6 +9239,23 @@ class ArcaTests {
       if (Math.abs(f.x - (cx + U.akR + 80)) > 1) bad.push("밖으로 못 나감");
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "끝나자 갇힘·둔화 해제, 결계 밖으로 이동, 결계 중 게이지 0 유지");
     });
+    run(G, "갇힌 적이 없으면(펼쳐질 때 아무도 없거나 묶인 적이 모두 쓰러지면) 결계가 바로 사라지고 게이지가 다시 차는가", function (done) {
+      var wait = api.BARRIERS.constructor.BIND_WAIT_MS, bad = [];
+      var W = self.scene([self.foe("far", 900)]), ak = W.ent("ak");
+      self.deploy(W);
+      W.step(wait + self.kit.FRAME * 2);
+      if (api.FIELD.barriers.length) bad.push("빈 결계가 " + api.secs(wait) + " 뒤에도 남음");
+      ak.gauge = 0; api.damage(W.ent("far"), 1, "ak", 1, null); W.frame(self.kit.FRAME);
+      if (!(ak.gauge > 0)) bad.push("빈 결계가 사라진 뒤 게이지 " + ak.gauge);
+      var W2 = self.scene([self.foe("one", cx)]);
+      self.deploy(W2);
+      W2.step(wait + self.kit.FRAME * 2);
+      if (!api.FIELD.barriers.length) bad.push("갇힌 적이 있는데 결계가 사라짐");
+      api.damage(W2.ent("one"), 9999, "ak", false, null);
+      W2.step(self.kit.FRAME * 3);
+      if (api.FIELD.barriers.length) bad.push("묶인 적이 쓰러져도 결계가 남음");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "빈 결계는 " + api.secs(wait) + " 뒤 사라지고 게이지가 참, 묶인 적이 쓰러지면 바로 사라짐");
+    });
     run(G, "사슬: 묶인 적 수만큼 사슬이 한 InstancedMesh 에 그려지고, 그 적이 쓰러지거나 결계가 끝나면 사라지는가", function (done) {
       var W = self.scene([self.foe("a", cx - 40), self.foe("b", cx + 40, 30)]), bad = [], view = api.BARRIER_VIEW;
       self.deploy(W);
@@ -9260,7 +9278,7 @@ class ArcaTests {
     });
     run(G, "카드: 패시브·스킬 설명과 능력치 표가 수치에서 만들어지는가", function (done) {
       var bad = [], text = api.ultDesc("arca"), pas = api.passiveDesc("arca"), table = api.statTable("arca"), C = api.CHARS.arca;
-      ["반경 " + U.akR, U.akDmg + "의 피해", api.slowPct(U.akSlowMul), api.secs(U.akStunMs) + "간 기절", api.secs(U.akDur) + "간"].forEach(function (w) { if (text.indexOf(w) < 0) bad.push("스킬 설명에 '" + w + "' 없음"); });
+      [U.akDmg + "의 피해", api.slowPct(U.akSlowMul), api.secs(U.akStunMs) + "간 기절", api.secs(U.akDur) + "간"].forEach(function (w) { if (text.indexOf(w) < 0) bad.push("스킬 설명에 '" + w + "' 없음"); });
       if (pas.indexOf(Math.round(C.impededBonus * 100) + "% 증가") < 0) bad.push("패시브 '" + pas + "'");
       ["<td>" + C.dmg + "</td>", "<td>" + C.range + "</td>", "<td>1.4초</td>", "<td>170</td>", "<td>결계</td>", "<td>" + C.hp + "</td>"].forEach(function (w) { if (table.indexOf(w) < 0) bad.push("표에 " + w + " 없음"); });
       if (/\.$/.test(text) || /\.$/.test(pas)) bad.push("설명 끝 마침표");
