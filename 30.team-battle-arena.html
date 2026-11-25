@@ -2589,6 +2589,8 @@ SinglePassMaterials.enable(THREE);
     afterStrike(T, d) {}
     skillShotFx(ox, oy, dx, dy) {}
     onShotLaunched(p) {}
+    dressProjectile(g, d) {}
+    animateProjectile(g, p, e, nowMs) {}
     onShotHitShown(d, T) {}
     get shotSound() { return "shoot"; }
     get smokeColor() { return null; }
@@ -5196,6 +5198,7 @@ SinglePassMaterials.enable(THREE);
     static BOLT_TINT = 0xB8B4D8;
     static BOLT_TAIL = 0xE0304C;
     static TAIL_LEN = 200;
+    static BOLT_AURA = { deep: 0x2A38A8, fire: 0xF0284A, haloLen: 24, haloR: 7, haloX: -2, haloAlpha: 0.5, coreAlpha: 0.35, wakeWidth: 30, pulse: 0.18, pulseMs: 45 };
     static HIT_COLOR = "#E0405A";
     get shotName() { return "볼트"; }
     get idleClip() { return "Idle_A"; }
@@ -5260,7 +5263,28 @@ SinglePassMaterials.enable(THREE);
       else g.add(new THREE.Mesh(services.geo.shaft, services.models.basicMat("shaft", 0xEADFC4, 1)));
       var tail = SniperShotShaders.tailMesh(HunterType.BOLT_TAIL, HunterType.TAIL_LEN, 16);
       g.add(tail);
-      g.userData.growTail = { mesh: tail, full: HunterType.TAIL_LEN };
+      g.userData.hunterBolt = { tail: tail, aura: this.boltAura(g) };
+    }
+    boltAura(g) { var services = this.services, A = HunterType.BOLT_AURA, root = new THREE.Group();
+      var haloMat = services.matlib.mats["hunter-bolt-halo"] || (services.matlib.mats["hunter-bolt-halo"] = new THREE.MeshBasicMaterial({ color: A.deep, transparent: true, opacity: A.haloAlpha, depthWrite: false }));
+      var halo = new THREE.Mesh(services.geo.ball, haloMat);
+      halo.scale.set(A.haloLen, A.haloR, A.haloR); halo.position.x = A.haloX; root.add(halo);
+      var core = new THREE.Mesh(services.geo.ball, services.models.glowMat("hunter-bolt-core", A.fire, A.coreAlpha));
+      core.scale.set(A.haloLen * 0.7, A.haloR * 0.45, A.haloR * 0.45); core.position.x = A.haloX; root.add(core);
+      var wake = SniperShotShaders.tailMesh(A.deep, HunterType.TAIL_LEN, A.wakeWidth);
+      wake.position.y = -1; root.add(wake);
+      g.add(root);
+      return { root: root, halo: halo, core: core, wake: wake };
+    }
+    dressProjectile(g, d) { var bolt = g.userData.hunterBolt; if (bolt) bolt.aura.root.visible = !!d.countsAsSkill; }
+    animateProjectile(g, p, e, nowMs) { var bolt = g.userData.hunterBolt, A = HunterType.BOLT_AURA;
+      if (!bolt) return;
+      var len = Math.max(1, Math.min(HunterType.TAIL_LEN, p.sp * e / 1000));
+      bolt.tail.scale.x = len;
+      if (!bolt.aura.root.visible) return;
+      bolt.aura.wake.scale.x = len;
+      var beat = 1 + A.pulse * Math.sin(nowMs / A.pulseMs);
+      bolt.aura.halo.scale.set(A.haloLen, A.haloR * beat, A.haloR * beat);
     }
     basicDesc() { var c = this.data;
       return "이동 방향으로 " + c.roll.dist + " 구른 뒤 가장 가까운 적을 쫓는 볼트로 " + c.dmg + "의 피해. 멈춰 있으면 조준 반대쪽으로 구름";
@@ -11015,6 +11039,7 @@ SinglePassMaterials.enable(THREE);
     constructor(services) { this.services = services; this.projPool = new ProjectileVisPool(services); this.stabFrom = new THREE.Vector3(); this.stabTo = new THREE.Vector3(); this.stabDir = new THREE.Vector3(); this.stabAxis = new THREE.Vector3(1, 0, 0); this.tmpV = new THREE.Vector3(); this.yUp = new THREE.Vector3(0, 1, 0); this.skyBeamFade = (function () {     var cv = document.createElement("canvas"); cv.width = 4; cv.height = 64;     var g = cv.getContext("2d"), grad = g.createLinearGradient(0, 0, 0, 64);     grad.addColorStop(0, "rgba(255,255,255,0)"); grad.addColorStop(0.55, "rgba(255,255,255,0.75)"); grad.addColorStop(1, "rgba(255,255,255,1)");     g.fillStyle = grad; g.fillRect(0, 0, 4, 64);     var tex = new THREE.CanvasTexture(cv); tex.generateMipmaps = false; tex.minFilter = THREE.LinearFilter; return tex; })(); this.stormMaskCache = { tex: null, arena: "" }; this.projectiles = {}; this.melees = {}; }
     makeProjVis(p) { var services = this.services;
       var d = p.d, g = services.effectView.projPool.takeOrBuild(d);
+      services.charTypes.of(d.ownerCharacterType).dressProjectile(g, d);
       var shooter = services.fighterView.fighters[d.owner];
       if (shooter && shooter.launchHand && shooter.root.visible) {
         var aimed = services.models.kit.muzzle[d.ownerCharacterType];
@@ -13617,7 +13642,7 @@ SinglePassMaterials.enable(THREE);
         if (from) g.position.set(pos.x + from.x * kk, ModelTuning.PROJ_Y + from.y * kk, pos.y + from.z * kk);
         else g.position.set(pos.x, ModelTuning.PROJ_Y, pos.y);
         if (p.path) g.rotation.y = services.homingBolts.yawAt(p, Math.max(0, e));
-        if (g.userData.growTail) g.userData.growTail.mesh.scale.x = Math.max(1, Math.min(g.userData.growTail.full, p.sp * Math.max(0, e) / 1000));
+        services.charTypes.of(p.d.ownerCharacterType).animateProjectile(g, p, Math.max(0, e), nowMs);
        if (g.userData.pulse) g.userData.pulse.scale.setScalar(9 + 2 * Math.sin(nowMs / 50));
         if (g.userData.spin) g.userData.spin.rotation.x = nowMs / 35;
         if (g.userData.whirl) g.userData.whirl.rotation.y = nowMs / 40;
