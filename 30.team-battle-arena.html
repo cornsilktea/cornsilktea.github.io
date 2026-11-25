@@ -324,7 +324,7 @@
 <script charset="utf-8" src="common/account-match-kit.js?v=20261103e"></script>
 <script charset="utf-8" src="common/account-stats.js?v=20261109a"></script>
 <script charset="utf-8" src="games/30.team-battle/30.team-battle-versus.js?v=20261104a"></script>
-<script charset="utf-8" src="games/30.team-battle/30.team-battle-fx.js?v=20261106h"></script>
+<script charset="utf-8" src="games/30.team-battle/30.team-battle-fx.js?v=20261125hunter"></script>
 <script charset="utf-8" src="games/30.team-battle/patch-notes.js?v=20261112b"></script>
 <script type="module">
 import * as THREE from "three";
@@ -2490,7 +2490,7 @@ SinglePassMaterials.enable(THREE);
       this.bursts = []; this.pools = []; this.poolHit = {}; this.lunges = []; this.waves = [];
       this.holes = []; this.storms = []; this.revs = []; this.graces = []; this.domains = [];
       this.curses = {}; this.bladeSpins = []; this.turrets = []; this.groves = []; this.shells = []; this.gales = []; this.stars = [];
-      this.hooks = []; this.hookFlights = []; this.slams = []; this.hammerStrikes = []; this.streams = []; this.tsunamis = []; this.impactBlasts = []; this.hitmanSlashes = []; this.sniperMarks = []; this.phantomSlashes = []; this.phantomCasts = []; this.barriers = [];
+      this.hooks = []; this.hookFlights = []; this.slams = []; this.hammerStrikes = []; this.streams = []; this.tsunamis = []; this.impactBlasts = []; this.hitmanSlashes = []; this.sniperMarks = []; this.phantomSlashes = []; this.phantomCasts = []; this.barriers = []; this.hunterEchoes = [];
     }
     dropOwnedBy(ownerId) { var services = this.services;
       var field = this, owned = function (item) { return (item.e || item.d).owner === ownerId; };
@@ -2527,6 +2527,7 @@ SinglePassMaterials.enable(THREE);
       this.phantomSlashes.forEach(services.phantomSlashes.drop.bind(services.phantomSlashes));
       this.barriers.forEach(services.barrierView.drop.bind(services.barrierView));
       services.phantomView.dropAll();
+      services.hunterEchoes.dropAll();
     }
     renderLingering(t, nowMs, dt) { var services = this.services;
       this.pools.forEach(function (pl) { services.poolView.renderPool(pl, t, nowMs); });
@@ -2548,6 +2549,7 @@ SinglePassMaterials.enable(THREE);
       services.sniperShots.render(t, nowMs);
       services.phantomSlashes.render(t, nowMs);
       services.phantomView.render(t, nowMs, dt);
+      services.hunterEchoes.render(t, nowMs);
       this.barriers.forEach(function (b) { services.barrierView.render(b, t, nowMs); });
     }
   }
@@ -2654,6 +2656,10 @@ SinglePassMaterials.enable(THREE);
     shotTouches(p, a, b, T) { return null; }
     shotDamage(d, T) { return d.dmg; }
     boostDealt(T, amount, t) { return amount; }
+    basicCooldown(E, cdMs, t) { return cdMs; }
+    hidesSelf(E, t) { return false; }
+    steerRemote(r, t) {}
+    decorateShot(E, ev, t) {}
     get hasSkillClip() { return false; }
     poseHeldProp(v, E, t) {}
     launchHandOf(model) { return model.getObjectByName("muzzle") || HeldTipAnchor.on(model, (this.constructor.MODEL || {}).launchTip); }
@@ -5172,6 +5178,93 @@ SinglePassMaterials.enable(THREE);
              ". 갇힌 적이 결계 끝에 닿으면 " + services.skilltext.secs(u.akStunMs) + "간 기절하고 중심으로 끌려감. 결계에 묶인 적이 있는 경우, 기본 공격이 결계의 모든 적에게 피해를 입힘";
     }
   }
+  class HunterType extends CharacterType {
+    static MELEE = { spark: "#E0405A" };
+    static MODEL = { file: "Rogue", right: "crossbow_1handed", rightTurn: Math.PI / 2, muzzle: [0, 0.1, 0.92], launchPose: { clip: "Ranged_1H_Shoot", sec: 0.12, node: "muzzle" },
+               recolor: [[1, 0, 1, "#2A3463", "#0F1433"], [1, 1, 1, "#2A3463", "#0F1433"], [2, 1, 1, "#26305A", "#0E1330"], [0, 5, 1, "#B3263D", "#5C0B1B"], [0, 6, 1, "#353B50", "#151824"],
+                         [0, 7, 1, "#C9D2DE", "#7C8798"], [2, 3, 1, "#252A3C", "#0D0F18"], [1, 7, 1, "#3A4466", "#181D33"], [2, 7, 1, "#3A4466", "#181D33"], [1, 5, 1, "#B3263D", "#5C0B1B"], [1, 6, 1, "#C9D2DE", "#7C8798"]],
+               rightRecolor: [[0, 0, 8, "#3A3F52", "#161924"], [1, 0, 8, "#C9D2DE", "#6F7A8C"]] };
+    static ULT = {
+      hnDur: GameTime.gameMs(6), hnCd: GameTime.gameMs(0.8), hnDmgRate: 0.3, hnSpeed: GameTime.gameSpeed(30)
+    };
+    static STATS = { name: "헌터", role: "shooter", icon: "🌙", hp: 100, speed: GameTime.gameSpeed(130), cd: GameTime.gameMs(1.2), dmg: 30, range: 450, pSpeed: 900, pr: 10,
+               roll: { dist: 100, ms: GameTime.gameMs(0.3) }, hunt: { ms: GameTime.gameMs(4), dmgRate: 0.2, speed: GameTime.gameSpeed(40) }, ultName: "그림자 사냥" };
+    static ROLL_CLIP = "Dodge_Forward";
+    static SHOOT_CLIP = "Ranged_1H_Shoot";
+    static SHOOT_SPEED = 2.6;
+    static HIDE_BOW_WHILE_ROLLING = true;
+    static BOLT_TINT = 0xB8B4D8;
+    static BOLT_TAIL = 0xE0304C;
+    static HIT_COLOR = "#E0405A";
+    get shotName() { return "볼트"; }
+    get idleClip() { return "Idle_A"; }
+    isSkilled(E, t) { return E.buffUntil > t; }
+    isHunting(E, t) { return E.huntUntil > t; }
+    rolling(E, t) { var R = E.roll; return !!R && t < R.at + R.ms; }
+    isRooted(E, t) { return !!E.roll; }
+    cannotAttack(E, t) { return !!E.roll; }
+    locksFacing(E, t) { return this.rolling(E, t); }
+    hidesSelf(E, t) { return !!E.roll && E.roll.hide && this.rolling(E, t); }
+    skillAuraOn(E, t) { return this.isSkilled(E, t); }
+    speedBonus(E, t) { var u = HunterType.ULT, c = this.data; return (this.isSkilled(E, t) ? u.hnSpeed : 0) + (this.isHunting(E, t) ? c.hunt.speed : 0); }
+    dmgRate(E, t) { var u = HunterType.ULT, c = this.data; return Math.round(((this.isSkilled(E, t) ? u.hnDmgRate : 0) + (this.isHunting(E, t) ? c.hunt.dmgRate : 0)) * 100) / 100; }
+    basicCooldown(E, cdMs, t) { return this.isSkilled(E, t) ? HunterType.ULT.hnCd : cdMs; }
+    decorateShot(E, ev, t) { var rate = this.dmgRate(E, t); if (rate) ev.b = rate; if (this.isSkilled(E, t)) ev.sk = 1; }
+    shotDamage(d, T) { return Math.round(d.dmg * (1 + (d.boost || 0))); }
+    overrideBasic(E, ang, reach, t, moveAng) { this.services.hunterRoll.start(E, ang, reach != null, moveAng, t); return true; }
+    stepSkill(E, t) { this.services.hunterRoll.stepOwner(E, t); }
+    steerRemote(r, t) { this.services.hunterRoll.steerRemote(r, t); }
+    onHitLate(owner, h) { if ((h.k || h.as) && owner.alive) owner.huntUntil = this.services.clock.now() + this.data.hunt.ms; }
+    cast(E, ang, reach, t) { var services = this.services, u = HunterType.ULT;
+      E.buffUntil = t + u.hnDur;
+      E.skillDur = u.hnDur;
+      E.cdUntil = Math.min(E.cdUntil, t + u.hnCd);
+      services.vision.revealBriefly(E.id, t);
+    }
+    get tintsHit() { return true; }
+    hitColor(d) { return HunterType.HIT_COLOR; }
+    botUltRange() { return this.data.range; }
+    botAct(B, target, enemies, t) { return this.services.hunterBot.act(B, target, t); }
+    statSkillDamage(c) { return Math.round(c.dmg * (1 + HunterType.ULT.hnDmgRate)); }
+    statAltCooldown(c) { return HunterType.ULT.hnCd; }
+    addMarkers(v, root, body) { var services = this.services;
+      v.skillAura = services.arenaFx.hunterAuras.attachTo(root);
+      if (v.kit) v.hunterBow = body.getObjectByName("mainhand");
+    }
+    poseHeldProp(v, E, t) { if (v.hunterBow) v.hunterBow.visible = !(HunterType.HIDE_BOW_WHILE_ROLLING && E.alive && this.rolling(E, t)); }
+    earlyPose(E, t) { var clip = this.clips[HunterType.ROLL_CLIP], R = E.roll;
+      return clip && R && this.rolling(E, t) ? [HunterType.ROLL_CLIP, clip.duration * 1000 / R.ms] : null;
+    }
+    attackClip(v, E, t) { return [HunterType.SHOOT_CLIP, HunterType.SHOOT_SPEED]; }
+    showAimGuide(E, ult, c) { var services = this.services;
+      if (ult) return false;
+      var dx = Math.cos(E.angle), dy = Math.sin(E.angle), len = services.physics.rayCast(E.x + dx * 20, E.y + dy * 20, dx, dy, c.range, c.pr) + 20;
+      services.aimGuide.showAimStrip(18, Math.max(1, len - 18), 16);
+      var spot = services.hunterRoll.landingOf(E, services.hunterRoll.rollAngleOf(E, E.angle, true, services.input.moveAim(), services.clock.now()));
+      services.aimGuide.showAimArea(E, spot, HunterRollSystem.AIM_SPOT_R);
+      return true;
+    }
+    boltModel() { var services = this.services, kit = services.models.kit;
+      if (kit.weapons.hunterBolt || !kit.weapons.arrow_crossbow) return kit.weapons.hunterBolt || null;
+      var bolt = kit.weapons.arrow_crossbow.clone();
+      bolt.traverse(function (o) { if (o.isMesh) { o.material = o.material.clone(); o.material.color.setHex(HunterType.BOLT_TINT); } });
+      return kit.weapons.hunterBolt = bolt;
+    }
+    projectileMesh(g, d) { var services = this.services, model = this.boltModel();
+      if (model) { var bolt = model.clone(); bolt.rotation.y = Math.PI / 2; bolt.scale.setScalar(44); g.add(bolt); }
+      else g.add(new THREE.Mesh(services.geo.shaft, services.models.basicMat("shaft", 0xEADFC4, 1)));
+      g.add(SniperShotShaders.tailMesh(HunterType.BOLT_TAIL, 200, 16));
+    }
+    basicDesc() { var c = this.data;
+      return "이동 방향으로 " + c.roll.dist + " 구른 뒤 조준한 방향으로 " + c.dmg + "의 피해. 멈춰 있으면 조준 반대쪽으로 구름";
+    }
+    ultDesc() { var services = this.services, u = HunterType.ULT, c = this.data;
+      return services.skilltext.secs(u.hnDur) + "간 공격속도 " + Math.round((c.cd / u.hnCd - 1) * 100) + "%·공격력 " + Math.round(u.hnDmgRate * 100) + "%·이동속도 " + services.skilltext.shownSpeed(u.hnSpeed) + " 증가. 지속 중 구르는 동안 은신";
+    }
+    passiveDesc() { var services = this.services, h = this.data.hunt;
+      return "처치 관여 시 " + services.skilltext.secs(h.ms) + "간 공격력 " + Math.round(h.dmgRate * 100) + "%·이동속도 " + services.skilltext.shownSpeed(h.speed) + " 증가";
+    }
+  }
   class CharacterRegistry {
     constructor(services) { this.services = services;
       this.fallback = new CharacterType(services, "");
@@ -5204,6 +5297,7 @@ SinglePassMaterials.enable(THREE);
         phantom: new PhantomType(services, "phantom"),
         shielder: new ShielderType(services, "shielder"),
         arca: new ArcaType(services, "arca"),
+        hunter: new HunterType(services, "hunter"),
         gargantua: new GargantuaType(services, "gargantua"),
         astrologer: new AstrologerType(services, "astrologer"),
         dummy: new DummyType(services, "dummy"),
@@ -5374,6 +5468,7 @@ SinglePassMaterials.enable(THREE);
         }
         r.team = d.team; r.char = services.catalog.playable(d.characterType) ? d.characterType : services.charTypes.fallbackId; r.maxHp = services.charTypes.statsOf(r.char).hp;
         r.mv = smooth ? smooth.mv : pos.mv; r.nickname = d.nickname; r.isAI = !!d.isAI;
+        r.type.steerRemote(r, services.clock.now());
         if (!pos.full) return;
         r.deaths = pos.deaths; r.diedAt = pos.diedAt; r.kills = pos.kills; r.assists = pos.assists; r.heal = pos.heal; r.protectUntil = pos.protectUntil;
         r.stunDealt = pos.stunDealt; r.slowDealt = pos.slowDealt; r.slowWeight = pos.slowWeight; r.blocked = pos.blocked; r.skillDmg = pos.skillDmg;
@@ -5749,7 +5844,8 @@ SinglePassMaterials.enable(THREE);
     static STEALTH_REVEAL_DIST = 100;
     static REVEAL_BREAK_MS = 500;
     inBush(x, y) { var services = this.services; return services.vision.bushIndexAt(x, y) >= 0; }
-    hiddenFrom(E, t) { var services = this.services; return services.vision.inBush(E.x, E.y) || E.isStealthed(t) || services.stormFx.inFriendlyStorm(E, t); }
+    hiddenFrom(E, t) { var services = this.services; return services.vision.inBush(E.x, E.y) || E.isStealthed(t) || services.vision.selfHidden(E, t) || services.stormFx.inFriendlyStorm(E, t); }
+    selfHidden(E, t) { var services = this.services; return !E.minion && E.type.hidesSelf(E, t || services.clock.now()); }
     bushIndexAt(x, y) { var services = this.services;
       var c = Math.floor((x - ArenaSize.MAP_X0) / ArenaSize.TILE), r = Math.floor((y - ArenaSize.MAP_Y0) / ArenaSize.TILE);
       if (c < 0 || r < 0 || c >= services.arenaMap.cols || r >= services.arenaMap.rowCount) return -1;
@@ -5761,7 +5857,7 @@ SinglePassMaterials.enable(THREE);
       if (E.revealUntil > (t || services.clock.now())) return true;
       var bush = services.vision.bushIndexAt(E.x, E.y);
       if (bush >= 0 && services.vision.bushIndexAt(viewer.x, viewer.y) !== bush) return false;
-      if ((E.isStealthed(t) || services.stormFx.inFriendlyStorm(E, t)) && MathKit.hyp(E.x - viewer.x, E.y - viewer.y) > VisionRules.STEALTH_REVEAL_DIST) return false;
+      if ((E.isStealthed(t) || services.vision.selfHidden(E, t) || services.stormFx.inFriendlyStorm(E, t)) && MathKit.hyp(E.x - viewer.x, E.y - viewer.y) > VisionRules.STEALTH_REVEAL_DIST) return false;
       return true;
     }
     visibleTo(E, viewer, t) { var services = this.services; return !services.vision.hiddenFrom(E, t) || services.vision.revealedTo(E, viewer, t); }
@@ -6236,6 +6332,7 @@ SinglePassMaterials.enable(THREE);
       services.dashMoves.haltDash(T);
       services.dashMoves.haltLeap(T);
       services.phantomStrike.halt(T, t);
+      services.hunterRoll.halt(T);
       if (T.shove) T.shove = null;
       if (T.hookPull) services.hookPull.snap(T, T.hookPull, t);
       if (T.phSweep) T.phSweep = null;
@@ -6314,6 +6411,109 @@ SinglePassMaterials.enable(THREE);
     }
     spot(B, target, t) { var services = this.services, threat = this.threatFoe(B, t);
       return this.clusterSpot(B, t) || (threat ? { x: threat.x, y: threat.y } : services.brain.leadSpot(target, ArcaType.ULT.akDelay / 1000, t));
+    }
+  }
+  class HunterRollSystem {
+    static AIM_SPOT_R = 16;
+    static REMOTE_SETTLE_MS = GameTime.gameMs(0.12);
+    constructor(services) { this.services = services; }
+    exactAngle(a) { return Math.round(a * 1000) / 1000; }
+    movingAngle(E, t) { return E.mv && E.moveAng != null && t - (E.moveAt || 0) < 150 ? E.moveAng : null; }
+    awayAngle(E, faceAng) { var services = this.services, T = services.autoAim.target(E);
+      return T ? Math.atan2(E.y - T.y, E.x - T.x) : faceAng + Math.PI;
+    }
+    rollAngleOf(E, ang, manual, moveAng, t) {
+      if (moveAng === undefined) moveAng = this.movingAngle(E, t);
+      if (moveAng != null) return moveAng;
+      return manual ? ang + Math.PI : this.awayAngle(E, ang);
+    }
+    landingOf(E, rollAng) { var services = this.services, reach = services.dashMoves.dashReach(E, rollAng, HunterType.STATS.roll.dist);
+      return { x: E.x + Math.cos(rollAng) * reach, y: E.y + Math.sin(rollAng) * reach, reach: reach };
+    }
+    start(E, ang, manual, moveAng, t) { var services = this.services, R = HunterType.STATS.roll;
+      var rollAng = this.exactAngle(this.rollAngleOf(E, ang, manual, moveAng, t)), land = this.landingOf(E, rollAng), hide = E.type.isSkilled(E, t);
+      E.roll = { sx: E.x, sy: E.y, ux: Math.cos(rollAng), uy: Math.sin(rollAng), len: land.reach, full: R.dist, at: t, ms: R.ms, ang: rollAng, shot: manual ? ang : null, face: ang, hide: hide };
+      E.angle = rollAng; E.pending = null; E.mv = false;
+      services.session.room.ref.child("effects").push({ type: "hunterRoll", owner: E.id, team: E.team, x: MathKit.r1(E.x), y: MathKit.r1(E.y), tx: MathKit.r1(land.x), ty: MathKit.r1(land.y), angle: rollAng, ms: R.ms, hide: hide ? 1 : 0, createdAt: t });
+    }
+    broken(E, t) { var services = this.services;
+      return E.isStunned(t) || !!E.shove || !!E.hookPull || !!E.phSweep || (E.holePullAt > 0 && t - E.holePullAt < StatusEffects.HOLE_PULL_HOLD_MS) || services.barriers.pulling(E, t);
+    }
+    stepOwner(E, t) {
+      if (!E.alive) { E.roll = null; E.huntUntil = 0; return; }
+      var R = E.roll; if (!R) return;
+      if (this.broken(E, t)) { this.cancel(E, t); return; }
+      var k = MathKit.clamp((t - R.at) / R.ms, 0, 1), go = Math.min(R.len, R.full * k);
+      E.x = R.sx + R.ux * go; E.y = R.sy + R.uy * go;
+      E.mv = false; E.angle = R.ang;
+      if (k < 1) return;
+      this.land(E, R, t);
+    }
+    land(E, R, t) { var services = this.services;
+      services.physics.resolve(E);
+      E.roll = null;
+      var shot = R.shot != null ? R.shot : this.tapAngle(E, R.face);
+      E.angle = shot;
+      services.projectiles.emitShots(E, shot, false);
+    }
+    tapAngle(E, faceAng) { var services = this.services, T = services.autoAim.target(E);
+      return T && MathKit.hyp(T.x - E.x, T.y - E.y) <= HunterType.STATS.range + T.hitR ? services.autoAim.angle(E) : faceAng;
+    }
+    cancel(E, t) { var services = this.services, R = E.roll;
+      E.roll = null;
+      if (R.hide) services.session.room.ref.child("effects").push({ type: "hunterRoll", owner: E.id, team: E.team, cut: 1, createdAt: t });
+      services.match.game.forceNet = true;
+    }
+    halt(T) { var R = T.roll; if (!R || R.remote) return; R.sx = T.x; R.sy = T.y; R.len = 0; }
+    isLocal(E) { var services = this.services; return E === services.match.me || (!!services.match.bots && services.match.bots[E.id] === E); }
+    onEffect(e, now) { var services = this.services, E = services.targets.ent(e.owner);
+      if (e.cut) { if (E && !this.isLocal(E)) E.roll = null; return; }
+      services.hunterEchoes.onRoll(e, now);
+      if (!E || this.isLocal(E) || now > e.createdAt + e.ms + HunterRollSystem.REMOTE_SETTLE_MS) return;
+      E.roll = { sx: e.x, sy: e.y, tx: e.tx, ty: e.ty, at: e.createdAt, ms: e.ms, ang: e.angle, hide: !!e.hide, remote: true };
+    }
+    steerRemote(r, t) { var R = r.roll;
+      if (!R || !R.remote) return;
+      if (!r.alive || t >= R.at + R.ms + HunterRollSystem.REMOTE_SETTLE_MS) { r.roll = null; return; }
+      var k = MathKit.clamp((t - R.at) / R.ms, 0, 1);
+      r.x = R.sx + (R.tx - R.sx) * k; r.y = R.sy + (R.ty - R.sy) * k;
+      if (k < 1) r.angle = R.ang;
+    }
+  }
+  class HunterBotMind {
+    static KEEP_NEAR = 300;
+    static KEEP_FAR = 400;
+    static BLOCKED_K = 0.6;
+    static RANGE_SLACK = 15;
+    constructor(services) { this.services = services; }
+    act(B, target, t) { var services = this.services, c = HunterType.STATS, k = B.bot;
+      if (B.roll) return true;
+      if (!target) return false;
+      var d = MathKit.hyp(target.x - B.x, target.y - B.y), open = services.physics.losClear(B.x, B.y, target.x, target.y);
+      if (B.gauge >= MatchRules.GAUGE_MAX && t - k.seenAt > 500 && open && d <= c.range) { services.attack.useUlt(B, B.angle); return true; }
+      if (t < B.cdUntil || t - k.seenAt <= BotThought.BOT_REACT_MS || d > c.range + c.roll.dist) return true;
+      var plan = this.plan(B, target, d, t);
+      if (!plan) return true;
+      services.attack.fireBasic(B, Math.atan2(plan.aim.y - plan.land.y, plan.aim.x - plan.land.x) + (Math.random() - 0.5) * 2 * BotThought.BOT_AIM_ERR, d, plan.rollAng);
+      return true;
+    }
+    plan(B, target, d, t) { var services = this.services, self = this, first = this.rollAngle(B, target, d), toward = Math.atan2(target.y - B.y, target.x - B.x), found = null;
+      [first, first + Math.PI, toward, toward + Math.PI].some(function (rollAng) {
+        var land = services.hunterRoll.landingOf(B, rollAng), aim = self.aimFrom(land, target, t);
+        if (!self.canHitFrom(land, aim)) return false;
+        found = { rollAng: rollAng, land: land, aim: aim };
+        return true;
+      });
+      return found;
+    }
+    aimFrom(land, target, t) { var c = HunterType.STATS; return this.services.brain.leadSpot(target, c.roll.ms / 1000 + MathKit.hyp(target.x - land.x, target.y - land.y) / c.pSpeed, t); }
+    canHitFrom(land, aim) { return MathKit.hyp(aim.x - land.x, aim.y - land.y) <= HunterType.STATS.range - HunterBotMind.RANGE_SLACK && this.services.physics.losClear(land.x, land.y, aim.x, aim.y); }
+    rollAngle(B, target, d) { var services = this.services, toward = Math.atan2(target.y - B.y, target.x - B.x), dist = HunterType.STATS.roll.dist;
+      var side = (Math.floor(B.bot.seed * 10) % 2 ? 1 : -1) * Math.PI / 2;
+      var want = d < HunterBotMind.KEEP_NEAR ? toward + Math.PI : toward + side;
+      if (services.dashMoves.dashReach(B, want, dist) >= dist * HunterBotMind.BLOCKED_K) return want;
+      var left = toward + Math.PI / 2, right = toward - Math.PI / 2;
+      return services.dashMoves.dashReach(B, left, dist) >= services.dashMoves.dashReach(B, right, dist) ? left : right;
     }
   }
   class StatusEffects {
@@ -6593,7 +6793,7 @@ SinglePassMaterials.enable(THREE);
         ["pool", new PoolEffect(services)], ["hole", new HoleEffect(services)], ["storm", new StormEffect(services)], ["rev", new RevEffect(services)],
         ["domain", new DomainEffect(services)], ["grace", new GraceEffect(services)], ["strike", new StrikeEffect(services)], ["zap", new ZapEffect(services)],
         ["tshot", new TurretShotEffect(services)], ["curse", new CurseEffect(services)], ["revCut", new RevCutEffect(services)], ["burst", new BurstEffect(services)], ["hook", new HookEffect(services)], ["marina", new MarinaStreamEffect(services)], ["phantom", new PhantomEffect(services)],
-        ["barrier", new BarrierEffect(services)], ["barrierBind", new BarrierBindEffect(services)], ["barrierEdge", new BarrierEdgeEffect(services)]
+        ["barrier", new BarrierEffect(services)], ["barrierBind", new BarrierBindEffect(services)], ["barrierEdge", new BarrierEdgeEffect(services)], ["hunterRoll", new HunterRollEffect(services)]
       ]);
     }
     take(e, now) {
@@ -7477,6 +7677,7 @@ SinglePassMaterials.enable(THREE);
       var t = services.clock.now(), ev = { o: E.id, x: Math.round(E.x), y: Math.round(E.y), a: Math.round(ang * 100) / 100, t: t };
       if (skill) ev.s = 1;
       if (statSkill) ev.sk = 1;
+      if (!skill) E.type.decorateShot(E, ev, t);
       E.atkAt = t;
       services.session.room.ref.child("shots").push(ev);
       services.vision.revealBriefly(E.id, t);
@@ -7513,7 +7714,7 @@ SinglePassMaterials.enable(THREE);
       for (var lane = 0; lane < lanes; lane++) {
         var side = (lane - (lanes - 1) / 2) * 2 * laneStep;
         services.projectiles.addProj(v.key + "_" + i + (lanes > 1 ? "_" + lane : ""), { team: v.team, owner: v.ev.o, ownerCharacterType: v.char, x: ox + dx * 20 - dy * side, y: oy + dy * 20 + dx * side,
-          vx: dx * sp, vy: dy * sp, castX: ox, castY: oy, isSkill: v.skill, countsAsSkill: !!v.ev.sk, overcharged: !v.skill && !!E && E.isOvercharged(v.ev.t), swingAt: v.ev.t, dmg: sv.dmg, ultKey: sv.ultKey, fx: sv.fx, laneHit: laneHit,
+          vx: dx * sp, vy: dy * sp, castX: ox, castY: oy, isSkill: v.skill, countsAsSkill: !!v.ev.sk, overcharged: !v.skill && !!E && E.isOvercharged(v.ev.t), swingAt: v.ev.t, dmg: sv.dmg, boost: v.ev.b || 0, ultKey: sv.ultKey, fx: sv.fx, laneHit: laneHit,
           pr: sv.pr, wallR: sv.wallR, pierced: sv.pierce ? {} : null, range: sv.range + (!v.skill && E && E.isOvercharged(v.ev.t) ? StormbowType.ULT.ocRangeBonus : 0), createdAt: v.ev.t + i * v.gap });
       }
       var shooterType = services.charTypes.of(v.char);
@@ -8172,13 +8373,13 @@ SinglePassMaterials.enable(THREE);
   }
   class AttackController {
     constructor(services) { this.services = services; }
-    fireBasic(E, ang, reach) { var services = this.services;
+    fireBasic(E, ang, reach, moveAng) { var services = this.services;
       var c = services.charTypes.statsOf(E.char), t = services.clock.now(), rage = E.isBerserk(t);
       if (E.isStunned(t) || services.charTypes.of(E.char).cannotAttack(E, t)) return;
       if (services.charTypes.of(E.char).takeoverBasic(E, ang, reach, t)) return;
-      E.cdDur = E.isRiposting(t) ? 1000 / DuelistType.ULT.rmRate : c.cd * (rage ? WarriorType.ULT.bzCdMul : 1) / (E.isOvercharged(t) ? StormbowType.ULT.ocRate : 1); E.cdUntil = t + E.cdDur; E.angle = ang;
       var type = services.charTypes.of(E.char);
-      if (type.overrideBasic(E, ang, reach, t)) return;
+      E.cdDur = type.basicCooldown(E, E.isRiposting(t) ? 1000 / DuelistType.ULT.rmRate : c.cd * (rage ? WarriorType.ULT.bzCdMul : 1) / (E.isOvercharged(t) ? StormbowType.ULT.ocRate : 1), t); E.cdUntil = t + E.cdDur; E.angle = ang;
+      if (type.overrideBasic(E, ang, reach, t, moveAng)) return;
       if (c.stab) { services.dashMoves.lunge(E, ang); return; }
       var ambushDmg = type.ambush(E, t);
       if (services.catalog.isMelee(E.char) && (!c.throwRange || services.melee.enemyInMelee(E))) {
@@ -8189,9 +8390,9 @@ SinglePassMaterials.enable(THREE);
       services.projectiles.emitShots(E, ang, false, !!ambushDmg);
       if (c.shots > 1) E.volley = { until: t + (c.shots - 1) * c.gap };
     }
-    tryFire(E, ang, reach) { var services = this.services;
-      if (services.clock.now() >= E.cdUntil) { services.attack.fireBasic(E, ang, reach); E.pending = null; }
-      else E.pending = { ang: ang, reach: reach, until: services.clock.now() + 350 };
+    tryFire(E, ang, reach, moveAng) { var services = this.services;
+      if (services.clock.now() >= E.cdUntil) { services.attack.fireBasic(E, ang, reach, moveAng); E.pending = null; }
+      else E.pending = { ang: ang, reach: reach, moveAng: moveAng, until: services.clock.now() + 350 };
     }
     burstSpot(E, ang, reach, maxR, minR) { var services = this.services;
       maxR = maxR || MageType.ULT.mbCast; minR = minR || MageType.ULT.mbMin;
@@ -8217,7 +8418,7 @@ SinglePassMaterials.enable(THREE);
       var t = services.clock.now();
       if (E.pending) {
         if (t > E.pending.until) E.pending = null;
-        else if (t >= E.cdUntil) { services.attack.fireBasic(E, E.pending.ang, E.pending.reach); E.pending = null; }
+        else if (t >= E.cdUntil) { services.attack.fireBasic(E, E.pending.ang, E.pending.reach, E.pending.moveAng); E.pending = null; }
       }
       if (E.burst && t >= E.burst.until) E.burst = null;
       if (E.volley && t >= E.volley.until) E.volley = null;
@@ -8958,6 +9159,7 @@ SinglePassMaterials.enable(THREE);
       services.input.moveX = vx; services.input.moveY = vy;
       return true;
     }
+    moveAim() { return this.readMove() && (this.moveX || this.moveY) ? Math.atan2(this.moveY, this.moveX) : null; }
     canAct() { var services = this.services; return services.match.game && services.session.room.status === "playing" && !services.clock.held() && services.clock.now() >= services.session.room.startAt && services.match.me && services.match.me.alive && !services.match.me.isStunned(); }
     keyName(e) { var services = this.services; return services.input.keyMap[e.code] || services.input.keyMap[e.key] || null; }
     flip() { var services = this.services; return services.match.me && services.match.me.team === "blue"; }
@@ -9000,7 +9202,7 @@ SinglePassMaterials.enable(THREE);
         if (cancelled || !services.input.canAct() || e.type === "pointercancel") return;
         var ang = drag ? services.input.screenToWorldAngle(Math.atan2(services.input.aim.dy, services.input.aim.dx)) : services.autoAim.angle(services.match.me);
         services.match.me.angle = ang;
-        if (btn === "atk") services.attack.tryFire(services.match.me, ang, reach);
+        if (btn === "atk") services.attack.tryFire(services.match.me, ang, reach, services.input.moveAim());
         else if (btn === "ult") services.attack.useUlt(services.match.me, ang, reach);
       }
       el.addEventListener("pointerup", up); el.addEventListener("pointercancel", up);
@@ -9309,7 +9511,7 @@ SinglePassMaterials.enable(THREE);
       var weaponNames = [];
       ModelKit.modelChars(services).forEach(function (c) { [services.charTypes.modelOf(c).right, services.charTypes.modelOf(c).left].forEach(function (w) { if (w && weaponNames.indexOf(w) < 0) weaponNames.push(w); }); });
       weaponNames.push(LancerShieldOrbit.MODEL, "arrow_bow", "arrow_crossbow", ModelKit.MINION_MODEL.right, WraithType.BLADE_MODEL, BannerBearerType.FLAG_MODELS.blue, BannerBearerType.FLAG_MODELS.red);
-      var jobs = [load(ModelKit.KIT_DIR + "animations/teambattle_anims.glb?v=crossbow").then(function (g) { g.animations.forEach(function (clip) { services.models.kit.clips[clip.name] = clip; }); }),
+      var jobs = [load(ModelKit.KIT_DIR + "animations/teambattle_anims.glb?v=hunter").then(function (g) { g.animations.forEach(function (clip) { services.models.kit.clips[clip.name] = clip; }); }),
                   load(ModelKit.KIT_DIR + "animations/teambattle_large.glb?v=giant").then(function (g) { g.animations.forEach(function (clip) { services.models.kit.largeClips[clip.name] = clip; }); })];
       weaponNames.forEach(function (w) { jobs.push(load(ModelKit.KIT_DIR + "props/" + w + ".gltf").then(function (g) { services.models.kit.weapons[w] = services.modelStyle.lambertize(g.scene, w === ThrowerType.MODEL.right); })); });
       ModelKit.modelChars(services).forEach(function (c) { jobs.push(load(ModelKit.KIT_DIR + "characters/" + services.charTypes.modelOf(c).file + ".glb").then(function (g) { services.models.kit.chars[c] = services.modelStyle.lambertize(g.scene); })); });
@@ -9329,7 +9531,7 @@ SinglePassMaterials.enable(THREE);
           if (spec.halo) services.modelStyle.attachHalo(m, spec.halo);
           (spec.hide || []).forEach(function (part) { var o = m.getObjectByName(part); if (o) o.visible = false; });
         });
-        services.charTypes.list.forEach(function (c) { var spec = services.charTypes.modelOf(c); if (spec.muzzle) services.models.kit.muzzle[c] = services.models.aimedMuzzle(c); else if (spec.launchPose) services.models.kit.muzzle[c] = services.models.posedPoint(c, spec.launchPose.clip, spec.launchPose.sec, spec.launchPose.node); });
+        services.charTypes.list.forEach(function (c) { var spec = services.charTypes.modelOf(c); if (spec.muzzle && !spec.launchPose) services.models.kit.muzzle[c] = services.models.aimedMuzzle(c); else if (spec.launchPose) services.models.kit.muzzle[c] = services.models.posedPoint(c, spec.launchPose.clip, spec.launchPose.sec, spec.launchPose.node); });
         services.models.kit.ready = true; services.models.kit.failed = false;
         services.models.makePortraits();
         services.shaderWarmup.warmEffects();
@@ -12314,6 +12516,33 @@ SinglePassMaterials.enable(THREE);
     }
     clear() { var self = this; if (!this.mesh) return; this.puffs.forEach(function (p, i) { p.life = 0; self.mesh.setMatrixAt(i, self.matrix.makeScale(0, 0, 0)); }); this.mesh.instanceMatrix.needsUpdate = true; }
   }
+  class GhostEchoForm {
+    static RIM_VERTEX = "#include <fog_vertex>\n#ifdef USE_SKINNING\nvRim = 1.0 - abs(normalize(transformedNormal).z);\n#else\nvRim = 0.0;\n#endif";
+    static RIM_FRAGMENT = "float rimEdge = smoothstep(0.42, 0.92, vRim);\nvec4 diffuseColor = vec4( mix( diffuse, uRim, rimEdge ), opacity * ( 0.7 + 0.6 * rimEdge ) );";
+    static material(look) {
+      var mat = new THREE.MeshBasicMaterial({ color: look.color, transparent: true, opacity: 0, depthWrite: false }), rim = look.rim == null ? null : { value: new THREE.Color(look.rim) };
+      mat.onBeforeCompile = function (sh) {
+        sh.uniforms.uTime = look.time;
+        var vertex = "uniform float uTime;\n" + sh.vertexShader.replace("#include <begin_vertex>", "#include <begin_vertex>\n#ifdef USE_SKINNING\ntransformed += objectNormal * " + look.wobble.toFixed(3) + " * sin(uTime * 7.0 + position.y * 9.0 + position.x * 5.0);\n#endif");
+        if (rim) {
+          sh.uniforms.uRim = rim;
+          vertex = "varying float vRim;\n" + vertex.replace("#include <fog_vertex>", GhostEchoForm.RIM_VERTEX);
+          sh.fragmentShader = "uniform vec3 uRim;\nvarying float vRim;\n" + sh.fragmentShader.replace("vec4 diffuseColor = vec4( diffuse, opacity );", GhostEchoForm.RIM_FRAGMENT);
+        }
+        sh.vertexShader = vertex;
+      };
+      mat.customProgramCacheKey = function () { return look.key; };
+      return mat;
+    }
+    static posed(services, charId, clipName, sec, mat) {
+      var model = SkeletonUtils.clone(services.models.kit.chars[charId]), clip = services.models.kit.clips[clipName];
+      SharedSkeleton.unify(model);
+      model.rotation.y = Math.PI / 2; model.scale.setScalar(ModelTuning.MODEL_SCALE);
+      model.traverse(function (o) { if (o.isMesh) { o.material = mat; o.frustumCulled = false; o.renderOrder = 6; } });
+      if (clip) { var mix = new THREE.AnimationMixer(model); mix.clipAction(clip).play(); mix.update(sec); }
+      return model;
+    }
+  }
   class PhantomEchoForm {
     static TIME = { value: 0 };
     static WOBBLE = 0.018;
@@ -12321,21 +12550,9 @@ SinglePassMaterials.enable(THREE);
     static POSE_SEC = 0.3;
     static TETHER_HEIGHT = 16;
     static TETHER_WIDTH = 46;
-    static ghostMaterial() {
-      var mat = new THREE.MeshBasicMaterial({ color: PhantomEchoForm.COLOR, transparent: true, opacity: 0, depthWrite: false });
-      mat.onBeforeCompile = function (sh) {
-        sh.uniforms.uTime = PhantomEchoForm.TIME;
-        sh.vertexShader = "uniform float uTime;\n" + sh.vertexShader.replace("#include <begin_vertex>", "#include <begin_vertex>\n#ifdef USE_SKINNING\ntransformed += objectNormal * " + PhantomEchoForm.WOBBLE.toFixed(3) + " * sin(uTime * 7.0 + position.y * 9.0 + position.x * 5.0);\n#endif");
-      };
-      mat.customProgramCacheKey = function () { return "phantomEcho"; };
-      return mat;
-    }
+    static ghostMaterial() { return GhostEchoForm.material({ color: PhantomEchoForm.COLOR, time: PhantomEchoForm.TIME, wobble: PhantomEchoForm.WOBBLE, key: "phantomEcho" }); }
     static build(services) {
-      var model = SkeletonUtils.clone(services.models.kit.chars.phantom), mat = PhantomEchoForm.ghostMaterial(), clip = services.models.kit.clips[PhantomType.WIND_CLIP];
-      SharedSkeleton.unify(model);
-      model.rotation.y = Math.PI / 2; model.scale.setScalar(ModelTuning.MODEL_SCALE);
-      model.traverse(function (o) { if (o.isMesh) { o.material = mat; o.frustumCulled = false; o.renderOrder = 6; } });
-      if (clip) { var mix = new THREE.AnimationMixer(model); mix.clipAction(clip).play(); mix.update(PhantomEchoForm.POSE_SEC); }
+      var mat = PhantomEchoForm.ghostMaterial(), model = GhostEchoForm.posed(services, "phantom", PhantomType.WIND_CLIP, PhantomEchoForm.POSE_SEC, mat);
       var group = new THREE.Group(), tether = PhantomEchoForm.tether(); group.add(model); group.add(tether.mesh);
       return { group: group, mat: mat, tether: tether };
     }
@@ -12447,6 +12664,68 @@ SinglePassMaterials.enable(THREE);
       this.live.forEach(function (vis) { if (!used.has(vis)) { if (vis.group.parent) vis.group.parent.remove(vis.group); view.live.delete(vis); view.free.push(vis); } });
       this.mist.update(nowMs);
     }
+  }
+  class HunterEchoView {
+    static TIME = { value: 0 };
+    static LIFE_MS = GameTime.gameMs(0.45);
+    static FADE_IN = 0.08;
+    static PER_HUNTER = 2;
+    static ALPHA = 0.7;
+    static DRIFT = 22;
+    static GROW = 0.12;
+    static POSE_SEC = 0.05;
+    static COLOR = 0x26318C;
+    static RIM = 0xE0304C;
+    static DUST_COLOR = 0xB9A88E;
+    static DUST_R = 34;
+    static DUST_MS = 380;
+    constructor(services) { this.services = services; this.free = []; this.built = 0; }
+    get echoes() { return this.services.field.hunterEchoes; }
+    set echoes(list) { this.services.field.hunterEchoes = list; }
+    ready() { var kit = this.services.models.kit; return kit.ready && !!kit.chars.hunter; }
+    build() { var services = this.services, mat = GhostEchoForm.material({ color: HunterEchoView.COLOR, rim: HunterEchoView.RIM, time: HunterEchoView.TIME, wobble: 0.01, key: "hunterEcho" });
+      var model = GhostEchoForm.posed(services, "hunter", HunterType.ROLL_CLIP, HunterEchoView.POSE_SEC, mat), group = new THREE.Group();
+      group.add(model); this.built++;
+      return { group: group, mat: mat };
+    }
+    prefill(count) { if (!this.ready()) return; while (this.free.length < count) this.free.push(this.build()); }
+    onRoll(e, now) { var services = this.services;
+      services.match.fx.push({ k: "boom", x: e.x, y: e.y, r: HunterEchoView.DUST_R, c: HunterEchoView.DUST_COLOR, t: Date.now(), life: HunterEchoView.DUST_MS });
+      if (!e.hide || now > e.createdAt + HunterEchoView.LIFE_MS) return;
+      var mine = this.echoes.filter(function (r) { return r.e.owner === e.owner; });
+      if (mine.length >= HunterEchoView.PER_HUNTER) this.drop(mine[0]);
+      this.echoes = this.echoes.filter(function (r) { return !r.dropped; });
+      this.echoes.push({ e: e, vis: null, dropped: false });
+    }
+    countOf(owner) { return this.echoes.filter(function (r) { return r.e.owner === owner; }).length; }
+    take() { var services = this.services;
+      if (!this.ready()) return null;
+      var vis = this.free.pop() || this.build();
+      services.stage.scene.add(vis.group);
+      return vis;
+    }
+    drop(r) { r.dropped = true; if (!r.vis) return; if (r.vis.group.parent) r.vis.group.parent.remove(r.vis.group); this.free.push(r.vis); r.vis = null; }
+    step(t) { var view = this;
+      this.echoes = this.echoes.filter(function (r) { if (t < r.e.createdAt + HunterEchoView.LIFE_MS) return true; view.drop(r); return false; });
+    }
+    dropAll() { var view = this; this.echoes.forEach(function (r) { view.drop(r); }); this.echoes = []; }
+    spareRoots() { return this.free.map(function (vis) { vis.group.position.set(ShaderWarmup.PROBE_SPOT, 0, ShaderWarmup.PROBE_SPOT); vis.mat.opacity = HunterEchoView.ALPHA; return vis.group; }); }
+    warmSample() { if (!this.ready()) return null; var vis = this.build(); vis.mat.opacity = HunterEchoView.ALPHA; this.free.push(vis); return vis.group; }
+    alphaAt(k) { return HunterEchoView.ALPHA * Math.min(1, k / HunterEchoView.FADE_IN) * (1 - k) * (1 - k * 0.3); }
+    render(t, nowMs) { var view = this, V = HunterEchoView;
+      V.TIME.value = (nowMs % 100000) / 1000;
+      this.echoes.forEach(function (r) {
+        if (!r.vis) r.vis = view.take();
+        if (!r.vis) return;
+        var e = r.e, k = MathKit.clamp((t - e.createdAt) / V.LIFE_MS, 0, 1), back = V.DRIFT * k;
+        r.vis.group.position.set(e.x - Math.cos(e.angle) * back, 0, e.y - Math.sin(e.angle) * back);
+        r.vis.group.rotation.y = -e.angle; r.vis.group.scale.setScalar(1 + V.GROW * k);
+        r.vis.mat.opacity = view.alphaAt(k);
+      });
+    }
+  }
+  class HunterRollEffect extends EffectHandler {
+    handle(e, now) { this.services.hunterRoll.onEffect(e, now); }
   }
   class SniperShotShaders {
     static TONES = { deep: 0x6A2A08, blade: 0xFFB347, core: 0xFFF4D8, far: 0xFFD34D };
@@ -14500,6 +14779,7 @@ SinglePassMaterials.enable(THREE);
         function () { return services.hitmanSlashView.warmSample(); },
         function () { return services.phantomSlashes.warmSample(); },
         function () { return services.phantomView.warmSample(); },
+        function () { return services.hunterEchoes.warmSample(); },
         function () { return services.sniperShots.warmSample(); },
         function () { return services.poolView.makeHoleVis(e); },
         function () { return services.poolView.makeBottleVis(); },
@@ -14598,6 +14878,7 @@ SinglePassMaterials.enable(THREE);
       var rogues = this.castersByTeam("rogue"), rangers = this.castersByTeam("ranger"), knights = this.castersByTeam("knight"), throwers = this.castersByTeam("thrower"), shamans = this.castersByTeam("shaman"), stargazers = this.castersByTeam("astrologer"), throwerCount = throwers.blue + throwers.red, starCount = (stargazers.blue + stargazers.red) * 2;
       var wraiths = this.castersByTeam("wraith"); services.hookView.prefill(wraiths.blue + wraiths.red);
       var phantoms = this.castersByTeam("phantom"); services.phantomSlashes.prefill((phantoms.blue + phantoms.red) * 5); services.phantomView.prefill(phantoms.blue + phantoms.red);
+      var hunters = this.castersByTeam("hunter"); services.hunterEchoes.prefill((hunters.blue + hunters.red) * HunterEchoView.PER_HUNTER);
       this.prefillReusedFx();
       this.rehearseFirstUses();
       services.arenaFx.prefillForMatch({ toxicPools: throwerCount * (ThrowerType.ULT.plMax + 1), domains: shamans.blue + shamans.red, starfalls: starCount, stealthBursts: rogues.blue + rogues.red });
@@ -14626,10 +14907,11 @@ SinglePassMaterials.enable(THREE);
       services.stormView.shelf.prefill(frosts);
       services.turrets.shellShelf.prefill(engineers * 8);
     }
-    rehearseFirstUses() { var rehearsal = this.rehearsal, druids = this.castersByTeam("druid"), hitmen = this.castersByTeam("hitman"), stormbows = this.castersByTeam("stormbow"), phantoms = this.castersByTeam("phantom"), arcas = this.castersByTeam("arca");
+    rehearseFirstUses() { var rehearsal = this.rehearsal, druids = this.castersByTeam("druid"), hitmen = this.castersByTeam("hitman"), stormbows = this.castersByTeam("stormbow"), phantoms = this.castersByTeam("phantom"), arcas = this.castersByTeam("arca"), hunters = this.castersByTeam("hunter");
       rehearsal.finish();
       ["blue", "red"].forEach(function (team) {
         rehearsal.shots("arca", team, false, arcas[team] * 2);
+        rehearsal.shots("hunter", team, false, hunters[team] * 2);
         rehearsal.shots("druid", team, false, druids[team] * 2);
         rehearsal.shots("hitman", team, true, hitmen[team]);
         rehearsal.shots("phantom", team, false, phantoms[team] * 2);
@@ -14637,7 +14919,7 @@ SinglePassMaterials.enable(THREE);
       if (stormbows.blue + stormbows.red) rehearsal.overcharge();
     }
     warmObjects() { var services = this.services;
-      return (this.kept || []).concat(services.fxView.bladeZones.spareRoots(), services.hammerStrikes.spareRoots(), services.cloudWaves.shelf.spareRoots(), services.gargantua.spareRoots(), services.stormView.shelf.spareRoots(), this.rehearsal.roots, services.fighterView.spareMinionRoots(), services.turrets.spareRoots(), services.groves.spare, services.revGraceView.spareBeamRoots(), services.meteorFall.spareRoots(), services.galeView.spareRoots(), services.barrierView.spareRoots(), services.impactBlasts.spareRoots(), services.hitmanSlashView.spareRoots(), services.phantomSlashes.spareRoots(), services.phantomView.spareRoots(), services.sniperShots.spareRoots(), services.arenaFx.spareRoots(ShaderWarmup.PROBE_SPOT), services.hookView.spareRoots());
+      return (this.kept || []).concat(services.fxView.bladeZones.spareRoots(), services.hammerStrikes.spareRoots(), services.cloudWaves.shelf.spareRoots(), services.gargantua.spareRoots(), services.stormView.shelf.spareRoots(), this.rehearsal.roots, services.fighterView.spareMinionRoots(), services.turrets.spareRoots(), services.groves.spare, services.revGraceView.spareBeamRoots(), services.meteorFall.spareRoots(), services.galeView.spareRoots(), services.barrierView.spareRoots(), services.impactBlasts.spareRoots(), services.hitmanSlashView.spareRoots(), services.phantomSlashes.spareRoots(), services.phantomView.spareRoots(), services.hunterEchoes.spareRoots(), services.sniperShots.spareRoots(), services.arenaFx.spareRoots(ShaderWarmup.PROBE_SPOT), services.hookView.spareRoots());
     }
   }
   class FramePhaseMeter {
@@ -14760,6 +15042,7 @@ SinglePassMaterials.enable(THREE);
       services.sniperShots.step(t);
       services.phantomSlashes.step(t);
       services.phantomView.step(t);
+      services.hunterEchoes.step(t);
       services.barriers.stepField(t);
       services.bannerLedger.step(t);
       services.world.pruneLocal(t);
@@ -14788,7 +15071,7 @@ SinglePassMaterials.enable(THREE);
           services.match.me.mv = MathKit.hyp(services.match.me.x - ox, services.match.me.y - oy) > 0.2;
           if (services.match.me.mv) { services.match.me.moveAng = Math.atan2(services.match.me.y - oy, services.match.me.x - ox); services.match.me.moveAt = services.clock.now(); }
         } else services.match.me.mv = false;
-        if (services.input.keys.atk && t >= services.match.me.cdUntil && !services.match.me.volley && !services.match.me.slash) services.attack.fireBasic(services.match.me, services.autoAim.angle(services.match.me));
+        if (services.input.keys.atk && t >= services.match.me.cdUntil && !services.match.me.volley && !services.match.me.slash) services.attack.fireBasic(services.match.me, services.autoAim.angle(services.match.me), undefined, services.input.moveAim());
         services.attack.stepCombat(services.match.me, dt);
       } else if (services.match.me) services.match.me.mv = false;
     }
@@ -14854,7 +15137,7 @@ SinglePassMaterials.enable(THREE);
       HUD: services.hud, LIVE_BOARD: services.liveBoard, END_BANNER: services.endBanner, SPEC_FOLLOW: services.specFollow, KILL_FEED: services.killfeed, RESULT_BOARD: services.resultBoard,SOUND: services.sound, BACKEND: services.backend, TIMESCALE: services.timescale, THREE: THREE, CAMERA_RIG: services.cameraRig, ARENA_VIEW: services.arenaView, PROPS: services.props, PROP_THEMES: services.propThemes, camera: services.stage.camera, overlay: Canvases.overlay, QA: services.quality, PIX_MIN: Environment.PIX_MIN, PIX_START: Environment.PIX_START, SCENERY: services.arenaView.scenery,
       setDb: function (fake) { var before = services.backend.db; services.backend.db = fake; return before; },
       setTestLink: function (flag) { var before = services.backend.isTestLink; services.backend.isTestLink = flag; return before; },
-      MAP_X0: ArenaSize.MAP_X0, MAP_Y0: ArenaSize.MAP_Y0, TSUNAMI_LANES: services.tsunamiLanes, TsunamiLanes: TsunamiLanes, MARINA_STREAMS: services.marinaStreams, MARINA_BOT: services.marinaBot, TridentProp: TridentProp, HOOK_PATH: services.hookPath, HOOK_PULL: services.hookPull, HOOK_VIEW: services.hookView, playersNow: function () { return services.session.players; }, HAMMER_STRIKES: services.hammerStrikes, HammerBasicBlast: HammerBasicBlast, BANNER_AURA: services.bannerAura, BANNER_LEDGER: services.bannerLedger, BannerCreditLedger: BannerCreditLedger, makeBannerGlow: function (d) { return new BannerStrikeGlow(services, d); }, BannerStrikeGlow: BannerStrikeGlow, BannerBearerRig: BannerBearerRig, DraggedChain: DraggedChain, WraithChainRig: WraithChainRig, ChainSlamBurst: ChainSlamBurst, FIGHTER_VIEW: services.fighterView, FIGHTER_MOTION: services.fighterMotion, GEO: services.geo, FRAME_RENDERER: services.frameRenderer, stage: services.stage, CHAR_TYPES: services.charTypes, SHIELD_WALLS: services.shieldWalls, BARRIERS: services.barriers, BARRIER_VIEW: services.barrierView, STATUS: services.status, AUTO_AIM: services.autoAim, AUTO_AIM_ERR: AutoAim.AUTO_AIM_ERR, AUTO_AIM_LEAD: AutoAim.AUTO_AIM_LEAD, FullscreenKeeper: FullscreenKeeper, DRAFT_AI: services.draftAi,
+      MAP_X0: ArenaSize.MAP_X0, MAP_Y0: ArenaSize.MAP_Y0, TSUNAMI_LANES: services.tsunamiLanes, TsunamiLanes: TsunamiLanes, MARINA_STREAMS: services.marinaStreams, MARINA_BOT: services.marinaBot, TridentProp: TridentProp, HOOK_PATH: services.hookPath, HOOK_PULL: services.hookPull, HOOK_VIEW: services.hookView, playersNow: function () { return services.session.players; }, HAMMER_STRIKES: services.hammerStrikes, HammerBasicBlast: HammerBasicBlast, BANNER_AURA: services.bannerAura, BANNER_LEDGER: services.bannerLedger, BannerCreditLedger: BannerCreditLedger, makeBannerGlow: function (d) { return new BannerStrikeGlow(services, d); }, BannerStrikeGlow: BannerStrikeGlow, BannerBearerRig: BannerBearerRig, DraggedChain: DraggedChain, WraithChainRig: WraithChainRig, ChainSlamBurst: ChainSlamBurst, FIGHTER_VIEW: services.fighterView, FIGHTER_MOTION: services.fighterMotion, GEO: services.geo, FRAME_RENDERER: services.frameRenderer, stage: services.stage, CHAR_TYPES: services.charTypes, SHIELD_WALLS: services.shieldWalls, BARRIERS: services.barriers, BARRIER_VIEW: services.barrierView, HUNTER_ROLL: services.hunterRoll, HUNTER_ECHOES: services.hunterEchoes, HUNTER_BOT: services.hunterBot, HunterEchoView: HunterEchoView, HunterType: HunterType, STATUS: services.status, AUTO_AIM: services.autoAim, AUTO_AIM_ERR: AutoAim.AUTO_AIM_ERR, AUTO_AIM_LEAD: AutoAim.AUTO_AIM_LEAD, FullscreenKeeper: FullscreenKeeper, DRAFT_AI: services.draftAi,
       MOCK_DRAFT: services.mockDraft, MOCK_DRAFT_VIEW: services.mockDraftView,
       DRAFT: services.draft, DRAFT_VIEW: services.draftView, DRAFT_STEPS: Draft.STEPS, DRAFT_STEP_MS: Draft.STEP_MS, DRAFT_AI_MS: Draft.AI_MS, DRAFT_AI_TRADE_MS: Draft.AI_TRADE_MS, DRAFT_ABSENT_WAIT_MS: Draft.ABSENT_WAIT_MS, NO_BAN: Draft.NO_BAN,
       STATS: services.stats, STATS_PATH: MatchStats.path, STATS_PATCHES: StatsPatches, STATS_PENDING: MatchStats.PENDING, STATS_SETTLE_MS: MatchStats.SETTLE_MS, STATS_HOLD_MAX_MS: MatchStats.HOLD_MAX_MS,
@@ -15211,6 +15494,8 @@ SinglePassMaterials.enable(THREE);
       services.phantomStrike = new PhantomStrikeSystem(services);
       services.barriers = new BarrierSystem(services);
       services.barrierBot = new BarrierBotMind(services);
+      services.hunterRoll = new HunterRollSystem(services);
+      services.hunterBot = new HunterBotMind(services);
       services.hookView = new HookChainView(services);
       services.hammerStrikes = new HammerStrikeView(services);
       services.bannerAura = new BannerAura(services);
@@ -15255,6 +15540,7 @@ SinglePassMaterials.enable(THREE);
       services.hitmanSlashView = new HitmanSlashView(services);
       services.phantomSlashes = new PhantomSlashView(services);
       services.phantomView = new PhantomView(services);
+      services.hunterEchoes = new HunterEchoView(services);
       services.sniperShots = new SniperShotView(services);
       services.starfallView = new StarfallView(services);
       services.aimGuide = new AimGuide(services);

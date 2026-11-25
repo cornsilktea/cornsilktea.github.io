@@ -979,6 +979,86 @@ class StealthVeilPool extends SkillAuraPool {
     }
 }
 StealthVeilPool.TONES = { uDeep: 0x150D22, uFire: 0x6A3FA0 };
+class HunterAuraShaders {
+}
+HunterAuraShaders.RIBBON_VERTEX = `
+    uniform float uTime; uniform float uBurst; uniform float uRadius; uniform float uHeight; uniform float uTurns; uniform float uWidth; varying vec2 vRib;
+    void main() {
+      float h = position.x, side = position.y, strand = position.z;
+      float a = strand * 6.2832 / 3.0 + h * uTurns * 6.2832 + uTime * 1.5;
+      float r = uRadius * (1.0 - 0.42 * h) * (1.0 + 0.3 * uBurst);
+      float w = uWidth * (1.0 - 0.7 * h);
+      vec3 p = vec3(cos(a) * r, 3.0 + h * uHeight + side * w * 0.5, sin(a) * r);
+      vRib = vec2(h, side);
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+    }`;
+HunterAuraShaders.RIBBON_FRAGMENT = `
+    uniform sampler2D uTex; uniform float uTime; uniform float uFade; uniform float uBurst; uniform vec3 uDeep; uniform vec3 uFire; uniform vec3 uHot; varying vec2 vRib;
+    void main() {
+      float h = vRib.x, edge = abs(vRib.y);
+      float flow = texture2D(uTex, vec2(h * 1.7 - uTime * 0.85, vRib.y * 0.2 + 0.37)).r;
+      float rim = smoothstep(0.5, 0.8, edge);
+      vec3 color = mix(uDeep, uFire, rim);
+      color = mix(color, uHot, max(smoothstep(0.55, 0.85, flow) * (1.0 - rim) * 0.9, uBurst * 0.6));
+      float body = (0.72 + 0.28 * smoothstep(0.3, 0.7, flow)) * (1.0 - h * 0.7) * smoothstep(0.0, 0.05, h) * smoothstep(1.0, 0.9, edge);
+      gl_FragColor = vec4(color, min(1.0, body * (1.0 + 0.5 * uBurst)) * uFade);
+      #include <colorspace_fragment>
+    }`;
+HunterAuraShaders.SHADOW_FRAGMENT = `
+    uniform float uFade; uniform float uBurst; uniform vec3 uFire; varying vec2 vP;
+    void main() {
+      float r = length(vP);
+      if (r > 1.0) discard;
+      float ring = uBurst * smoothstep(0.14, 0.0, abs(r - (1.0 - uBurst)));
+      gl_FragColor = vec4(uFire, (smoothstep(1.0, 0.25, r) * 0.2 + ring * 0.75) * uFade);
+      #include <colorspace_fragment>
+    }`;
+class HunterAuraPool extends SkillAuraPool {
+    constructor() {
+        super(...arguments);
+        this.ribbon = null;
+    }
+    ribbonShape() {
+        if (this.ribbon)
+            return this.ribbon;
+        const S = HunterAuraPool, points = [], order = [];
+        for (let strand = 0; strand < S.STRANDS; strand++) {
+            const base = points.length / 3;
+            for (let i = 0; i <= S.STEPS; i++)
+                points.push(i / S.STEPS, -1, strand, i / S.STEPS, 1, strand);
+            for (let i = 0; i < S.STEPS; i++) {
+                const o = base + i * 2;
+                order.push(o, o + 2, o + 1, o + 1, o + 2, o + 3);
+            }
+        }
+        const shape = new this.kit.THREE.BufferGeometry();
+        shape.setAttribute("position", new this.kit.THREE.Float32BufferAttribute(points, 3));
+        shape.setIndex(order);
+        return this.ribbon = shape;
+    }
+    build() {
+        const kit = this.kit, L = HunterAuraPool.LOOK, C = this.common(HunterAuraPool.TONES), H = HunterAuraShaders;
+        C.uniforms.uRadius = kit.number(L.radius);
+        C.uniforms.uHeight = kit.number(L.height);
+        C.uniforms.uTurns = kit.number(L.turns);
+        C.uniforms.uWidth = kit.number(L.width);
+        C.uniforms.uReach = kit.number(L.sparkReach);
+        C.uniforms.uHeightSpark = kit.number(L.sparkHeight);
+        const ribbons = kit.mesh(this.ribbonShape(), kit.soft(C.uniforms, H.RIBBON_VERTEX, H.RIBBON_FRAGMENT, kit.THREE.DoubleSide), 7);
+        const shadow = kit.mesh(kit.flat, kit.soft(C.uniforms, BladeTrailShaders.VERTEX, H.SHADOW_FRAGMENT), 3);
+        shadow.position.y = 1.4;
+        shadow.scale.set(L.shadow, 1, L.shadow);
+        const sparkUniforms = Object.assign({}, C.uniforms, { uHeight: C.uniforms.uHeightSpark });
+        const sparks = kit.points(this.seeds(12, 173), kit.soft(sparkUniforms, SkillAuraShaders.SPARK_VERTEX, SkillAuraShaders.SPARK_FRAGMENT), 8);
+        const root = new kit.THREE.Group();
+        root.add(shadow, ribbons, sparks);
+        return { root, fade: C.fade, burst: C.burst, time: C.time, pixelScale: C.pixelScale, sparks };
+    }
+}
+HunterAuraPool.TONES = { uDeep: 0x2A38A8, uFire: 0xF0284A, uHot: 0xF2F5FF };
+HunterAuraPool.STRANDS = 3;
+HunterAuraPool.STEPS = 40;
+HunterAuraPool.LOOK = { radius: 31, height: 96, turns: 1.1, width: 17, sparkReach: 28, sparkHeight: 104, shadow: 36 };
 class StealthBurstShaders {
 }
 StealthBurstShaders.RING_FRAGMENT = `
@@ -1108,9 +1188,10 @@ class ArenaFxViews {
         this.bladeStormAuras = new BladeStormAuraPool(kit, host.bladeStormRadius);
         this.stealthVeils = new StealthVeilPool(kit);
         this.stealthBursts = new StealthBurstPool(kit);
+        this.hunterAuras = new HunterAuraPool(kit);
     }
     get all() {
-        return [this.arcBlades, this.thrustBlades, this.stabs, this.toxicPools, this.domains, this.starfalls, this.lungeBands, this.berserkAuras, this.guardAuras, this.bladeStormAuras, this.stealthVeils, this.stealthBursts];
+        return [this.arcBlades, this.thrustBlades, this.stabs, this.toxicPools, this.domains, this.starfalls, this.lungeBands, this.berserkAuras, this.guardAuras, this.bladeStormAuras, this.stealthVeils, this.stealthBursts, this.hunterAuras];
     }
     tick(nowMs) {
         this.orbs.tick(nowMs);

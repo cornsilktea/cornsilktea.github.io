@@ -3198,7 +3198,7 @@ class ResultCollector {
 
   run(AIMG, "AI 역할: 기사·창술사·대장장이는 앞, 화염술사·주술사·궁수·뇌전사수·저격수는 뒤, 은신자·자객·결투가는 틈새를 노리는 역할인가", function (done) {
     var want = { knight: "front", lancer: "front", blacksmith: "front", guardian: "front", warrior: "front", mage: "back", shaman: "back", ranger: "back", stormbow: "back", sniper: "back", frost: "back", cleric: "back", necro: "back", thrower: "back",
-                 rogue: "flank", hitman: "flank", duelist: "flank", dancer: "back", engineer: "back", druid: "back", giant: "front", astrologer: "back", wraith: "front", bearer: "front", marina: "back", phantom: "flank", shielder: "front", arca: "back" }, bad = [];
+                 rogue: "flank", hitman: "flank", duelist: "flank", dancer: "back", engineer: "back", druid: "back", giant: "front", astrologer: "back", wraith: "front", bearer: "front", marina: "back", phantom: "flank", shielder: "front", arca: "back", hunter: "back" }, bad = [];
     Object.keys(want).forEach(function (c) { var got = api.CHAR_TYPES.of(c).botRole; if (got !== want[c]) bad.push(c + " " + got + " (기대 " + want[c] + ")"); });
     api.CHAR_LIST.forEach(function (c) { if (!want[c]) bad.push(c + " 역할이 정해지지 않음"); });
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : Object.keys(want).length + "명 역할이 맞음");
@@ -5180,6 +5180,13 @@ class ResultCollector {
   new PhantomTests(api, { world: world, run: run, FRAME: FRAME }).register();
   new ShielderTests(api, { world: world, run: run, runAsync: runAsync, FRAME: FRAME }).register();
   new ArcaTests(api, { world: world, run: run, runAsync: runAsync, FRAME: FRAME, OPEN_Y: OPEN_Y, blockedAt: blockedAt, singleRowWall: singleRowWall }).register();
+  new HunterTests(api, { world: world, run: run, runAsync: runAsync, FRAME: FRAME, OPEN_Y: OPEN_Y, blockedAt: blockedAt, singleRowWall: singleRowWall }).register();
+  run(AUTO, "AI 6명 60초 난전 — 강 맵 + 헌터 고정 (시드 2047)", function (done) {
+    var r = autoMelee("river", 60, 2047, "hunter"), kinds = Object.keys(r.issues);
+    var roster = r.list.map(function (e) { return api.CHARS[e.char].name; }).join("·");
+    done(kinds.length ? "fail" : "pass", "출전: " + roster + " / 킬 " + r.kills + ", 궁극기 " + r.ults + "번" +
+      (kinds.length ? " / 규칙 위반: " + kinds.map(function (k) { return k + " " + r.issues[k].n + "번 (처음: " + r.issues[k].first + ")"; }).join("; ") : " / 규칙 위반 없음(벽 안·결계 밖 탈출 포함)"));
+  });
   run(AUTO, "AI 6명 60초 난전 — 던전 맵 + 아르카 고정 (시드 2046)", function (done) {
     var r = autoMelee("dungeon", 60, 2046, "arca"), kinds = Object.keys(r.issues);
     var roster = r.list.map(function (e) { return api.CHARS[e.char].name; }).join("·");
@@ -9276,7 +9283,7 @@ class ArcaTests {
       if (api.FIELD.barriers.length || b.vis || group.parent) bad.push("결계가 끝나도 그림이 남음");
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "사슬 2개(InstancedMesh 1개), 쓰러진 적 사슬 사라짐, 끝나면 그림 회수");
     });
-    this.kit.runAsync(G, "발사 지점: 아르카·마법사 투사체가 무기 끝에서 나가고, 아르카·화염술사·점성술사에 시전 동작이 있는가 (몸에서 쏘는 캐릭터 목록도)", async function (done) {
+    this.kit.runAsync(G, "발사 지점: 아르카·마법사 투사체가 무기 끝에서, 헌터 볼트가 석궁 끝에서 나가고, 아르카·화염술사·점성술사에 시전 동작이 있는가 (몸에서 쏘는 캐릭터 목록도)", async function (done) {
       var W = self.scene([]), ak = W.ent("ak");
       for (var wait = 0; wait < 40 && !api.FIGHTER_VIEW.makeVis(ak, new api.THREE.Group()).kit; wait++) await new Promise(function (r) { setTimeout(r, 100); });
       var v = api.FIGHTER_VIEW.makeVis(ak, new api.THREE.Group()), bad = [];
@@ -9294,8 +9301,11 @@ class ArcaTests {
         if (!(tipAt.distanceTo(gripAt) > 10)) bad.push(c + " 끝점이 손에서 떨어져 있지 않음(" + Math.round(tipAt.distanceTo(gripAt)) + ")");
       });
       ["mage", "astrologer"].forEach(function (c) { if (!api.CHAR_TYPES.of(c).hasSkillClip) bad.push(c + " 시전 동작 없음"); });
+      var hv = api.FIGHTER_VIEW.makeVis(self.kit.world("forest", [{ id: "p", team: "blue", char: "hunter", x: 200, y: self.y }]).ent("p"), new api.THREE.Group());
+      if (!hv.launchHand || hv.launchHand.name !== "muzzle" || hv.launchHand.parent !== hv.root.getObjectByName("mainhand")) bad.push("헌터 볼트 발사 지점이 석궁 끝(muzzle)에 없음");
+      else { hv.root.updateMatrixWorld(true); reach.push("헌터 석궁 " + Math.round(hv.launchHand.getWorldPosition(new api.THREE.Vector3()).distanceTo(hv.launchHand.parent.getWorldPosition(new api.THREE.Vector3())))); }
       var fromBody = api.CHAR_LIST.filter(function (c) { if (!api.CHARS[c] || /bot/.test(c)) return false; var e = self.kit.world("forest", [{ id: "p", team: "blue", char: c, x: 200, y: self.y }]).ent("p"), pv = api.FIGHTER_VIEW.makeVis(e, new api.THREE.Group()); return pv.kit && !pv.launchHand; });
-      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "아르카·화염술사·얼음술사·드루이드·네크로·마리나·점성술사는 무기 끝 고정점(손에서 끝까지 " + reach.join(", ") + "), 시전 동작 있음. 손·총구 고정점 없이 몸에서 나가는 캐릭터: " + (fromBody.join(", ") || "없음"));
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "아르카·화염술사·얼음술사·드루이드·네크로·마리나·점성술사는 무기 끝, 헌터는 석궁 끝 고정점(손에서 끝까지 " + reach.join(", ") + "), 시전 동작 있음. 손·총구 고정점 없이 몸에서 나가는 캐릭터: " + (fromBody.join(", ") || "없음"));
     });
     run(G, "카드: 패시브·스킬 설명과 능력치 표가 수치에서 만들어지는가", function (done) {
       var bad = [], text = api.ultDesc("arca"), pas = api.passiveDesc("arca"), table = api.statTable("arca"), C = api.CHARS.arca;
@@ -9304,6 +9314,289 @@ class ArcaTests {
       ["<td>" + C.dmg + "</td>", "<td>" + C.range + "</td>", "<td>1.4초</td>", "<td>170</td>", "<td>결계</td>", "<td>" + C.hp + "</td>"].forEach(function (w) { if (table.indexOf(w) < 0) bad.push("표에 " + w + " 없음"); });
       if (/\.$/.test(text) || /\.$/.test(pas)) bad.push("설명 끝 마침표");
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "패시브 '" + pas + "'");
+    });
+  }
+}
+
+class HunterTests {
+  static GROUP = "헌터";
+  static NEAR = 2;
+  constructor(api, kit) { this.api = api; this.kit = kit; this.y = kit.OPEN_Y.forest; }
+  get C() { return this.api.CHARS.hunter; }
+  get U() { return this.api.ULT; }
+  foe(id, x, dy, char) { return { id: id, team: "red", char: char || "ranger", x: x, y: this.y + (dy || 0) }; }
+  scene(list, x, y, gauge) { return this.kit.world("forest", [{ id: "hn", team: "blue", char: "hunter", x: x == null ? 400 : x, y: y == null ? this.y : y, angle: 0, gauge: gauge || 0 }].concat(list || [])); }
+  shots(W) { return W.log.filter(function (p) { return p.path === "shots" && p.v.o === "hn"; }).map(function (p) { return p.v; }); }
+  rolls(W) { return W.log.filter(function (p) { return p.path === "effects" && p.v.type === "hunterRoll" && !p.v.cut; }).map(function (p) { return p.v; }); }
+  rollMs() { return this.C.roll.ms; }
+  near(a, b, gap) { return Math.abs(a - b) <= (gap == null ? HunterTests.NEAR : gap); }
+  angleGap(a, b) { var d = Math.abs(a - b) % (Math.PI * 2); return d > Math.PI ? Math.PI * 2 - d : d; }
+  lost(E) { return E.maxHp - E.hp; }
+  fire(W, ang, manual, moveAng) { var hn = W.ent("hn"); hn.cdUntil = 0; this.api.fireBasic(hn, ang, manual ? 300 : undefined, moveAng); }
+  register() {
+    this.registerRolls();
+    this.registerStops();
+    this.registerSkill();
+    this.registerEchoAndAura();
+    this.registerPassive();
+    this.registerCardAndBot();
+  }
+  registerRolls() {
+    var self = this, api = this.api, run = this.kit.run, G = HunterTests.GROUP, C = this.C;
+    run(G, "이동 중 수동 조준: 이동 방향으로 " + C.roll.dist + " 구르고, 착지 후 입력 순간의 조준 방향으로 볼트 1발(구르는 중 조준을 돌려도·옆에 적이 있어도 그대로)", function (done) {
+      var W = self.scene([self.foe("side", 520, 0)]), hn = W.ent("hn"), bad = [];
+      self.fire(W, -Math.PI / 2, true, Math.PI);
+      W.step(self.kit.FRAME * 3); hn.angle = 0;
+      if (self.shots(W).length) bad.push("구르는 중에 볼트가 나감");
+      W.step(self.rollMs() + 100);
+      var shot = self.shots(W);
+      if (!self.near(hn.x, 400 - C.roll.dist) || !self.near(hn.y, self.y)) bad.push("착지 (" + Math.round(hn.x) + ", " + Math.round(hn.y) + ")");
+      if (shot.length !== 1) bad.push("볼트 " + shot.length + "발");
+      else { if (Math.abs(shot[0].a - (-Math.PI / 2)) > 0.011) bad.push("쏜 방향 " + shot[0].a); if (!self.near(shot[0].x, hn.x, 1.5) || !self.near(shot[0].y, hn.y, 1.5)) bad.push("쏜 자리가 착지 자리가 아님"); }
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "왼쪽으로 " + C.roll.dist + " 굴러 착지한 자리에서 위쪽(-90°)으로 1발, 옆 적·조준 변경에 꺾이지 않음");
+    });
+    run(G, "멈춘 채 수동 조준: 조준 반대쪽으로 " + C.roll.dist + " 구르고 조준 방향으로 쏘는가", function (done) {
+      var W = self.scene([]), hn = W.ent("hn"), bad = [];
+      self.fire(W, 0, true, null);
+      W.step(self.rollMs() + 100);
+      var shot = self.shots(W);
+      if (!self.near(hn.x, 400 - C.roll.dist) || !self.near(hn.y, self.y)) bad.push("착지 (" + Math.round(hn.x) + ", " + Math.round(hn.y) + ")");
+      if (shot.length !== 1 || Math.abs(shot[0].a) > 0.011) bad.push("볼트 " + JSON.stringify(shot.map(function (s) { return s.a; })));
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "오른쪽 조준 → 왼쪽으로 " + C.roll.dist + " 구른 뒤 오른쪽으로 1발");
+    });
+    run(G, "탭: 이동 중이면 이동 방향으로, 멈춰 있으면 가장 가까운 보이는 적의 반대쪽으로 구르고, 착지 순간 가장 가까운 보이는 적을 조준(은신 적은 기준·대상 아님)", function (done) {
+      var bad = [], E = api.AUTO_AIM_ERR + 0.01;
+      var W = self.scene([self.foe("seen", 700), self.foe("hid", 400, -200, "rogue")]), hn = W.ent("hn"), hid = W.ent("hid");
+      hid.stealthUntil = W.t() + api.ULT.asDur;
+      self.fire(W, 0, false, null);
+      W.step(self.rollMs() + 100);
+      var shot = self.shots(W);
+      if (!self.near(hn.x, 400 - C.roll.dist) || !self.near(hn.y, self.y)) bad.push("멈춤 탭 착지 (" + Math.round(hn.x) + ", " + Math.round(hn.y) + ") — 보이는 적 반대쪽(왼쪽)이어야 함");
+      if (shot.length !== 1 || Math.abs(shot[0].a) > E) bad.push("멈춤 탭 볼트 방향 " + (shot[0] ? shot[0].a : "없음") + " (보이는 적은 0°)");
+      var W2 = self.scene([self.foe("seen", 700)]), hn2 = W2.ent("hn");
+      self.fire(W2, Math.PI, false, 0);
+      W2.step(self.rollMs() + 100);
+      var shot2 = self.shots(W2), want = Math.atan2(self.y - hn2.y, 700 - hn2.x);
+      if (!self.near(hn2.x, 400 + C.roll.dist) || !self.near(hn2.y, self.y)) bad.push("이동 탭 착지 (" + Math.round(hn2.x) + ", " + Math.round(hn2.y) + ") — 이동 방향(오른쪽, 적 쪽)이어야 함");
+      if (shot2.length !== 1 || self.angleGap(shot2[0].a, want) > E) bad.push("이동 탭 볼트 방향 " + (shot2[0] ? shot2[0].a : "없음"));
+      var W3 = self.scene([self.foe("far", 900)], 300), hn3 = W3.ent("hn"); hn3.angle = Math.PI / 2;
+      self.fire(W3, Math.PI / 2, false, null);
+      W3.step(self.rollMs() + 100);
+      var shot3 = self.shots(W3);
+      if (shot3.length !== 1 || Math.abs(shot3[0].a - Math.PI / 2) > 0.011) bad.push("사거리 밖 적만 있을 때 바라보던 방향이 아님 " + (shot3[0] ? shot3[0].a : ""));
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "멈춤 탭: 은신 적은 무시하고 보이는 적 반대쪽으로 굴러 그 적에게, 이동 탭: 이동 방향으로 굴러 착지 자리에서 적에게, 사거리 밖 적만 있으면 바라보던 방향으로");
+    });
+  }
+  registerStops() {
+    var self = this, api = this.api, run = this.kit.run, G = HunterTests.GROUP, C = this.C;
+    run(G, "벽 앞에서 구르면 벽에서 멈추고 그 자리에서 쏘는가", function (done) {
+      self.kit.world("forest", []);
+      var q = self.kit.singleRowWall(), y0 = q.y + q.h / 2 + api.BODY_R + 30, bad = [], worst = null;
+      var W = self.scene([], q.x, y0), hn = W.ent("hn");
+      self.fire(W, Math.PI / 2, true, -Math.PI / 2);
+      W.step(self.rollMs() + 100, self.kit.FRAME, function () { var why = self.kit.blockedAt(hn.x, hn.y); if (why && !worst) worst = why; });
+      var shot = self.shots(W), edge = q.y + q.h / 2 + api.BODY_R;
+      if (worst) bad.push(worst);
+      if (hn.y < edge - 2 || hn.y > y0 - 20) bad.push("멈춘 y " + Math.round(hn.y) + " (벽 앞 " + Math.round(edge) + ")");
+      if (shot.length !== 1 || !self.near(shot[0].y, hn.y, 1.5)) bad.push("벽 앞에서 쏘지 않음");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "벽에서 " + Math.round(y0 - edge) + " 떨어진 곳에서 위로 굴러 벽 앞 y≈" + Math.round(edge) + " 에서 멈춘 뒤 1발");
+    });
+    run(G, "아르카 결계에 갇힌 채 구르면 결계 끝에서 멈추는가(끝 닿음 기절로 그 공격은 취소)", function (done) {
+      var W = self.scene([]), hn = W.ent("hn"), t = W.t(), lim = api.ULT.akR - hn.hitR, bad = [], far = 0;
+      hn.barrierTrap = { owner: "nobody", bid: 1, x: 400 - 60, y: self.y, r: api.ULT.akR, until: t + 5000, lim: lim, edgeAt: 0, pull: null };
+      self.fire(W, Math.PI, true, 0);
+      W.step(self.rollMs() + 100, self.kit.FRAME, function () { far = Math.max(far, Math.hypot(hn.x - (400 - 60), hn.y - self.y)); });
+      if (far > lim + 1) bad.push("결계 밖으로 " + Math.round(far) + " (한계 " + Math.round(lim) + ")");
+      if (hn.roll) bad.push("구르기가 남음");
+      if (self.shots(W).length) bad.push("기절했는데 볼트가 나감");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "중심에서 가장 멀리 " + Math.round(far) + "(한계 " + Math.round(lim) + ")에서 멈춤, 끝 닿음 기절로 공격 취소");
+    });
+    run(G, "구르는 중 기절·밀려남·사슬 끌림이면 구르기와 그 공격이 취소되는가", function (done) {
+      var bad = [], cases = {
+        "기절": function (W, hn) { api.afflict(hn, { stunMs: 500 }, "nobody"); },
+        "밀려남": function (W, hn) { hn.shove = { ux: 0, uy: 1, dist: 40, at: W.t(), done: 0 }; },
+        "사슬 끌림": function (W, hn) { hn.hookPull = { sx: hn.x, sy: hn.y, ux: 0, uy: 1, dist: 60, at: W.t(), owner: "nobody", castX: hn.x, castY: hn.y + 200, stunSet: 0, revealSet: 0 }; }
+      };
+      Object.keys(cases).forEach(function (name) {
+        var W = self.scene([]), hn = W.ent("hn");
+        self.fire(W, 0, true, Math.PI);
+        W.step(self.kit.FRAME * 4);
+        var x = hn.x;
+        cases[name](W, hn);
+        W.step(self.rollMs() + 300);
+        if (hn.roll || self.shots(W).length) bad.push(name + ": 취소 안 됨");
+        if (hn.x < x - 2) bad.push(name + ": 끊긴 뒤에도 계속 구름");
+      });
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "세 경우 모두 구르기가 그 자리에서 끝나고 볼트가 나가지 않음");
+    });
+  }
+  registerSkill() {
+    var self = this, api = this.api, run = this.kit.run, G = HunterTests.GROUP, C = this.C, U = this.U;
+    run(G, "스킬: " + api.secs(U.hnDur) + "간 공격 간격 " + api.secs(U.hnCd) + "·피해 " + Math.round(C.dmg * (1 + U.hnDmgRate)) + "(스킬 피해)·이동 +" + api.shownSpeed(U.hnSpeed) + ", 게이지 0, 끝나면 " + api.secs(C.cd) + "·" + C.dmg + "·" + api.shownSpeed(C.speed) + " 으로 돌아오는가", function (done) {
+      var W = self.scene([self.foe("f", 700)], 400, null, api.GAUGE_MAX), hn = W.ent("hn"), f = W.ent("f"), bad = [];
+      var base = api.speedOf(hn);
+      hn.cdUntil = W.t() + C.cd;
+      api.useUlt(hn, 0);
+      if (!self.near(hn.cdUntil - W.t(), U.hnCd, 1)) bad.push("쓰는 순간 남은 간격 " + Math.round(hn.cdUntil - W.t()) + " (기대 " + U.hnCd + ")");
+      if (!self.near(api.speedOf(hn) - base, U.hnSpeed, 0.01)) bad.push("이동 증가 " + api.shownSpeed(api.speedOf(hn) - base));
+      self.fire(W, 0, true, null);
+      if (!self.near(hn.cdDur, U.hnCd, 0.5)) bad.push("공격 간격 " + api.secs(hn.cdDur));
+      W.step(self.rollMs() + 700);
+      var want = Math.round(C.dmg * (1 + U.hnDmgRate));
+      if (self.lost(f) !== want) bad.push("피해 " + self.lost(f) + " (기대 " + want + ")");
+      if (hn.skillDmg !== want) bad.push("스킬 피해 집계 " + hn.skillDmg);
+      if (hn.gauge !== 0) bad.push("지속 중 게이지 " + hn.gauge);
+      W.step(U.hnDur);
+      var f0 = f.hp;
+      hn.x = 400; hn.y = self.y;
+      self.fire(W, 0, true, null);
+      if (!self.near(hn.cdDur, C.cd, 0.5)) bad.push("끝난 뒤 간격 " + api.secs(hn.cdDur));
+      W.step(self.rollMs() + 900);
+      if (f0 - f.hp !== C.dmg) bad.push("끝난 뒤 피해 " + (f0 - f.hp));
+      if (!self.near(api.speedOf(hn), base, 0.01)) bad.push("끝난 뒤 이동 " + api.shownSpeed(api.speedOf(hn)));
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "스킬 중 간격 " + api.secs(U.hnCd) + "·피해 " + want + "(스킬 피해)·이동 +" + api.shownSpeed(U.hnSpeed) + "·게이지 0, 끝나면 " + api.secs(C.cd) + "·" + C.dmg + "·" + api.shownSpeed(base));
+    });
+    run(G, "스킬 은신: 구르는 " + api.secs(C.roll.ms) + " 동안만 적에게 안 보이고 쏘는 순간 보이며, 구르기가 끊기면 바로 보이는가(스킬 밖 구르기는 안 숨음)", function (done) {
+      var W = self.scene([self.foe("f", 750)], 400, null, api.GAUGE_MAX), hn = W.ent("hn"), f = W.ent("f"), bad = [];
+      self.fire(W, 0, true, null);
+      W.step(self.kit.FRAME * 3);
+      if (!api.visibleTo(hn, f, W.t())) bad.push("스킬 밖 구르기에서 숨음");
+      W.step(self.rollMs());
+      api.useUlt(hn, 0);
+      hn.x = 400; hn.y = self.y;
+      self.fire(W, 0, true, null);
+      var hidden = 0, seen = 0, shotSeen = null;
+      W.step(self.rollMs() + 100, self.kit.FRAME, function (t) {
+        var vis = api.visibleTo(hn, f, t);
+        if (hn.roll) { if (vis) seen++; else hidden++; }
+        else if (shotSeen === null) shotSeen = vis;
+      });
+      if (seen || !hidden) bad.push("구르는 동안 보인 프레임 " + seen + "/" + (seen + hidden));
+      if (!shotSeen) bad.push("쏘는 순간 안 보임");
+      hn.x = 400; hn.y = self.y;
+      self.fire(W, 0, true, null);
+      W.step(self.kit.FRAME * 3);
+      var hiddenBefore = !api.visibleTo(hn, f, W.t());
+      api.afflict(hn, { stunMs: 300 }, "f"); W.frame(self.kit.FRAME);
+      if (!hiddenBefore) bad.push("두 번째 구르기에서 숨지 않음");
+      if (!api.visibleTo(hn, f, W.t())) bad.push("구르기가 끊겼는데 숨어 있음");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "스킬 밖 구르기는 보임, 스킬 중 구르는 " + hidden + "프레임 모두 숨고 쏘는 순간 보임, 기절로 끊기면 바로 보임");
+    });
+  }
+  registerEchoAndAura() {
+    var self = this, api = this.api, run = this.kit.run, G = HunterTests.GROUP, C = this.C, V = api.HunterEchoView;
+    run(G, "그림자 잔상: 스킬 중 구르기마다 시작 자리에 생겨 " + api.secs(V.LIFE_MS) + " 뒤 사라지고 헌터당 " + V.PER_HUNTER + "개를 넘지 않으며, 스킬 밖 구르기는 잔상이 없는가", function (done) {
+      var W = self.scene([], 400, null, api.GAUGE_MAX), hn = W.ent("hn"), bad = [], echoes = function () { return api.FIELD.hunterEchoes.filter(function (r) { return r.e.owner === "hn"; }); };
+      self.fire(W, 0, true, null); W.frame(self.kit.FRAME);
+      if (echoes().length) bad.push("스킬 밖 구르기에 잔상");
+      W.step(self.rollMs() + 100);
+      api.useUlt(hn, 0);
+      var sx = hn.x;
+      self.fire(W, 0, true, null); W.frame(self.kit.FRAME);
+      var first = echoes()[0];
+      if (!first || !self.near(first.e.x, sx, 1)) bad.push("시작 자리 잔상 없음");
+      var most = 0;
+      for (var i = 0; i < 4; i++) { W.step(self.rollMs() + 20, self.kit.FRAME, function () { most = Math.max(most, echoes().length); }); self.fire(W, 0, true, null); }
+      W.frame(self.kit.FRAME); most = Math.max(most, echoes().length);
+      if (most > V.PER_HUNTER) bad.push("잔상 " + most + "개");
+      W.step(V.LIFE_MS + self.rollMs() + 50);
+      if (echoes().length) bad.push(api.secs(V.LIFE_MS) + " 뒤에도 잔상 " + echoes().length + "개");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "스킬 밖 0개, 스킬 중 시작 자리에 생기고 연속 구르기에도 최대 " + most + "개, " + api.secs(V.LIFE_MS) + " 뒤 0개");
+    });
+    this.kit.runAsync(G, "그림: 잔상은 미리 만든 " + V.PER_HUNTER + "개만 쓰고(게임 중 새 모델 0), 오라는 메시 2개 + 점 1개로 몸에 붙어 스킬 동안만 보이는가", async function (done) {
+      var W = self.scene([], 400, null, api.GAUGE_MAX), hn = W.ent("hn"), view = api.HUNTER_ECHOES, bad = [];
+      for (var wait = 0; wait < 40 && !api.FIGHTER_VIEW.makeVis(hn, new api.THREE.Group()).kit; wait++) await new Promise(function (r) { setTimeout(r, 100); });
+      var v = api.FIGHTER_VIEW.makeVis(hn, new api.THREE.Group());
+      if (!v.kit) { done("info", "모델을 4초 안에 못 읽어 건너뜀"); return; }
+      view.dropAll(); view.prefill(V.PER_HUNTER);
+      var built = view.built;
+      api.useUlt(hn, 0);
+      for (var i = 0; i < 5; i++) { self.fire(W, 0, true, null); W.frame(self.kit.FRAME); view.render(W.t(), performance.now()); W.step(self.rollMs() + 20); }
+      view.render(W.t(), performance.now());
+      var live = api.FIELD.hunterEchoes.filter(function (r) { return r.vis; }).length;
+      if (view.built !== built) bad.push("게임 중 잔상 모델 " + (view.built - built) + "개 새로 만듦");
+      if (live > V.PER_HUNTER) bad.push("그려진 잔상 " + live + "개");
+      view.dropAll();
+      var aura = v.skillAura && v.skillAura.vis, meshes = 0, points = 0;
+      if (!aura) bad.push("오라 없음");
+      else {
+        aura.root.traverse(function (o) { if (o.isPoints) points++; else if (o.isMesh) meshes++; });
+        if (meshes !== 2 || points !== 1) bad.push("오라 메시 " + meshes + "·점 " + points);
+        var p = aura.root; while (p && p !== v.root) p = p.parent;
+        if (!p) bad.push("오라가 몸 그룹에 붙지 않음(은신 때 함께 숨지 않음)");
+        var now = performance.now();
+        v.skillAura.update(api.CHAR_TYPES.of("hunter").skillAuraOn(hn, W.t()), now); v.skillAura.update(true, now + 200);
+        if (!aura.root.visible) bad.push("스킬 중 오라가 안 보임");
+        for (var off = 1; off <= 6; off++) v.skillAura.update(false, now + 200 + off * 100);
+        if (aura.root.visible) bad.push("끝난 뒤 오라가 남음");
+      }
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "구르기 5번에 새 모델 0·그려진 잔상 " + live + "개 이하, 오라 메시 2·점 1(몸 그룹에 붙음), 켜고 끄기 정상");
+    });
+  }
+  registerPassive() {
+    var self = this, api = this.api, run = this.kit.run, G = HunterTests.GROUP, C = this.C, U = this.U, H = C.hunt;
+    run(G, "패시브: 처치·어시스트 각각 " + api.secs(H.ms) + "간 공격력 " + Math.round(H.dmgRate * 100) + "%(" + C.dmg + " → " + Math.round(C.dmg * (1 + H.dmgRate)) + ")·이동 +" + api.shownSpeed(H.speed) + ", 스킬과 겹치면 " + Math.round(C.dmg * (1 + H.dmgRate + U.hnDmgRate)) + "·+" + api.shownSpeed(H.speed + U.hnSpeed) + ", 다시 관여하면 시간만 새로, 해골 처치는 무효인가", function (done) {
+      var bad = [], shot = function (W, x) { var f = W.ent("t" + x), h0 = f.hp; self.fire(W, 0, true, null); W.step(self.rollMs() + 800); return h0 - f.hp; };
+      var W = self.scene([self.foe("v", 300, 200), self.foe("t1", 700), { id: "al", team: "blue", char: "knight", x: 300, y: self.y + 300 }, self.foe("v2", 300, 250)], 400, null, 0), hn = W.ent("hn"), base = api.speedOf(hn);
+      api.damage(W.ent("v"), 9999, "hn", 1, null);
+      var until = hn.huntUntil - W.t();
+      if (!self.near(until, H.ms, 1)) bad.push("처치 뒤 지속 " + Math.round(until));
+      if (!self.near(api.speedOf(hn) - base, H.speed, 0.01)) bad.push("처치 뒤 이동 +" + api.shownSpeed(api.speedOf(hn) - base));
+      var hit1 = shot(W, 1), want1 = Math.round(C.dmg * (1 + H.dmgRate));
+      if (hit1 !== want1) bad.push("처치 뒤 피해 " + hit1 + " (기대 " + want1 + ")");
+      W.step(H.ms);
+      if (hn.huntUntil > W.t()) bad.push(api.secs(H.ms) + " 뒤에도 남음");
+      api.damage(W.ent("v2"), 5, "hn", 1, null); api.damage(W.ent("v2"), 9999, "al", 1, null);
+      if (!(hn.huntUntil > W.t())) bad.push("어시스트로 안 켜짐");
+      var t1 = hn.huntUntil; W.step(1000);
+      var W2 = self.scene([self.foe("v3", 300, 200), self.foe("t1", 700)], 400, null, api.GAUGE_MAX), hn2 = W2.ent("hn"), base2 = api.speedOf(hn2);
+      api.useUlt(hn2, 0);
+      api.damage(W2.ent("v3"), 9999, "hn", 1, null);
+      var both = Math.round(C.dmg * (1 + H.dmgRate + U.hnDmgRate));
+      if (!self.near(api.speedOf(hn2) - base2, H.speed + U.hnSpeed, 0.01)) bad.push("겹친 이동 +" + api.shownSpeed(api.speedOf(hn2) - base2));
+      var hit2 = shot(W2, 1);
+      if (hit2 !== both) bad.push("겹친 피해 " + hit2 + " (기대 " + both + ")");
+      var before = hn2.huntUntil; W2.step(1000);
+      W2.room.ref.child("hits/hn").push({ d: 0, b: 0, t: W2.t(), as: 1 });
+      if (!self.near(hn2.huntUntil - W2.t(), H.ms, 1) || hn2.huntUntil <= before) bad.push("다시 관여해도 시간이 새로 시작하지 않음");
+      var W3 = self.scene([self.foe("nc", 800, 0, "necro")], 400, null, 0), hn3 = W3.ent("hn");
+      W3.ent("nc").gauge = api.GAUGE_MAX; api.useUlt(W3.ent("nc"), Math.PI); W3.step(api.ULT.smRiseMs + 100);
+      var minion = (W3.ent("nc").minions || [])[0];
+      if (!minion) bad.push("시험 준비 실패: 해골 없음");
+      else { api.damage(minion, 9999, "hn", 1, null); if (hn3.huntUntil > W3.t()) bad.push("해골 처치로 켜짐"); }
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "처치·어시스트 " + api.secs(H.ms) + "·피해 " + want1 + "·이동 +" + api.shownSpeed(H.speed) + ", 스킬과 겹쳐 " + both + "·+" + api.shownSpeed(H.speed + U.hnSpeed) + ", 다시 관여하면 시간만 새로, 해골 무효");
+    });
+  }
+  registerCardAndBot() {
+    var self = this, api = this.api, run = this.kit.run, G = HunterTests.GROUP, C = this.C, U = this.U, H = C.hunt;
+    run(G, "카드: 기본 공격·패시브·스킬 설명과 능력치 표가 수치에서 만들어지는가", function (done) {
+      var bad = [], basic = api.basicDesc("hunter"), pas = api.passiveDesc("hunter"), ult = api.ultDesc("hunter"), table = api.statTable("hunter");
+      var wantBasic = "이동 방향으로 " + C.roll.dist + " 구른 뒤 조준한 방향으로 " + C.dmg + "의 피해. 멈춰 있으면 조준 반대쪽으로 구름";
+      var wantUlt = api.secs(U.hnDur) + "간 공격속도 " + Math.round((C.cd / U.hnCd - 1) * 100) + "%·공격력 " + Math.round(U.hnDmgRate * 100) + "%·이동속도 " + api.shownSpeed(U.hnSpeed) + " 증가. 지속 중 구르는 동안 은신";
+      var wantPas = "처치 관여 시 " + api.secs(H.ms) + "간 공격력 " + Math.round(H.dmgRate * 100) + "%·이동속도 " + api.shownSpeed(H.speed) + " 증가";
+      if (basic !== wantBasic) bad.push("기본 공격 '" + basic + "'");
+      if (ult !== wantUlt) bad.push("스킬 '" + ult + "'");
+      if (pas !== wantPas) bad.push("패시브 '" + pas + "'");
+      if (ult !== "6초간 공격속도 50%·공격력 30%·이동속도 30 증가. 지속 중 구르는 동안 은신") bad.push("스킬 문구가 지시와 다름");
+      ["<td>" + C.hp + "</td>", "<td>" + C.dmg + " / " + Math.round(C.dmg * (1 + U.hnDmgRate)) + "</td>", "<td>1.2 / 0.8초</td>", "<td>130</td>", "<td>" + C.range + "</td>", "<td>" + C.ultName + "</td>"].forEach(function (w) { if (table.indexOf(w) < 0) bad.push("표에 " + w + " 없음"); });
+      if ([basic, ult, pas].some(function (s) { return /\.$/.test(s); })) bad.push("끝 마침표");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "스킬 '" + ult + "' / 패시브 '" + pas + "'");
+    });
+    run(G, "AI: 가까운 적은 뒤로, 먼 적은 옆으로 구르고(막히면 덜 막힌 옆), 사거리 안 적이 있으면 스킬을 쓰는가", function (done) {
+      var bad = [], bot = api.HUNTER_BOT;
+      var W = self.scene([self.foe("f", 600)], 400, null, 0), hn = W.ent("hn"), f = W.ent("f");
+      var near = bot.rollAngle(hn, f, 200), far = bot.rollAngle(hn, f, 380);
+      if (self.angleGap(near, Math.PI) > 0.01) bad.push("가까운 적에서 구르는 방향 " + near.toFixed(2));
+      if (Math.abs(self.angleGap(far, 0) - Math.PI / 2) > 0.01) bad.push("먼 적에서 구르는 방향 " + far.toFixed(2));
+      self.kit.world("forest", []);
+      var q = self.kit.singleRowWall(), Wq = self.scene([{ id: "f", team: "red", char: "knight", x: q.x, y: q.y + q.h / 2 + api.BODY_R + 30 + 150 }], q.x, q.y + q.h / 2 + api.BODY_R + 30, 0);
+      var blocked = bot.rollAngle(Wq.ent("hn"), Wq.ent("f"), 150);
+      if (Math.abs(self.angleGap(blocked, Math.PI / 2) - Math.PI / 2) > 0.01) bad.push("벽 쪽이 막혔는데 구르는 방향 " + blocked.toFixed(2));
+      var W2 = self.scene([self.foe("f", 750)], 400, null, api.GAUGE_MAX), hn2 = W2.ent("hn");
+      hn2.bot.seenAt = W2.t() - 2000;
+      bot.act(hn2, W2.ent("f"), W2.t());
+      if (!(hn2.buffUntil > W2.t())) bad.push("사거리 안 적이 있는데 스킬을 안 씀");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "가까운 적 → 뒤로, 먼 적 → 옆으로, 벽에 막힌 뒤쪽 → 옆으로, 사거리 안 적에 스킬 사용");
     });
   }
 }

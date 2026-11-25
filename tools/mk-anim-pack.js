@@ -41,6 +41,10 @@ const PACKS = {
     { file: "Rig_Medium_General.glb", clips: ["Hit_B", "Spawn_Ground"] },
     { file: "Rig_Medium_Simulation.glb", clips: ["Cheering"] }
   ],
+  teambattle: [
+    { file: "Rig_Medium_MovementAdvanced.glb", clips: ["Dodge_Forward"] },
+    { file: "Rig_Medium_CombatRanged.glb", clips: ["Ranged_1H_Shoot", "Ranged_1H_Aiming"] }
+  ],
   snow: [
     { file: "Rig_Medium_General.glb", clips: ["Interact", "Spawn_Air", "Hit_B"] },
     { file: "Rig_Medium_MovementBasic.glb", clips: ["Jump_Idle", "Jump_Land"] },
@@ -108,6 +112,15 @@ class AnimationPack {
   }
 
   copyAccessor(glb, index) {
+    this.copied = this.copied || new Map();
+    if (!this.copied.has(glb)) this.copied.set(glb, new Map());
+    const seen = this.copied.get(glb);
+    if (seen.has(index)) return seen.get(index);
+    seen.set(index, this.copyFresh(glb, index));
+    return seen.get(index);
+  }
+
+  copyFresh(glb, index) {
     const { accessor, bytes } = glb.accessorBytes(index);
     const padding = (4 - (bytes.length % 4)) % 4;
     this.chunks.push(bytes, Buffer.alloc(padding));
@@ -141,8 +154,12 @@ class AnimationPack {
   }
 }
 
+const KEEPS_OLD_CLIPS = ["teambattle"];
 const files = WANTED.map((entry) => ({ entry, glb: new GlbFile(path.join(SOURCE_DIRECTORY, entry.file)) }));
-const pack = new AnimationPack(files[0].glb.json);
+const added = new Set([].concat(...WANTED.map((entry) => entry.clips)));
+const old = KEEPS_OLD_CLIPS.includes(process.argv[4]) && fs.existsSync(OUTPUT_FILE) ? new GlbFile(OUTPUT_FILE) : null;
+const pack = new AnimationPack((old || files[0].glb).json);
+if (old) old.json.animations.filter((animation) => !added.has(animation.name)).forEach((animation) => pack.addClip(old, animation.name));
 files.forEach(({ entry, glb }) => entry.clips.forEach((clip) => pack.addClip(glb, clip)));
 fs.mkdirSync(path.dirname(OUTPUT_FILE), { recursive: true });
 fs.writeFileSync(OUTPUT_FILE, pack.toGlb());
