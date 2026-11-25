@@ -775,7 +775,10 @@ class ResultCollector {
     wr.hp = 100000; wr.maxHp = 100000; wr.cdUntil = Infinity;
     nc.minions.forEach(function (m) { m.x = 380; m.y = y; m.cdUntil = 0; });
     var from = W.t();
-    W.step(api.ULT.smFrenzyMs + 2500);
+    W.step(api.ULT.smFrenzyMs - 100);
+    if (nc.gauge !== 0) bad.push("스킬 중 게이지가 참 " + nc.gauge);
+    W.step(2600);
+    if (!(nc.gauge > 0)) bad.push("스킬이 끝난 뒤 게이지가 안 참");
     var swings = W.log.filter(function (p) { return p.path === "meleeHits" && p.v.m && p.v.owner === "nc" && p.v.createdAt >= from; });
     function gapsOf(lo, hi) {
       var byMi = {}, gaps = [];
@@ -787,6 +790,27 @@ class ResultCollector {
     if (!fast || Math.abs(fast - want) > 40) bad.push("스킬 중 공격 간격 " + Math.round(fast) + " (기대 " + Math.round(want) + ")");
     if (!slow || Math.abs(slow - api.ULT.smCd) > 40) bad.push("끝난 뒤 공격 간격 " + Math.round(slow) + " (기대 " + api.ULT.smCd + ")");
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "해골 " + api.ULT.smCount + "마리·체력 가득, 공격 간격 " + Math.round(fast) + " → " + Math.round(slow));
+  });
+
+  run(PASSIVE, "네크로 해골: 한 자리에 몰려도 서로 겹치지 않게 벌어지고, 공격 대상을 둘러싸는가", function (done) {
+    var y = OPEN_Y.forest, bad = [];
+    var W = world("forest", [{ id: "nc", team: "blue", char: "necro", x: 100, y: y }, { id: "foe", team: "red", char: "guardian", x: 320, y: y }]), nc = W.ent("nc"), foe = W.ent("foe");
+    W.step(api.ULT.smRiseMs + 100);
+    foe.maxHp = 100000; foe.hp = 100000; foe.cdUntil = Infinity;
+    nc.minions.forEach(function (m) { m.x = 220; m.y = y; m.cdUntil = Infinity; });
+    W.step(2500);
+    var list = nc.minions, gap = Infinity, angles = [];
+    for (var i = 0; i < list.length; i++) {
+      angles.push(Math.atan2(list[i].y - foe.y, list[i].x - foe.x));
+      for (var j = i + 1; j < list.length; j++) gap = Math.min(gap, hyp(list[i].x - list[j].x, list[i].y - list[j].y));
+    }
+    if (gap < 30) bad.push("해골끼리 가장 가까운 거리 " + Math.round(gap));
+    angles.sort(function (a, b) { return a - b; });
+    var widest = 0;
+    angles.forEach(function (a, i) { var next = i + 1 < angles.length ? angles[i + 1] : angles[0] + Math.PI * 2; widest = Math.max(widest, next - a); });
+    if (widest > Math.PI * 1.1) bad.push("한쪽에 몰림(가장 큰 빈 각 " + Math.round(widest * 180 / Math.PI) + "°)");
+    if (list.some(function (m) { return hyp(m.x - foe.x, m.y - foe.y) > api.ULT.smRange + 30; })) bad.push("대상에서 먼 해골이 있음");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "해골 간격 " + Math.round(gap) + " 이상, 빈 각 " + Math.round(widest * 180 / Math.PI) + "°");
   });
 
   run(PASSIVE, "네크로 표식: 기본 공격에 맞은 적에게 해골이 뛰어들고, 네크로에서 " + api.ULT.smLeash + " 밖의 적은 쫓지 않는가", function (done) {
@@ -818,7 +842,7 @@ class ResultCollector {
       { id: "wr", team: "red", char: "warrior", x: 330, y: y, angle: Math.PI }
     ]);
     var nc = W.ent("nc"), wr = W.ent("wr"), bad = [];
-    api.useUlt(nc, 0);
+    nc.gauge = 0;
     nc.x = 150;
     W.step(api.ULT.smRiseMs + 100);
     if (!nc.minions || !nc.minions.length) { done("fail", "시험 준비 실패: 해골이 소환되지 않음"); return; }
@@ -7914,6 +7938,33 @@ class EngineerDruidTests {
       if (self.shotsOf(W).length !== count + 1) bad.push(api.secs(ULT.trCd) + " 동안 사격 " + (self.shotsOf(W).length - count) + "번");
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "반경 안 두 적 " + ULT.trDmg + "씩, 게이지 +" + ULT.trGauge * 2 + ", 기절 없음");
     });
+    run(G, "포탑 곡사 포격: 비행 시간이 " + ULT.trFlyNear + " 안은 " + api.secs(ULT.trFlyMs) + ", 사거리 끝은 " + api.secs(ULT.trFlyFarMs) + "이고 그 사이는 거리에 비례하는가", function (done) {
+      var bad = [], sys = api.TURRETS;
+      [[100, ULT.trFlyMs], [ULT.trFlyNear, ULT.trFlyMs], [ULT.trR, ULT.trFlyFarMs], [(ULT.trFlyNear + ULT.trR) / 2, Math.round((ULT.trFlyMs + ULT.trFlyFarMs) / 2)]].forEach(function (c) {
+        if (sys.flyMsFor(c[0]) !== c[1]) bad.push("거리 " + c[0] + " → " + sys.flyMsFor(c[0]) + " (기대 " + c[1] + ")");
+      });
+      var W = self.engineerWorld([{ id: "far", x: 150 + ULT.trR - 10 }]), eg = W.ent("eg");
+      api.useUlt(eg, 0); W.frame(FRAME); W.step(ULT.trWarmMs + 30);
+      var shot = self.shotsOf(W)[0];
+      if (!shot || shot.v.fly < ULT.trFlyFarMs - 30) bad.push("먼 적 비행 " + (shot && shot.v.fly));
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "가까이 " + ULT.trFlyMs + "·멀리 " + ULT.trFlyFarMs + "ms, 중간 비례");
+    });
+    run(G, "공학자 표식: 렌치에 맞은 적을 포탑이 더 가까운 적보다 먼저 쏘고, 표식이 끝나면 다시 가장 가까운 적을 쏘는가", function (done) {
+      var bad = [], W = self.engineerWorld([{ id: "near", x: 150 + 120, dy: 120 }, { id: "mk", x: 150 + 300 }]), eg = W.ent("eg");
+      ["near", "mk"].forEach(function (id) { var E = W.ent(id); E.maxHp = 100000; E.hp = 100000; E.cdUntil = Infinity; });
+      api.useUlt(eg, 0); W.frame(FRAME);
+      eg.cdUntil = 0; api.fireBasic(eg, 0);
+      for (var ms = 0; ms < 1500 && !(eg.markUntil > W.t()); ms += FRAME) W.frame(FRAME);
+      if (eg.markId !== "mk") bad.push("표식 대상 " + eg.markId);
+      var from = self.shotsOf(W).length;
+      W.step(ULT.trCd * 2 + 50);
+      var shots = self.shotsOf(W).slice(from);
+      if (!shots.length || shots.some(function (p) { return p.v.tgt !== "mk"; })) bad.push("표식 중 대상 " + shots.map(function (p) { return p.v.tgt; }).join());
+      W.step(ULT.trMarkMs);
+      var after = self.shotsOf(W).slice(-1)[0];
+      if (!after || after.v.tgt !== "near") bad.push("표식 뒤 대상 " + (after && after.v.tgt));
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "표식 적 먼저, 끝나면 가까운 적");
+    });
     run(G, "포탑 곡사 포격: 벽 너머 적도 쏘고 맞히는가", function (done) {
       var bad = [], W = self.freshWorld([{ id: "eg", team: "blue", char: "engineer", x: 275, y: 525 }, { id: "hid", team: "red", char: "guardian", x: 275, y: 325 }]), eg = W.ent("eg");
       if (api.losClear(275, 525, 275, 325)) bad.push("시험 준비 실패: 벽이 없음");
@@ -8099,13 +8150,13 @@ class EngineerDruidTests {
       if (g.dur !== ULT.drDur) bad.push("지속시간 " + g.dur + " (기대 " + ULT.drDur + ")");
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "정사각형 한 변 " + h * 2);
     });
-    run(G, "드루이드: 저절로 차는 게이지는 없고 체력도 저절로 회복하지 않는가", function (done) {
+    run(G, "드루이드 패시브: 부쉬와 상관없이 1초마다 스킬 게이지가 " + ULT.drSelfGauge + " 차오르고 체력은 회복하지 않는가", function (done) {
       var bad = [], W = self.druidWorld([]), dr = W.ent("dr"), tick = api.TIMESCALE.regenTickMs;
       dr.hp = dr.maxHp - 40; var h0 = dr.hp;
       W.step(tick * 3 + 100);
-      if (dr.gauge !== 0) bad.push("게이지 " + dr.gauge);
+      if (dr.gauge !== 3 * ULT.drSelfGauge) bad.push("게이지 " + dr.gauge + " (기대 " + 3 * ULT.drSelfGauge + ")");
       if (dr.hp !== h0) bad.push("체력이 회복됨 " + (dr.hp - h0));
-      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "3초 뒤 게이지 0, 체력 그대로");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "3초에 게이지 +" + 3 * ULT.drSelfGauge + ", 체력 그대로");
     });
     run(G, "드루이드 스킬: 자신도 부쉬 안에서 1초당 " + ULT.drHeal + " 회복하고, 부쉬가 있는 동안 게이지가 차지 않는가", function (done) {
       var bad = [], W = self.druidWorld([]), dr = W.ent("dr"), tick = api.TIMESCALE.regenTickMs;

@@ -2539,6 +2539,7 @@ SinglePassMaterials.enable(THREE);
       this.turrets.forEach(function (s) { services.turrets.render(s, t, nowMs); });
       this.groves.forEach(function (s) { services.groves.render(s, t, nowMs); });
       this.shells.forEach(function (s) { services.turrets.renderShell(s, t); });
+      services.turretShells.renderBlasts(Date.now());
       this.gales.forEach(function (g) { services.galeView.render(g, t, nowMs); });
       this.stars.forEach(function (s) { services.starfallView.render(s, t, nowMs); });
       services.hookView.render(t, nowMs);
@@ -2942,6 +2943,7 @@ SinglePassMaterials.enable(THREE);
   }
   class NecroType extends MagicShooterType {
     static MELEE = { color: 0xB07CFF, spark: "#C9A6FF" };
+    static FRENZY_GLOW = 0x6A0E0E;
     static MODEL = { file: "Necromancer", launchTip: "mainhand", portraitPlant: true, plantTurn: Math.PI / 2, right: "Skeleton_Scythe" };
     static ULT = {
       smCount: 3, smAhead: ArenaSize.KEY * 1, smSide: 38, smHp: 60, smSpeed: GameTime.gameSpeed(180), smGauge: 0.5, smDmg: 10, smCd: 800, smRange: 80,
@@ -2958,13 +2960,13 @@ SinglePassMaterials.enable(THREE);
     get hasSkillClip() { return true; }
     playSkillClip(v, E, t) { var services = this.services; services.fighterMotion.playOnce(v, "Ranged_Magic_Summon", 3.2, t); }
     get shotName() { return "에너지 구"; }
-    get startsSkillTimer() { return false; }
     attackClip(v, E, t) {
       return ["Melee_2H_Attack_Slice", 2];
     }
     cast(E, ang, reach, t) { var services = this.services;
       E.angle = ang;
       E.ultUntil = t + 450;
+      E.skillDur = NecroType.ULT.smFrenzyMs;
       services.minions.summonMinions(E, ang, t);
     }
     stepPassive(T, t) { var services = this.services;
@@ -2977,11 +2979,7 @@ SinglePassMaterials.enable(THREE);
       var up = (B.minions || []).filter(function (m) { return m.alive && m.hp > m.maxHp * 0.5; }).length;
       return up < NecroType.ULT.smCount;
     }
-    onShotHitShown(d, T) { var services = this.services;
-      var A = services.targets.ent(d.owner);
-      if (d.isSkill || !A || !services.turrets.isOwnerLocal(d.owner)) return;
-      A.markId = T.id; A.markAt = services.clock.now(); A.markUntil = A.markAt + NecroType.ULT.smMarkMs;
-    }
+    onShotHitShown(d, T) { this.services.focusMarks.note(d, T); }
     ultDesc() { var services = this.services;
       return "해골 병사를 " + NecroType.ULT.smCount + "마리로 채우고 체력을 모두 회복. " + services.skilltext.secs(NecroType.ULT.smFrenzyMs) + "간 해골의 공격속도 " + Math.round(NecroType.ULT.smFrenzyRate * 100) + "% 증가. 해골이 적을 공격할 때마다 게이지 " + NecroType.ULT.smGauge + " 회복";
     }
@@ -3580,7 +3578,8 @@ SinglePassMaterials.enable(THREE);
   class EngineerType extends CharacterType {
     static MODEL = { file: "Engineer", right: "engineer_Wrench" };
     static ULT = {
-      trDur: GameTime.gameMs(15), trR: 500, trCd: GameTime.gameMs(1), trScanMs: 120, trWarmMs: 300, trDmg: 30, trFlyMs: GameTime.gameMs(0.4), trBlastR: 50, trArcH: 140,
+      trDur: GameTime.gameMs(15), trR: 500, trCd: GameTime.gameMs(1), trScanMs: 120, trWarmMs: 300, trDmg: 20, trFlyMs: GameTime.gameMs(0.4), trFlyFarMs: GameTime.gameMs(0.8), trFlyNear: 300,
+      trBlastR: 50, trArcH: 140, trMarkMs: GameTime.gameMs(4),
       trMax: 2, trGauge: 1, trSpeedBonus: GameTime.gameSpeed(30), trCast: 300, trCastMs: 450
     };
     static STATS = { name: "공학자", role: "shooter", icon: "🔧", hp: 105, speed: GameTime.gameSpeed(140), cd: GameTime.gameMs(1), dmg: 10, range: 350, pSpeed: 760, pr: 9, ultName: "포탑 설치", ultAim: true, startGauge: MatchRules.GAUGE_MAX };
@@ -3589,6 +3588,7 @@ SinglePassMaterials.enable(THREE);
     get startsSkillTimer() { return false; }
     get shotSound() { return "star"; }
     get shotName() { return "렌치"; }
+    onShotHitShown(d, T) { this.services.focusMarks.note(d, T); }
     launchHandOf(model) { return model.getObjectByName("muzzle") || model.getObjectByName("handslotr"); }
     botUltRange() { return EngineerType.ULT.trR; }
     botUltSpot(B, target, td, t) { var k = Math.min(1, EngineerType.ULT.trCast * 0.7 / Math.max(1, td)); return { x: B.x + (target.x - B.x) * k, y: B.y + (target.y - B.y) * k }; }
@@ -3629,10 +3629,10 @@ SinglePassMaterials.enable(THREE);
     }
     ultDesc() { var services = this.services;
       return "거리 " + EngineerType.ULT.trCast + " 안에 " + services.skilltext.secs(EngineerType.ULT.trDur) + "간 유지되는 포탑 설치(최대 " + EngineerType.ULT.trMax + "개). 포탑은 사거리 " + EngineerType.ULT.trR + " 안의 가장 가까운 적에게 " + services.skilltext.secs(EngineerType.ULT.trCd) + "마다 포탄을 쏘아 " +
-      services.skilltext.secs(EngineerType.ULT.trFlyMs) + " 뒤 반경 " + EngineerType.ULT.trBlastR + "에 " + EngineerType.ULT.trDmg + "의 피해. 적중마다 게이지 " + EngineerType.ULT.trGauge + " 회복";
+      services.skilltext.secs(EngineerType.ULT.trFlyMs) + "~" + services.skilltext.secs(EngineerType.ULT.trFlyFarMs) + " 뒤 반경 " + EngineerType.ULT.trBlastR + "에 " + EngineerType.ULT.trDmg + "의 피해. 적중마다 게이지 " + EngineerType.ULT.trGauge + " 회복";
     }
     passiveDesc() { var services = this.services;
-      return "게이지가 가득 찬 채로 시작. 포탑마다 사거리 안에서 이동속도 " + services.skilltext.shownSpeed(EngineerType.ULT.trSpeedBonus) + " 증가(두 포탑 범위가 겹치면 " + services.skilltext.shownSpeed(EngineerType.ULT.trSpeedBonus * 2) + ")";
+      return "게이지가 가득 찬 채로 시작. 렌치에 맞은 적은 " + services.skilltext.secs(EngineerType.ULT.trMarkMs) + "간 포탑이 먼저 포격. 포탑마다 사거리 안에서 이동속도 " + services.skilltext.shownSpeed(EngineerType.ULT.trSpeedBonus) + " 증가(두 포탑 범위가 겹치면 " + services.skilltext.shownSpeed(EngineerType.ULT.trSpeedBonus * 2) + ")";
     }
     basicDesc() {
       var c = this.data;
@@ -3645,7 +3645,7 @@ SinglePassMaterials.enable(THREE);
   class DruidType extends MagicShooterType {
     static MODEL = { file: "Druid", launchTip: "mainhand", portraitPlant: true, right: "druid_staff" };
     static ULT = {
-      drR: 175, drDur: GameTime.gameMs(10), drTick: GameTime.gameMs(1), drHeal: 20, drCast: 450, drMin: 60, drSnareMs: GameTime.gameMs(0.3), drRiseMs: 350, drCastMs: 500
+      drR: 175, drDur: GameTime.gameMs(10), drTick: GameTime.gameMs(1), drHeal: 20, drCast: 450, drMin: 60, drSelfGauge: 1, drSnareMs: GameTime.gameMs(0.3), drRiseMs: 350, drCastMs: 500
     };
     static STATS = { name: "드루이드", role: "caster", icon: "🌿", hp: 110, speed: GameTime.gameSpeed(165), cd: GameTime.gameMs(1.4), dmg: 10, range: 350, pSpeed: 1000, pr: 12, lanes: 2,
                ultName: "덩굴 부쉬", ultAim: true, heals: true };
@@ -3678,11 +3678,19 @@ SinglePassMaterials.enable(THREE);
       services.vision.revealBriefly(E.id, t);
     }
     projectileEffect(d, T, immune, fx) { return !d.isSkill && !immune && !T.minion ? { snareMs: DruidType.ULT.drSnareMs } : fx; }
+    stepPassive(T, t) { var services = this.services;
+      if (!T.alive) { T.groveNext = 0; return; }
+      if (!T.groveNext) T.groveNext = t + services.timescale.regenTickMs;
+      if (t < T.groveNext) return;
+      T.groveNext += services.timescale.regenTickMs;
+      if (!T.isGaugeLocked(t)) T.gauge = Math.min(MatchRules.GAUGE_MAX, T.gauge + DruidType.ULT.drSelfGauge);
+      services.match.game.forceNet = true;
+    }
     ultDesc() { var services = this.services;
       return services.skilltext.secs(DruidType.ULT.drDur) + "간 유지되는 " + GroveSystem.TILES_PER_SIDE + "×" + GroveSystem.TILES_PER_SIDE + " 크기의 부쉬를 설치함. 부쉬 내의 아군은 1초당 체력 " + DruidType.ULT.drHeal + " 회복";
     }
     passiveDesc() { var services = this.services;
-      return "기본 공격에 맞은 적을 " + services.skilltext.secs(DruidType.ULT.drSnareMs) + "간 속박(이동·이동 기술 사용 불가)";
+      return "1초당 스킬 게이지 " + DruidType.ULT.drSelfGauge + " 회복. 기본 공격에 맞은 적을 " + services.skilltext.secs(DruidType.ULT.drSnareMs) + "간 속박(이동·이동 기술 사용 불가)";
     }
     basicDesc() {
       var c = this.data;
@@ -5501,6 +5509,7 @@ SinglePassMaterials.enable(THREE);
       services.fxView.clear3d();
       services.match.game = { startAt: services.session.room.startAt, endSent: false, playingSent: false, lastNet: 0, sent: {}, finalSent: false, beeped: -1 };
       services.match.me = services.flow.isSpec() ? null : services.flow.makeEnt(services.session.myId, services.session.players[services.session.myId]);
+      services.flow.grantStartGauge(services.match.me);
       services.match.startRound();
       services.match.lastHp = {};
       services.remoteMotion.clear();
@@ -5512,13 +5521,17 @@ SinglePassMaterials.enable(THREE);
       Dom.show(Dom.$("endOv"), false);
     }
     isSpec() { var services = this.services; return !!services.session.players[services.session.myId] && services.session.players[services.session.myId].team === "spec"; }
+    grantStartGauge(E) { var services = this.services;
+      if (!E || services.clock.now() >= services.session.room.startAt) return;
+      E.gauge = Math.max(E.gauge || 0, services.charTypes.statsOf(E.char).startGauge || 0);
+    }
     syncRemote(dt) { var services = this.services;
       var host = services.session.isHost();
       services.targets.participants().forEach(function (id) {
         if (id === services.session.myId) return;
         var d = services.session.players[id];
         if (d.isAI && host) {
-          if (!services.match.bots[id]) { services.match.bots[id] = services.flow.makeEnt(id, d); services.match.bots[id].bot = { seed: Math.random() * 10, seenAt: 0, target: null, stuck: 0, detour: 0, detourDir: 1 }; delete services.match.remotes[id]; services.damage.listenHits(id); }
+          if (!services.match.bots[id]) { services.match.bots[id] = services.flow.makeEnt(id, d); services.flow.grantStartGauge(services.match.bots[id]); services.match.bots[id].bot = { seed: Math.random() * 10, seenAt: 0, target: null, stuck: 0, detour: 0, detourDir: 1 }; delete services.match.remotes[id]; services.damage.listenHits(id); }
           return;
         }
         var r = services.match.remotes[id], fresh = !r;
@@ -5818,6 +5831,11 @@ SinglePassMaterials.enable(THREE);
   }
 
   class MinionSystem {
+    static SURROUND_GAP = 44;
+    static SLOT_SLACK = 6;
+    static SPREAD_GAP = 36;
+    static SLOT_TRIES = 8;
+    static SLOT_TURN = Math.PI / 9;
     constructor(services) { this.services = services; }
     minionKey(E, born, n) { return E.id + "_" + born + "_" + n; }
     newMinion(E, born, n, x, y, angle) { var services = this.services;
@@ -5865,7 +5883,7 @@ SinglePassMaterials.enable(THREE);
       for (var i = 0; list.length < NecroType.ULT.smCount; i++) list.push(services.minions.placeAround(E, born, i, ang));
       E.minions = list;
     }
-    frenzied(E, t) { return E.summonAt > 0 && t - E.summonAt < NecroType.ULT.smFrenzyMs; }
+    frenzied(E, t) { return !!E && E.skillUntil > t; }
     inLeash(E, x, y) { return MathKit.hyp(x - E.x, y - E.y) <= NecroType.ULT.smLeash; }
     markedFoe(E, M, t) { var services = this.services;
       if (!(E.markUntil > t)) return null;
@@ -5922,13 +5940,18 @@ SinglePassMaterials.enable(THREE);
       var before = E.minions.length;
       E.minions = E.minions.filter(function (m) { return m.alive || t - m.diedAt < NecroType.ULT.smCorpseMs; });
       if (E.minions.length !== before) services.match.game.forceNet = true;
-      var markFresh = E.markUntil > t ? E.markAt : 0;
+      var markFresh = E.markUntil > t ? E.markAt : 0, active = [];
       E.minions.forEach(function (m) {
-        m.mv = false;
+        m.mv = false; m.foe = null;
         if (m.leap && (!m.alive || m.isStunned(t))) m.leap = null;
         if (m.leap) { services.minions.stepLeap(m, t); return; }
         if (!services.minions.minionReady(m, t) || m.isStunned(t)) return;
-        var foe = services.minions.minionFoe(m, E, t);
+        m.foe = services.minions.minionFoe(m, E, t);
+        active.push(m);
+      });
+      services.minions.assignSlots(E, active);
+      active.forEach(function (m) {
+        var foe = m.foe;
         if (foe && markFresh && m.markSeen !== markFresh && foe.id === E.markId) {
           m.markSeen = markFresh;
           if (MathKit.hyp(foe.x - m.x, foe.y - m.y) > NecroType.ULT.smRange + ArenaSize.BODY_R && services.minions.startLeap(m, foe, t)) return;
@@ -5939,8 +5962,10 @@ SinglePassMaterials.enable(THREE);
           return;
         }
         var dx = foe.x - m.x, dy = foe.y - m.y, d = MathKit.hyp(dx, dy) || 1, reach = NecroType.ULT.smRange + ArenaSize.BODY_R - 6;
-        m.angle = Math.atan2(dy, dx);
-        if (d > reach - 12) services.minions.walkMinion(m, E, dx, dy, d, dt, t);
+        var spot = services.minions.slotSpot(m, foe), sx = spot.x - m.x, sy = spot.y - m.y, sd = MathKit.hyp(sx, sy);
+        if (sd > MinionSystem.SLOT_SLACK) services.minions.walkMinion(m, E, sx, sy, sd, dt, t);
+        m.angle = Math.atan2(foe.y - m.y, foe.x - m.x);
+        d = MathKit.hyp(foe.x - m.x, foe.y - m.y);
         if (d <= reach && t >= m.cdUntil && services.physics.losClear(m.x, m.y, foe.x, foe.y)) {
           m.cdUntil = t + NecroType.ULT.smCd / (services.minions.frenzied(E, t) ? 1 + NecroType.ULT.smFrenzyRate : 1); m.atkAt = t;
           services.session.room.ref.child("meleeHits").push({ team: m.team, owner: E.id, m: 1, mi: m.n, x: MathKit.r1(m.x), y: MathKit.r1(m.y), radius: NecroType.ULT.smRange, angle: MathKit.r1(m.angle),
@@ -5948,6 +5973,38 @@ SinglePassMaterials.enable(THREE);
           if (services.targets.hear(m)) services.sound.sfx("swing");
         }
       });
+      services.minions.spreadApart(E.minions);
+    }
+    assignSlots(E, list) {
+      var groups = {};
+      list.forEach(function (m) { if (m.foe) (groups[m.foe.id] = groups[m.foe.id] || []).push(m); });
+      Object.keys(groups).forEach(function (id) {
+        var g = groups[id], foe = g[0].foe;
+        var base = Math.atan2(E.y - foe.y, E.x - foe.x), step = Math.PI * 2 / g.length;
+        g.map(function (m) { return { m: m, rel: MathKit.angDiff(Math.atan2(m.y - foe.y, m.x - foe.x), base) }; })
+          .sort(function (a, b) { return a.rel - b.rel; })
+          .forEach(function (o, i) { o.m.slotAng = base + (i - (g.length - 1) / 2) * step; });
+      });
+    }
+    slotSpot(m, foe) { var services = this.services;
+      var ring = (foe.hitR || ArenaSize.BODY_R) + MinionSystem.SURROUND_GAP;
+      for (var n = 0; n <= MinionSystem.SLOT_TRIES; n++) {
+        var turn = (n % 2 ? 1 : -1) * Math.ceil(n / 2) * MinionSystem.SLOT_TURN, a = m.slotAng + turn, spot = { x: foe.x + Math.cos(a) * ring, y: foe.y + Math.sin(a) * ring };
+        if (services.physics.bodyFitsAt(spot.x, spot.y)) return spot;
+      }
+      return { x: foe.x + Math.cos(m.slotAng) * ring, y: foe.y + Math.sin(m.slotAng) * ring };
+    }
+    spreadApart(list) { var services = this.services, gap = MinionSystem.SPREAD_GAP;
+      for (var i = 0; i < list.length; i++) for (var j = i + 1; j < list.length; j++) {
+        var a = list[i], b = list[j];
+        if (!a.alive || !b.alive || a.leap || b.leap) continue;
+        var dx = b.x - a.x, dy = b.y - a.y, d = MathKit.hyp(dx, dy);
+        if (d >= gap) continue;
+        if (d < 0.01) { dx = Math.cos(i + j); dy = Math.sin(i + j); d = 1; }
+        var push = (gap - d) / 2 / d;
+        a.x -= dx * push; a.y -= dy * push; b.x += dx * push; b.y += dy * push;
+        services.physics.resolve(a); services.physics.resolve(b);
+      }
     }
   }
 
@@ -7311,29 +7368,127 @@ SinglePassMaterials.enable(THREE);
       });
     }
   }
-  class NecroMarkView {
-    static COLOR = 0xC07CFF;
-    static SIZE = { w: 9, h: 15 };
-    static LIFT = { fighter: 112, minion: 80 };
-    constructor(services) { this.services = services; this.mesh = null; }
-    build() { var services = this.services;
-      this.mesh = new THREE.Mesh(new THREE.OctahedronGeometry(1), new THREE.MeshBasicMaterial({ color: NecroMarkView.COLOR, transparent: true, opacity: 0.92, depthWrite: false }));
-      this.mesh.scale.set(NecroMarkView.SIZE.w, NecroMarkView.SIZE.h, NecroMarkView.SIZE.w);
-      this.mesh.renderOrder = GroveSystem.RENDER_AFTER_UNITS + 1;
-      services.stage.scene.add(this.mesh);
+  class FocusMarks {
+    static STYLE = { necro: { fill: "#B57CFF", edge: "#4A1F7A" }, engineer: { fill: "#FF9A2E", edge: "#7A3A08" } };
+    static SIZE = { w: 8, h: 11 };
+    constructor(services) { this.services = services; }
+    lifeOf(char) { return char === "necro" ? NecroType.ULT.smMarkMs : char === "engineer" ? EngineerType.ULT.trMarkMs : 0; }
+    note(d, T) { var services = this.services;
+      var A = services.targets.ent(d.owner), life = A ? this.lifeOf(A.char) : 0;
+      if (d.isSkill || !life || !services.turrets.isOwnerLocal(d.owner)) return;
+      A.markId = T.id; A.markAt = services.clock.now(); A.markUntil = A.markAt + life;
     }
-    targetOf(me, t) { var services = this.services;
-      if (!me || me.char !== "necro" || !(me.markUntil > t)) return null;
-      var o = services.targets.ent(me.markId) || services.minions.allMinions().filter(function (m) { return m.key === me.markId; })[0];
-      return o && o.alive && services.vision.visibleTo(o, me, t) ? o : null;
+    unitOf(id) { var services = this.services; return services.targets.ent(id) || services.minions.allMinions().filter(function (m) { return m.key === id; })[0] || null; }
+    targetOf(A, t) { var services = this.services;
+      if (!A || !(A.markUntil > t)) return null;
+      var o = this.unitOf(A.markId);
+      return o && o.alive && (o.minion || services.vision.visibleTo(o, A, t)) ? o : null;
     }
-    render(t, nowMs) { var services = this.services;
-      var o = this.targetOf(services.match.me, t);
-      if (!o) { if (this.mesh) this.mesh.visible = false; return; }
-      if (!this.mesh || this.mesh.parent !== services.stage.scene) this.build();
-      this.mesh.visible = true;
-      this.mesh.position.set(o.x, (o.minion ? NecroMarkView.LIFT.minion : NecroMarkView.LIFT.fighter) + Math.sin(nowMs / 180) * 3, o.y);
-      this.mesh.rotation.y = nowMs / 400;
+    styleFor(U, t) { var services = this.services, me = services.match.me, style = me && FocusMarks.STYLE[me.char];
+      return style && me.markUntil > t && me.markId === U.id ? style : null;
+    }
+    draw(style, x, y, nowMs) {
+      var ctx = Canvases.overlayCtx, w = FocusMarks.SIZE.w, h = FocusMarks.SIZE.h, bob = Math.sin(nowMs / 160) * 2;
+      ctx.save();
+      ctx.beginPath(); ctx.moveTo(x, y - h + bob); ctx.lineTo(x + w, y + bob); ctx.lineTo(x, y + h + bob); ctx.lineTo(x - w, y + bob); ctx.closePath();
+      ctx.fillStyle = style.fill; ctx.fill(); ctx.lineWidth = 2.5; ctx.strokeStyle = style.edge; ctx.stroke();
+      ctx.restore();
+    }
+  }
+  class TurretShellView {
+    static SHELL_SIZE = 24;
+    static TRAIL_PUFFS = 9;
+    static TRAIL_GAP = 0.045;
+    static WARN_LIFT = 2.2;
+    static WARN_COLOR = 0xFF5A1F;
+    static BLAST_MS = 700;
+    static SMOKE_PUFFS = 8;
+    static EMBERS = 12;
+    constructor(services) { this.services = services; this.shelf = new SpareShelf(this.buildShell.bind(this)); this.blastShelf = new SpareShelf(this.buildBlast.bind(this)); this.blasts = []; this.m4 = new THREE.Matrix4(); this.q = new THREE.Quaternion(); this.v = new THREE.Vector3(); this.s = new THREE.Vector3(); }
+    mat(key, make) { var mats = this.services.matlib.mats; return mats[key] || (mats[key] = make()); }
+    puffMesh(material, count) { var mesh = new THREE.InstancedMesh(this.services.geo.ball, material, count); mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage); mesh.frustumCulled = false; return mesh; }
+    bombModel() { var services = this.services, tpl = services.models.kit.props.shellBomb, holder = new THREE.Group();
+      if (!tpl) { var ball = new THREE.Mesh(services.geo.ball, this.mat("turret-iron", function () { return new THREE.MeshLambertMaterial({ color: 0x2E3138 }); })); ball.scale.setScalar(TurretShellView.SHELL_SIZE / 2); holder.add(ball); return holder; }
+      var box = services.props.propSize(tpl), size = box.getSize(new THREE.Vector3()), mid = box.getCenter(new THREE.Vector3()), k = TurretShellView.SHELL_SIZE / Math.max(size.x, size.y, size.z), body = tpl.clone();
+      body.scale.setScalar(k); body.position.copy(mid).multiplyScalar(-k); holder.add(body);
+      return holder;
+    }
+    buildShell() { var services = this.services, g = new THREE.Group(), self = this;
+      var bomb = this.bombModel();
+      var fuse = new THREE.Mesh(services.geo.ball, services.models.glowMat("turret-fuse", 0xFFB347, 0.95)); fuse.position.y = TurretShellView.SHELL_SIZE * 0.55; bomb.add(fuse);
+      var trail = this.puffMesh(this.mat("turret-smoke", function () { return new THREE.MeshBasicMaterial({ color: 0xA49C8E, transparent: true, opacity: 0.5, depthWrite: false }); }), TurretShellView.TRAIL_PUFFS);
+      var shadow = services.arenaView.flatMesh(services.geo.disc, this.mat("turret-shadow", function () { return new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.3, depthWrite: false }); }));
+      var warn = new THREE.Group();
+      warn.add(services.arenaView.flatMesh(services.geo.poolEdge, this.mat("turret-warn-edge", function () { return new THREE.MeshBasicMaterial({ color: TurretShellView.WARN_COLOR, transparent: true, opacity: 0.9, depthWrite: false }); })));
+      var fill = services.arenaView.flatMesh(services.geo.disc, this.mat("turret-warn-fill", function () { return new THREE.MeshBasicMaterial({ color: TurretShellView.WARN_COLOR, transparent: true, opacity: 0.28, depthWrite: false }); }));
+      warn.add(fill);
+      g.add(bomb); g.add(trail); g.add(shadow); g.add(warn);
+      g.userData = { bomb: bomb, fuse: fuse, trail: trail, shadow: shadow, warn: warn, fill: fill };
+      return g;
+    }
+    buildBlast() { var services = this.services, g = new THREE.Group();
+      var flashMat = new THREE.MeshBasicMaterial({ color: 0xFFD27A, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+      var ringMat = new THREE.MeshBasicMaterial({ color: 0xFF8A3A, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+      var scorchMat = new THREE.MeshBasicMaterial({ color: 0x1A120C, transparent: true, depthWrite: false });
+      var smokeMat = new THREE.MeshLambertMaterial({ color: 0x9A9286, emissive: 0x2A2620, transparent: true, depthWrite: false });
+      var emberMat = new THREE.MeshBasicMaterial({ color: 0xFFB040, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+      var flash = new THREE.Mesh(services.geo.ball, flashMat), ring = services.arenaView.flatMesh(services.geo.ringFx, ringMat), scorch = services.arenaView.flatMesh(services.geo.disc, scorchMat);
+      var smoke = this.puffMesh(smokeMat, TurretShellView.SMOKE_PUFFS), embers = this.puffMesh(emberMat, TurretShellView.EMBERS);
+      ring.position.y = 3; scorch.position.y = 1.5;
+      g.add(scorch); g.add(ring); g.add(flash); g.add(smoke); g.add(embers);
+      g.userData = { flash: flash, ring: ring, scorch: scorch, smoke: smoke, embers: embers, mats: [flashMat, ringMat, scorchMat, smokeMat, emberMat] };
+      return g;
+    }
+    prefill(engineers) { this.shelf.prefill(engineers * 4); this.blastShelf.prefill(engineers * 3); }
+    spareRoots() { return this.shelf.spareRoots().concat(this.blastShelf.spareRoots()); }
+    arcHeight(e) { return EngineerType.ULT.trArcH * (0.8 + 0.6 * MathKit.clamp((e.fly - EngineerType.ULT.trFlyMs) / Math.max(1, EngineerType.ULT.trFlyFarMs - EngineerType.ULT.trFlyMs), 0, 1)); }
+    pointAt(e, k) {
+      return { x: e.mx + (e.tx - e.mx) * k, y: TurretSystem.MUZZLE_HEIGHT + (TurretSystem.TARGET_HEIGHT * 0.3 - TurretSystem.MUZZLE_HEIGHT) * k + 4 * this.arcHeight(e) * k * (1 - k), z: e.my + (e.ty - e.my) * k };
+    }
+    render(s, t, nowMs) { var services = this.services;
+      if (!s.shown) return;
+      var e = s.e, k = MathKit.clamp((t - e.createdAt) / e.fly, 0, 1), r = e.r || EngineerType.ULT.trBlastR;
+      if (!s.vis) s.vis = this.shelf.take(services.stage.scene);
+      var ud = s.vis.userData, at = this.pointAt(e, k), heading = -Math.atan2(e.ty - e.my, e.tx - e.mx);
+      ud.bomb.position.set(at.x, at.y, at.z); ud.bomb.rotation.set(k * 7, heading, k * 4);
+      ud.fuse.scale.setScalar(3.4 + 1.8 * Math.abs(Math.sin(nowMs / 37)));
+      for (var i = 0; i < TurretShellView.TRAIL_PUFFS; i++) {
+        var back = k - (i + 1) * TurretShellView.TRAIL_GAP, p = back > 0 ? this.pointAt(e, back) : at, size = back > 0 ? (4 + i * 1.1) * (1 - i / (TurretShellView.TRAIL_PUFFS + 2)) : 0.001;
+        this.v.set(p.x, p.y + i * 0.8, p.z); this.s.setScalar(size);
+        ud.trail.setMatrixAt(i, this.m4.compose(this.v, this.q, this.s));
+      }
+      ud.trail.instanceMatrix.needsUpdate = true;
+      ud.shadow.position.set(at.x, 0.9, at.z); ud.shadow.scale.setScalar(6 + 6 * k);
+      ud.warn.position.set(e.tx, TurretShellView.WARN_LIFT, e.ty); ud.warn.scale.setScalar(r);
+      ud.fill.scale.setScalar(0.2 + 0.8 * k);
+    }
+    drop(s) { if (!s.vis) return; this.shelf.give(s.vis); s.vis = null; }
+    blastAt(x, y, r) { if (this.services.cameraRig.renderer) this.blasts.push({ x: x, y: y, r: r, born: Date.now(), vis: null }); }
+    paintPuffs(mesh, count, place) {
+      for (var i = 0; i < count; i++) { place(i, this.v, this.s); mesh.setMatrixAt(i, this.m4.compose(this.v, this.q, this.s)); }
+      mesh.instanceMatrix.needsUpdate = true;
+    }
+    renderBlasts(nowMs) { var services = this.services, self = this;
+      this.blasts = this.blasts.filter(function (b) {
+        var f = (nowMs - b.born) / TurretShellView.BLAST_MS;
+        if (f >= 1 || !services.stage.scene) { if (b.vis) self.blastShelf.give(b.vis); return false; }
+        if (!b.vis) { b.vis = self.blastShelf.take(services.stage.scene); b.vis.position.set(b.x, 0, b.y); }
+        var ud = b.vis.userData, r = b.r, out = 1 - Math.pow(1 - f, 3), pop = Math.min(1, f * 5);
+        ud.flash.position.y = 10; ud.flash.scale.setScalar(r * (0.22 + 0.4 * pop)); ud.mats[0].opacity = 0.8 * Math.max(0, 1 - f * 3.5);
+        ud.ring.scale.setScalar(r * (0.45 + 0.85 * out)); ud.mats[1].opacity = 0.95 * (1 - f);
+        ud.scorch.scale.setScalar(r * 0.9); ud.mats[2].opacity = 0.45 * (1 - f * f);
+        ud.mats[3].opacity = 0.88 * (1 - f) * Math.min(1, f * 6);
+        self.paintPuffs(ud.smoke, TurretShellView.SMOKE_PUFFS, function (i, v, s) {
+          var a = i * Math.PI * 2 / TurretShellView.SMOKE_PUFFS + 0.3, spread = r * 0.75 * out * (0.7 + 0.3 * ((i * 7) % 5) / 5);
+          v.set(Math.cos(a) * spread, 8 + 30 * out * (0.5 + 0.5 * ((i * 3) % 4) / 4), Math.sin(a) * spread); s.setScalar((10 + 4 * ((i * 5) % 3)) * (0.45 + 1.0 * out));
+        });
+        ud.mats[4].opacity = Math.max(0, 1 - f * 1.3);
+        self.paintPuffs(ud.embers, TurretShellView.EMBERS, function (i, v, s) {
+          var a = i * Math.PI * 2 / TurretShellView.EMBERS + 0.15, fly = Math.min(1, f * 1.5), reach = r * (1 + 0.6 * ((i * 11) % 7) / 7) * fly;
+          v.set(Math.cos(a) * reach, Math.max(2, 10 + 90 * fly - 100 * fly * fly), Math.sin(a) * reach); s.setScalar(3.6 * (1 - f));
+        });
+        return true;
+      });
     }
   }
   class DurationRing {
@@ -7364,10 +7519,7 @@ SinglePassMaterials.enable(THREE);
     static MUZZLE_HEIGHT = 39;
     static MUZZLE_FORWARD = 24;
     static TARGET_HEIGHT = 34;
-    static SHELL_R = 8;
-    static WARN_LIFT = 2.2;
-    static WARN_COLOR = 0xFF5A1F;
-    constructor(services) { this.services = services; this.rangeRing = null; this.spare = { blue: [], red: [] }; this.shellShelf = new SpareShelf(this.buildShell.bind(this)); }
+    constructor(services) { this.services = services; this.rangeRing = null; this.spare = { blue: [], red: [] }; }
     isOwnerLocal(owner) { var services = this.services;
       var A = services.targets.ent(owner);
       return !!A && (A === services.match.me || (services.session.isHost() && !!services.match.bots[owner]));
@@ -7386,13 +7538,18 @@ SinglePassMaterials.enable(THREE);
       });
       return n;
     }
+    canShoot(s, o, owner, t) { var services = this.services, e = s.e;
+      if (!o || !o.alive || o.team === e.team || o.isProtected(t)) return false;
+      if (MathKit.hyp(o.x - e.x, o.y - e.y) > e.r + ArenaSize.BODY_R * 0.5) return false;
+      return o.minion || !owner || services.vision.visibleTo(o, owner, t);
+    }
     pickTarget(s, t) { var services = this.services;
-      var e = s.e, owner = services.targets.ent(e.owner), best = null, bestDist = Infinity;
+      var e = s.e, owner = services.targets.ent(e.owner), best = null, bestDist = Infinity, marked = services.focusMarks.targetOf(owner, t);
+      if (marked && services.turrets.canShoot(s, marked, owner, t)) return marked;
       services.targets.everyone(t).forEach(function (o) {
-        if (!o || !o.alive || o.team === e.team || o.isProtected(t)) return;
+        if (!services.turrets.canShoot(s, o, owner, t)) return;
         var d = MathKit.hyp(o.x - e.x, o.y - e.y);
-        if (d > e.r + ArenaSize.BODY_R * 0.5 || d >= bestDist) return;
-        if (!o.minion && owner && !services.vision.visibleTo(o, owner, t)) return;
+        if (d >= bestDist) return;
         bestDist = d; best = o;
       });
       return best;
@@ -7406,8 +7563,8 @@ SinglePassMaterials.enable(THREE);
       if (!T) { s.nextShot = t + EngineerType.ULT.trScanMs; return; }
       s.shotN++;
       s.nextShot = t + EngineerType.ULT.trCd;
-      var muzzle = services.turrets.muzzleToward(e, T);
-      services.session.room.ref.child("effects").push({ type: "tshot", team: e.team, owner: e.owner, x: e.x, y: e.y, mx: muzzle.x, my: muzzle.y, tx: Math.round(T.x), ty: Math.round(T.y), fly: EngineerType.ULT.trFlyMs, tgt: T.id,
+      var muzzle = services.turrets.muzzleToward(e, T), fly = services.turrets.flyMsFor(MathKit.hyp(T.x - e.x, T.y - e.y));
+      services.session.room.ref.child("effects").push({ type: "tshot", team: e.team, owner: e.owner, x: e.x, y: e.y, mx: muzzle.x, my: muzzle.y, tx: Math.round(T.x), ty: Math.round(T.y), fly: fly, tgt: T.id,
                                        r: EngineerType.ULT.trBlastR, dmg: EngineerType.ULT.trDmg, createdAt: t });
     }
     step(t) { var services = this.services;
@@ -7426,7 +7583,7 @@ SinglePassMaterials.enable(THREE);
     }
     land(s) { var services = this.services;
       var e = s.e;
-      services.fxView.spark(e.tx, e.ty, "#FF9A3A", 2);
+      services.turretShells.blastAt(e.tx, e.ty, e.r || EngineerType.ULT.trBlastR);
       if (services.session.room.status !== "playing") return;
       var t = services.clock.now(), radius = e.r || EngineerType.ULT.trBlastR;
       services.targets.localTargets().forEach(function (T) {
@@ -7435,47 +7592,11 @@ SinglePassMaterials.enable(THREE);
         services.damage.damage(T, e.dmg, e.owner, true, "turret", null, T.minion ? 0 : EngineerType.ULT.trGauge);
       });
     }
-    makeShellVis(s) { var services = this.services;
-      var e = s.e, g = this.shellShelf.take(services.stage.scene), r = TurretSystem.SHELL_R, ud = g.userData;
-      ud.r = r;
-      ud.core.scale.setScalar(r);
-      ud.tail.scale.set(0.01, r * 0.5, r * 0.5);
-      ud.warn.scale.setScalar(e.r || EngineerType.ULT.trBlastR);
-      ud.warn.position.set(e.tx, TurretSystem.WARN_LIFT, e.ty);
-      ud.warn.visible = true;
-      return g;
-    }
-    buildShell() { var services = this.services, g = new THREE.Group();
-      var core = new THREE.Mesh(services.geo.ball, services.models.glowMat("shell-heavy", 0xFF7A2A, 0.95)); g.add(core);
-      var tail = new THREE.Mesh(services.geo.trail, services.models.glowMat("trail-shell", 0xFFC46A, 0.4)); g.add(tail);
-      var mats = services.matlib.mats, warn = new THREE.Group();
-      var edgeMat = mats["turret-warn-edge"] || (mats["turret-warn-edge"] = new THREE.MeshBasicMaterial({ color: TurretSystem.WARN_COLOR, transparent: true, opacity: 0.85, depthWrite: false }));
-      var fillMat = mats["turret-warn-fill"] || (mats["turret-warn-fill"] = new THREE.MeshBasicMaterial({ color: TurretSystem.WARN_COLOR, transparent: true, opacity: 0.22, depthWrite: false }));
-      warn.add(services.arenaView.flatMesh(services.geo.poolEdge, edgeMat));
-      warn.add(services.arenaView.flatMesh(services.geo.disc, fillMat));
-      g.userData = { r: TurretSystem.SHELL_R, core: core, tail: tail, warn: warn };
-      return g;
-    }
-    dropShellVis(s) { var services = this.services;
-      if (!s.vis) return;
-      var warn = s.vis.userData.warn;
-      if (warn.parent) warn.parent.remove(warn);
-      s.vis.userData.shelf.give(s.vis); s.vis = null;
-    }
-    shellPoint(e, k) {
-      return { x: e.mx + (e.tx - e.mx) * k, y: TurretSystem.MUZZLE_HEIGHT + (TurretSystem.TARGET_HEIGHT - TurretSystem.MUZZLE_HEIGHT) * k + 4 * EngineerType.ULT.trArcH * k * (1 - k), z: e.my + (e.ty - e.my) * k };
-    }
-    renderShell(s, t) { var services = this.services;
-      if (!s.shown) return;
-      var e = s.e, k = MathKit.clamp((t - e.createdAt) / e.fly, 0, 1);
-      if (!s.vis) s.vis = services.turrets.makeShellVis(s);
-      var ud = s.vis.userData;
-      if (!ud.warn.parent) services.stage.scene.add(ud.warn);
-      var at = this.shellPoint(e, k), ahead = this.shellPoint(e, Math.min(1, k + 0.02));
-      s.vis.position.set(at.x, at.y, at.z);
-      s.vis.rotation.set(0, -Math.atan2(ahead.z - at.z, ahead.x - at.x), Math.atan2(ahead.y - at.y, MathKit.hyp(ahead.x - at.x, ahead.z - at.z)));
-      var r = ud.r, tailLen = Math.max(0.01, Math.min(r * 4, k * MathKit.hyp(e.tx - e.mx, e.ty - e.my)));
-      ud.tail.scale.x = tailLen; ud.tail.position.x = -r * 0.4;
+    dropShellVis(s) { this.services.turretShells.drop(s); }
+    renderShell(s, t) { this.services.turretShells.render(s, t, Date.now()); }
+    flyMsFor(dist) {
+      var u = EngineerType.ULT, k = MathKit.clamp((dist - u.trFlyNear) / Math.max(1, u.trR - u.trFlyNear), 0, 1);
+      return Math.round(u.trFlyMs + (u.trFlyFarMs - u.trFlyMs) * k);
     }
     findTurret(e) { var services = this.services;
       for (var i = 0; i < services.field.turrets.length; i++) { var s = services.field.turrets[i]; if (s.e.owner === e.owner && s.e.x === e.x && s.e.y === e.y && !s.cut) return s; }
@@ -9312,7 +9433,7 @@ SinglePassMaterials.enable(THREE);
       services.session.room.ref.child("players/" + services.session.myId + "/characterType").set(c);
       if (services.session.room.roster && services.session.room.roster[services.session.myId]) services.session.room.ref.child("roster/" + services.session.myId + "/c").set(c);
       var E = services.flow.makeEnt(services.session.myId, d);
-      Object.assign(E, { x: old.x, y: old.y, angle: old.angle, alive: true, diedAt: 0, gauge: 0, minions: [], protectUntil: 0,
+      Object.assign(E, { x: old.x, y: old.y, angle: old.angle, alive: true, diedAt: 0, gauge: services.charTypes.statsOf(c).startGauge || 0, minions: [], protectUntil: 0,
                          stealthUntil: 0, skillUntil: 0, skillDur: 0, stunUntil: 0, slowUntil: 0, slowMul: 1, revealUntil: 0, burnUntil: 0, poisonUntil: 0,
                          frostStacks: 0, frostStackAt: 0, lastStandUsed: false, rallyUsed: false, shield: !!services.charTypes.statsOf(c).respawnShield });
       E.maxHp = services.charTypes.statsOf(E.char).hp; E.hp = E.maxHp;
@@ -9652,7 +9773,7 @@ SinglePassMaterials.enable(THREE);
       dgBox: "dungeon/box_large.gltf", dgBarrel: "dungeon/barrel_large.gltf", dgTorch: "dungeon/torch_lit.gltf",
       dgBannerBlue: "dungeon/banner_patternA_blue.gltf", dgBannerRed: "dungeon/banner_patternA_red.gltf",
       mill: "medieval/objects/mill.glb", farmPlot: "medieval/objects/farm_plot.glb", hill: "medieval/objects/detail_hill.glb",
-      forestTile: "medieval/tiles/square_forest.glb", turret: "props/turret_base.gltf" };
+      forestTile: "medieval/tiles/square_forest.glb", turret: "props/turret_base.gltf", shellBomb: "props/smokebomb.gltf" };
     static KIT_DIR = "assets/kaykit/";
     static modelChars(services) { return services.charTypes.list.concat(["giantGolem", "dummy", "dummyAlly"]); }
     static SKIN_COLS = 8;
@@ -13756,14 +13877,13 @@ SinglePassMaterials.enable(THREE);
         else { v.body.rotation.set(0, v.yaw, M.alive ? 0 : Math.PI / 2); v.body.position.y = M.alive ? 0 : 17; }
         services.fighterMotion.animateMinion(v, M, t, dt);
         v.mats.forEach(function (m) { m.opacity = alpha; });
-        var glow = M.flashUntil > nowMs ? 0x999999 : (t < M.rise ? 0x2A1044 : services.bannerAura.stanceGlow(M, t));
+        var glow = M.flashUntil > nowMs ? 0x999999 : (t < M.rise ? 0x2A1044 : (services.minions.frenzied(services.targets.ent(M.owner), t) ? NecroType.FRENZY_GLOW : services.bannerAura.stanceGlow(M, t)));
         v.glowMats.forEach(function (m) { m.emissive.setHex(glow); });
         v.ring.visible = M.alive;
         if (v.kit && M.alive) v.body.position.y = services.minions.leapHeight(M, t);
         if (M.alive && t >= M.rise) services.hud.labels.push({ e: M, alpha: alpha, ally: ally, minion: true });
       });
       Object.keys(services.fighterView.minions || {}).forEach(function (id) { if (!shown[id]) services.fighterView.dropMinionVis(id, true); });
-      services.necroMarks.render(t, nowMs);
       services.arenaView.bushVis.forEach(function (bv, i) {
         bv.fade += ((bushSeen[i] ? 0.42 : 1) - bv.fade) * Math.min(1, dt * 8);
         bv.mats.forEach(function (m) { m.opacity = bv.full * bv.fade; });
@@ -14368,6 +14488,9 @@ SinglePassMaterials.enable(THREE);
     }
   }
   class HudBars {
+    static MARK_OVER_TAG = 24;
+    static MARK_OVER_MINION_BAR = 15;
+    static STATUS_OVER_MARK = 58;
     constructor(services) { this.services = services; }
     drawMinionBar(M, alpha, ally) { var services = this.services;
       var p = services.hud.toScreen(M.x, CameraRig.HEAD_Y * 0.85, M.y); if (!p) return;
@@ -14378,6 +14501,8 @@ SinglePassMaterials.enable(THREE);
       Canvases.overlayCtx.fillStyle = ally ? "#B58CFF" : "#E8505A";
       Canvases.overlayCtx.fillRect(x0, top, bw * ratio, bh);
       Canvases.overlayCtx.restore();
+      var mark = services.focusMarks.styleFor(M, services.clock.now());
+      if (mark) services.focusMarks.draw(mark, p.x, top - HudBars.MARK_OVER_MINION_BAR, Date.now());
     }
     drawStatus(E, x, y) { var services = this.services;
       var t = services.clock.now(), label = E.isStunned(t) ? "💫 기절" : (E.isSnared(t) ? "속박" : (E.isSlowed(t) ? "느려짐" : ""));
@@ -14388,9 +14513,11 @@ SinglePassMaterials.enable(THREE);
       var p = services.hud.toScreen(E.x, services.charTypes.of(E.char).headY, E.y); if (!p) return;
       var compact = !services.match.me, bw = compact ? 34 : 62, bh = compact ? 4 : 7, x0 = p.x - bw / 2, top = p.y - 4, ratio = MathKit.clamp(E.hp / E.maxHp, 0, 1);
       Canvases.overlayCtx.save(); Canvases.overlayCtx.globalAlpha = alpha;
-      services.hudBars.drawStatus(E, p.x, top - (E === services.match.me ? 52 : (compact ? 24 : 33)));
+      var mark = services.focusMarks.styleFor(E, services.clock.now());
+      services.hudBars.drawStatus(E, p.x, top - (E === services.match.me ? 52 : (mark ? HudBars.STATUS_OVER_MARK : (compact ? 24 : 33))));
       var mine = E === services.match.me, teamCss = E.team === "blue" ? "#2F6FD6" : "#D6453D", ny = top - (compact ? 10 : 13), gauge = ally;
       services.overlaySprites.drawNameTag(E.nickname || "", teamCss, mine, p.x, ny, compact);
+      if (mark) services.focusMarks.draw(mark, p.x, ny - HudBars.MARK_OVER_TAG, Date.now());
       if (mine) services.hudBars.drawMeArrow(p.x, ny - 14);
       var frameH = bh + 4 + (gauge ? 7 : 0);
       Canvases.overlayCtx.fillStyle = "rgba(10,14,12,.85)"; services.hud.pill(x0 - 2, top - 2, bw + 4, frameH, 3); Canvases.overlayCtx.fill();
@@ -15138,7 +15265,7 @@ SinglePassMaterials.enable(THREE);
       services.gargantua.holeShelf.prefill(stargazers);
       services.gargantua.burstShelf.prefill(stargazers);
       services.stormView.shelf.prefill(frosts);
-      services.turrets.shellShelf.prefill(engineers * 8);
+      if (services.models.kit.propsReady) services.turretShells.prefill(engineers);
     }
     rehearseFirstUses() { var rehearsal = this.rehearsal, druids = this.castersByTeam("druid"), hitmen = this.castersByTeam("hitman"), stormbows = this.castersByTeam("stormbow"), phantoms = this.castersByTeam("phantom"), arcas = this.castersByTeam("arca"), hunters = this.castersByTeam("hunter");
       rehearsal.finish();
@@ -15152,7 +15279,7 @@ SinglePassMaterials.enable(THREE);
       if (stormbows.blue + stormbows.red) rehearsal.overcharge();
     }
     warmObjects() { var services = this.services;
-      return (this.kept || []).concat(services.fxView.bladeZones.spareRoots(), services.hammerStrikes.spareRoots(), services.cloudWaves.shelf.spareRoots(), services.gargantua.spareRoots(), services.stormView.shelf.spareRoots(), this.rehearsal.roots, services.fighterView.spareMinionRoots(), services.turrets.spareRoots(), services.groves.spare, services.revGraceView.spareBeamRoots(), services.meteorFall.spareRoots(), services.galeView.spareRoots(), services.barrierView.spareRoots(), services.impactBlasts.spareRoots(), services.hitmanSlashView.spareRoots(), services.phantomSlashes.spareRoots(), services.phantomView.spareRoots(), services.hunterEchoes.spareRoots(), services.sniperShots.spareRoots(), services.arenaFx.spareRoots(ShaderWarmup.PROBE_SPOT), services.hookView.spareRoots());
+      return (this.kept || []).concat(services.fxView.bladeZones.spareRoots(), services.hammerStrikes.spareRoots(), services.cloudWaves.shelf.spareRoots(), services.gargantua.spareRoots(), services.stormView.shelf.spareRoots(), this.rehearsal.roots, services.fighterView.spareMinionRoots(), services.turrets.spareRoots(), services.turretShells.spareRoots(), services.groves.spare, services.revGraceView.spareBeamRoots(), services.meteorFall.spareRoots(), services.galeView.spareRoots(), services.barrierView.spareRoots(), services.impactBlasts.spareRoots(), services.hitmanSlashView.spareRoots(), services.phantomSlashes.spareRoots(), services.phantomView.spareRoots(), services.hunterEchoes.spareRoots(), services.sniperShots.spareRoots(), services.arenaFx.spareRoots(ShaderWarmup.PROBE_SPOT), services.hookView.spareRoots());
     }
   }
   class FramePhaseMeter {
@@ -15371,7 +15498,7 @@ SinglePassMaterials.enable(THREE);
       HUD: services.hud, LIVE_BOARD: services.liveBoard, END_BANNER: services.endBanner, SPEC_FOLLOW: services.specFollow, KILL_FEED: services.killfeed, RESULT_BOARD: services.resultBoard,SOUND: services.sound, BACKEND: services.backend, TIMESCALE: services.timescale, THREE: THREE, CAMERA_RIG: services.cameraRig, ARENA_VIEW: services.arenaView, PROPS: services.props, PROP_THEMES: services.propThemes, camera: services.stage.camera, overlay: Canvases.overlay, QA: services.quality, PIX_MIN: Environment.PIX_MIN, PIX_START: Environment.PIX_START, SCENERY: services.arenaView.scenery,
       setDb: function (fake) { var before = services.backend.db; services.backend.db = fake; return before; },
       setTestLink: function (flag) { var before = services.backend.isTestLink; services.backend.isTestLink = flag; return before; },
-      MAP_X0: ArenaSize.MAP_X0, MAP_Y0: ArenaSize.MAP_Y0, TSUNAMI_LANES: services.tsunamiLanes, TsunamiLanes: TsunamiLanes, MARINA_STREAMS: services.marinaStreams, MARINA_BOT: services.marinaBot, TridentProp: TridentProp, HOOK_PATH: services.hookPath, HOOK_PULL: services.hookPull, HOOK_VIEW: services.hookView, playersNow: function () { return services.session.players; }, HAMMER_STRIKES: services.hammerStrikes, HammerBasicBlast: HammerBasicBlast, BANNER_AURA: services.bannerAura, BANNER_LEDGER: services.bannerLedger, BannerCreditLedger: BannerCreditLedger, makeBannerGlow: function (d) { return new BannerStrikeGlow(services, d); }, BannerStrikeGlow: BannerStrikeGlow, BannerBearerRig: BannerBearerRig, DraggedChain: DraggedChain, WraithChainRig: WraithChainRig, ChainSlamBurst: ChainSlamBurst, FIGHTER_VIEW: services.fighterView, FIGHTER_MOTION: services.fighterMotion, GEO: services.geo, FRAME_RENDERER: services.frameRenderer, stage: services.stage, CHAR_TYPES: services.charTypes, SHIELD_WALLS: services.shieldWalls, BARRIERS: services.barriers, BARRIER_VIEW: services.barrierView, HUNTER_ROLL: services.hunterRoll, HUNTER_ECHOES: services.hunterEchoes, HUNTER_BOT: services.hunterBot, HunterEchoView: HunterEchoView, HunterType: HunterType, STATUS: services.status, AUTO_AIM: services.autoAim, AUTO_AIM_ERR: AutoAim.AUTO_AIM_ERR, AUTO_AIM_LEAD: AutoAim.AUTO_AIM_LEAD, FullscreenKeeper: FullscreenKeeper, DRAFT_AI: services.draftAi,
+      MAP_X0: ArenaSize.MAP_X0, MAP_Y0: ArenaSize.MAP_Y0, TSUNAMI_LANES: services.tsunamiLanes, TsunamiLanes: TsunamiLanes, MARINA_STREAMS: services.marinaStreams, MARINA_BOT: services.marinaBot, TridentProp: TridentProp, HOOK_PATH: services.hookPath, HOOK_PULL: services.hookPull, HOOK_VIEW: services.hookView, playersNow: function () { return services.session.players; }, HAMMER_STRIKES: services.hammerStrikes, HammerBasicBlast: HammerBasicBlast, BANNER_AURA: services.bannerAura, BANNER_LEDGER: services.bannerLedger, BannerCreditLedger: BannerCreditLedger, makeBannerGlow: function (d) { return new BannerStrikeGlow(services, d); }, BannerStrikeGlow: BannerStrikeGlow, BannerBearerRig: BannerBearerRig, DraggedChain: DraggedChain, WraithChainRig: WraithChainRig, ChainSlamBurst: ChainSlamBurst, FIGHTER_VIEW: services.fighterView, FIGHTER_MOTION: services.fighterMotion, GEO: services.geo, FRAME_RENDERER: services.frameRenderer, stage: services.stage, CHAR_TYPES: services.charTypes, SHIELD_WALLS: services.shieldWalls, TURRETS: services.turrets, TURRET_SHELLS: services.turretShells, BARRIERS: services.barriers, BARRIER_VIEW: services.barrierView, HUNTER_ROLL: services.hunterRoll, HUNTER_ECHOES: services.hunterEchoes, HUNTER_BOT: services.hunterBot, HunterEchoView: HunterEchoView, HunterType: HunterType, STATUS: services.status, AUTO_AIM: services.autoAim, AUTO_AIM_ERR: AutoAim.AUTO_AIM_ERR, AUTO_AIM_LEAD: AutoAim.AUTO_AIM_LEAD, FullscreenKeeper: FullscreenKeeper, DRAFT_AI: services.draftAi,
       MOCK_DRAFT: services.mockDraft, MOCK_DRAFT_VIEW: services.mockDraftView,
       DRAFT: services.draft, DRAFT_VIEW: services.draftView, DRAFT_STEPS: Draft.STEPS, DRAFT_STEP_MS: Draft.STEP_MS, DRAFT_AI_MS: Draft.AI_MS, DRAFT_AI_TRADE_MS: Draft.AI_TRADE_MS, DRAFT_ABSENT_WAIT_MS: Draft.ABSENT_WAIT_MS, NO_BAN: Draft.NO_BAN,
       STATS: services.stats, STATS_PATH: MatchStats.path, STATS_PATCHES: StatsPatches, STATS_PENDING: MatchStats.PENDING, STATS_SETTLE_MS: MatchStats.SETTLE_MS, STATS_HOLD_MAX_MS: MatchStats.HOLD_MAX_MS,
@@ -15713,7 +15840,8 @@ SinglePassMaterials.enable(THREE);
       services.stormFx = new StormEffects(services);
       services.domainFx = new DomainEffects(services);
       services.turrets = new TurretSystem(services);
-      services.necroMarks = new NecroMarkView(services);
+      services.focusMarks = new FocusMarks(services);
+      services.turretShells = new TurretShellView(services);
       services.groves = new GroveSystem(services);
       services.damage = new DamageResolver(services);
       services.projectiles = new ProjectileSystem(services);
