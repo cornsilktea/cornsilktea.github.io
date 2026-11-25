@@ -8017,20 +8017,12 @@ class EngineerDruidTests {
       if (same.x !== 150 || same.y !== y) bad.push("같은 자리 대상 계산 오류");
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "총구 " + forward + " 앞에서 출발, 대상을 넘지 않음");
     });
-    run(G, "공학자 패시브: 포탑마다 사거리 안에서 이동속도 " + ULT.trSpeedBonus + "(게임 값) 증가하고, 두 포탑이 겹친 곳은 두 배인가", function (done) {
+    run(G, "공학자: 포탑 범위 안에서도 이동속도가 그대로인가(이동속도 패시브 없음)", function (done) {
       var bad = [], W = self.engineerWorld([]), eg = W.ent("eg"), base = C.speed;
       api.useUlt(eg, 0); W.frame(FRAME);
-      var one = api.speedOf(eg);
-      if (one !== base + ULT.trSpeedBonus) bad.push("포탑 하나 안 이동속도 " + one + " (기대 " + (base + ULT.trSpeedBonus) + ")");
-      eg.x = 150 + ULT.trR + 40; W.frame(FRAME);
-      if (api.speedOf(eg) !== base) bad.push("사거리 밖 이동속도 " + api.speedOf(eg) + " (기대 " + base + ")");
       eg.gauge = api.GAUGE_MAX; eg.ultUntil = 0; api.useUlt(eg, 0); W.frame(FRAME);
-      eg.x = 150 + ULT.trR; W.frame(FRAME);
-      var both = api.speedOf(eg);
-      if (both !== base + ULT.trSpeedBonus * 2) bad.push("겹친 곳 이동속도 " + both + " (기대 " + (base + ULT.trSpeedBonus * 2) + ")");
-      eg.x = 160; W.frame(FRAME);
-      if (api.speedOf(eg) !== base + ULT.trSpeedBonus) bad.push("포탑 하나만 닿는 곳 이동속도 " + api.speedOf(eg));
-      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "하나 " + one + ", 겹침 " + both + ", 밖 " + base);
+      if (api.speedOf(eg) !== base) bad.push("포탑 두 개 안 이동속도 " + api.speedOf(eg) + " (기대 " + base + ")");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "이동속도 " + base + " 그대로");
     });
     this.registerDruid();
   }

@@ -3578,13 +3578,12 @@ SinglePassMaterials.enable(THREE);
   class EngineerType extends CharacterType {
     static MODEL = { file: "Engineer", right: "engineer_Wrench" };
     static ULT = {
-      trDur: GameTime.gameMs(15), trR: 500, trCd: GameTime.gameMs(1), trScanMs: 120, trWarmMs: 300, trDmg: 20, trFlyMs: GameTime.gameMs(0.4), trFlyFarMs: GameTime.gameMs(0.8), trFlyNear: 300,
+      trDur: GameTime.gameMs(15), trR: 500, trCd: GameTime.gameMs(1.2), trScanMs: 120, trWarmMs: 300, trDmg: 20, trFlyMs: GameTime.gameMs(0.4), trFlyFarMs: GameTime.gameMs(0.8), trFlyNear: 300,
       trBlastR: 50, trArcH: 140, trMarkMs: GameTime.gameMs(4),
-      trMax: 2, trGauge: 1, trSpeedBonus: GameTime.gameSpeed(30), trCast: 300, trCastMs: 450
+      trMax: 2, trGauge: 1, trCast: 300, trCastMs: 450
     };
     static STATS = { name: "공학자", role: "shooter", icon: "🔧", hp: 105, speed: GameTime.gameSpeed(140), cd: GameTime.gameMs(1), dmg: 10, range: 350, pSpeed: 760, pr: 9, ultName: "포탑 설치", ultAim: true, startGauge: MatchRules.GAUGE_MAX };
     static WRENCH_SCALE = 0.9;
-    speedBonus(E, t) { var services = this.services; return services.turrets.coveringCount(E, t) * EngineerType.ULT.trSpeedBonus; }
     get startsSkillTimer() { return false; }
     get shotSound() { return "star"; }
     get shotName() { return "렌치"; }
@@ -3632,7 +3631,7 @@ SinglePassMaterials.enable(THREE);
       services.skilltext.secs(EngineerType.ULT.trFlyMs) + "~" + services.skilltext.secs(EngineerType.ULT.trFlyFarMs) + " 뒤 반경 " + EngineerType.ULT.trBlastR + "에 " + EngineerType.ULT.trDmg + "의 피해. 적중마다 게이지 " + EngineerType.ULT.trGauge + " 회복";
     }
     passiveDesc() { var services = this.services;
-      return "게이지가 가득 찬 채로 시작. 렌치에 맞은 적은 " + services.skilltext.secs(EngineerType.ULT.trMarkMs) + "간 포탑이 먼저 포격. 포탑마다 사거리 안에서 이동속도 " + services.skilltext.shownSpeed(EngineerType.ULT.trSpeedBonus) + " 증가(두 포탑 범위가 겹치면 " + services.skilltext.shownSpeed(EngineerType.ULT.trSpeedBonus * 2) + ")";
+      return "게이지가 가득 찬 채로 시작. 렌치에 맞은 적은 " + services.skilltext.secs(EngineerType.ULT.trMarkMs) + "간 포탑이 먼저 포격";
     }
     basicDesc() {
       var c = this.data;
@@ -5832,8 +5831,11 @@ SinglePassMaterials.enable(THREE);
 
   class MinionSystem {
     static SURROUND_GAP = 44;
-    static SLOT_SLACK = 6;
+    static SLOT_ARRIVE = 3;
+    static SLOT_LEAVE = 18;
     static SPREAD_GAP = 36;
+    static SPREAD_EASE = 0.35;
+    static WALK_HOLD_MS = 300;
     static SLOT_TRIES = 8;
     static SLOT_TURN = Math.PI / 9;
     constructor(services) { this.services = services; }
@@ -5904,16 +5906,17 @@ SinglePassMaterials.enable(THREE);
       services.minions.allMinions().forEach(function (o) { if (services.minions.minionReady(o, t)) consider(o); });
       return best;
     }
-    walkMinion(m, E, dx, dy, d, dt, t) { var services = this.services;
+    walkMinion(m, E, dx, dy, d, dt, t, limit) { var services = this.services;
       var mx = dx / d, my = dy / d;
       if (m.detour > t) { var rx = -my * m.detourDir; my = mx * m.detourDir; mx = rx; }
-      var ox = m.x, oy = m.y, step = (NecroType.ULT.smSpeed + services.bannerAura.speedBonusFor(m, t)) * dt;
+      var ox = m.x, oy = m.y, step = Math.min(limit == null ? Infinity : limit, (NecroType.ULT.smSpeed + services.bannerAura.speedBonusFor(m, t)) * dt);
       m.x += mx * step; m.y += my * step; services.physics.resolve(m);
       if (!services.minions.inLeash(E, m.x, m.y) && MathKit.hyp(m.x - E.x, m.y - E.y) > MathKit.hyp(ox - E.x, oy - E.y)) { m.x = ox; m.y = oy; }
       var moved = MathKit.hyp(m.x - ox, m.y - oy);
       if (moved < step * 0.3) { m.stuck += dt; if (m.stuck > 0.4) { m.detour = t + 600; m.detourDir = Math.random() < 0.5 ? -1 : 1; m.stuck = 0; } }
       else m.stuck = 0;
-      m.mv = moved > 0.2;
+      if (moved > 0.2) m.walkUntil = t + MinionSystem.WALK_HOLD_MS;
+      m.mv = m.walkUntil > t;
     }
     startLeap(m, foe, t) { var services = this.services;
       var dx = foe.x - m.x, dy = foe.y - m.y, d = MathKit.hyp(dx, dy) || 1, stop = Math.max(0, d - NecroType.ULT.smRange * 0.6), go = Math.min(stop, NecroType.ULT.smLeapMax);
@@ -5942,7 +5945,7 @@ SinglePassMaterials.enable(THREE);
       if (E.minions.length !== before) services.match.game.forceNet = true;
       var markFresh = E.markUntil > t ? E.markAt : 0, active = [];
       E.minions.forEach(function (m) {
-        m.mv = false; m.foe = null;
+        m.mv = m.walkUntil > t; m.foe = null;
         if (m.leap && (!m.alive || m.isStunned(t))) m.leap = null;
         if (m.leap) { services.minions.stepLeap(m, t); return; }
         if (!services.minions.minionReady(m, t) || m.isStunned(t)) return;
@@ -5957,13 +5960,18 @@ SinglePassMaterials.enable(THREE);
           if (MathKit.hyp(foe.x - m.x, foe.y - m.y) > NecroType.ULT.smRange + ArenaSize.BODY_R && services.minions.startLeap(m, foe, t)) return;
         }
         if (!foe) {
+          m.settled = false;
           var home = MathKit.hyp(E.x - m.x, E.y - m.y);
           if (E.alive && home > NecroType.ULT.smFollow) { m.angle = Math.atan2(E.y - m.y, E.x - m.x); services.minions.walkMinion(m, E, E.x - m.x, E.y - m.y, home, dt, t); }
           return;
         }
         var dx = foe.x - m.x, dy = foe.y - m.y, d = MathKit.hyp(dx, dy) || 1, reach = NecroType.ULT.smRange + ArenaSize.BODY_R - 6;
         var spot = services.minions.slotSpot(m, foe), sx = spot.x - m.x, sy = spot.y - m.y, sd = MathKit.hyp(sx, sy);
-        if (sd > MinionSystem.SLOT_SLACK) services.minions.walkMinion(m, E, sx, sy, sd, dt, t);
+        if (m.settled && sd > MinionSystem.SLOT_LEAVE) m.settled = false;
+        if (!m.settled) {
+          services.minions.walkMinion(m, E, sx, sy, sd, dt, t, sd);
+          if (MathKit.hyp(spot.x - m.x, spot.y - m.y) <= MinionSystem.SLOT_ARRIVE) m.settled = true;
+        }
         m.angle = Math.atan2(foe.y - m.y, foe.x - m.x);
         d = MathKit.hyp(foe.x - m.x, foe.y - m.y);
         if (d <= reach && t >= m.cdUntil && services.physics.losClear(m.x, m.y, foe.x, foe.y)) {
@@ -5979,17 +5987,19 @@ SinglePassMaterials.enable(THREE);
       var groups = {};
       list.forEach(function (m) { if (m.foe) (groups[m.foe.id] = groups[m.foe.id] || []).push(m); });
       Object.keys(groups).forEach(function (id) {
-        var g = groups[id], foe = g[0].foe;
+        var g = groups[id], foe = g[0].foe, key = id + ":" + g.length;
+        if (g.every(function (m) { return m.slotKey === key; })) return;
         var base = Math.atan2(E.y - foe.y, E.x - foe.x), step = Math.PI * 2 / g.length;
         g.map(function (m) { return { m: m, rel: MathKit.angDiff(Math.atan2(m.y - foe.y, m.x - foe.x), base) }; })
           .sort(function (a, b) { return a.rel - b.rel; })
-          .forEach(function (o, i) { o.m.slotAng = base + (i - (g.length - 1) / 2) * step; });
+          .forEach(function (o, i) { o.m.slotAng = base + (i - (g.length - 1) / 2) * step; o.m.slotKey = key; o.m.settled = false; });
       });
+      list.forEach(function (m) { if (!m.foe) m.slotKey = ""; });
     }
     slotSpot(m, foe) { var services = this.services;
-      var ring = (foe.hitR || ArenaSize.BODY_R) + MinionSystem.SURROUND_GAP;
+      var ring = (foe.hitR || ArenaSize.BODY_R) + MinionSystem.SURROUND_GAP, side = m.n % 2 ? 1 : -1;
       for (var n = 0; n <= MinionSystem.SLOT_TRIES; n++) {
-        var turn = (n % 2 ? 1 : -1) * Math.ceil(n / 2) * MinionSystem.SLOT_TURN, a = m.slotAng + turn, spot = { x: foe.x + Math.cos(a) * ring, y: foe.y + Math.sin(a) * ring };
+        var turn = (n % 2 ? side : -side) * Math.ceil(n / 2) * MinionSystem.SLOT_TURN, a = m.slotAng + turn, spot = { x: foe.x + Math.cos(a) * ring, y: foe.y + Math.sin(a) * ring };
         if (services.physics.bodyFitsAt(spot.x, spot.y)) return spot;
       }
       return { x: foe.x + Math.cos(m.slotAng) * ring, y: foe.y + Math.sin(m.slotAng) * ring };
@@ -6001,7 +6011,7 @@ SinglePassMaterials.enable(THREE);
         var dx = b.x - a.x, dy = b.y - a.y, d = MathKit.hyp(dx, dy);
         if (d >= gap) continue;
         if (d < 0.01) { dx = Math.cos(i + j); dy = Math.sin(i + j); d = 1; }
-        var push = (gap - d) / 2 / d;
+        var push = (gap - d) * MinionSystem.SPREAD_EASE / 2 / d;
         a.x -= dx * push; a.y -= dy * push; b.x += dx * push; b.y += dy * push;
         services.physics.resolve(a); services.physics.resolve(b);
       }
@@ -7530,13 +7540,6 @@ SinglePassMaterials.enable(THREE);
       var mine = services.field.turrets.filter(function (s) { return s.e.owner === e.owner && !s.cut; }).sort(function (a, b) { return a.e.createdAt - b.e.createdAt; });
       while (mine.length >= EngineerType.ULT.trMax) mine.shift().cut = true;
       services.field.turrets.push({ e: e, vis: null, nextShot: e.createdAt + EngineerType.ULT.trWarmMs, shotN: 0, aim: 0 });
-    }
-    coveringCount(E, t) { var services = this.services;
-      var n = 0;
-      services.field.turrets.forEach(function (s) {
-        if (s.e.owner === E.id && services.turrets.isActive(s, t) && MathKit.hyp(E.x - s.e.x, E.y - s.e.y) <= s.e.r) n++;
-      });
-      return n;
     }
     canShoot(s, o, owner, t) { var services = this.services, e = s.e;
       if (!o || !o.alive || o.team === e.team || o.isProtected(t)) return false;
@@ -14305,7 +14308,8 @@ SinglePassMaterials.enable(THREE);
     drawOverlay(nowMs) { var services = this.services;
       Canvases.overlayCtx.setTransform(services.cameraRig.dpr, 0, 0, services.cameraRig.dpr, 0, 0);
       Canvases.overlayCtx.clearRect(0, 0, services.cameraRig.w, services.cameraRig.h);
-      services.hud.labels.forEach(function (L) { if (L.minion) services.hudBars.drawMinionBar(L.e, L.alpha, L.ally); else services.hudBars.drawBars(L.e, L.alpha, L.ally); });
+      services.hud.labels.forEach(function (L) { if (L.minion) services.hudBars.drawMinionBar(L.e, L.alpha, L.ally); });
+      services.hud.labels.forEach(function (L) { if (!L.minion) services.hudBars.drawBars(L.e, L.alpha, L.ally); });
       var floats = 0;
       for (var i = services.match.fx.length - 1; i >= 0 && floats < Hud2D.MAX_FLOAT_TEXTS; i--) {
         var f = services.match.fx[i];
@@ -14491,9 +14495,10 @@ SinglePassMaterials.enable(THREE);
     static MARK_OVER_TAG = 24;
     static MARK_OVER_MINION_BAR = 15;
     static STATUS_OVER_MARK = 58;
+    static MINION_BAR_LIFT = 0.72;
     constructor(services) { this.services = services; }
     drawMinionBar(M, alpha, ally) { var services = this.services;
-      var p = services.hud.toScreen(M.x, CameraRig.HEAD_Y * 0.85, M.y); if (!p) return;
+      var p = services.hud.toScreen(M.x, CameraRig.HEAD_Y * HudBars.MINION_BAR_LIFT, M.y); if (!p) return;
       var compact = !services.match.me, bw = compact ? 24 : 38, bh = compact ? 4 : 5, x0 = p.x - bw / 2, top = p.y, ratio = MathKit.clamp(M.hp / M.maxHp, 0, 1);
       Canvases.overlayCtx.save(); Canvases.overlayCtx.globalAlpha = alpha;
       Canvases.overlayCtx.fillStyle = "rgba(10,14,12,.85)"; services.hud.pill(x0 - 2, top - 2, bw + 4, bh + 4, 3); Canvases.overlayCtx.fill();
