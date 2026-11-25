@@ -714,25 +714,42 @@ class ResultCollector {
     var ok = near === c.dmg && far === Math.round(c.dmg * (1 + c.farBonus));
     done(ok ? "pass" : "fail", "거리 300 → " + near + ", 거리 600 → " + far + " (기대: " + c.dmg + " / " + Math.round(c.dmg * (1 + c.farBonus)) + ")");
   });
-  run(PASSIVE, "네크로: 체력이 " + api.CHARS.necro.lastStandHp + " 아래로 떨어질 피해는 " + api.CHARS.necro.lastStandHp + "에서 멈추고 은신, 한 목숨에 한 번, 부활하면 다시 되는가", function (done) {
-    var y = OPEN_Y.forest, c = api.CHARS.necro, bad = [];
+  run(PASSIVE, "네크로: 체력이 낮아져도 은신하거나 체력이 멈추지 않는가", function (done) {
+    var y = OPEN_Y.forest, bad = [];
     var W = world("forest", [
       { id: "nc", team: "blue", char: "necro", x: 250, y: y },
       { id: "foe", team: "red", char: "knight", x: 700, y: y }
     ]);
     var nc = W.ent("nc"), foe = W.ent("foe");
     api.damage(nc, 90, "foe", true, null, null);
-    if (nc.hp !== c.lastStandHp) bad.push("120에서 90 피해 → 체력 " + nc.hp);
-    if (!api.hiddenFrom(nc, W.t()) || api.visibleTo(nc, foe, W.t())) bad.push("발동 후 은신 안 됨");
-    W.step(c.lastStandHideMs + 100);
-    if (api.hiddenFrom(nc, W.t())) bad.push(c.lastStandHideMs + "ms 뒤에도 은신 유지");
-    api.damage(nc, 80, "foe", true, null, null);
-    if (nc.alive) bad.push("두 번째에도 발동해 살아남음");
-    W.step(api.RESPAWN_MS + 3100);
-    nc.hp = 70;
-    api.damage(nc, 80, "foe", true, null, null);
-    if (!nc.alive || nc.hp !== c.lastStandHp) bad.push("부활 뒤 70에서 80 피해 → " + (nc.alive ? "체력 " + nc.hp : "죽음"));
-    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "120-90 → 50·은신, 두 번째 치명타에 죽음, 부활 뒤 70-80 → 50");
+    if (nc.hp !== api.CHARS.necro.hp - 90) bad.push(api.CHARS.necro.hp + "에서 90 피해 → 체력 " + nc.hp);
+    if (api.hiddenFrom(nc, W.t()) || !api.visibleTo(nc, foe, W.t())) bad.push("은신함");
+    api.damage(nc, 40, "foe", true, null, null);
+    if (nc.alive) bad.push("치명타에도 살아남음");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "90 피해 → 체력 " + (api.CHARS.necro.hp - 90) + "·은신 없음, 다음 치명타에 쓰러짐");
+  });
+  run(PASSIVE, "네크로 해골: 기본 공격이 붙어 선 두 적 중 노린 한 명에게만 들어가고 호 표시가 없는가", function (done) {
+    var y = OPEN_Y.forest, bad = [];
+    var W = world("forest", [
+      { id: "nc", team: "blue", char: "necro", x: 100, y: y },
+      { id: "fa", team: "red", char: "knight", x: 330, y: y },
+      { id: "fb", team: "red", char: "knight", x: 330, y: y + 34 }
+    ]);
+    var nc = W.ent("nc"), foes = [W.ent("fa"), W.ent("fb")];
+    W.step(api.ULT.smRiseMs + 100);
+    foes.forEach(function (f) { f.maxHp = 100000; f.hp = 100000; f.cdUntil = Infinity; f.speed = function () { return 0; }; });
+    nc.cdUntil = Infinity;
+    var from = W.t();
+    W.step(3000);
+    var swings = W.log.filter(function (p) { return p.path === "meleeHits" && p.v.m && p.v.owner === "nc" && p.v.createdAt >= from; });
+    if (!swings.length) { done("fail", "시험 준비 실패: 해골이 공격하지 않음"); return; }
+    if (swings.some(function (p) { return p.v.arc || !p.v.tgt; })) bad.push("호 범위로 공격함");
+    if (swings.some(function (p) { return !api.hasOwnBlast(p.v); })) bad.push("호 표시가 그려짐");
+    foes.forEach(function (f) {
+      var aimed = swings.filter(function (p) { return p.v.tgt === f.id; }).length, lost = 100000 - f.hp;
+      if (lost > aimed * api.ULT.smDmg) bad.push(f.id + " 노린 " + aimed + "번·잃은 체력 " + lost);
+    });
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "공격 " + swings.length + "번, 모두 노린 적에게만 " + api.ULT.smDmg + "씩");
   });
   run(PASSIVE, "네크로 해골: 공격할 대상이 없으면 네크로에게 다가오는가", function (done) {
     var y = OPEN_Y.forest;
@@ -6431,17 +6448,6 @@ class WraithTests {
         if (c[1](T, W.t())) bad.push(c[0] + " 끊기지 않음");
       });
       self.verdict(done, bad, "넷 다 끊김");
-    });
-    run(G, "네크로 마지막 은신: 체력 규칙과 부딪히지 않고 끌리는가", function (done) {
-      var bad = [], W = self.duel("practice", 450, 340, 450, 800, "necro"), A = W.ent("wr"), T = W.ent("foe"), floor = api.CHARS.necro.lastStandHp;
-      T.hp = floor + 5; T.lastStandUsed = false;
-      self.throwChain(W, A, T.x, T.y);
-      self.untilCaught(W, 4);
-      if (!T.alive || T.hp !== floor) bad.push("체력 " + T.hp + " (기대 " + floor + ")");
-      if (!T.hookPull) bad.push("안 끌림");
-      self.untilArrived(W, T, FRAME);
-      if (!self.canStand(T.x, T.y)) bad.push("끝 위치 어긋남");
-      self.verdict(done, bad, "체력 " + T.hp + " 유지, 끌림");
     });
     run(G, "연습 봇: 끌린 뒤 제자리 복귀가 끌기 중에 끼어들지 않는가", function (done) {
       var bad = [], W = self.duel("practice", 450, 340, 450, 800, "dummy"), A = W.ent("wr"), T = W.ent("foe");

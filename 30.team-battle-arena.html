@@ -2946,11 +2946,11 @@ SinglePassMaterials.enable(THREE);
     static FRENZY_GLOW = 0x6A0E0E;
     static MODEL = { file: "Necromancer", launchTip: "mainhand", portraitPlant: true, plantTurn: Math.PI / 2, right: "Skeleton_Scythe" };
     static ULT = {
-      smCount: 3, smAhead: ArenaSize.KEY * 1, smSide: 38, smHp: 60, smSpeed: GameTime.gameSpeed(180), smGauge: 0.5, smDmg: 10, smCd: 800, smRange: 80,
-      smArc: Math.PI * 0.6, smFollow: ArenaSize.KEY * 1.5, smRiseMs: 1100, smCorpseMs: 1400,
+      smCount: 3, smAhead: ArenaSize.KEY * 1, smSide: 38, smHp: 80, smSpeed: GameTime.gameSpeed(180), smGauge: 0.5, smDmg: 10, smCd: 800, smRange: 80,
+      smSwingFromSec: 0.3, smSwingImpactSec: 0.62, smSwingLeadMs: 120, smFollow: ArenaSize.KEY * 1.5, smRiseMs: 1100, smCorpseMs: 1400,
       smLeash: 600, smFrenzyMs: GameTime.gameMs(3), smFrenzyRate: 0.5, smMarkMs: GameTime.gameMs(4), smLeapMax: 300, smLeapMs: 380, smLeapH: 45
     };
-    static STATS = { name: "네크로", role: "caster", icon: "💀", hp: 120, lastStandHp: 50, lastStandHideMs: GameTime.gameMs(1.5), speed: GameTime.gameSpeed(170), cd: GameTime.gameMs(1.4), dmg: 10, range: 350, pSpeed: 1000, pr: 9, ultName: "해골 소환", blocks: true };
+    static STATS = { name: "네크로", role: "caster", icon: "💀", hp: 120, speed: GameTime.gameSpeed(170), cd: GameTime.gameMs(1.4), dmg: 10, range: 350, pSpeed: 1000, pr: 9, ultName: "해골 소환", blocks: true };
     get smokeColor() { return Palette.NECRO_SMOKE_COLOR; }
     hitColor(d) { return "#B07CFF"; }
     get tintsHit() { return true; }
@@ -2984,8 +2984,7 @@ SinglePassMaterials.enable(THREE);
       return "해골 병사를 " + NecroType.ULT.smCount + "마리로 채우고 체력을 모두 회복. " + services.skilltext.secs(NecroType.ULT.smFrenzyMs) + "간 해골의 공격속도 " + Math.round(NecroType.ULT.smFrenzyRate * 100) + "% 증가. 해골이 적을 공격할 때마다 게이지 " + NecroType.ULT.smGauge + " 회복";
     }
     passiveDesc() { var services = this.services;
-      var c = this.data;
-      return "해골 병사 " + NecroType.ULT.smCount + "마리(체력 " + NecroType.ULT.smHp + "·공격 " + NecroType.ULT.smDmg + ")와 함께 시작. 해골은 반경 " + NecroType.ULT.smLeash + " 안에서 싸우고 기본 공격에 맞은 적에게 뛰어듦. 체력이 " + c.lastStandHp + " 미만으로 떨어지면 " + c.lastStandHp + "을 남기고 " + services.skilltext.secs(c.lastStandHideMs) + "간 은신(죽을 때마다 한 번)";
+      return "해골 병사 " + NecroType.ULT.smCount + "마리(체력 " + NecroType.ULT.smHp + "·공격 " + NecroType.ULT.smDmg + ")와 함께 시작. 해골은 반경 " + NecroType.ULT.smLeash + " 안에서 싸우고 기본 공격에 맞은 적에게 뛰어듦";
     }
   }
   class SniperType extends CharacterType {
@@ -3644,7 +3643,7 @@ SinglePassMaterials.enable(THREE);
   class DruidType extends MagicShooterType {
     static MODEL = { file: "Druid", launchTip: "mainhand", portraitPlant: true, right: "druid_staff" };
     static ULT = {
-      drR: 175, drDur: GameTime.gameMs(10), drTick: GameTime.gameMs(1), drHeal: 20, drCast: 450, drMin: 60, drSelfGauge: 1, drSnareMs: GameTime.gameMs(0.3), drRiseMs: 350, drCastMs: 500
+      drR: 175, drDur: GameTime.gameMs(10), drTick: GameTime.gameMs(1), drHeal: 20, drCast: 450, drMin: 60, drSelfGauge: 1, drSnareMs: GameTime.gameMs(0.5), drRiseMs: 350, drCastMs: 500
     };
     static STATS = { name: "드루이드", role: "caster", icon: "🌿", hp: 110, speed: GameTime.gameSpeed(165), cd: GameTime.gameMs(1.4), dmg: 10, range: 350, pSpeed: 1000, pr: 12, lanes: 2,
                ultName: "덩굴 부쉬", ultAim: true, heals: true };
@@ -5473,7 +5472,6 @@ SinglePassMaterials.enable(THREE);
                stunDealt: s.stunDealt || 0, slowDealt: s.slowDealt || 0, slowWeight: s.slowWeight || 0, blocked: s.blocked || 0, skillDmg: s.skillDmg || 0,
                slowUntil: s.slowUntil || 0, slowMul: s.slowMul || 1, stunUntil: s.stunUntil || 0,
                summonAt: s.summonAt || 0, minions: [], revealUntil: s.revealUntil || 0, frostStacks: s.frostStacks || 0, frostStackAt: s.frostStackAt || 0,
-               lastStandUsed: !!(services.charTypes.statsOf(c).lastStandHp && s.hp != null && s.hp <= services.charTypes.statsOf(c).lastStandHp),
                rallyUsed: !!(services.charTypes.statsOf(c).rally && s.hp != null && s.hp < services.charTypes.statsOf(c).hp * services.charTypes.statsOf(c).rally.hpRate),
                burnUntil: s.burnUntil || 0, burnNext: 0, poisonUntil: s.poisonUntil || 0, poisonNext: 0, regenNext: 0, shield: s.hp == null ? !!services.charTypes.statsOf(c).respawnShield : !!s.shield,
                burst: null, volley: null, mv: false, pending: null });
@@ -5886,6 +5884,9 @@ SinglePassMaterials.enable(THREE);
       E.minions = list;
     }
     frenzied(E, t) { return !!E && E.skillUntil > t; }
+    playSwing(v, t) { var services = this.services, u = NecroType.ULT;
+      services.fighterMotion.playOnce(v, "Melee_1H_Attack_Chop", (u.smSwingImpactSec - u.smSwingFromSec) * 1000 / u.smSwingLeadMs, t, null, u.smSwingFromSec);
+    }
     inLeash(E, x, y) { return MathKit.hyp(x - E.x, y - E.y) <= NecroType.ULT.smLeash; }
     markedFoe(E, M, t) { var services = this.services;
       if (!(E.markUntil > t)) return null;
@@ -5977,7 +5978,7 @@ SinglePassMaterials.enable(THREE);
         if (d <= reach && t >= m.cdUntil && services.physics.losClear(m.x, m.y, foe.x, foe.y)) {
           m.cdUntil = t + NecroType.ULT.smCd / (services.minions.frenzied(E, t) ? 1 + NecroType.ULT.smFrenzyRate : 1); m.atkAt = t;
           services.session.room.ref.child("meleeHits").push({ team: m.team, owner: E.id, m: 1, mi: m.n, x: MathKit.r1(m.x), y: MathKit.r1(m.y), radius: NecroType.ULT.smRange, angle: MathKit.r1(m.angle),
-                                            arc: NecroType.ULT.smArc, dmg: NecroType.ULT.smDmg, createdAt: t });
+                                            tgt: foe.id, dmg: NecroType.ULT.smDmg, createdAt: t });
           if (services.targets.hear(m)) services.sound.sfx("swing");
         }
       });
@@ -7852,14 +7853,6 @@ SinglePassMaterials.enable(THREE);
       unguarded -= beforeBanner - amount;
       if (C.armor) amount = Math.max(0, amount - C.armor);
       targetType.tallyBlocked(T, unguarded, amount);
-      var floorHp = services.charTypes.statsOf(T.char).lastStandHp;
-      if (floorHp && !T.lastStandUsed && T.hp - amount < floorHp) {
-        amount = Math.max(0, T.hp - floorHp);
-        T.lastStandUsed = true;
-        T.stealthUntil = Math.max(T.stealthUntil || 0, services.clock.now() + services.charTypes.statsOf(T.char).lastStandHideMs);
-        T.revealUntil = 0;
-        services.fxView.smoke(T.x, T.y, Palette.NECRO_SMOKE_COLOR);
-      }
       if (amount > 0) services.damage.noteHurt(T, owner, t);
       var dm = Math.min(amount, T.hp), killed = false;
       T.taken = (T.taken || 0) + dm;
@@ -8367,7 +8360,7 @@ SinglePassMaterials.enable(THREE);
       return along >= -br && along <= d.len + br && Math.abs(side) <= d.width / 2 + br;
     }
     inStrike(T, d) { var services = this.services; return services.melee.inStrikeArea(T, d) && !services.shieldWalls.strikeStop(T, d, services.clock.now()); }
-    inStrikeArea(T, d) { var services = this.services; return d.binds ? d.binds.indexOf(T.id) >= 0 : d.lanes ? TsunamiLanes.hits(T, d, services.melee.waveFront(d, services.clock.now(), MarinaType.WAVE.travel)) : d.stab ? !!d.tgt && T.id === d.tgt : d.len ? services.melee.inLine(T, d) : services.melee.inArc(T, d) && (!!d.thruWall || services.physics.losClear(d.x, d.y, T.x, T.y)); }
+    inStrikeArea(T, d) { var services = this.services; return d.binds ? d.binds.indexOf(T.id) >= 0 : d.lanes ? TsunamiLanes.hits(T, d, services.melee.waveFront(d, services.clock.now(), MarinaType.WAVE.travel)) : d.stab || d.m ? !!d.tgt && T.id === d.tgt : d.len ? services.melee.inLine(T, d) : services.melee.inArc(T, d) && (!!d.thruWall || services.physics.losClear(d.x, d.y, T.x, T.y)); }
     lineReach(x, y, ang, len) { var services = this.services; return Math.min(len, services.physics.rayObst(x, y, Math.cos(ang), Math.sin(ang), 2) + ArenaSize.BODY_R); }
     onMelee(key, d) { var services = this.services;
       if (!d) return;
@@ -8443,7 +8436,7 @@ SinglePassMaterials.enable(THREE);
       if (T === services.match.me) services.sound.sfx("heal");
     }
     hasOwnBlast(d) { var services = this.services, who = services.session.players[d.owner] ? services.session.players[d.owner].characterType : "";
-      return !!(d.hammer || d.mace || services.charTypes.of(who).drawsOwnStrike(d));
+      return !!(d.hammer || d.mace || d.m || services.charTypes.of(who).drawsOwnStrike(d));
     }
     meleeStrike(key, d) { var services = this.services;
       var who = services.session.players[d.owner] ? services.session.players[d.owner].characterType : "";
@@ -8720,7 +8713,7 @@ SinglePassMaterials.enable(THREE);
       E.hp = E.maxHp; E.alive = true; E.protectUntil = t + services.timescale.respawnProtectMs;
       E.cdUntil = 0; E.pending = null; E.burst = null; E.volley = null; E.slash = null;
       E.buffUntil = 0; E.slamAt = 0; E.leap = null; E.dash = null; E.shove = null; E.stealthUntil = 0; E.ultUntil = 0; E.skillUntil = 0; E.regenUntil = 0; E.slowUntil = 0; E.slows = null; E.stunUntil = 0; E.snareUntil = 0; E.lance = null; E.windUntil = 0; E.hookPull = null; E.hookCast = null; E.hookRootUntil = 0; E.phantom = null; E.phSweep = null; E.barrierTrap = null;
-      E.frostStacks = 0; E.frostStackAt = 0; E.revealUntil = 0; E.lastStandUsed = false; E.hasteUntil = 0; E.hasteStacks = 0;
+      E.frostStacks = 0; E.frostStackAt = 0; E.revealUntil = 0; E.hasteUntil = 0; E.hasteStacks = 0;
       E.burnUntil = 0; E.burnNext = 0; E.poisonUntil = 0; E.poisonNext = 0; E.rallyUsed = false; E.regenNext = 0; E.shield = !!services.charTypes.statsOf(E.char).respawnShield;
       if (E === services.match.me) services.cameraRig.view.snap = true;
       services.match.game.forceNet = true;
@@ -9438,7 +9431,7 @@ SinglePassMaterials.enable(THREE);
       var E = services.flow.makeEnt(services.session.myId, d);
       Object.assign(E, { x: old.x, y: old.y, angle: old.angle, alive: true, diedAt: 0, gauge: services.charTypes.statsOf(c).startGauge || 0, minions: [], protectUntil: 0,
                          stealthUntil: 0, skillUntil: 0, skillDur: 0, stunUntil: 0, slowUntil: 0, slowMul: 1, revealUntil: 0, burnUntil: 0, poisonUntil: 0,
-                         frostStacks: 0, frostStackAt: 0, lastStandUsed: false, rallyUsed: false, shield: !!services.charTypes.statsOf(c).respawnShield });
+                         frostStacks: 0, frostStackAt: 0, rallyUsed: false, shield: !!services.charTypes.statsOf(c).respawnShield });
       E.maxHp = services.charTypes.statsOf(E.char).hp; E.hp = E.maxHp;
       services.practice.clearSkillsOf(old.id);
       services.shaderWarmup.matchStarting();
@@ -10417,9 +10410,9 @@ SinglePassMaterials.enable(THREE);
       } else if (t < M.rise) {
         services.fighterMotion.showClip(v, "Skeletons_Awaken_Floor", services.models.kit.clips.Skeletons_Awaken_Floor.duration * 1000 / NecroType.ULT.smRiseMs, false);
       } else {
-        if (M.atkAt !== v.atkSeen) { v.atkSeen = M.atkAt; if (t - M.atkAt < 600) services.fighterMotion.playOnce(v, "Melee_1H_Attack_Chop", 1.7, t); }
+        if (M.atkAt !== v.atkSeen) { v.atkSeen = M.atkAt; if (t - M.atkAt < 600) services.minions.playSwing(v, t); }
         if (v.once && t > v.once.until) v.once = null;
-        if (v.once) { services.fighterMotion.showClip(v, v.once.name, v.once.ts, false, v.once.fresh); v.once.fresh = false; }
+        if (v.once) { services.fighterMotion.showClip(v, v.once.name, v.once.ts, false, v.once.fresh, v.once.from); v.once.fresh = false; }
         else if (M.mv) services.fighterMotion.showClip(v, "Skeletons_Walking", 1.4, true);
         else services.fighterMotion.showClip(v, "Skeletons_Idle", 1, true);
       }
@@ -15485,7 +15478,7 @@ SinglePassMaterials.enable(THREE);
       },
       loadMapData: services.arenaMap.load.bind(services.arenaMap), makeEnt: services.flow.makeEnt.bind(services.flow), resolve: services.physics.resolve.bind(services.physics), stepWorld: services.world.stepWorld.bind(services.world),
       useUlt: services.attack.useUlt.bind(services.attack), fireBasic: services.attack.fireBasic.bind(services.attack), damage: services.damage.damage.bind(services.damage), onZap: services.stormFx.onZap.bind(services.stormFx), healCut: services.status.healCut.bind(services.status), healAmount: services.status.healAmount.bind(services.status), respawnIfReady: services.respawn.respawnIfReady.bind(services.respawn), afflict: services.status.afflict.bind(services.status), speedOf: function (E) { return E.speed(); }, stunned: function (E, t) { return E.isStunned(t); },
-      onShot: services.projectiles.onShot.bind(services.projectiles), onMelee: services.melee.onMelee.bind(services.melee), potionFlightMs: services.fieldFx.potionFlightMs.bind(services.fieldFx), meteorHitAt: services.fieldFx.meteorHitAt.bind(services.fieldFx), onEffect: services.fieldFx.onEffect.bind(services.fieldFx), onHit: services.damage.onHit.bind(services.damage),
+      onShot: services.projectiles.onShot.bind(services.projectiles), onMelee: services.melee.onMelee.bind(services.melee), hasOwnBlast: services.melee.hasOwnBlast.bind(services.melee), potionFlightMs: services.fieldFx.potionFlightMs.bind(services.fieldFx), meteorHitAt: services.fieldFx.meteorHitAt.bind(services.fieldFx), onEffect: services.fieldFx.onEffect.bind(services.fieldFx), onHit: services.damage.onHit.bind(services.damage),
       multiKillCount: services.killfeed.multiKillCount.bind(services.killfeed), MULTI_KILL_MS: KillFeed.MULTI_KILL_MS, ASSIST_MS: DamageResolver.ASSIST_MS, onKill: services.damage.creditHelpAssists.bind(services.damage),
       hiddenFrom: services.vision.hiddenFrom.bind(services.vision), visibleTo: services.vision.visibleTo.bind(services.vision), storms: function () { return services.field.storms; }, stormCenter: services.stormFx.stormCenter.bind(services.fieldFx), revs: function () { return services.field.revs; }, domains: function () { return services.field.domains; }, graceTarget: services.fieldFx.graceTarget.bind(services.fieldFx),
       bushTiles: function () { return services.arenaMap.bushes.map(function (b) { return b.tiles.map(function (tl) { return { x: services.arenaMap.tileX(tl[0]), y: services.arenaMap.tileY(tl[1]) }; }); }); },
