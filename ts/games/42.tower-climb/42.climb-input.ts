@@ -20,6 +20,7 @@ class KeyboardInput extends ClimbInputRouter {
   static readonly LOOK_OF_KEY: Readonly<Record<string, string>> = { ArrowUp: "lookUp", ArrowDown: "lookDown", ArrowLeft: "lookLeft", ArrowRight: "lookRight" };
 
   onPauseKey: () => void = () => undefined;
+  onRestartKey: () => void = () => undefined;
   private readonly held = new Set<string>();
 
   constructor() {
@@ -50,6 +51,7 @@ class KeyboardInput extends ClimbInputRouter {
   private key(e: KeyboardEvent, down: boolean): void {
     if (e.code === "Escape") { if (down && !e.repeat) this.onPauseKey(); return; }
     if (!this.enabled) return;
+    if (e.code === "KeyR") { if (down && !e.repeat) this.onRestartKey(); return; }
     const control = this.control(e);
     if (control) {
       if (down) this.held.add(control); else this.held.delete(control);

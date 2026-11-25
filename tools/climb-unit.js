@@ -449,7 +449,9 @@ function box(id, x, z, y, sx, sz, more = {}) { return { id, kind: "static", stag
     const pieces = [hub,
       { id: "rest2", kind: "rest", stage: 1, x: 0, y: 30, z: 40, radius: 4, depth: 0.5, startOf: 2 },
       { id: "rest3", kind: "rest", stage: 2, x: 0, y: 60, z: 40, radius: 4, depth: 0.5, startOf: 3 },
+      { id: "rest4", kind: "rest", stage: 3, x: 0, y: 90, z: 40, radius: 4, depth: 0.5, startOf: 4 },
       { id: "high", kind: "static", stage: 1, x: 20, y: 12, z: 20, sx: 3, sz: 3 },
+      { id: "skip4", kind: "static", stage: 4, x: -20, y: 95, z: 40, sx: 3, sz: 3 },
       { id: "top", kind: "summit", stage: 7, x: 0, y: 200, z: 40, radius: 4, depth: 1 }];
     const portals = [{ kind: "stage", stage: 2, x: 30, y: 0, z: 0, yaw: 0 }, { kind: "speedrun", stage: 0, x: -10, y: 0, z: 0, yaw: 0 }];
     const level = new TowerLevel({ stages: STAGES, pieces, portals, routes: [], spawn: { x: 0, y: 0, z: 0, yaw: 0 } });
@@ -489,7 +491,29 @@ function box(id, x, z, y, sx, sz, more = {}) { return { id, kind: "static", stag
   r.body.place(0, 60, 40);
   tickRun(r, 0.5, splits);
   const splitEvents = splits.filter((e) => e.t === "split");
-  check("스피드런: 쉼터마다 split 한 번씩(다시 서도 안 셈)", splitEvents.length === 2 && splitEvents[0].stage === 1 && splitEvents[1].stage === 2 && splitEvents[0].seconds < splitEvents[1].seconds, splitEvents);
+  check("스피드런: 시작점 높이에 닿을 때마다 split 한 번씩(다시 서도 안 셈)", splitEvents.length === 2 && splitEvents[0].stage === 1 && splitEvents[1].stage === 2 && splitEvents[0].seconds < splitEvents[1].seconds, splitEvents);
+
+  const skip = [];
+  r.body.place(-20, 95.05, 40);
+  tickRun(r, 0.3, skip);
+  const skipSplits = skip.filter((e) => e.t === "split");
+  check("스피드런: 쉼터를 안 거쳐도 시작점 높이 이상 발판에 서면 split(스테이지 클리어는 아님)", skipSplits.length === 1 && skipSplits[0].stage === 3 && !skip.some((e) => e.t === "stageClear"), skip.map((e) => e.t));
+
+  {
+    const again = speedLevel(), alog = [];
+    settle(again);
+    enterSpeedrun(again, alog);
+    again.body.place(0, 30, 40);
+    tickRun(again, 1, alog);
+    const fallsAt = again.falls, ok = again.restartSpeedrun(), restartLog = again.events.slice();
+    check("스피드런 처음부터: 시작 지점·시계 0·구간 비움", ok && again.mode.name === "speedrun" && again.mode.seconds === 0 && again.mode.splits.every((x) => x === 0) && Math.hypot(again.body.x, again.body.z) < 1e-6 && again.body.mode === "free" && restartLog.some((e) => e.t === "speedrunStart"), [again.mode.seconds, restartLog.map((e) => e.t)]);
+    const after = [];
+    tickRun(again, 0.5, after);
+    check("스피드런 처음부터: 바로 시간이 다시 흐르고 떨어진 횟수도 새로 셈", near(again.mode.seconds, 0.5, 1e-6) && again.falls === fallsAt, again.mode.seconds);
+    const practice = speedLevel();
+    settle(practice);
+    check("일반 모드에서는 처음부터가 동작하지 않음", !practice.restartSpeedrun() && practice.mode.name === "practice");
+  }
 
   const finish = [];
   r.body.place(0, 200, 40);
@@ -498,7 +522,7 @@ function box(id, x, z, y, sx, sz, more = {}) { return { id, kind: "static", stag
   const doneTick = done.length ? done[0].tick : -1;
   check("스피드런: 꼭대기에서 speedrunFinish 한 번, summit 이벤트는 없음", done.length === 1 && !finish.some((e) => e.t === "summit"), finish.map((e) => e.t));
   check("스피드런: 기록 = 들어간 틱부터 꼭대기 틱까지", done.length === 1 && near(done[0].seconds, (doneTick - start.tick) * B.TICK, 1e-9), done[0] && [done[0].seconds, (doneTick - start.tick) * B.TICK]);
-  check("스피드런: 결과에 구간 기록(1·2·7)과 떨어진 횟수", done.length === 1 && done[0].splits.length === 7 && done[0].splits[0] > 0 && done[0].splits[1] > 0 && done[0].splits[6] === done[0].seconds && done[0].splits[3] === 0 && done[0].falls === 1, done[0]);
+  check("스피드런: 결과에 구간 기록(1·2·3·7)과 떨어진 횟수", done.length === 1 && done[0].splits.length === 7 && done[0].splits[0] > 0 && done[0].splits[1] > 0 && done[0].splits[2] > 0 && done[0].splits[2] < done[0].seconds && done[0].splits[3] === 0 && done[0].splits[6] === done[0].seconds && done[0].falls === 1, done[0]);
   const after = r.mode.seconds;
   tickRun(r, 0.5, []);
   check("스피드런: 끝난 뒤에는 시계가 멈춤", r.mode.seconds === after);

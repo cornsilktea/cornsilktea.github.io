@@ -18,6 +18,7 @@ class KeyboardInput extends ClimbInputRouter {
     constructor() {
         super();
         this.onPauseKey = () => undefined;
+        this.onRestartKey = () => undefined;
         this.held = new Set();
         window.addEventListener("keydown", (e) => this.key(e, true));
         window.addEventListener("keyup", (e) => this.key(e, false));
@@ -45,6 +46,11 @@ class KeyboardInput extends ClimbInputRouter {
         }
         if (!this.enabled)
             return;
+        if (e.code === "KeyR") {
+            if (down && !e.repeat)
+                this.onRestartKey();
+            return;
+        }
         const control = this.control(e);
         if (control) {
             if (down)

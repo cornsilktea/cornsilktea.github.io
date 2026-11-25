@@ -222,7 +222,7 @@ class ClimbHudSwitch {
 
 class ClimbHud {
   static readonly MAP_CELL = 22;
-  static readonly PLAY_IDS: readonly string[] = ["hudTop", "hudLeft", "hudMap", "controls", "btnPause"];
+  static readonly PLAY_IDS: readonly string[] = ["hudTop", "hudLeft", "hudMap", "controls", "btnPause", "btnSpeedReset"];
 
   private readonly height = new ClimbHudField(ClimbDom.el("hudHeight"));
   private readonly stage = new ClimbHudField(ClimbDom.el("hudStage"));
@@ -230,6 +230,7 @@ class ClimbHud {
   private readonly best = new ClimbHudField(ClimbDom.el("hudBest"));
   private readonly speedBest = new ClimbHudField(ClimbDom.el("hudSpeedBest"));
   private readonly speedMode = new ClimbHudSwitch(ClimbDom.el("hudLeft"), "speed");
+  private readonly restartButton = new ClimbHudSwitch(ClimbDom.el("btnSpeedReset"), "live");
   private readonly bar = new ClimbHudMeter(ClimbDom.el("hudBarFill"));
   private readonly veil = new ClimbHudFade(ClimbDom.el("slowVeil"));
   private readonly white = new ClimbHudFade(ClimbDom.el("whiteFade"));
@@ -299,6 +300,7 @@ class ClimbHud {
     this.stage.set(stage.index > 0 ? "스테이지 " + stage.index + " · " + stage.name : stage.name);
     this.bar.set(height / B.TOP);
     this.speedMode.set(mode.timed);
+    this.restartButton.set(mode.restartable);
     this.time.set(mode.timed ? ClimbText.clock(mode.seconds) : "");
     this.best.set(mode.timed ? "이번 판 " + ClimbText.meters(mode.peak) + " · 최고 " + records.best.h + "m" : "최고 " + records.best.h + "m" + (fresh.height ? " NEW" : ""));
     this.speedBest.set(mode.timed ? "최고 기록 " + (speed.seconds ? ClimbText.clock(speed.seconds) : "-") + (fresh.speed ? " NEW" : "") : "");

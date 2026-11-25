@@ -70,6 +70,9 @@ class TowerClimbGame {
             input.onPause = () => this.pause();
         }
         this.keyboard.onPauseKey = () => this.togglePause();
+        this.keyboard.onRestartKey = () => this.restartSpeedrun();
+        const restart = ClimbDom.el("btnSpeedReset");
+        restart.addEventListener("click", () => { restart.blur(); this.restartSpeedrun(); });
         if (touchDevice)
             document.body.classList.add("touch");
         ClimbDom.el("btnStart").addEventListener("click", () => this.startRun(false));
@@ -154,6 +157,15 @@ class TowerClimbGame {
         this.state = "play";
         ClimbDom.el("pauseBox").hidden = true;
         this.setInputs(true);
+    }
+    restartSpeedrun() {
+        if (this.state !== "play" || !this.rules.restartSpeedrun())
+            return;
+        this.view.rig.reset(0);
+        this.portalHint = "";
+        this.dispatch(this.rules.events);
+        this.rules.events.length = 0;
+        this.hud.banner("스피드런 처음부터! 시계 0:00.0", true, 2);
     }
     fell() {
         this.sfx.play("fall");

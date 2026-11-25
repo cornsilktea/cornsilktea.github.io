@@ -617,8 +617,9 @@ abstract class ClimbRunMode {
   get timed(): boolean { return false; }
   get seconds(): number { return 0; }
   get peak(): number { return 0; }
+  get restartable(): boolean { return false; }
   tick(_rules: ClimbRules): void {}
-  restReached(_cleared: number, _rules: ClimbRules): void {}
+  stoodAt(_height: number, _rules: ClimbRules): void {}
   abstract finish(rules: ClimbRules): void;
   abstract switched(rules: ClimbRules): ClimbRunMode;
 }
@@ -645,6 +646,7 @@ class ClimbSpeedrunMode extends ClimbRunMode {
   get timed(): boolean { return true; }
   get seconds(): number { return this.elapsed; }
   get peak(): number { return this.highest; }
+  get restartable(): boolean { return !this.finished; }
 
   tick(rules: ClimbRules): void {
     if (this.finished) return;
@@ -653,7 +655,14 @@ class ClimbSpeedrunMode extends ClimbRunMode {
     if (body.grounded || body.hanging) this.highest = Math.max(this.highest, body.y);
   }
 
-  restReached(cleared: number, rules: ClimbRules): void {
+  stoodAt(height: number, rules: ClimbRules): void {
+    for (let stage = 2; stage <= ClimbBalance.STAGE_COUNT; stage++) {
+      const start = rules.level.stageStart(stage);
+      if (start && height >= start.top - 1e-6) this.markSplit(stage - 1, rules);
+    }
+  }
+
+  private markSplit(cleared: number, rules: ClimbRules): void {
     const slot = cleared - 1;
     if (this.finished || slot < 0 || slot >= this.splits.length || this.splits[slot] > 0) return;
     this.splits[slot] = this.elapsed;
@@ -663,7 +672,7 @@ class ClimbSpeedrunMode extends ClimbRunMode {
   finish(rules: ClimbRules): void {
     if (this.finished) return;
     this.highest = ClimbBalance.TOP;
-    this.restReached(ClimbBalance.STAGE_COUNT, rules);
+    this.markSplit(ClimbBalance.STAGE_COUNT, rules);
     this.finished = true;
     rules.emit({ t: "speedrunFinish", seconds: this.elapsed, splits: this.splits.slice(), falls: rules.falls - this.fallsBefore, peak: this.highest });
   }
@@ -844,6 +853,20 @@ class ClimbCharacterBody {
     this.vx = this.vy = this.vz = 0;
     this.stopDrift();
   }
+  respawn(spawn: ClimbSpawnSpec): void {
+    this.place(spawn.x, spawn.y, spawn.z);
+    this.yaw = spawn.yaw;
+    this.mode = "free";
+    this.grounded = false;
+    this.ground = null;
+    this.sliding = false;
+    this.coyote = this.jumpBuffer = this.hangTime = this.hopTime = this.shiftCooldown = this.grabCooldown = 0;
+    this.stunTime = this.knockTime = this.knockCooldown = this.portalTime = 0;
+    this.windX = this.windZ = 0;
+    this.letGo = null;
+    this.portal = null;
+    this.airPeak = spawn.y;
+  }
   stopDrift(): void { this.driftX = this.driftZ = 0; }
   remember(): void { this.prevX = this.x; this.prevY = this.y; this.prevZ = this.z; }
   get speed(): number { return Math.hypot(this.vx, this.vz); }
@@ -1013,6 +1036,18 @@ class ClimbRules {
 
   beginSpeedrun(): void { this.mode = new ClimbPracticeMode().switched(this); }
 
+  restartSpeedrun(): boolean {
+    if (!this.mode.restartable) return false;
+    this.body.respawn(this.level.spawn);
+    this.crumbles.forEach((piece) => piece.reset());
+    this.steer(0, 0);
+    this.jumpLatch = false;
+    this.bank = 0;
+    this.mode = new ClimbPracticeMode().switched(this);
+    this.emit({ t: "hubArrive" });
+    return true;
+  }
+
   private carrier(): MovingPlatform | null {
     const body = this.body;
     const piece = body.mode === "hang" ? body.spot.piece : body.mode === "climbUp" ? body.climbPath.piece : body.grounded ? body.ground : null;
@@ -1031,7 +1066,13 @@ class ClimbRules {
 
   touchStageStart(stage: number): void {
     if (this.progress.clear(stage - 1)) this.emit({ t: "stageClear", stage: stage - 1 });
-    this.mode.restReached(stage - 1, this);
+  }
+
+  private standOnGround(): void {
+    const body = this.body;
+    if (!body.ground) return;
+    this.mode.stoodAt(body.y, this);
+    body.ground.stand(this);
   }
 
   bounce(pad: PlatformPiece): void {
@@ -1111,7 +1152,7 @@ class ClimbRules {
       body.airPeak = Math.max(body.airPeak, body.y);
     }
 
-    if (body.grounded && body.ground) body.ground.stand(this);
+    if (body.grounded) this.standOnGround();
     if (body.speed > 0.5) body.yaw = Math.atan2(body.vx, body.vz);
     if (body.grounded) { this.peak = Math.max(this.peak, body.y); this.enterPortalIfInside(); }
     else if (this.canAutoGrab()) this.startHang();
@@ -1275,7 +1316,7 @@ class ClimbRules {
     const body = this.body;
     body.stunTime -= ClimbBalance.TICK;
     if (body.stunTime <= 0) body.mode = "free";
-    if (body.ground) body.ground.stand(this);
+    this.standOnGround();
   }
 
   private stepPortal(): void {

@@ -52,6 +52,9 @@
   #hudMapCells i.cleared { background: #D97B4F; }
   #hudMapDot { position: absolute; left: 6px; top: 3px; width: 9px; height: 9px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 2px #10182A; }
   #btnPause { position: fixed; right: 12px; top: 8px; z-index: 7; font: inherit; font-size: 15px; font-weight: 800; color: #fff; cursor: pointer; border-top: 0; border-right: 0; border-bottom: 0; padding: 7px 14px; }
+  #btnSpeedReset { position: fixed; right: 84px; top: 8px; z-index: 7; display: none; font: inherit; font-size: 15px; font-weight: 800; color: #fff; cursor: pointer; border-top: 0; border-right: 0; border-bottom: 0; border-left-color: #FFC83D; padding: 7px 14px; }
+  #btnSpeedReset.live { display: block; }
+  #btnSpeedReset[hidden] { display: none; }
   #banner { position: fixed; left: 50%; top: 104px; transform: translateX(-50%); z-index: 8; padding: 8px 16px; font-size: 17px; font-weight: 800; pointer-events: none; max-width: 92vw; text-align: center; white-space: nowrap; }
   #banner.strong { font-size: 22px; background: rgba(217,123,79,.92); border-left-color: #fff; }
   #bigCount { position: fixed; left: 50%; top: 40%; transform: translate(-50%, -50%); z-index: 8; font-size: 96px; font-weight: 800; pointer-events: none; color: #fff; text-shadow: 0 4px 0 #1A5C99, 0 0 24px rgba(110,200,255,.8); }
@@ -123,6 +126,7 @@
 <div id="hudLeft" class="hud-box" hidden><div id="hudMode" class="speed-tag">스피드런</div><div id="hudTime">0:00.0</div><div id="hudSpeedBest"></div><div id="hudBest"></div></div>
 <div id="hudMap" class="hud-box" hidden><div id="hudMapCells"><div id="hudMapDot"></div></div></div>
 <button type="button" id="btnPause" class="hud-box" hidden>멈춤</button>
+<button type="button" id="btnSpeedReset" class="hud-box" hidden>↺ 처음부터</button>
 <div id="banner" class="hud-box" hidden></div>
 <div id="grabHint" class="hud-box" hidden></div>
 <div id="bigCount" hidden></div>
@@ -189,6 +193,7 @@
         <span><kbd>Space</kbd></span><span>점프 · 손잡이에서 위 손잡이로</span>
         <span><kbd>W</kbd> <kbd>Space</kbd> / <kbd>S</kbd></span><span>모서리에 매달려서 기어오르기 / 손 놓기 (잡기는 저절로 돼요)</span>
         <span><kbd>Shift</kbd></span><span>누르는 동안 슬로 모션</span>
+        <span><kbd>R</kbd></span><span>스피드런 중에 처음 지점으로 돌아가 시계를 0 으로 (위쪽 <b>↺ 처음부터</b> 버튼과 같아요)</span>
       </div>
       <div class="st-keys">
         <span><kbd>태블릿</kbd></span><span>왼쪽 조이스틱으로 이동, 오른쪽 조이스틱으로 시야, <b>점프</b>·<b>슬로</b> 버튼. 매달리면 조이스틱 위로 오르기, 아래로 놓기</span>
@@ -211,13 +216,13 @@
 <script charset="utf-8" src="common/load-gauge.js?v=20261118c"></script>
 <script charset="utf-8" src="common/character-kit.js?v=20261116b"></script>
 <script charset="utf-8" src="common/fold-card.js"></script>
-<script charset="utf-8" src="games/42.tower-climb/42.climb-rules.js?v=20261118hg"></script>
+<script charset="utf-8" src="games/42.tower-climb/42.climb-rules.js?v=20261125a"></script>
 <script charset="utf-8" src="games/42.tower-climb/42.tower-level-data.js?v=20261118mb"></script>
 <script charset="utf-8" src="games/42.tower-climb/42.climb-scene.js?v=20261118dn"></script>
 <script charset="utf-8" src="games/42.tower-climb/42.climb-sky.js?v=20261118dn"></script>
-<script charset="utf-8" src="games/42.tower-climb/42.climb-input.js?v=20261118ts"></script>
-<script charset="utf-8" src="games/42.tower-climb/42.climb-hud.js?v=20261118sb"></script>
-<script charset="utf-8" src="games/42.tower-climb/42.tower-climb.js?v=20261118ts"></script>
+<script charset="utf-8" src="games/42.tower-climb/42.climb-input.js?v=20261125a"></script>
+<script charset="utf-8" src="games/42.tower-climb/42.climb-hud.js?v=20261125a"></script>
+<script charset="utf-8" src="games/42.tower-climb/42.tower-climb.js?v=20261125a"></script>
 <script charset="utf-8" src="games/42.tower-climb/42.climb-boot.js?v=20261118b"></script>
 <script type="module">
 new ClimbBoot(async () => {

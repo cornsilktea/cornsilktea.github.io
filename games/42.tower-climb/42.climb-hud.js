@@ -242,6 +242,7 @@ class ClimbHud {
         this.best = new ClimbHudField(ClimbDom.el("hudBest"));
         this.speedBest = new ClimbHudField(ClimbDom.el("hudSpeedBest"));
         this.speedMode = new ClimbHudSwitch(ClimbDom.el("hudLeft"), "speed");
+        this.restartButton = new ClimbHudSwitch(ClimbDom.el("btnSpeedReset"), "live");
         this.bar = new ClimbHudMeter(ClimbDom.el("hudBarFill"));
         this.veil = new ClimbHudFade(ClimbDom.el("slowVeil"));
         this.white = new ClimbHudFade(ClimbDom.el("whiteFade"));
@@ -305,6 +306,7 @@ class ClimbHud {
         this.stage.set(stage.index > 0 ? "스테이지 " + stage.index + " · " + stage.name : stage.name);
         this.bar.set(height / B.TOP);
         this.speedMode.set(mode.timed);
+        this.restartButton.set(mode.restartable);
         this.time.set(mode.timed ? ClimbText.clock(mode.seconds) : "");
         this.best.set(mode.timed ? "이번 판 " + ClimbText.meters(mode.peak) + " · 최고 " + records.best.h + "m" : "최고 " + records.best.h + "m" + (fresh.height ? " NEW" : ""));
         this.speedBest.set(mode.timed ? "최고 기록 " + (speed.seconds ? ClimbText.clock(speed.seconds) : "-") + (fresh.speed ? " NEW" : "") : "");
@@ -327,7 +329,7 @@ class ClimbHud {
     }
 }
 ClimbHud.MAP_CELL = 22;
-ClimbHud.PLAY_IDS = ["hudTop", "hudLeft", "hudMap", "controls", "btnPause"];
+ClimbHud.PLAY_IDS = ["hudTop", "hudLeft", "hudMap", "controls", "btnPause", "btnSpeedReset"];
 ClimbHud.LEDGE_TIP = "<b>W / Space</b><span>올라가기</span><b>S</b><span>놓기</span>";
 ClimbHud.HOLD_TIP = "<b>Space</b><span>위로</span><b>S</b><span>놓기</span>";
 ClimbHud.LEDGE_TIP_TOUCH = "<b>위로 밀기 · 점프</b><span>올라가기</span><b>아래로 당기기</b><span>놓기</span>";
