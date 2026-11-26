@@ -584,7 +584,7 @@ SinglePassMaterials.enable(THREE);
   class CharCatalog {
     constructor(services) { this.services = services; this.iconSrc = {}; this.faceSrc = {}; }
     faceImgSrc(c) { var services = this.services; return services.catalog.faceSrc[c] || services.catalog.charImgSrc(c); }
-    playable(c) { var services = this.services; return !!(services.charTypes.statsOf(c) && !services.charTypes.statsOf(c).retired); }
+    playable(c) { var services = this.services; return !!services.charTypes.statsOf(c); }
     pickable(c) { var services = this.services; return services.catalog.playable(c) && !services.charTypes.statsOf(c).practiceBot; }
     roleOf(c) { var services = this.services; return RoleKinds.TABLE[services.charTypes.statsOf(c).role]; }
     gaugeOnHitOf(c) { var services = this.services; return services.charTypes.statsOf(c).gaugeOnHit != null ? services.charTypes.statsOf(c).gaugeOnHit : RoleKinds.TABLE[services.charTypes.statsOf(c).role].gaugeOnHit; }
@@ -1761,7 +1761,7 @@ SinglePassMaterials.enable(THREE);
       function pair(a, b) { return b == null ? String(a) : a + " / " + b; }
       var times = c.shots || c.hits || c.ticks || 1, hit = services.skilltext.num(c.dmg) + (times > 1 ? "*" + times : "");
       var dmg = !c.dmg ? "-" : c.dashDmg ? pair(services.skilltext.num(c.dashDmg), services.skilltext.num(c.dmg))
-              : type.statDamageText(c) || pair(hit, c.throwDmg || type.statSkillDamage(c)) + (c.heal ? " / " + c.heal : "");
+              : type.statDamageText(c) || pair(hit, c.throwDmg || type.statSkillDamage(c));
       var altCd = type.statAltCooldown(c);
       var cdText = type.statCooldownText(c), rangeText = type.statRangeText(c);
       var rateRow = cdText ? "<tr><th>공격 간격</th><td>" + cdText + "초</td></tr>" : services.clock.scale !== 1 ? "<tr><th>공격 간격</th><td>" + pair(services.skilltext.num(c.cd / services.clock.scale / 1000), altCd == null ? null : services.skilltext.num(altCd / services.clock.scale / 1000)) + "초</td></tr>"
@@ -3299,45 +3299,6 @@ SinglePassMaterials.enable(THREE);
       return ["Melee_1H_Attack_Chop", 1.6];
     }
   }
-  class PriestType extends CharacterType {
-    static MELEE = { color: 0x7CFFB2, spark: "#C9A6FF" };
-    static MODEL = { file: "Mage", right: "wand", left: "spellbook_open", leftTurn: Math.PI, hide: ["Mage_Hat"],
-               recolor: [[1, 0, 2, "#FFFFFF", "#CFC8BA"], [1, 2, 1, "#9CCBF2", "#3E6BA6"], [0, 1, 1, "#F2D38A", "#A87A3A"]] };
-    static ULT = {
-      bhR: 200, bhDur: 3000, bhDelay: 500, bhPull: 220, bhCast: 380, bhMin: 60, bhCcRate: 0.8
-    };
-    static STATS = { name: "사제", role: "caster", icon: "📖", hp: 120, speed: 240, cd: 1000, dmg: 10, heal: 10, range: 320, width: 200, ultName: "블랙홀", ultAim: true, heals: true, retired: true };
-    static WAVE = { life: 703, travel: 543 };
-    get hasSkillClip() { return true; }
-    playSkillClip(v, E, t) { var services = this.services; services.fighterMotion.playOnce(v, "Ranged_Magic_Spellcasting_Long", 2.6, t); }
-    cast(E, ang, reach, t) { var services = this.services;
-      var holeSpot = this.skillSpot(E, ang, reach);
-      E.angle = Math.atan2(holeSpot.y - E.y, holeSpot.x - E.x);
-      E.ultUntil = t + 450;
-      E.skillDur = PriestType.ULT.bhDelay + PriestType.ULT.bhDur;
-      services.session.room.ref.child("effects").push({ type: "hole", team: E.team, owner: E.id, x: Math.round(holeSpot.x), y: Math.round(holeSpot.y),
-                                       r: PriestType.ULT.bhR, dur: PriestType.ULT.bhDur, delay: PriestType.ULT.bhDelay, createdAt: t });
-      services.vision.revealBriefly(E.id, t);
-    }
-    aimRange(btn) { return [PriestType.ULT.bhMin, PriestType.ULT.bhCast]; }
-    skillSpot(E, ang, reach) { return this.services.attack.burstSpot(E, ang, reach, PriestType.ULT.bhCast, PriestType.ULT.bhMin); }
-    botUltRange() { return PriestType.ULT.bhCast; }
-    showAimGuide(E, ult, c) { var services = this.services;
-      if (!ult) return false;
-      services.aimGuide.showAimArea(E, this.skillSpot(E, E.angle, services.input.aimReach(E, "ult")), PriestType.ULT.bhR + AimGuide.HALF_IN);
-      return true;
-    }
-    ultDesc() { var services = this.services;
-      return "지정한 곳에 " + services.skilltext.secs(PriestType.ULT.bhDelay) + " 뒤 " + services.skilltext.secs(PriestType.ULT.bhDur) + "간 유지되는 반경 " + PriestType.ULT.bhR + "의 블랙홀 생성. 적은 중심으로 끌려감";
-    }
-    passiveDesc() {
-      var c = this.data;
-      return "기본 공격에 맞은 아군은 체력 " + c.heal + " 회복";
-    }
-    attackClip(v, E, t) {
-      return ["Ranged_Magic_Shoot", 1.4];
-    }
-  }
   class ShamanType extends CharacterType {
     get meleeOutline() { return 0xC0101E; }
     static MELEE = { color: 0x241C2E, spark: "#8A1420" };
@@ -3810,60 +3771,17 @@ SinglePassMaterials.enable(THREE);
       return "사거리 " + c.range + "의 덩굴 " + c.lanes + "줄을 나란히 발사(한 번 맞으면 나머지 줄은 같은 적을 통과). 맞은 적은 " + c.dmg + "의 피해";
     }
   }
-  class GargantuaType extends CharacterType {
-    static ULT = {
-      gaCast: 350, gaMin: 60, gaTransformMs: GameTime.gameMs(1.2), gaDur: GameTime.gameMs(6), gaR: 350, gaPull: 260, gaGap: 70, gaBoomDmg: 30
-    };
-    static STATS = { name: "가르강튀아", role: "caster", icon: "🌀", hp: 300, speed: GameTime.gameSpeed(150), cd: GameTime.gameMs(1.4), dmg: 10, range: 120, arc: Math.PI * 0.6, ultName: "가르강튀아", ultAim: true, retired: true };
-    get startsSkillTimer() { return false; }
-    isSurging(E, t) { return E.buffUntil > t && t >= E.buffUntil - GargantuaType.ULT.gaDur; }
-    isHammerLeaping(E, t) { return E.ultUntil > t && !this.isSurging(E, t); }
-    isRooted(E, t) { return this.isHammerLeaping(E, t) || this.isSurging(E, t); }
-    cannotAttack(E, t) { return this.isRooted(E, t); }
-    aimRange(btn) { return [GargantuaType.ULT.gaMin, GargantuaType.ULT.gaCast]; }
-    showAimGuide(E, ult, c) { var services = this.services;
-      if (!ult) return false;
-      services.aimGuide.showAimArea(E, this.skillSpot(E, E.angle, services.input.aimReach(E, "ult")), GargantuaType.ULT.gaR + AimGuide.HALF_IN);
-      return true;
-    }
-    botUltRange() { return GargantuaType.ULT.gaCast; }
-    botUltSpot(B, target, td, t) { var services = this.services; return services.brain.leadSpot(target, services.dashMoves.hammerLeapMs(td) / 1000, t); }
-    skillSpot(E, ang, reach) { var services = this.services, landing = services.attack.burstSpot(E, ang, reach, GargantuaType.ULT.gaCast, GargantuaType.ULT.gaMin); services.physics.resolve(landing); return landing; }
-    cast(E, ang, reach, t) { var services = this.services;
-      var landing = this.skillSpot(E, ang, reach);
-      E.angle = Math.atan2(landing.y - E.y, landing.x - E.x);
-      var leapMs = services.dashMoves.hammerLeapMs(MathKit.hyp(landing.x - E.x, landing.y - E.y));
-      E.leapAt = t;
-      E.ultUntil = t + leapMs;
-      E.cdUntil = Math.max(E.cdUntil, t + leapMs + 250);
-      E.pending = null; E.slash = null;
-      E.leap = { sx: E.x, sy: E.y, tx: landing.x, ty: landing.y, at: t, until: t + leapMs };
-    }
-    onLeapLand(E, t) { var services = this.services; services.gargantuaSys.land(E, t); return true; }
-    skillMoves(E, t) { return true; }
-    get hasSkillClip() { return true; }
-    playSkillClip(v, E, t) { var services = this.services;
-      if (!this.isSurging(E, t)) services.fighterMotion.playOnce(v, "Melee_1H_Attack_Jump_Chop", ModelTuning.JUMP_CHOP_LAND_SEC * 1000 / Math.max(1, E.ultUntil - (E.leapAt || t)), t);
-    }
-    ultDesc() { var services = this.services;
-      return "지정한 곳(최대 " + GargantuaType.ULT.gaCast + ")으로 점프해 " + services.skilltext.secs(GargantuaType.ULT.gaDur) + "간 블랙홀 생성. 그동안 움직이거나 기본 공격을 할 수 없고, 반경 " + GargantuaType.ULT.gaR +
-             "의 적을 계속 끌어당김. 끝나면 폭발해 반경 안의 적에게 " + GargantuaType.ULT.gaBoomDmg + "의 피해";
-    }
-  }
-  class AstrologerType extends GargantuaType {
+  class AstrologerType extends CharacterType {
     static MODEL = { file: "Mage", launchTip: "offhand", left: "spellbook_open", leftTurn: Math.PI, hide: ["Mage_Hat"],
                   halo: { on: "Mage_Head", color: 0xD9A8FF, r: 0.42, tube: 0.035, stars: 3, starSize: 0.075, rise: 0.14, tilt: 0.3 },
                   recolor: [[1, 0, 2, "#2E2038", "#0A060F"], [1, 2, 1, "#C58BFF", "#6A2BC4"], [2, 1, 1, "#C58BFF", "#6A2BC4"], [0, 5, 1, "#C58BFF", "#6A2BC4"]],
                   leftRecolor: [[1, 2, 1, "#C58BFF", "#6A2BC4"], [2, 1, 1, "#C58BFF", "#6A2BC4"]] };
     static ULT = {
       sfMin: 60, sfDelay: GameTime.gameMs(0.6 / 1.3), sfR: 90, sfStunEvery: 4, sfStunMs: GameTime.gameMs(1), agCast: 400, agMin: 60, agDur: GameTime.gameMs(2.5),
-      agR: 280, agPull: 260, agGap: 70, agBoomDmg: 25
+      agR: 280, agPull: 260, agGap: 70, agBoomDmg: 25, agCcRate: 0.8
     };
     static STATS = { name: "점성술사", role: "caster", icon: "🌠", hp: 115, speed: GameTime.gameSpeed(170), cd: GameTime.gameMs(1.4), dmg: 15, range: 380, ultName: "가르강튀아", ultAim: true };
-    get startsSkillTimer() { return true; }
-    isHammerLeaping(E, t) { return false; }
-    isRooted(E, t) { return false; }
-    cannotAttack(E, t) { return false; }
+    skillMoves(E, t) { return true; }
     aimRange(btn) { return btn === "ult" ? [AstrologerType.ULT.agMin, AstrologerType.ULT.agCast] : [AstrologerType.ULT.sfMin, this.data.range]; }
     showAimGuide(E, ult, c) { var services = this.services;
       var reach = services.input.aimReach(E, services.input.aim.btn);
@@ -5454,7 +5372,6 @@ SinglePassMaterials.enable(THREE);
         thrower: new ThrowerType(services, "thrower"),
         lancer: new LancerType(services, "lancer"),
         blacksmith: new BlacksmithType(services, "blacksmith"),
-        priest: new PriestType(services, "priest"),
         shaman: new ShamanType(services, "shaman"),
         cleric: new ClericType(services, "cleric"),
         hitman: new HitmanType(services, "hitman"),
@@ -5472,7 +5389,6 @@ SinglePassMaterials.enable(THREE);
         shielder: new ShielderType(services, "shielder"),
         arca: new ArcaType(services, "arca"),
         hunter: new HunterType(services, "hunter"),
-        gargantua: new GargantuaType(services, "gargantua"),
         astrologer: new AstrologerType(services, "astrologer"),
         dummy: new DummyType(services, "dummy"),
         dummyAlly: new DummyAllyType(services, "dummyAlly")
@@ -6954,7 +6870,7 @@ SinglePassMaterials.enable(THREE);
     }
     creditHolePull(T, owner, t, dt) { var services = this.services;
       if (T.isStunned(t)) return;
-      var already = 1 - T.slowMulAt(t), extra = PriestType.ULT.bhCcRate - already;
+      var already = 1 - T.slowMulAt(t), extra = AstrologerType.ULT.agCcRate - already;
       if (extra <= 0) return;
       services.status.creditCC(owner, 0, already > 0 ? 0 : dt * 1000, dt * 1000 * extra);
     }
@@ -7150,13 +7066,12 @@ SinglePassMaterials.enable(THREE);
     }
     stepHoles(t, dt) { var services = this.services;
       services.field.holes = services.field.holes.filter(function (h) {
-        var e = h.e, start = e.createdAt + e.delay, end = start + e.dur, center = services.fieldFx.holeCenter(e);
-        if (center.ownerFell) { services.poolView.dropHoleVis(h); return false; }
-        if (t >= end) { if (e.ga) services.gargantuaSys.explode(e, center, t); services.poolView.dropHoleVis(h); return false; }
+        var e = h.e, start = e.createdAt + e.delay, end = start + e.dur, center = { x: e.x, y: e.y };
+        if (t >= end) { services.gargantuaSys.explode(e, center, t); services.poolView.dropHoleVis(h); return false; }
         if (t < start) return true;
         if (!h.landed) { h.landed = true; if (!services.match.me || MathKit.hyp(center.x - services.match.me.x, center.y - services.match.me.y) < 700) services.sound.sfx("orb"); }
         if (services.session.room.status !== "playing") return true;
-        var gap = e.gap || 6, pullRate = e.pull || PriestType.ULT.bhPull;
+        var gap = e.gap, pullRate = e.pull;
         services.targets.localTargets().forEach(function (T) {
           if (!T.alive || T.team === e.team || T.isProtected(t) || T.hookPull) return;
           var dx = center.x - T.x, dy = center.y - T.y, d = MathKit.hyp(dx, dy);
@@ -8595,7 +8510,6 @@ SinglePassMaterials.enable(THREE);
       if (rage && !dmgOverride) { d.ownBase = c.dmg; d.ownRate = WarriorType.ULT.bzDmgMul; }
       d.radius = c.range;
       if (c.arc) d.arc = c.arc;
-      if (c.heal) d.heal = c.heal;
       if (c.fx) d.fx = c.fx;
       E.atkAt = services.clock.now();
       services.vision.revealBriefly(E.id, E.atkAt);
@@ -8724,21 +8638,9 @@ SinglePassMaterials.enable(THREE);
   }
   class GargantuaSystem {
     constructor(services) { this.services = services; }
-    land(E, t) { var services = this.services;
-      E.buffUntil = t + GargantuaType.ULT.gaDur;
-      E.skillDur = GargantuaType.ULT.gaDur;
-      E.skillUntil = t + GargantuaType.ULT.gaDur;
-      E.ultUntil = t + GargantuaType.ULT.gaTransformMs;
-      E.pending = null;
-      services.session.room.ref.child("effects").push({ type: "hole", team: E.team, owner: E.id, x: Math.round(E.x), y: Math.round(E.y), r: GargantuaType.ULT.gaR, dur: GargantuaType.ULT.gaDur, delay: 0,
-                                       follow: 1, ga: 1, gap: GargantuaType.ULT.gaGap, pull: GargantuaType.ULT.gaPull, createdAt: t });
-      services.vision.revealBriefly(E.id, t);
-      if (services.targets.hear(E)) services.sound.sfx("boom");
-      services.match.game.forceNet = true;
-    }
     summon(E, spot, t) { var services = this.services;
       services.session.room.ref.child("effects").push({ type: "hole", team: E.team, owner: E.id, x: Math.round(spot.x), y: Math.round(spot.y), r: AstrologerType.ULT.agR, dur: AstrologerType.ULT.agDur, delay: 0,
-                                       ga: 1, gap: AstrologerType.ULT.agGap, pull: AstrologerType.ULT.agPull, boom: AstrologerType.ULT.agBoomDmg, createdAt: t });
+                                       gap: AstrologerType.ULT.agGap, pull: AstrologerType.ULT.agPull, boom: AstrologerType.ULT.agBoomDmg, createdAt: t });
       services.vision.revealBriefly(E.id, t);
       if (services.targets.hear(E)) services.sound.sfx("boom");
       services.match.game.forceNet = true;
@@ -8749,8 +8651,8 @@ SinglePassMaterials.enable(THREE);
       if (services.session.room.status !== "playing") return;
       services.targets.localTargets().forEach(function (T) {
         if (!T.alive || T.team === e.team || T.isProtected(t) || MathKit.hyp(center.x - T.x, center.y - T.y) > e.r + T.hitR * 0.5) return;
-        if (services.shieldWalls.shrug(T, center.x, center.y, e.boom || GargantuaType.ULT.gaBoomDmg, t)) return;
-        services.damage.damage(T, e.boom || GargantuaType.ULT.gaBoomDmg, e.owner, false, "blackhole");
+        if (services.shieldWalls.shrug(T, center.x, center.y, e.boom, t)) return;
+        services.damage.damage(T, e.boom, e.owner, false, "blackhole");
       });
     }
   }
@@ -11566,28 +11468,11 @@ SinglePassMaterials.enable(THREE);
     constructor(services) { this.services = services; this.spareBottles = []; }
     giveBottle(bottle) { var services = this.services; services.stage.scene.remove(bottle); services.poolView.spareBottles.push(bottle); }
     prefillBottles(count) { var services = this.services, made = []; while (services.poolView.spareBottles.length + made.length < count) made.push(services.poolView.makeBottleVis()); made.forEach(services.poolView.giveBottle.bind(services.poolView)); }
-    makeHoleVis(e) { var services = this.services;
-      if (e.ga) return services.gargantua.make(e);
-      var g = new THREE.Group();
-      var fillMat = new THREE.MeshBasicMaterial({ color: 0x1A0033, transparent: true, opacity: 0.55, depthWrite: false });
-      var ringMat = new THREE.MeshBasicMaterial({ color: 0xB07CFF, transparent: true, opacity: 0.85, depthWrite: false, blending: THREE.AdditiveBlending });
-      var fill = services.arenaView.flatMesh(services.geo.disc, fillMat); fill.scale.setScalar(e.r); fill.position.y = 1.6; g.add(fill);
-      var ring = services.arenaView.flatMesh(services.geo.ringFx, ringMat); ring.scale.setScalar(e.r); ring.position.y = 2; g.add(ring);
-      g.position.set(e.x, 0, e.y);
-      g.userData = { mats: [fillMat, ringMat], ring: ring, fill: fill, r: e.r };
-      services.stage.scene.add(g);
-      return g;
-    }
-    dropHoleVis(h) { var services = this.services; if (!h.vis) return; if (h.vis.userData.shelf) { h.vis.userData.shelf.give(h.vis); h.vis = null; return; } services.stage.scene.remove(h.vis); h.vis.userData.mats.forEach(function (m) { m.dispose(); }); h.vis = null; }
+    dropHoleVis(h) { if (!h.vis) return; h.vis.userData.shelf.give(h.vis); h.vis = null; }
     renderHole(h, t, nowMs) { var services = this.services;
-      var e = h.e, start = e.createdAt + e.delay;
-      if (t < start) return;
-      if (!h.vis) h.vis = services.poolView.makeHoleVis(e);
-      if (e.ga) { services.gargantua.render(h, t, nowMs); return; }
-      var ud = h.vis.userData, grow = MathKit.clamp((t - start) / 200, 0.01, 1);
-      h.vis.scale.set(grow, 1, grow);
-      ud.ring.rotation.z = -nowMs / 250;
-      ud.fill.scale.setScalar(ud.r * (0.9 + 0.1 * Math.sin(nowMs / 180)));
+      if (t < h.e.createdAt + h.e.delay) return;
+      if (!h.vis) h.vis = services.gargantua.make(h.e);
+      services.gargantua.render(h, t, nowMs);
     }
     makeBottleVis() { var services = this.services, spare = services.poolView.spareBottles.pop();
       if (spare) { services.stage.scene.add(spare); return spare; }
@@ -11910,8 +11795,8 @@ SinglePassMaterials.enable(THREE);
     render(h, t, nowMs) { var services = this.services;
       var e = h.e, ud = h.vis.userData, start = e.createdAt + e.delay, end = start + e.dur, G = GargantuaView;
       var rise = MathKit.clamp((t - start) / G.RISE_MS, 0.001, 1), charge = MathKit.clamp((t - (end - G.CHARGE_MS)) / G.CHARGE_MS, 0, 1), k = rise * rise * (3 - 2 * rise) * (1 + 0.1 * charge);
-      var shown = e.follow ? services.fighterView.fighters[e.owner] : null, center = services.fieldFx.holeCenter(e), spin = nowMs / 1000 * (1 + 2 * charge);
-      h.vis.position.set(shown ? shown.root.position.x : center.x, 0, shown ? shown.root.position.z : center.y);
+      var spin = nowMs / 1000 * (1 + 2 * charge);
+      h.vis.position.set(e.x, 0, e.y);
       h.vis.scale.setScalar(Math.max(0.001, k));
       ud.vortex.rotation.z = spin * 1.1;
       ud.edgeMat.opacity = 0.55 + 0.25 * Math.sin(nowMs / (140 - 90 * charge));
@@ -14200,7 +14085,7 @@ SinglePassMaterials.enable(THREE);
       }).join("") + "</table><ul>" +
         "<li>둔화는 둔화율을 곱합니다. 예) 50% 둔화 2초 = 2 × 0.5 × " + ResultBoard.MVP_SLOW_PER_SEC + " = " + ResultBoard.MVP_SLOW_PER_SEC + "점</li>" +
         "<li>기절·둔화는 이미 걸린 효과와 겹치지 않고 새로 늘어난 시간만 셉니다</li>" +
-        "<li>블랙홀에 끌려간 시간은 " + Math.round(PriestType.ULT.bhCcRate * 100) + "% 둔화로 셉니다</li>" +
+        "<li>블랙홀에 끌려간 시간은" + Math.round(AstrologerType.ULT.agCcRate * 100) + "% 둔화로 셉니다</li>" +
         "<li>MVP는 환산점수가 가장 높은 사람이고, 처치·어시스트가 하나도 없거나 경기 중에 나간 사람은 MVP에서 제외합니다</li></ul>";
     }
   }
@@ -15299,7 +15184,7 @@ SinglePassMaterials.enable(THREE);
         return g;
       });
     }
-    sampleViews() { var services = this.services, P = ShaderWarmup.PROBE_SPOT, e = { x: P, y: P, r: 60, team: "blue", createdAt: 0, u: 1, owner: "", ga: false };
+    sampleViews() { var services = this.services, P = ShaderWarmup.PROBE_SPOT, e = { x: P, y: P, r: 60, team: "blue", createdAt: 0, u: 1, owner: "" };
       var makers = [
         function () { return services.fxView.fxMesh({ k: "spark", x: P, y: P, c: "#FFFFFF", s: 1 }); },
         function () { return services.fxView.fxMesh({ k: "smoke", x: P, y: P, c: 0xC8C8CD }); },
@@ -15316,13 +15201,12 @@ SinglePassMaterials.enable(THREE);
         function () { return services.phantomView.warmSample(); },
         function () { return services.hunterEchoes.warmSample(); },
         function () { return services.sniperShots.warmSample(); },
-        function () { return services.poolView.makeHoleVis(e); },
         function () { return services.poolView.makeBottleVis(); },
         function () { return services.domainView.makeCurseVis(); },
         function () { return services.revGraceView.makeSkyBeam(EffectView.REV_ALLY_COLOR, false); },
         function () { return services.revGraceView.makeSkyBeam(EffectView.REV_FOE_COLOR, true); },
         function () { return services.stormView.makeStormVis(e); },
-        function () { return services.gargantua.make(Object.assign({}, e, { ga: true })); },
+        function () { return services.gargantua.make(e); },
         function () { return services.galeView.warmSample(); },
         function () { return services.barrierView.warmSample(); },
         function () { return services.hookView.warmSample(); },

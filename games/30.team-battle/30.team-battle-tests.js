@@ -270,7 +270,7 @@ class ResultCollector {
   run(MOVE, "블랙홀 중심을 벽 안에 찍어도 끌려간 적이 벽에 끼지 않는가", function (done) {
     var q = singleRowWall(), ty = q.y + q.h / 2 + api.BODY_R + 40;
     var W = world("forest", [
-      { id: "pr", team: "blue", char: "priest", x: q.x, y: ty + 150, gauge: api.GAUGE_MAX },
+      { id: "pr", team: "blue", char: "astrologer", x: q.x, y: ty + 150, gauge: api.GAUGE_MAX },
       { id: "foe", team: "red", char: "knight", x: q.x + 30, y: ty }
     ]);
     var pr = W.ent("pr"), aim = Math.atan2(q.y - pr.y, q.x - pr.x);
@@ -284,7 +284,7 @@ class ResultCollector {
   run(MOVE, "블랙홀에 끌려가는 중에 창벽 넉백을 같이 받으면 벽·물에 끼지 않는가", function (done) {
     var y = OPEN_Y.forest;
     var W = world("forest", [
-      { id: "pr", team: "blue", char: "priest", x: 250, y: y, gauge: api.GAUGE_MAX },
+      { id: "pr", team: "blue", char: "astrologer", x: 250, y: y, gauge: api.GAUGE_MAX },
       { id: "gd", team: "blue", char: "guardian", x: 500, y: y, gauge: api.GAUGE_MAX },
       { id: "foe", team: "red", char: "knight", x: 440, y: y }
     ]);
@@ -302,9 +302,9 @@ class ResultCollector {
       { id: "ln", team: "blue", char: "lancer", x: 250, y: y, gauge: api.GAUGE_MAX },
       { id: "foe", team: "red", char: "knight", x: 480, y: y },
       { id: "gd", team: "red", char: "guardian", x: 190, y: y, gauge: api.GAUGE_MAX },
-      { id: "pr", team: "red", char: "priest", x: 250, y: y + 250, gauge: api.GAUGE_MAX }
+      { id: "pr", team: "red", char: "astrologer", x: 250, y: y + 250, gauge: api.GAUGE_MAX }
     ]);
-    if (push === "hole") { api.useUlt(W.ent("pr"), -Math.PI / 2, 120); W.step(api.ULT.bhDelay + 100); }
+    if (push === "hole") { api.useUlt(W.ent("pr"), -Math.PI / 2, 120); W.step(100); }
     var castX = W.ent("ln").x, castY = W.ent("ln").y;
     api.useUlt(W.ent("ln"), 0);
     W.step(50);
@@ -355,7 +355,7 @@ class ResultCollector {
       { id: "gd", team: "blue", char: "guardian", x: 520, y: y, gauge: api.GAUGE_MAX },
       { id: "bs", team: "blue", char: "blacksmith", x: 420, y: y + 250, gauge: api.GAUGE_MAX },
       { id: "th", team: "blue", char: "thrower", x: 250, y: y + 200, gauge: api.GAUGE_MAX },
-      { id: "pr", team: "blue", char: "priest", x: 250, y: y - 150, gauge: api.GAUGE_MAX },
+      { id: "pr", team: "blue", char: "astrologer", x: 250, y: y - 150, gauge: api.GAUGE_MAX },
       { id: "hm", team: "blue", char: "hitman", x: 150, y: y, gauge: api.GAUGE_MAX },
       { id: "gb", team: "blue", char: "guardian", x: 360, y: y, slot: 3 }
     ];
@@ -403,15 +403,15 @@ class ResultCollector {
     if (Math.round(d.slow || 0) !== 0 || Math.round(d.weight) !== 400) bad.push("겹친 40% 2초 둔화 " + d.slow + "ms·가중 " + d.weight + " (기대 0·400)");
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "기절 1.2초만, 둔화는 늘어난 강도만(가중 0.8초 + 0.4초) 기여로 셈");
   });
-  run(STUN, "블랙홀에 끌려간 시간은 기절이 아니라 " + Math.round(api.ULT.bhCcRate * 100) + "% 둔화로 MVP 기여에 쌓이는가", function (done) {
+  run(STUN, "블랙홀에 끌려간 시간은 기절이 아니라 " + Math.round(api.ULT.agCcRate * 100) + "% 둔화로 MVP 기여에 쌓이는가", function (done) {
     var y = OPEN_Y.forest;
     var W = world("forest", [
-      { id: "pr", team: "blue", char: "priest", x: 250, y: y, gauge: api.GAUGE_MAX },
+      { id: "pr", team: "blue", char: "astrologer", x: 250, y: y, gauge: api.GAUGE_MAX },
       { id: "foe", team: "red", char: "knight", x: 560, y: y }
     ]);
     var foe = W.ent("foe");
     api.useUlt(W.ent("pr"), 0, 200);
-    W.step(api.ULT.bhDelay + 1000 + 20);
+    W.step(1000 + 20);
     var left = api.ccPending().pr || {}, pulled = { stun: left.stun || 0, slow: left.slow || 0, weight: left.weight || 0 }, bad = [];
     W.log.filter(function (p) { return p.path === "hits/pr"; }).forEach(function (p) {
       pulled.stun += p.v.cs || 0; pulled.slow += p.v.ss || 0; pulled.weight += p.v.sw || 0;
@@ -419,7 +419,7 @@ class ResultCollector {
     if (pulled.stun) bad.push("기절 기여 " + Math.round(pulled.stun) + "ms");
     if (api.stunned(foe, W.t())) bad.push("끌려가는 적이 기절 상태");
     if (pulled.slow < 500) bad.push("둔화 " + Math.round(pulled.slow) + "ms (끌림 기여가 거의 없음)");
-    if (Math.abs(pulled.weight - pulled.slow * api.ULT.bhCcRate) > 5) bad.push("가중 " + Math.round(pulled.weight) + " (둔화 × " + api.ULT.bhCcRate + " 기대)");
+    if (Math.abs(pulled.weight - pulled.slow * api.ULT.agCcRate) > 5) bad.push("가중 " + Math.round(pulled.weight) + " (둔화 × " + api.ULT.agCcRate + " 기대)");
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "끌린 " + Math.round(pulled.slow) + "ms → 가중 " + Math.round(pulled.weight) + ", 기절 0");
   });
 
@@ -1532,10 +1532,10 @@ class ResultCollector {
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "5.5초 전 피해는 제외, 4초 전 피해만 어시스트, 처치한 사람은 처치 1");
   });
 
-  function priestHealsThenKill(waitMs) {
+  function clericHealsThenKill(waitMs) {
     var y = OPEN_Y.forest;
     var W = world("forest", [
-      { id: "pr", team: "blue", char: "priest", x: 250, y: y },
+      { id: "pr", team: "blue", char: "cleric", x: 250, y: y },
       { id: "ally", team: "blue", char: "sniper", x: 450, y: y },
       { id: "foe", team: "red", char: "ranger", x: 450, y: y + 400 }
     ]);
@@ -1550,15 +1550,15 @@ class ResultCollector {
     W.step(100);
     return { healed: healed, assists: pr.assists || 0, kills: ally.kills };
   }
-  run(ASSIST, "회복 어시스트: 사제가 회복시킨 아군이 " + AMS / 1000 + "초 안에 처치하면 어시스트 1번(사제가 피해도 줬어도 1번만)", function (done) {
-    var r = priestHealsThenKill(1000);
-    if (!r.healed) { done("fail", "시험 준비 실패: 사제 기본 공격으로 아군이 회복되지 않음"); return; }
-    done(r.assists === 1 && r.kills === 1 ? "pass" : "fail", "사제 어시스트 " + r.assists + " (기대 1), 아군 처치 " + r.kills);
+  run(ASSIST, "회복 어시스트: 클레릭이 회복시킨 아군이 " + AMS / 1000 + "초 안에 처치하면 어시스트 1번(클레릭이 피해도 줬어도 1번만)", function (done) {
+    var r = clericHealsThenKill(1000);
+    if (!r.healed) { done("fail", "시험 준비 실패: 클레릭 기본 공격으로 아군이 회복되지 않음"); return; }
+    done(r.assists === 1 && r.kills === 1 ? "pass" : "fail", "클레릭 어시스트 " + r.assists + " (기대 1), 아군 처치 " + r.kills);
   });
   run(ASSIST, "회복 어시스트: 회복 뒤 " + AMS / 1000 + "초가 지나 처치하면 어시스트가 없는가", function (done) {
     var y = OPEN_Y.forest;
     var W = world("forest", [
-      { id: "pr", team: "blue", char: "priest", x: 250, y: y },
+      { id: "pr", team: "blue", char: "cleric", x: 250, y: y },
       { id: "ally", team: "blue", char: "sniper", x: 450, y: y },
       { id: "foe", team: "red", char: "ranger", x: 450, y: y + 400 }
     ]);
@@ -1571,7 +1571,7 @@ class ResultCollector {
     api.damage(W.ent("foe"), 9999, "ally", false, null);
     W.step(100);
     var n = W.ent("pr").assists || 0;
-    done(n === 0 ? "pass" : "fail", "사제 어시스트 " + n + " (기대 0)");
+    done(n === 0 ? "pass" : "fail", "클레릭 어시스트 " + n + " (기대 0)");
   });
   run(ASSIST, "이로운 효과 어시스트: 얼음술사 눈보라로 은신한 아군이 처치하면 얼음술사가 어시스트를 받는가", function (done) {
     var y = OPEN_Y.forest;
@@ -1594,7 +1594,7 @@ class ResultCollector {
     var W = world("forest", [
       { id: "stunner", team: "blue", char: "knight", x: 200, y: y },
       { id: "slower", team: "blue", char: "guardian", x: 300, y: y },
-      { id: "late", team: "blue", char: "priest", x: 400, y: y },
+      { id: "late", team: "blue", char: "cleric", x: 400, y: y },
       { id: "killer", team: "blue", char: "sniper", x: 500, y: y },
       { id: "foe", team: "red", char: "ranger", x: 650, y: y + 400 }
     ]);
@@ -5026,7 +5026,7 @@ class ResultCollector {
     await withNet({}, async function (fake) {
       var others = { b2: person("블2", "blue", 1, 1), r1: person("레드1", "red", 2, 2), r2: person("레드2", "red", 4, 3), b4: person("블넷", "blue", 6, 4), b5: person("블다섯", "blue", 7, 5) };
       var base = await lobbyOf(fake, code, others, person("나", "blue", 3, 0));
-      fake.put(base + "players/r1/characterType", "priest-없음");
+      fake.put(base + "players/r1/characterType", "nobody-없음");
       var before = api.CLOCK.real();
       api.startGame(); await sleep(10);
       var node = fake.get(ROOMS + "/" + code), ps = node.players, roster = node.roster || {};
@@ -5346,7 +5346,6 @@ class ResultCollector {
   });
   new EngineerDruidTests(api, { world: world, run: run, OPEN_Y: OPEN_Y, FRAME: FRAME }).register();
   new GiantTests(api, { world: world, run: run, OPEN_Y: OPEN_Y, FRAME: FRAME }).register();
-  new GargantuaTests(api, { world: world, run: run, OPEN_Y: OPEN_Y, FRAME: FRAME }).register();
   new SkillResetTests(api, { world: world, run: run, OPEN_Y: OPEN_Y, FRAME: FRAME }).register();
   new AstrologerTests(api, { world: world, run: run, OPEN_Y: OPEN_Y, FRAME: FRAME }).register();
   new MinionSkillTests(api, { world: world, run: run, OPEN_Y: OPEN_Y, FRAME: FRAME }).register();
@@ -5381,7 +5380,7 @@ class ShieldSweepTests {
   static ALLY_ONLY = { "cleric:skill": "요한계시록은 방패병 본인만 막고 아군은 맞음", "cleric:both": "요한계시록은 방패병 본인만 막고 아군은 맞음", "thrower:basic": "독병 웅덩이는 땅에 깔려 뒤 아군만 맞음", "thrower:skill": "독안개는 땅에 깔려 뒤 아군만 맞음", "thrower:both": "독병·독안개는 땅에 깔려 뒤 아군만 맞음" };
   constructor(api, kit) { this.api = api; this.kit = kit; }
 
-  attackers() { var api = this.api; return api.CHAR_LIST.filter(function (c) { return c !== "shielder" && !(api.CHARS[c] || {}).retired; }); }
+  attackers() { var api = this.api; return api.CHAR_LIST.filter(function (c) { return c !== "shielder"; }); }
   gapOf(c) { var range = (this.api.CHARS[c] || {}).range || 150; return Math.max(130, Math.min(300, range * 0.8)); }
   verdict(done, bad, okText) { done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : okText); }
   reachOf(c, gap) { var r = ShieldSweepTests.REACH[c]; return r != null ? r : gap; }
@@ -6469,7 +6468,7 @@ class WraithTests {
     });
     run(G, "끌리는 중 블랙홀: 경로를 벗어나지 않고, 끝나면 블랙홀로 끌려가는가", function (done) {
       var bad = [], s = pulled("practice", 450, 340, 450, 900), T = s.T, W = s.W;
-      W.room.ref.child("effects").push({ type: "hole", team: "blue", owner: "wr", x: 700, y: 700, r: 900, dur: 6000, delay: 0, createdAt: W.t() });
+      W.room.ref.child("effects").push({ type: "hole", team: "blue", owner: "wr", x: 700, y: 700, r: 900, dur: 6000, delay: 0, gap: api.ULT.agGap, pull: api.ULT.agPull, boom: api.ULT.agBoomDmg, createdAt: W.t() });
       self.untilArrived(W, T, FRAME, function () { if (T.hookPull && Math.abs(T.x - 450) > 0.01) bad.push("경로 이탈 " + T.x.toFixed(2)); });
       var x0 = T.x;
       W.step(300);
@@ -8556,115 +8555,6 @@ class GiantTests {
   }
 }
 
-class GargantuaTests {
-  static GROUP = "가르강튀아(보관)";
-  constructor(api, kit) { this.api = api; this.kit = kit; }
-
-  lost(W, id) { var E = W.ent(id); return E.maxHp - E.hp; }
-
-  giantWorld(foes, startX) {
-    var y = this.kit.OPEN_Y.forest;
-    this.api.MATCH.stateByKey = {};
-    return this.kit.world("forest", [{ id: "gi", team: "blue", char: "gargantua", x: startX || 200, y: y, gauge: this.api.GAUGE_MAX }].concat(foes.map(function (f) {
-      return { id: f.id, team: "red", char: "guardian", x: f.x, y: y + (f.dy || 0) };
-    })));
-  }
-
-  jump(W, angle, reach) {
-    var gi = W.ent("gi"), type = this.api.CHAR_TYPES.of("gargantua");
-    this.api.useUlt(gi, angle, reach);
-    for (var ms = 0; ms < 3000 && !type.isSurging(gi, W.t()); ms += this.kit.FRAME) W.frame(this.kit.FRAME);
-  }
-
-  register() {
-    var self = this, api = this.api, run = this.kit.run, FRAME = this.kit.FRAME, ULT = api.ULT, G = GargantuaTests.GROUP, C = api.CHARS.gargantua, type = api.CHAR_TYPES.of("gargantua");
-    run(G, "가르강튀아 기본 공격: 앞쪽 반경 " + C.range + " 부채꼴 안의 적에게 " + C.dmg + "의 피해와 기본 게이지를 주고, 휘두르는 순간 바로 맞는가", function (done) {
-      var bad = [], W = self.giantWorld([{ id: "near", x: 200 + 100 }, { id: "far", x: 200 + C.range + 120 }]), gi = W.ent("gi");
-      gi.gauge = 0;
-      api.fireBasic(gi, 0); W.frame(FRAME);
-      if (self.lost(W, "near") !== C.dmg) bad.push("휘두른 직후 피해 " + self.lost(W, "near") + " (기대 " + C.dmg + ")");
-      W.step(1500);
-      if (self.lost(W, "far")) bad.push("멀리 있는 적이 맞음");
-      if (gi.gauge !== api.roleGauge("gargantua")) bad.push("게이지 " + gi.gauge + " (기대 " + api.roleGauge("gargantua") + ")");
-      if (gi.maxHp !== C.hp) bad.push("체력 " + gi.maxHp);
-      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "체력 "+ C.hp + "·피해 " + C.dmg + "(즉시)·게이지 +" + gi.gauge);
-    });
-    run(G, "가르강튀아 스킬: 지정한 곳으로 점프해 블랙홀 상태로 바뀜하고 게이지가 0이 되며, 끝나면 원래대로 돌아오는가", function (done) {
-      var bad = [], W = self.giantWorld([]), gi = W.ent("gi");
-      api.useUlt(gi, 0, 300);
-      if (!gi.leap || !type.isHammerLeaping(gi, W.t())) bad.push("점프가 시작되지 않음");
-      W.step(ULT.bsLeapMaxMs + 100);
-      if (Math.abs(gi.x - 500) > 3) bad.push("착지 위치 " + Math.round(gi.x) + " (기대 500)");
-      if (!type.isSurging(gi, W.t())) bad.push("블랙홀 상태로 바뀜하지 않음");
-      if (gi.gauge !== 0) bad.push("게이지 " + gi.gauge);
-      var holes = api.FIELD.holes.filter(function (h) { return h.e.ga; });
-      if (holes.length !== 1 || !holes[0].e.follow) bad.push("블랙홀 " + holes.length + "개");
-      W.step(ULT.gaDur + 200);
-      if (type.isSurging(gi, W.t())) bad.push("변신이 끝나지 않음");
-      if (api.FIELD.holes.some(function (h) { return h.e.ga; })) bad.push("블랙홀이 남음");
-      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "점프 300 → 변신 " + (ULT.gaDur / 700) + "초 → 복귀, 블랙홀 같이 사라짐");
-    });
-    run(G, "가르강튀아 스킬: 점프 사거리는 최대 " + ULT.gaCast + "이고 대장장이(" + ULT.bsCast + ")보다 짧은가", function (done) {
-      var bad = [], W = self.giantWorld([]), gi = W.ent("gi");
-      if (ULT.gaCast >= ULT.bsCast) bad.push("대장장이보다 짧지 않음");
-      api.useUlt(gi, 0, 900);
-      W.step(ULT.bsLeapMaxMs + 100);
-      var jumped = gi.x - 200;
-      if (Math.abs(jumped - ULT.gaCast) > 3) bad.push("멀리 겨냥했을 때 점프 거리 " + Math.round(jumped) + " (기대 " + ULT.gaCast + ")");
-      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "900 을 겨냥해도 " + Math.round(jumped) + " 까지만 점프");
-    });
-    run(G, "가르강튀아 스킬: 점프 중과 변신 중에는 움직이거나 기본 공격을 할 수 없고, 끝나면 다시 되는가", function (done) {
-      var bad = [], W = self.giantWorld([{ id: "near", x: 200 + 300 + 100 }]), gi = W.ent("gi"), near = W.ent("near");
-      api.useUlt(gi, 0, 300); W.frame(FRAME);
-      if (api.speedOf(gi) !== 0) bad.push("점프 중 이동속도 " + api.speedOf(gi));
-      W.step(ULT.bsLeapMaxMs + 100);
-      if (api.speedOf(gi) !== 0) bad.push("변신 중 이동속도 " + api.speedOf(gi));
-      gi.cdUntil = 0; var shots = W.log.length; api.fireBasic(gi, 0); W.frame(FRAME);
-      if (self.lost(W, "near") || W.log.length !== shots) bad.push("변신 중 기본 공격이 나감");
-      W.step(ULT.gaDur);
-      if (api.speedOf(gi) !== C.speed) bad.push("끝난 뒤 이동속도 " + api.speedOf(gi) + " (기대 " + C.speed + ")");
-      near.hp = near.maxHp; gi.cdUntil = 0; api.fireBasic(gi, 0); W.frame(FRAME);
-      if (!self.lost(W, "near")) bad.push("끝난 뒤 기본 공격이 안 나감");
-      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "점프·변신 중 이동 0·공격 불가, 끝나면 복귀");
-    });
-    run(G, "가르강튀아 블랙홀: 반경 " + ULT.gaR + " 안의 적만 가르강튀아 곁(" + ULT.gaGap + ")까지 끌려오고, 가르강튀아이 밀려나면 같이 따라오는가", function (done) {
-      var landX = 200, bad = [], W = self.giantWorld([{ id: "in", x: landX + 300, dy: 40 }, { id: "out", x: landX + ULT.gaR + 120 }], 500), gi = W.ent("gi"), inn = W.ent("in"), out = W.ent("out");
-      self.jump(W, Math.PI, 300);
-      var outX = out.x;
-      W.step(2000);
-      var d = Math.hypot(inn.x - gi.x, inn.y - gi.y);
-      if (Math.abs(d - ULT.gaGap) > 8) bad.push("끌려온 적과의 거리 " + Math.round(d) + " (기대 " + ULT.gaGap + ")");
-      if (Math.abs(out.x - outX) > 1) bad.push("반경 밖 적이 끌려옴");
-      gi.x -= 100; W.step(1500);
-      var d2 = Math.hypot(inn.x - gi.x, inn.y - gi.y);
-      if (Math.abs(d2 - ULT.gaGap) > 8) bad.push("가르강튀아이 밀려났는데 따라오지 않음 " + Math.round(d2));
-      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "반경 안 거리 " + Math.round(d) + "→" + Math.round(d2) + ", 반경 밖은 그대로");
-    });
-    run(G, "가르강튀아 폭발: 블랙홀이 끝나는 순간 반경 안의 적에게만 " + ULT.gaBoomDmg + "의 피해를 주고, 그 전에는 피해가 없는가", function (done) {
-      var landX = 200, bad = [], W = self.giantWorld([{ id: "in", x: landX + 300, dy: 40 }, { id: "out", x: landX + ULT.gaR + 120 }], 500);
-      self.jump(W, Math.PI, 300);
-      W.step(ULT.gaDur - 400);
-      if (self.lost(W, "in")) bad.push("끝나기 전에 이미 피해 " + self.lost(W, "in"));
-      W.step(600);
-      if (self.lost(W, "in") !== ULT.gaBoomDmg) bad.push("폭발 피해 " + self.lost(W, "in") + " (기대 " + ULT.gaBoomDmg + ")");
-      if (self.lost(W, "out")) bad.push("반경 밖 적이 맞음");
-      W.step(1500);
-      if (self.lost(W, "in") !== ULT.gaBoomDmg) bad.push("폭발이 한 번이 아님 " + self.lost(W, "in"));
-      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "끝나기 전 0, 끝난 뒤 안 " + ULT.gaBoomDmg + " 한 번, 밖 0");
-    });
-    run(G, "가르강튀아 폭발: 가르강튀아이 쓰러지면 블랙홀이 사라지고 폭발하지 않는가", function (done) {
-      var landX = 200, bad = [], W = self.giantWorld([{ id: "in", x: landX + 300, dy: 40 }], 500), gi = W.ent("gi");
-      self.jump(W, Math.PI, 300);
-      api.damage(gi, 9999, "in", false, null);
-      W.step(ULT.gaDur + 200);
-      if (self.lost(W, "in")) bad.push("쓰러진 뒤에 폭발함 " + self.lost(W, "in"));
-      if (api.FIELD.holes.some(function (h) { return h.e.ga; })) bad.push("블랙홀이 남음");
-      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "블랙홀 소멸·폭발 없음");
-    });
-  }
-}
-
-
 class SkillResetTests {
   static GROUP = "광전사·투척병 확인";
   constructor(api, kit) { this.api = api; this.kit = kit; }
@@ -8750,7 +8640,7 @@ class AstrologerTests {
     run(G, "점성술사 스킬: 지정한 곳(최대 " + ULT.agCast + ")에 " + ULT.agDur / 700 + "초짜리 블랙홀이 생기고 게이지가 0이 되며, 시전자는 움직이고 공격할 수 있는가", function (done) {
       var bad = [], W = self.astroWorld([{ id: "near", x: 200 + 600 }]), as = W.ent("as");
       api.useUlt(as, 0, 300);
-      var holes = api.FIELD.holes.filter(function (h) { return h.e.ga; });
+      var holes = api.FIELD.holes.slice();
       if (holes.length !== 1) bad.push("블랙홀 " + holes.length + "개");
       else {
         var e = holes[0].e;
@@ -8765,18 +8655,18 @@ class AstrologerTests {
       as.cdUntil = 0; api.fireBasic(as, 0, 300);
       if (!api.FIELD.stars.length) bad.push("블랙홀 중에 기본 공격이 안 나감");
       W.step(ULT.agDur + 400);
-      if (api.FIELD.holes.some(function (h) { return h.e.ga; })) bad.push("끝난 뒤에도 블랙홀이 남음");
+      if (api.FIELD.holes.length > 0) bad.push("끝난 뒤에도 블랙홀이 남음");
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "300 앞에 설치·게이지 0·이동 " + api.speedOf(as) + "·기본 공격 가능·끝나면 사라짐");
     });
     run(G, "점성술사 스킬: 사거리는 최대 " + ULT.agCast + "이고, 자동 조준이면 가장 가까운 적 위치에 생기는가", function (done) {
       var bad = [], W = self.astroWorld([{ id: "near", x: 200 + 250, dy: 120 }]), as = W.ent("as"), near = W.ent("near");
       api.useUlt(as, 0, 900);
-      var far = api.FIELD.holes.filter(function (h) { return h.e.ga; })[0];
+      var far = api.FIELD.holes.slice()[0];
       if (!far || Math.abs(far.e.x - (200 + ULT.agCast)) > 2) bad.push("멀리 겨냥했을 때 위치 " + (far && far.e.x) + " (기대 " + (200 + ULT.agCast) + ")");
       api.FIELD.holes.length = 0;
       as.gauge = api.GAUGE_MAX; as.skillUntil = 0;
       api.useUlt(as, 0);
-      var auto = api.FIELD.holes.filter(function (h) { return h.e.ga; })[0];
+      var auto = api.FIELD.holes.slice()[0];
       if (!auto || Math.hypot(auto.e.x - near.x, auto.e.y - near.y) > 2) bad.push("자동 조준 위치 " + (auto && auto.e.x + "," + auto.e.y) + " (적 " + Math.round(near.x) + "," + Math.round(near.y) + ")");
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "900 을 겨냥해도 " + ULT.agCast + " 까지만, 자동 조준은 가장 가까운 적 위치");
     });
@@ -8784,7 +8674,7 @@ class AstrologerTests {
       var bad = [], W = self.astroWorld([{ id: "in", x: 300 + 250, dy: 30 }, { id: "out", x: 300 + ULT.agR + 120 }], [{ id: "ally", x: 300 + 200 }]), as = W.ent("as"), inn = W.ent("in"), out = W.ent("out"), ally = W.ent("ally");
       var outX = out.x, allyX = ally.x;
       api.useUlt(as, 0, 100);
-      var hole = api.FIELD.holes.filter(function (h) { return h.e.ga; })[0];
+      var hole = api.FIELD.holes.slice()[0];
       as.x -= 120;
       W.step(ULT.agDur - 600);
       var d = Math.hypot(inn.x - hole.e.x, inn.y - hole.e.y);
@@ -8892,9 +8782,7 @@ export function runTeamBattleTests(api) {
     if (!api.isIdle()) { alert("방에 들어가 있지 않은 첫 화면에서만 검사할 수 있어요."); return; }
     var mapBefore = api.currentMap(), started = performance.now(), results, offsetBefore = api.CLOCK.serverOffset;
     api.CLOCK.serverOffset = 0;
-    var retired = Object.keys(api.CHARS).filter(function (c) { return api.CHARS[c].retired; });
-    retired.forEach(function (c) { api.CHARS[c].retired = false; });
-    function restore() { retired.forEach(function (c) { api.CHARS[c].retired = true; }); api.CLOCK.serverOffset = offsetBefore; api.finish(mapBefore); }
+    function restore() { api.CLOCK.serverOffset = offsetBefore; api.finish(mapBefore); }
     try { results = new ResultCollector(api).collect(); }
     catch (err) { restore(); throw err; }
     results.pending.then(function () { restore(); TestPanel.render(results, performance.now() - started, once); }, function (err) { restore(); throw err; });
@@ -8984,9 +8872,7 @@ class AimGuideReachTests {
       { name: "화염술사 메테오", char: "mage", reach: 200, ms: 3000, edge: U.mbR + R, place: round() },
       { name: "대장장이 내려찍기", char: "blacksmith", reach: 200, ms: 3000, edge: U.bsR + R, place: round() },
       { name: "투척병 독안개", char: "thrower", reach: 200, ms: 3000, edge: U.fgR + half, place: round() },
-      { name: "사제 블랙홀", char: "priest", reach: 200, ms: U.bhDelay + 1500, edge: U.bhR + half, place: round() },
       { name: "점성술사 블랙홀", char: "astrologer", reach: 200, ms: 2000, edge: U.agR + half, place: round() },
-      { name: "가르강튀아 블랙홀", char: "gargantua", reach: 200, ms: 3000, edge: U.gaR + half, place: round() },
       { name: "창술사 창 찌르기(옆)", char: "lancer", reach: 200, ms: U.lnWind + 600, edge: U.lnW / 2 + R, place: function (d, y) { return { x: 380, y: y + d }; } },
       { name: "방패병 밀어내기(옆)", char: "shielder", reach: 200, ms: 1200, edge: U.sgWidth / 2 + R, place: function (d, y) { return { x: 300, y: y + d }; } },
       { name: "방패병 밀어내기(앞)", char: "shielder", reach: 200, ms: 1200, edge: U.sgPushLen + R, place: function (d, y) { return { x: 200 + d, y: y }; } },
@@ -9469,7 +9355,6 @@ class ArcaTests {
       { name: "결투가 찌르기", list: trapped("duelist"), act: function (W) { api.fireBasic(W.ent("m"), 0); } },
       { name: "대장장이 도약", list: trapped("blacksmith"), act: function (W) { api.useUlt(W.ent("m"), 0, 320); } },
       { name: "거신 도약", list: trapped("giant"), act: function (W) { api.useUlt(W.ent("m"), 0, 320); } },
-      { name: "가르강튀아 도약", list: trapped("gargantua"), act: function (W) { api.useUlt(W.ent("m"), 0, 320); } },
       { name: "방패병 아군 도약", list: trapped("shielder").concat([self.foe("mate", cx + 260)]), act: function (W) { var m = W.ent("m"); api.useUlt(m, 0); W.step(100); m.cdUntil = 0; api.fireBasic(m, 0); } },
       { name: "팬텀 잔영섬", list: trapped("phantom"), act: function (W) { api.useUlt(W.ent("m"), 0); } },
       { name: "수문장 밀어내기", list: trapped("knight").concat([self.ally("gd", cx - 20, 0, "guardian")]), act: function (W) { api.useUlt(W.ent("gd"), 0); } },
