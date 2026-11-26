@@ -3416,7 +3416,7 @@ SinglePassMaterials.enable(THREE);
       E.pending = null;
       var fullHeal = E.maxHp - E.hp;
       if (fullHeal > 0) { E.hp = E.maxHp; E.heal = (E.heal || 0) + fullHeal; if (E === services.match.me) services.sound.sfx("heal"); }
-      services.session.room.ref.child("effects").push({ type: "rev", team: E.team, owner: E.id, dur: ClericType.ULT.rvDur, tick: ClericType.ULT.rvTick, heal: ClericType.ULT.rvHeal, dmg: ClericType.ULT.rvDmg, createdAt: t });
+      services.session.room.ref.child("effects").push({ type: "rev", team: E.team, owner: E.id, x: Math.round(E.x), y: Math.round(E.y), dur: ClericType.ULT.rvDur, tick: ClericType.ULT.rvTick, heal: ClericType.ULT.rvHeal, dmg: ClericType.ULT.rvDmg, createdAt: t });
       services.vision.revealBriefly(E.id, t);
     }
     ultDesc() { var services = this.services;
@@ -7130,7 +7130,7 @@ SinglePassMaterials.enable(THREE);
           if (!T.alive || MathKit.hyp(T.x - e.x, T.y - e.y) > e.r + T.hitR * 0.5) return;
           if (T.team === e.team) { if (e.u && !T.minion) services.fieldFx.healInFog(T, e, t); return; }
           if (T.isProtected(t)) return;
-          if (services.shieldWalls.shrug(T, e.x, e.y, 0, t)) return;
+          if (services.shieldWalls.shrug(T, e.ox != null ? e.ox : e.x, e.oy != null ? e.oy : e.y, 0, t)) return;
           if (e.u && !T.minion) services.status.slowWhileInside(T, t, e.owner, ThrowerType.ULT.fgSlowMul, ThrowerType.ULT.fgSlowMs);
           var key = e.owner + (e.u ? ">fog>" : ">") + T.id;
           if (services.field.poolHit[key] && t - services.field.poolHit[key] < ThrowerType.ULT.plTick) return;
@@ -7236,6 +7236,9 @@ SinglePassMaterials.enable(THREE);
       services.match.game.forceNet = true;
       if (T === services.match.me) services.sound.sfx("heal");
     }
+    revBlocked(T, e, t) { var services = this.services, src = e.x != null ? e : services.targets.ent(e.owner);
+      return !!src && services.shieldWalls.stopsDirect(T, src.x, src.y, e.team, e.dmg, t);
+    }
     revTickIndex(e, t) { return Math.floor((t - e.createdAt) / e.tick); }
     stepRevs(t) { var services = this.services;
       services.field.revs = services.field.revs.filter(function (r) {
@@ -7252,7 +7255,7 @@ SinglePassMaterials.enable(THREE);
           r.ticked[T.id] = tick;
           if (!T.alive || T.isProtected(t)) return;
           if (T.team === e.team) services.fieldFx.healAlly(T, e.owner, e.heal, healAt);
-          else services.damage.damage(T, e.dmg, e.owner, false, "revelation");
+          else if (!services.fieldFx.revBlocked(T, e, t)) services.damage.damage(T, e.dmg, e.owner, false, "revelation");
         });
     }
     potionFlightMs(dist) {
@@ -8373,7 +8376,11 @@ SinglePassMaterials.enable(THREE);
     }
     strikeStop(T, d, t) {
       if (!T || T.team === d.team) return null;
-      return d.lanes || d.thruWall || d.binds ? this.guardsFrom(T, d.x, d.y, t) : this.stops(T, d.x, d.y, d.team, t);
+      if (d.lanes) { var src = this.waveSource(T, d); return this.stops(T, src.x, src.y, d.team, t); }
+      return d.thruWall || d.binds ? this.guardsFrom(T, d.x, d.y, t) : this.stops(T, d.x, d.y, d.team, t);
+    }
+    waveSource(T, d) { var ux = Math.cos(d.angle), uy = Math.sin(d.angle), along = Math.max(0, (T.x - d.x) * ux + (T.y - d.y) * uy);
+      return { x: T.x - ux * along, y: T.y - uy * along };
     }
     cutShots(t) { var services = this.services, list = this.active(t), shots = services.match.remoteShots || {}, self = this;
       Object.keys(shots).forEach(function (id) {

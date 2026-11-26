@@ -5356,48 +5356,48 @@ class ShieldSweepTests {
   static X = 450;
   static Y = 600;
   static BEHIND = 80;
+  static RENEW_MS = 100;
   static MODES = { basic: "기본 공격", skill: "스킬", both: "스킬 + 기본 공격" };
   static REACH = { engineer: 0 };
   static OPEN = {
     "giant:skill": "도약 착지가 방패병 발밑", "giant:both": "도약 착지가 방패병 발밑",
     "blacksmith:skill": "도약 착지가 방패병 발밑", "blacksmith:both": "도약 착지가 방패병 발밑",
     "necro:basic": "해골이 옆·뒤로 돌아감", "necro:skill": "해골이 옆·뒤로 돌아감", "necro:both": "해골이 옆·뒤로 돌아감",
-    "marina:skill": "해일은 방패병 본인만 막음", "marina:both": "해일은 방패병 본인만 막음",
     "arca:skill": "결계 중심이 방패병 발밑", "arca:both": "결계 중심이 방패병 발밑",
     "astrologer:basic": "별이 방패병 발밑에 떨어짐", "astrologer:skill": "블랙홀 중심이 방패병 발밑", "astrologer:both": "별·블랙홀이 방패병 발밑",
-    "cleric:skill": "맵 전체 공격", "cleric:both": "맵 전체 공격",
     "mage:skill": "메테오가 방패병 발밑", "mage:both": "메테오가 방패병 발밑",
     "shaman:both": "저주 폭발·영역 번개가 대상 자리",
-    "thrower:basic": "독병 웅덩이가 방패병 발밑", "thrower:skill": "독안개가 방패병 발밑", "thrower:both": "독병·독안개가 방패병 발밑",
     "duelist:basic": "돌진 찌르기가 방패를 지나 뒤에서 찌름", "duelist:both": "돌진 찌르기가 방패를 지나 뒤에서 찌름",
     "hitman:basic": "돌진이 방패를 지나 뒤에서 벰", "hitman:both": "돌진이 방패를 지나 뒤에서 벰",
     "phantom:both": "잔영섬으로 방패 뒤로 넘어감"
   };
+  static ALLY_ONLY = { "thrower:basic": "독병 웅덩이는 땅에 깔려 뒤 아군만 맞음", "thrower:skill": "독안개는 땅에 깔려 뒤 아군만 맞음", "thrower:both": "독병·독안개는 땅에 깔려 뒤 아군만 맞음" };
   constructor(api, kit) { this.api = api; this.kit = kit; }
 
   attackers() { var api = this.api; return api.CHAR_LIST.filter(function (c) { return c !== "shielder" && !(api.CHARS[c] || {}).retired; }); }
   gapOf(c) { var range = (this.api.CHARS[c] || {}).range || 150; return Math.max(130, Math.min(300, range * 0.8)); }
+  verdict(done, bad, okText) { done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : okText); }
   reachOf(c, gap) { var r = ShieldSweepTests.REACH[c]; return r != null ? r : gap; }
 
-  trial(c, mode, shield) {
-    var api = this.api, X = ShieldSweepTests.X, Y = ShieldSweepTests.Y, B = ShieldSweepTests.BEHIND, gap = this.gapOf(c);
-    var down = Math.PI / 2, up = -Math.PI / 2, sum = { sh: 0, al: 0 };
+  trial(c, mode, shield, fromBack) {
+    var api = this.api, X = ShieldSweepTests.X, Y = ShieldSweepTests.Y, B = ShieldSweepTests.BEHIND, gap = this.gapOf(c), side = fromBack ? -1 : 1;
+    var down = Math.PI / 2, sum = { sh: 0, al: 0 };
     api.MATCH.stateByKey = {};
     var W = this.kit.world("practice", [
       { id: "sh", team: "blue", char: "shielder", slot: 1, x: X, y: Y },
       { id: "al", team: "blue", char: "guardian", slot: 2, x: X, y: Y - B },
-      { id: "at", team: "red", char: c, slot: 1, x: X, y: Y + gap, gauge: api.GAUGE_MAX }
+      { id: "at", team: "red", char: c, slot: 1, x: fromBack ? X + 60 : X, y: Y + gap * side, gauge: api.GAUGE_MAX }
     ]);
     var S = W.ent("sh"), A = W.ent("al"), K = W.ent("at");
     function guard() { S.gauge = api.GAUGE_MAX; api.useUlt(S, down); S.gauge = 0; }
     function hold() {
       sum.sh += S.maxHp - S.hp; sum.al += A.maxHp - A.hp; S.hp = S.maxHp; A.hp = A.maxHp;
       S.x = X; S.y = Y; S.shove = null; A.x = X; A.y = Y - B; A.shove = null;
-      if (shield && !S.type.isGuarding(S, W.t())) guard();
+      if (shield && !S.type.isGuarding(S, W.t() + ShieldSweepTests.RENEW_MS)) guard();
     }
     if (shield) guard();
     S.cdUntil = Infinity;
-    if (mode !== "basic") { K.gauge = api.GAUGE_MAX; api.useUlt(K, up, this.reachOf(c, gap)); }
+    if (mode !== "basic") { K.gauge = api.GAUGE_MAX; api.useUlt(K, Math.atan2(S.y - K.y, S.x - K.x), this.reachOf(c, gap)); }
     W.step(mode === "basic" ? 2500 : 4000, null, function (t) {
       hold();
       if (mode !== "skill" && t >= K.cdUntil && K.alive) api.fireBasic(K, Math.atan2(S.y - K.y, S.x - K.x), gap);
@@ -5409,6 +5409,15 @@ class ShieldSweepTests {
 
   register() {
     var self = this, run = this.kit.run, G = ShieldSweepTests.GROUP;
+    run(G, "뒤에서 쓴 요한계시록·해일·독병·독안개는 방패병도 맞는가(앞에서만 막음)", function (done) {
+      var bad = [], shown = [];
+      [["cleric", "skill"], ["marina", "skill"], ["thrower", "basic"], ["thrower", "skill"]].forEach(function (k) {
+        var on = self.trial(k[0], k[1], true, true), name = self.api.CHARS[k[0]].name + " " + ShieldSweepTests.MODES[k[1]];
+        if (!on.sh) bad.push(name + " 이 뒤에서 썼는데 방패병이 안 맞음");
+        shown.push(name + " " + on.sh);
+      });
+      self.verdict(done, bad, "방패병 피해 " + shown.join(" · "));
+    });
     run(G, "모든 캐릭터의 기본 공격·스킬을 방패 앞에서 써도 방패병과 방패 뒤 아군이 안 맞는가(정해 둔 예외 말고)", function (done) {
       var bad = [], open = [], quiet = [], held = 0;
       self.attackers().forEach(function (c) {
@@ -5417,6 +5426,8 @@ class ShieldSweepTests {
           if (!off.sh && !off.al) { quiet.push(name); return; }
           if (!on.sh && !on.al) { held++; if (why) bad.push(name + ": 예외 표(" + why + ")에 있는데 이제 막힘"); return; }
           if (why) { open.push(name + " " + on.sh + "/" + on.al); return; }
+          var allyOnly = ShieldSweepTests.ALLY_ONLY[c + ":" + mode];
+          if (allyOnly && !on.sh) { open.push(name + " 뒤 아군만 " + on.al); return; }
           bad.push(name + ": 방패병 " + on.sh + "·뒤 아군 " + on.al + " 피해(방패 없을 때 " + off.sh + "·" + off.al + ")");
         });
       });
