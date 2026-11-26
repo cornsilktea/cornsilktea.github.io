@@ -2807,6 +2807,79 @@ SinglePassMaterials.enable(THREE);
       return E.ultUntil > E.atkAt ? ["Melee_1H_Attack_Chop", 1.6] : ["Melee_1H_Attack_Slice_Horizontal", 1.5];
     }
   }
+  class ProjectileAura {
+    constructor(services, look) { this.services = services; this.look = look; }
+    build(g) { var services = this.services, A = this.look, root = new THREE.Group(), haloKey = A.key + "-halo";
+      var haloMat = services.matlib.mats[haloKey] || (services.matlib.mats[haloKey] = new THREE.MeshBasicMaterial({ color: A.deep, transparent: true, opacity: A.haloAlpha, depthWrite: false }));
+      var halo = new THREE.Mesh(services.geo.ball, haloMat);
+      halo.scale.set(A.haloLen, A.haloR, A.haloR); halo.position.x = A.haloX; root.add(halo);
+      var core = new THREE.Mesh(services.geo.ball, services.models.glowMat(A.key + "-core", A.fire, A.coreAlpha));
+      core.scale.set(A.haloLen * 0.7, A.haloR * 0.45, A.haloR * 0.45); core.position.x = A.haloX; root.add(core);
+      var wake = SniperShotShaders.tailMesh(A.deep, A.tailLen, A.wakeWidth);
+      wake.position.y = -1; root.add(wake);
+      var orbit = A.embers ? this.addEmbers(root) : null;
+      g.add(root);
+      return { root: root, halo: halo, core: core, wake: wake, orbit: orbit };
+    }
+    addEmbers(root) { var services = this.services, E = this.look.embers, orbit = new THREE.Group(), mat = services.models.glowMat(this.look.key + "-ember", E.color, E.alpha);
+      for (var i = 0; i < E.count; i++) {
+        var turn = i / E.count * Math.PI * 2, ember = new THREE.Mesh(services.geo.ball, mat);
+        ember.position.set(E.x - i * E.step, Math.cos(turn) * E.r, Math.sin(turn) * E.r); ember.scale.set(E.len, E.size, E.size); orbit.add(ember);
+      }
+      root.add(orbit);
+      return orbit;
+    }
+    animate(aura, len, nowMs) { var A = this.look, beat = 1 + A.pulse * Math.sin(nowMs / A.pulseMs);
+      aura.wake.scale.x = len;
+      aura.halo.scale.set(A.haloLen, A.haloR * beat, A.haloR * beat);
+      if (aura.orbit) aura.orbit.rotation.x = nowMs / A.embers.spinMs;
+    }
+  }
+  class StormArrowBolt {
+    static LOOK = { from: 6, len: 125, segs: 7, jag: 8, variants: 3, glowWidth: 8, coreWidth: 2.4, taper: 0.6, branchAt: [2, 4], branch: 26, glow: 0x3F8CFF, glowAlpha: 0.75, core: 0xFFF27A, aura: 0x8FE8FF, auraAlpha: 0.4, auraX: 12, auraR: 15, flickerMs: 45 };
+    static SHAPES = null;
+    constructor(services) { this.services = services; }
+    jitter(variant, i, axis) { var n = Math.sin((variant * 31.7 + i * 7.3 + axis * 13.1) * 12.9898) * 43758.5453; return (n - Math.floor(n)) * 2 - 1; }
+    zigzag(variant) { var L = StormArrowBolt.LOOK, pts = [];
+      for (var i = 0; i <= L.segs; i++) { var edge = i === 0 ? 0 : 1; pts.push(new THREE.Vector3(L.from - (L.from + L.len) * i / L.segs, this.jitter(variant, i, 1) * L.jag * edge, this.jitter(variant, i, 2) * L.jag * edge)); }
+      return pts;
+    }
+    addRibbon(pos, idx, a, b, wa, wb) {
+      [[0, 0, 1], [0, 1, 0]].forEach(function (side) {
+        var base = pos.length / 3;
+        pos.push(a.x, a.y + side[1] * wa, a.z + side[2] * wa, a.x, a.y - side[1] * wa, a.z - side[2] * wa, b.x, b.y + side[1] * wb, b.z + side[2] * wb, b.x, b.y - side[1] * wb, b.z - side[2] * wb);
+        idx.push(base, base + 1, base + 2, base + 1, base + 3, base + 2, base, base + 2, base + 1, base + 1, base + 2, base + 3);
+      });
+    }
+    shape(variant, width) { var L = StormArrowBolt.LOOK, pts = this.zigzag(variant), pos = [], idx = [], bolt = this;
+      var widthAt = function (i) { return width * 0.5 * (1 - L.taper * i / L.segs); };
+      for (var i = 0; i < L.segs; i++) this.addRibbon(pos, idx, pts[i], pts[i + 1], widthAt(i), widthAt(i + 1));
+      L.branchAt.forEach(function (i, n) {
+        var tip = new THREE.Vector3(pts[i].x - L.branch * 0.6, pts[i].y + bolt.jitter(variant, i + 10, 1) * L.branch * 0.5, pts[i].z + (n % 2 ? -1 : 1) * L.branch * 0.5);
+        bolt.addRibbon(pos, idx, pts[i], tip, widthAt(i) * 0.7, widthAt(i) * 0.2);
+      });
+      var geometry = new THREE.BufferGeometry();
+      geometry.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); geometry.setIndex(idx);
+      return geometry;
+    }
+    shapes() { var L = StormArrowBolt.LOOK;
+      if (StormArrowBolt.SHAPES) return StormArrowBolt.SHAPES;
+      var list = [];
+      for (var v = 0; v < L.variants; v++) list.push({ glow: this.shape(v, L.glowWidth), core: this.shape(v, L.coreWidth) });
+      return StormArrowBolt.SHAPES = list;
+    }
+    build(g) { var services = this.services, L = StormArrowBolt.LOOK, S = this.shapes(), root = new THREE.Group(), streak = new THREE.Group();
+      var aura = new THREE.Mesh(services.geo.ball, services.models.glowMat("storm-arrow-aura", L.aura, L.auraAlpha)); aura.position.x = L.auraX; aura.scale.setScalar(L.auraR); root.add(aura);
+      var glow = new THREE.Mesh(S[0].glow, services.models.glowMat("storm-arrow-glow", L.glow, L.glowAlpha)), core = new THREE.Mesh(S[0].core, services.models.basicMat("zapCore", L.core, 1));
+      glow.frustumCulled = core.frustumCulled = false; streak.add(glow); streak.add(core); root.add(streak);
+      g.add(root);
+      return { root: root, streak: streak, glow: glow, core: core, shown: 0 };
+    }
+    animate(bolt, traveled, nowMs) { var L = StormArrowBolt.LOOK, S = this.shapes(), k = Math.floor(nowMs / L.flickerMs) % S.length;
+      if (k !== bolt.shown) { bolt.glow.geometry = S[k].glow; bolt.core.geometry = S[k].core; bolt.shown = k; }
+      bolt.streak.scale.x = MathKit.clamp(traveled / (L.from + L.len), 0.05, 1);
+    }
+  }
   class RangerType extends CharacterType {
     static MODEL = { file: "Ranger", left: "bow_withString", leftTurn: Math.PI };
     static ULT = {
@@ -2816,11 +2889,27 @@ SinglePassMaterials.enable(THREE);
     get idleClip() { return "Ranged_Bow_Idle"; }
     basicHitMark(d) { return d.isSkill ? false : d.swingAt; }
     static VOLLEY_COLOR = 0xFF8A3D;
-    static VOLLEY_MUZZLE = { size: 62, sec: 0.11 };
-    static VOLLEY_HIT = { size: 58, sec: 0.18 };
-    projectileMesh(g, d) { super.projectileMesh(g, d); if (!d.isSkill) return; g.remove(g.children[g.children.length - 1]); g.add(SniperShotShaders.tailMesh(RangerType.VOLLEY_COLOR, 170, 18)); }
-    onShotLaunched(p) { if (p.d.isSkill) this.services.sniperShots.flash(p.d.x, p.d.y, Math.atan2(p.dy, p.dx), RangerType.VOLLEY_MUZZLE, RangerType.VOLLEY_COLOR, p.d.createdAt); }
-    onShotHitShown(d, T) { var services = this.services; if (d.isSkill) services.sniperShots.flash(T.x, T.y, Math.atan2(d.vy, d.vx), RangerType.VOLLEY_HIT, RangerType.VOLLEY_COLOR, services.clock.now()); }
+    static ARROW = { scale: 38, tail: 170, tailWidth: 18 };
+    static BASIC_MUZZLE = { size: 62, sec: 0.11 };
+    static BASIC_HIT = { size: 58, sec: 0.18 };
+    static VOLLEY_MUZZLE = { size: 84, sec: 0.13 };
+    static VOLLEY_HIT = { size: 80, sec: 0.22 };
+    static VOLLEY_AURA = { key: "ranger-volley", deep: 0xC23A0C, fire: 0xFFD27A, haloLen: 26, haloR: 8, haloX: 4, haloAlpha: 0.5, coreAlpha: 0.45, tailLen: 170, wakeWidth: 34, pulse: 0.2, pulseMs: 40,
+                           embers: { count: 3, r: 7, x: 2, step: 9, len: 5, size: 2.4, color: 0xFFE08A, alpha: 0.9, spinMs: 30 } };
+    projectileMesh(g, d) { var services = this.services, V = RangerType.ARROW;
+      if (services.models.kit.weapons.arrow_bow) {
+        var arrow = services.models.kit.weapons.arrow_bow.clone(); arrow.rotation.y = Math.PI / 2; arrow.scale.setScalar(V.scale); g.add(arrow);
+      } else {
+        var shaft = new THREE.Mesh(services.geo.shaft, services.models.basicMat("shaft", 0xEADFC4, 1)); shaft.scale.set(1.2, 1.4, 1.4); g.add(shaft);
+        g.add(new THREE.Mesh(services.geo.head, services.models.basicMat("head-v", RangerType.VOLLEY_COLOR, 1)));
+      }
+      g.add(SniperShotShaders.tailMesh(RangerType.VOLLEY_COLOR, V.tail, V.tailWidth));
+      if (d.isSkill) g.userData.volleyAura = this.volleyAura().build(g);
+    }
+    volleyAura() { return this.auraKit || (this.auraKit = new ProjectileAura(this.services, RangerType.VOLLEY_AURA)); }
+    animateProjectile(g, p, e, nowMs) { var aura = g.userData.volleyAura; if (aura) this.volleyAura().animate(aura, Math.max(1, Math.min(RangerType.VOLLEY_AURA.tailLen, p.sp * e / 1000)), nowMs); }
+    onShotLaunched(p) { this.services.sniperShots.flash(p.d.x, p.d.y, Math.atan2(p.dy, p.dx), p.d.isSkill ? RangerType.VOLLEY_MUZZLE : RangerType.BASIC_MUZZLE, RangerType.VOLLEY_COLOR, p.d.createdAt); }
+    onShotHitShown(d, T) { var services = this.services; services.sniperShots.flash(T.x, T.y, Math.atan2(d.vy, d.vx), d.isSkill ? RangerType.VOLLEY_HIT : RangerType.BASIC_HIT, RangerType.VOLLEY_COLOR, services.clock.now()); }
     onHitLate(owner, h) { if (h.u === "volley") owner.gauge = Math.min(MatchRules.GAUGE_MAX, owner.gauge + RangerType.ULT.mkRefund); }
     ultLeadSeconds(dist) { return dist / RangerType.ULT.mkSpeed; }
     launchHandOf(model) { return model.getObjectByName("handslotl"); }
@@ -3547,7 +3636,11 @@ SinglePassMaterials.enable(THREE);
       var zapTrail = new THREE.Mesh(services.geo.trail, services.models.glowMat("trail-zap", 0x6FC8FF, 0.55)); zapTrail.position.x = -15; zapTrail.scale.set(60, 1.8, 1.8); g.add(zapTrail);
       var zapSpark = new THREE.Mesh(services.geo.trail, services.models.glowMat("trail-zap-core", 0xFFF27A, 0.7)); zapSpark.position.x = -8; zapSpark.scale.set(34, 0.7, 0.7); g.add(zapSpark);
       g.userData.pulse = zapHalo;
+      g.userData.storm = { trail: zapTrail, spark: zapSpark, bolt: this.overchargeBolt().build(g) };
     }
+    overchargeBolt() { return this.boltKit || (this.boltKit = new StormArrowBolt(this.services)); }
+    dressProjectile(g, d) { var storm = g.userData.storm; if (!storm) return; var on = !!d.overcharged; storm.bolt.root.visible = on; storm.trail.visible = storm.spark.visible = !on; }
+    animateProjectile(g, p, e, nowMs) { var storm = g.userData.storm; if (storm && storm.bolt.root.visible) this.overchargeBolt().animate(storm.bolt, p.sp * e / 1000, nowMs); }
     launchHandOf(model) { return model.getObjectByName("handslotl"); }
     addMarkers(v, root, body) { var services = this.services;
       v.stormAura = services.fxView.makeStormAura(); root.add(v.stormAura);
@@ -5238,7 +5331,7 @@ SinglePassMaterials.enable(THREE);
     static BOLT_TINT = 0xB8B4D8;
     static BOLT_TAIL = 0xE0304C;
     static TAIL_LEN = 200;
-    static BOLT_AURA = { deep: 0x2A38A8, fire: 0xF0284A, haloLen: 24, haloR: 7, haloX: -2, haloAlpha: 0.5, coreAlpha: 0.35, wakeWidth: 30, pulse: 0.18, pulseMs: 45 };
+    static BOLT_AURA = { key: "hunter-bolt", tailLen: HunterType.TAIL_LEN, deep: 0x2A38A8, fire: 0xF0284A, haloLen: 24, haloR: 7, haloX: -2, haloAlpha: 0.5, coreAlpha: 0.35, wakeWidth: 30, pulse: 0.18, pulseMs: 45 };
     static HIT_COLOR = "#E0405A";
     get shotName() { return "볼트"; }
     get idleClip() { return "Idle_A"; }
@@ -5303,28 +5396,15 @@ SinglePassMaterials.enable(THREE);
       else g.add(new THREE.Mesh(services.geo.shaft, services.models.basicMat("shaft", 0xEADFC4, 1)));
       var tail = SniperShotShaders.tailMesh(HunterType.BOLT_TAIL, HunterType.TAIL_LEN, 16);
       g.add(tail);
-      g.userData.hunterBolt = { tail: tail, aura: this.boltAura(g) };
+      g.userData.hunterBolt = { tail: tail, aura: this.boltAura().build(g) };
     }
-    boltAura(g) { var services = this.services, A = HunterType.BOLT_AURA, root = new THREE.Group();
-      var haloMat = services.matlib.mats["hunter-bolt-halo"] || (services.matlib.mats["hunter-bolt-halo"] = new THREE.MeshBasicMaterial({ color: A.deep, transparent: true, opacity: A.haloAlpha, depthWrite: false }));
-      var halo = new THREE.Mesh(services.geo.ball, haloMat);
-      halo.scale.set(A.haloLen, A.haloR, A.haloR); halo.position.x = A.haloX; root.add(halo);
-      var core = new THREE.Mesh(services.geo.ball, services.models.glowMat("hunter-bolt-core", A.fire, A.coreAlpha));
-      core.scale.set(A.haloLen * 0.7, A.haloR * 0.45, A.haloR * 0.45); core.position.x = A.haloX; root.add(core);
-      var wake = SniperShotShaders.tailMesh(A.deep, HunterType.TAIL_LEN, A.wakeWidth);
-      wake.position.y = -1; root.add(wake);
-      g.add(root);
-      return { root: root, halo: halo, core: core, wake: wake };
-    }
+    boltAura() { return this.auraKit || (this.auraKit = new ProjectileAura(this.services, HunterType.BOLT_AURA)); }
     dressProjectile(g, d) { var bolt = g.userData.hunterBolt; if (bolt) bolt.aura.root.visible = !!d.countsAsSkill; }
-    animateProjectile(g, p, e, nowMs) { var bolt = g.userData.hunterBolt, A = HunterType.BOLT_AURA;
+    animateProjectile(g, p, e, nowMs) { var bolt = g.userData.hunterBolt;
       if (!bolt) return;
       var len = Math.max(1, Math.min(HunterType.TAIL_LEN, p.sp * e / 1000));
       bolt.tail.scale.x = len;
-      if (!bolt.aura.root.visible) return;
-      bolt.aura.wake.scale.x = len;
-      var beat = 1 + A.pulse * Math.sin(nowMs / A.pulseMs);
-      bolt.aura.halo.scale.set(A.haloLen, A.haloR * beat, A.haloR * beat);
+      if (bolt.aura.root.visible) this.boltAura().animate(bolt.aura, len, nowMs);
     }
     basicDesc() { var c = this.data;
       return "이동 방향으로 " + c.roll.dist + " 구른 뒤 가장 가까운 적을 쫓는 볼트로 " + c.dmg + "의 피해. 멈춰 있으면 조준 반대쪽으로 구름";
@@ -15268,7 +15348,7 @@ SinglePassMaterials.enable(THREE);
       services.stormView.shelf.prefill(frosts);
       if (services.models.kit.propsReady) services.turretShells.prefill(engineers);
     }
-    rehearseFirstUses() { var rehearsal = this.rehearsal, druids = this.castersByTeam("druid"), hitmen = this.castersByTeam("hitman"), stormbows = this.castersByTeam("stormbow"), phantoms = this.castersByTeam("phantom"), arcas = this.castersByTeam("arca"), hunters = this.castersByTeam("hunter");
+    rehearseFirstUses() { var rehearsal = this.rehearsal, druids = this.castersByTeam("druid"), hitmen = this.castersByTeam("hitman"), stormbows = this.castersByTeam("stormbow"), phantoms = this.castersByTeam("phantom"), arcas = this.castersByTeam("arca"), hunters = this.castersByTeam("hunter"), rangers = this.castersByTeam("ranger");
       rehearsal.finish();
       ["blue", "red"].forEach(function (team) {
         rehearsal.shots("arca", team, false, arcas[team] * 2);
@@ -15276,6 +15356,9 @@ SinglePassMaterials.enable(THREE);
         rehearsal.shots("druid", team, false, druids[team] * 2);
         rehearsal.shots("hitman", team, true, hitmen[team]);
         rehearsal.shots("phantom", team, false, phantoms[team] * 2);
+        rehearsal.shots("ranger", team, false, rangers[team] * 4);
+        rehearsal.shots("ranger", team, true, rangers[team] * RangerType.ULT.mkCount);
+        rehearsal.shots("stormbow", team, false, stormbows[team] * 3);
       });
       if (stormbows.blue + stormbows.red) rehearsal.overcharge();
     }

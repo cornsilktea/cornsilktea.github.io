@@ -5297,6 +5297,7 @@ class ResultCollector {
   new ShielderTests(api, { world: world, run: run, runAsync: runAsync, FRAME: FRAME }).register();
   new ArcaTests(api, { world: world, run: run, runAsync: runAsync, FRAME: FRAME, OPEN_Y: OPEN_Y, blockedAt: blockedAt, singleRowWall: singleRowWall }).register();
   new HunterTests(api, { world: world, run: run, runAsync: runAsync, FRAME: FRAME, OPEN_Y: OPEN_Y, blockedAt: blockedAt, singleRowWall: singleRowWall }).register();
+  new ArrowLookTests(api, { run: run }).register();
   run(AUTO, "AI 6명 60초 난전 — 강 맵 + 헌터 고정 (시드 2047)", function (done) {
     var r = autoMelee("river", 60, 2047, "hunter"), kinds = Object.keys(r.issues);
     var roster = r.list.map(function (e) { return api.CHARS[e.char].name; }).join("·");
@@ -9836,6 +9837,60 @@ class HunterTests {
       bot.act(hn2, W2.ent("f"), W2.t());
       if (!(hn2.buffUntil > W2.t())) bad.push("사거리 안 적이 있는데 스킬을 안 씀");
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "가까운 적 → 뒤로, 먼 적 → 옆으로, 벽에 막힌 뒤쪽 → 옆으로, 사거리 안 적에 스킬 사용");
+    });
+  }
+}
+
+class ArrowLookTests {
+  static GROUP = "화살 그림";
+  static FRAMES = 24;
+  constructor(api, kit) { this.api = api; this.kit = kit; }
+  shot(c, extra) { return Object.assign({ x: 0, y: 0, team: "blue", owner: "", ownerCharacterType: c, r: 8, createdAt: 0 }, extra || {}); }
+  build(c, extra) { var api = this.api, type = api.CHAR_TYPES.of(c), d = this.shot(c, extra), g = new api.THREE.Group(); type.projectileMesh(g, d); type.dressProjectile(g, d); return { g: g, type: type, d: d }; }
+  play(v, ms, nowMs) { v.type.animateProjectile(v.g, { sp: 600, d: v.d }, ms, nowMs); }
+  tailColors(g) { var list = []; g.traverse(function (o) { var u = o.material && o.material.uniforms; if (u && u.uBlade) list.push(u.uBlade.value.getHex()); }); return list; }
+  register() {
+    var self = this, api = this.api, run = this.kit.run, G = ArrowLookTests.GROUP;
+    run(G, "궁수: 기본 화살도 난사 화살과 같은 주황 꼬리를 달고, 난사 화살에만 불꽃 오라(후광·심지·꼬리·도는 불씨 3개)가 붙어 움직이는가", function (done) {
+      var basic = self.build("ranger"), volley = self.build("ranger", { isSkill: true }), bad = [], orange = 0xFF8A3D;
+      if (self.tailColors(basic.g).indexOf(orange) < 0) bad.push("기본 화살 주황 꼬리 없음");
+      if (self.tailColors(volley.g).indexOf(orange) < 0) bad.push("난사 화살 주황 꼬리 없음");
+      if (basic.g.userData.volleyAura) bad.push("기본 화살에 오라");
+      var aura = volley.g.userData.volleyAura;
+      if (!aura) { done("fail", bad.concat("난사 화살 오라 없음").join(" / ")); return; }
+      if (!aura.orbit || aura.orbit.children.length !== 3) bad.push("불씨 " + (aura.orbit ? aura.orbit.children.length : 0) + "개");
+      self.play(volley, 50, 100); var turn = aura.orbit.rotation.x, wake = aura.wake.scale.x;
+      self.play(volley, 200, 400);
+      if (aura.orbit.rotation.x === turn) bad.push("불씨가 돌지 않음");
+      if (!(aura.wake.scale.x > wake)) bad.push("꼬리가 늘지 않음");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "기본·난사 모두 주황 꼬리, 난사만 오라(불씨 3개 회전·꼬리 " + Math.round(wake) + "→" + Math.round(aura.wake.scale.x) + ")");
+    });
+    run(G, "뇌전사수: 평상시 화살은 그대로이고, 과충전 화살만 곧은 꼬리 대신 깜빡이는 지그재그 번개가 보이며 깜빡임에 새 모양을 만들지 않는가", function (done) {
+      var calm = self.build("stormbow"), charged = self.build("stormbow", { overcharged: true }), bad = [], seen = [];
+      var a = calm.g.userData.storm, b = charged.g.userData.storm;
+      if (!a || !b) { done("fail", "번개 그림 정보 없음"); return; }
+      if (a.bolt.root.visible || !a.trail.visible || !a.spark.visible) bad.push("평상시 모습이 바뀜");
+      if (!b.bolt.root.visible || b.trail.visible || b.spark.visible) bad.push("과충전 모습이 아님");
+      for (var i = 0; i < ArrowLookTests.FRAMES; i++) { self.play(charged, i * 16, i * 16); if (seen.indexOf(b.bolt.glow.geometry) < 0) seen.push(b.bolt.glow.geometry); }
+      if (seen.length < 2) bad.push("번개가 깜빡이지 않음");
+      if (seen.length > 3) bad.push("번개 모양 " + seen.length + "개 생김");
+      var other = self.build("stormbow", { overcharged: true });
+      self.play(other, 0, 0); self.play(charged, 0, 0);
+      if (other.g.userData.storm.bolt.glow.geometry !== b.bolt.glow.geometry) bad.push("화살마다 번개 모양을 새로 만듦");
+      self.play(charged, 10, 0); var short = b.bolt.streak.scale.x; self.play(charged, 400, 0);
+      if (!(b.bolt.streak.scale.x > short)) bad.push("번개가 활에서 뻗어 나가지 않음");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "평상시 그대로, 과충전만 번개(모양 " + seen.length + "개 돌려 쓰기, 화살끼리 공유)");
+    });
+    run(G, "헌터: 공용 오라로 바꾼 뒤에도 스킬 중 볼트만 오라가 보이고 후광이 맥박치는가", function (done) {
+      var plain = self.build("hunter"), skill = self.build("hunter", { countsAsSkill: 1 }), bad = [];
+      var p = plain.g.userData.hunterBolt, s = skill.g.userData.hunterBolt;
+      if (!p || !s) { done("fail", "볼트 정보 없음"); return; }
+      if (p.aura.root.visible) bad.push("평상시 볼트에 오라");
+      if (!s.aura.root.visible) bad.push("스킬 볼트에 오라 없음");
+      if (s.aura.root.children.length !== 3) bad.push("오라 조각 " + s.aura.root.children.length + "개");
+      self.play(skill, 100, 0); var r0 = s.aura.halo.scale.y; self.play(skill, 100, 70);
+      if (s.aura.halo.scale.y === r0) bad.push("후광이 맥박치지 않음");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "평상시 오라 없음, 스킬 중 오라 3조각·맥박");
     });
   }
 }
