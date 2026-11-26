@@ -9207,6 +9207,7 @@ class AccountStatsTests {
 
 class ArcaTests {
   static GROUP = "아르카";
+  static BASE_R = 150;
   constructor(api, kit) { this.api = api; this.kit = kit; this.y = kit.OPEN_Y.forest; this.cx = 500; }
   foe(id, x, dy, char) { return { id: id, team: "red", char: char || "guardian", x: x, y: this.y + (dy || 0), gauge: this.api.GAUGE_MAX }; }
   ally(id, x, dy, char) { return { id: id, team: "blue", char: char || "guardian", x: x, y: this.y + (dy || 0), gauge: this.api.GAUGE_MAX }; }
@@ -9379,7 +9380,7 @@ class ArcaTests {
       { name: "팬텀 잔영섬", list: trapped("phantom"), act: function (W) { api.useUlt(W.ent("m"), 0); } },
       { name: "수문장 밀어내기", list: trapped("knight").concat([self.ally("gd", cx - 20, 0, "guardian")]), act: function (W) { api.useUlt(W.ent("gd"), 0); } },
       { name: "사슬 망령 끌림", list: trapped("knight").concat([self.ally("wr", cx + 400, 0, "wraith")]), act: function (W) { api.useUlt(W.ent("wr"), Math.PI); } },
-      { name: "블랙홀 끌림", list: trapped("knight").concat([self.ally("as", cx + 420, 0, "astrologer")]), act: function (W) { api.useUlt(W.ent("as"), Math.PI, 200); } }
+      { name: "블랙홀 끌림", list: trapped("knight").concat([self.ally("as", cx + 420 + (U.akR - ArcaTests.BASE_R), 0, "astrologer")]), act: function (W) { api.useUlt(W.ent("as"), Math.PI, 200); } }
     ];
     run(G, "이동기·끌림이 결계 끝에서 멈추는가: " + cases.map(function (c) { return c.name; }).join("·"), function (done) {
       var bad = [], shown = [];
@@ -9395,7 +9396,7 @@ class ArcaTests {
         if (walled) bad.push(c.name + ": " + walled);
         if (m.dash || m.leap || m.shove || m.hookPull || m.phSweep) bad.push(c.name + ": 이동 상태가 안 끝남");
       });
-      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "모두 결계 끝(150 − 몸 반지름)에서 멈춤: " + shown.join(", "));
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "모두 결계 끝(" + U.akR + " − 몸 반지름)에서 멈춤: " + shown.join(", "));
     });
     run(G, "팬텀 회귀: 결계에 갇힌 팬텀은 끝에서 회귀가 끝나고 원래 자리로 가지 않는가", function (done) {
       var W = self.kit.world("forest", [{ id: "ak", team: "blue", char: "arca", x: 200, y: self.y, gauge: api.GAUGE_MAX }, { id: "m", team: "red", char: "phantom", x: 950, y: self.y, gauge: api.GAUGE_MAX }]), m = W.ent("m"), bad = [];
@@ -9639,10 +9640,10 @@ class HunterTests {
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "벽에서 " + Math.round(y0 - edge) + " 떨어진 곳에서 위로 굴러 벽 앞 y≈" + Math.round(edge) + " 에서 멈춘 뒤 1발");
     });
     run(G, "아르카 결계에 갇힌 채 구르면 결계 끝에서 멈추는가(끝 닿음 기절로 그 공격은 취소)", function (done) {
-      var W = self.scene([]), hn = W.ent("hn"), t = W.t(), lim = api.ULT.akR - hn.hitR, bad = [], far = 0;
-      hn.barrierTrap = { owner: "nobody", bid: 1, x: 400 - 60, y: self.y, r: api.ULT.akR, until: t + 5000, lim: lim, edgeAt: 0, pull: null };
+      var W = self.scene([]), hn = W.ent("hn"), t = W.t(), lim = api.ULT.akR - hn.hitR, bad = [], far = 0, bx = 400 - 60 - (api.ULT.akR - ArcaTests.BASE_R);
+      hn.barrierTrap = { owner: "nobody", bid: 1, x: bx, y: self.y, r: api.ULT.akR, until: t + 5000, lim: lim, edgeAt: 0, pull: null };
       self.fire(W, Math.PI, true, 0);
-      W.step(self.rollMs() + 100, self.kit.FRAME, function () { far = Math.max(far, Math.hypot(hn.x - (400 - 60), hn.y - self.y)); });
+      W.step(self.rollMs() + 100, self.kit.FRAME, function () { far = Math.max(far, Math.hypot(hn.x - bx, hn.y - self.y)); });
       if (far > lim + 1) bad.push("결계 밖으로 " + Math.round(far) + " (한계 " + Math.round(lim) + ")");
       if (hn.roll) bad.push("구르기가 남음");
       if (self.shots(W).length) bad.push("기절했는데 볼트가 나감");

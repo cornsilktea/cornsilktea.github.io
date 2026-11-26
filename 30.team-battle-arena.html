@@ -3643,7 +3643,7 @@ SinglePassMaterials.enable(THREE);
   class DruidType extends MagicShooterType {
     static MODEL = { file: "Druid", launchTip: "mainhand", portraitPlant: true, right: "druid_staff" };
     static ULT = {
-      drR: 175, drDur: GameTime.gameMs(10), drTick: GameTime.gameMs(1), drHeal: 20, drCast: 450, drMin: 60, drSelfGauge: 1, drSnareMs: GameTime.gameMs(0.5), drRiseMs: 350, drCastMs: 500
+      drR: 175, drDur: GameTime.gameMs(10), drTick: GameTime.gameMs(1), drHeal: 25, drCast: 450, drMin: 60, drSelfGauge: 1, drSnareMs: GameTime.gameMs(0.5), drRiseMs: 350, drCastMs: 500
     };
     static STATS = { name: "드루이드", role: "caster", icon: "🌿", hp: 110, speed: GameTime.gameSpeed(165), cd: GameTime.gameMs(1.4), dmg: 10, range: 350, pSpeed: 1000, pr: 12, lanes: 2,
                ultName: "덩굴 부쉬", ultAim: true, heals: true };
@@ -5168,8 +5168,8 @@ SinglePassMaterials.enable(THREE);
                wear: { from: "rogue", part: "RogueHooded_Head", recolor: [[1, 1, 1, "#6B3519", "#2E140A"], [2, 1, 1, "#C8641E", "#6A2C0C"], [1, 0, 1, "#F2C14E", "#A8761C"]] },
                recolor: [[1, 0, 2, "#EE8A2C", "#9A460E"], [1, 7, 1, "#4A2614", "#1E0E06"], [1, 2, 1, "#F7D27A", "#B98A2A"], [2, 1, 1, "#F7D27A", "#B98A2A"], [0, 5, 1, "#5A2E16", "#261008"]] };
     static ULT = {
-      akCast: 450, akMin: 60, akR: 150, akDelay: GameTime.gameMs(0.4), akDur: GameTime.gameMs(5), akDmg: 20, akEdgeDmg: 20, akStunMs: GameTime.gameMs(1),
-      akPullMs: GameTime.gameMs(0.3), akEdgeGapMs: GameTime.gameMs(1), akSlowMul: 0.7
+      akCast: 450, akMin: 60, akR: 180, akDelay: GameTime.gameMs(0.4), akDur: GameTime.gameMs(5), akDmg: 30, akEdgeDmg: 20, akStunMs: GameTime.gameMs(1),
+      akPullMs: GameTime.gameMs(0.3), akEdgeGapMs: GameTime.gameMs(1), akSlowMul: 0.6
     };
     static STATS = { name: "아르카", role: "caster", icon: "🏮", hp: 120, speed: GameTime.gameSpeed(170), cd: GameTime.gameMs(1.4), dmg: 15, range: 350, pSpeed: GameTime.gameSpeed(1000), pr: 9,
                impededBonus: 0.5, ultName: "결계", ultAim: true };
