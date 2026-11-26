@@ -577,7 +577,7 @@ SinglePassMaterials.enable(THREE);
     fighter:  { name: "전사", icon: "⚔️", gaugeOnHit: 2, gaugeOnHurt: 1 },
     caster:   { name: "마법사", icon: "✨", gaugeOnHit: 3, gaugeOnHurt: 0 },
     shooter:  { name: "원거리 딜러", icon: "🏹", gaugeOnHit: 2, gaugeOnHurt: 0 },
-    assassin: { name: "암살자", icon: "🗡️", gaugeOnHit: 3, gaugeOnHurt: 0 }
+    assassin: { name: "암살자", icon: "🗡️", gaugeOnHit: 4, gaugeOnHurt: 0 }
     };
     static LIST = ["fighter", "caster", "shooter", "assassin"];
   }
@@ -1799,7 +1799,8 @@ SinglePassMaterials.enable(THREE);
       { id: "v3", path: "teambattle/patchstats/v3" },
       { id: "v4", path: "teambattle/patchstats/v4" },
       { id: "v5", path: "teambattle/patchstats/v5" },
-      { id: "v6", path: "teambattle/patchstats/v6" }
+      { id: "v6", path: "teambattle/patchstats/v6" },
+      { id: "v7", path: "teambattle/patchstats/v7" }
     ];
     static get current() { return StatsPatches.LIST[StatsPatches.LIST.length - 1]; }
     static get number() { return Number(StatsPatches.current.id.slice(1)) || 0; }
@@ -4954,7 +4955,7 @@ SinglePassMaterials.enable(THREE);
     };
     static STATS = { name: "팬텀", role: "assassin", icon: "👻", hp: 130, speed: GameTime.gameSpeed(175), cd: GameTime.gameMs(1.4),
                dmg: 35, farDmg: 15, dmgStep: 5, fullDmgReach: 100, range: 450, pSpeed: GameTime.gameSpeed(350), pr: 75, wallR: 10, pierce: true,
-               gust: { add: 15 / MatchRules.GAME_SPEED, ms: GameTime.gameMs(4), max: 4 }, ultName: "잔영섬", ultAim: true };
+               gust: { add: 10 / MatchRules.GAME_SPEED, ms: GameTime.gameMs(4), max: 3 }, ultName: "잔영섬", ultAim: true };
     static SWORD_WAVE = { arc: Math.PI * 0.72, glowR: 87, glowThick: 24, coreR: 82, coreThick: 11, afterGap: 20, lead: 10 };
     static WAVE_SWING = { clip: "Melee_1H_Attack_Slice_Horizontal", speed: 2.2, from: 0.17, release: 0.23 };
     static WIND_CLIP = "Melee_2H_Idle";
