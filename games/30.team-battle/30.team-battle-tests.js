@@ -1461,8 +1461,10 @@ class ResultCollector {
     W.ent("n1").hp = W.ent("n1").maxHp = 5000;
     shootTimes(W, sb, CH.every - 2);
     var before = sb.zapHits;
+    sb.cdUntil = W.t() + SB.cd;
     api.useUlt(sb, 0);
     if (sb.gauge !== 0) bad.push("스킬 뒤 게이지 " + sb.gauge);
+    if (sb.cdUntil > W.t()) bad.push("스킬 쓰는 순간 남은 기본 공격 대기 " + Math.round(sb.cdUntil - W.t()) + " (기대 0)");
     var start = W.t();
     api.fireBasic(sb, 0);
     var cd = sb.cdDur, wantCd = SB.cd / U.ocRate;
@@ -9767,7 +9769,7 @@ class HunterTests {
       var base = api.speedOf(hn);
       hn.cdUntil = W.t() + C.cd;
       api.useUlt(hn, 0);
-      if (!self.near(hn.cdUntil - W.t(), U.hnCd, 1)) bad.push("쓰는 순간 남은 간격 " + Math.round(hn.cdUntil - W.t()) + " (기대 " + U.hnCd + ")");
+      if (hn.cdUntil > W.t()) bad.push("쓰는 순간 남은 간격 " + Math.round(hn.cdUntil - W.t()) + " (기대 0, 바로 기본 공격)");
       if (!self.near(api.speedOf(hn) - base, U.hnSpeed, 0.01)) bad.push("이동 증가 " + api.shownSpeed(api.speedOf(hn) - base));
       self.fire(W, 0, true, null);
       if (!self.near(hn.cdDur, U.hnCd, 0.5)) bad.push("공격 간격 " + api.secs(hn.cdDur));

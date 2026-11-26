@@ -3670,7 +3670,7 @@ SinglePassMaterials.enable(THREE);
     cast(E, ang, reach, t) { var services = this.services;
       E.buffUntil = t + StormbowType.ULT.ocDur;
       E.skillDur = StormbowType.ULT.ocDur;
-      E.cdUntil = Math.min(E.cdUntil, t + StormbowType.STATS.cd / StormbowType.ULT.ocRate);
+      E.cdUntil = Math.min(E.cdUntil, t);
       services.session.room.ref.child("meleeHits").push({ team: E.team, owner: E.id, x: MathKit.r1(E.x), y: MathKit.r1(E.y), angle: MathKit.r1(E.angle), radius: StormbowType.ULT.ocR, arc: Math.PI * 2,
                                         dmg: StormbowType.ULT.ocDmg, u: 1, slam: 1, zap: 1, thruWall: 1, fx: { stunMs: StormbowType.ULT.ocStunMs }, createdAt: t });
       services.vision.revealBriefly(E.id, t);
@@ -5376,7 +5376,7 @@ SinglePassMaterials.enable(THREE);
     cast(E, ang, reach, t) { var services = this.services, u = HunterType.ULT;
       E.buffUntil = t + u.hnDur;
       E.skillDur = u.hnDur;
-      E.cdUntil = Math.min(E.cdUntil, t + u.hnCd);
+      E.cdUntil = Math.min(E.cdUntil, t);
       services.vision.revealBriefly(E.id, t);
     }
     get tintsHit() { return true; }
