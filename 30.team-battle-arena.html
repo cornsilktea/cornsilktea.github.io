@@ -3100,13 +3100,14 @@ SinglePassMaterials.enable(THREE);
     static ULT = {
       pnDmg: 90, pnSpeed: 735, pnRange: 900, pnPr: 16, pnRefund: 4, pnScale: 3
     };
-    static STATS = { name: "저격수", role: "shooter", icon: "🎯", hp: 100, speed: GameTime.gameSpeed(130), cd: GameTime.gameMs(1), dmg: 37, range: 600, pSpeed: 800, pr: 12, farDist: 500, farBonus: 0.5, ultName: "거대 화살", ultAim: true };
+    static STATS = { name: "저격수", role: "shooter", icon: "🎯", hp: 100, speed: GameTime.gameSpeed(130), cd: GameTime.gameMs(1), dmg: 37, range: 600, pSpeed: 800, pr: 12, farDist: 400, farBonus: 0.5, ultName: "거대 화살", ultAim: true };
     get idleClip() { return "Ranged_2H_Aiming"; }
     ultAimShot() { return { len: SniperType.ULT.pnRange, pr: SniperType.ULT.pnPr }; }
     skillShotSpec() { return { count: 1, gap: 0, sp: SniperType.ULT.pnSpeed, dmg: SniperType.ULT.pnDmg, pr: SniperType.ULT.pnPr, range: SniperType.ULT.pnRange, ultKey: "giant" }; }
     onHitLate(owner, h) { if (h.u === "giant") owner.gauge = Math.min(MatchRules.GAUGE_MAX, owner.gauge + SniperType.ULT.pnRefund); }
     ultLeadSeconds(dist) { return dist / SniperType.ULT.pnSpeed; }
     get holdsFullRange() { return true; }
+    rangeRingOf(E, t) { return SniperType.STATS.farDist; }
     projectileMesh(g, d) { var services = this.services;
       var big = d.isSkill ? SniperType.ULT.pnScale : 1, boltCol = d.isSkill ? 0xFFB347 : Palette.C_FX[d.team];
       if (services.models.kit.weapons.arrow_crossbow) {

@@ -697,6 +697,11 @@ class ResultCollector {
     var ok = near(got[0], 2 * h.add) && near(got[1], Math.min(h.max, 4 * h.add)) && near(got[2], h.max) && near(got[3], h.max) && near(got[4], h.max) && near(got[5], 0);
     done(ok ? "pass" : "fail", "이동속도 증가(표시) " + got.map(function (v) { return "+" + api.shownSpeed(v); }).join(" → ") + " (기대: +" + api.shownSpeed(2 * h.add) + " → +" + api.shownSpeed(h.max) + " ×4 → +0, 적중마다 지속시간 초기화)");
   });
+  run(PASSIVE, "저격수: 내 화면 발밑 반투명 원 반지름이 추가 피해 거리 " + api.CHARS.sniper.farDist + " 와 같은가", function (done) {
+    var W = world("forest", [{ id: "sn", team: "blue", char: "sniper", x: 100, y: OPEN_Y.forest }]), sn = W.ent("sn");
+    var r = api.CHAR_TYPES.of("sniper").rangeRingOf(sn, W.t());
+    done(r === api.CHARS.sniper.farDist ? "pass" : "fail", "원 반지름 " + r + " (기대 " + api.CHARS.sniper.farDist + ")");
+  });
   run(PASSIVE, "저격수: " + api.CHARS.sniper.farDist + "보다 먼 적에게만 피해 +" + Math.round(api.CHARS.sniper.farBonus * 100) + "%인가", function (done) {
     var y = OPEN_Y.forest, c = api.CHARS.sniper;
     function shotAt(dist) {
