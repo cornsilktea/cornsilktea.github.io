@@ -593,7 +593,7 @@ class ClimbRunMode {
     get timed() { return false; }
     get seconds() { return 0; }
     get peak() { return 0; }
-    get restartable() { return false; }
+    get restartable() { return true; }
     tick(_rules) { }
     stoodAt(_height, _rules) { }
 }
@@ -603,6 +603,7 @@ class ClimbPracticeMode extends ClimbRunMode {
         this.name = "practice";
     }
     finish(rules) { rules.emit({ t: "summit", falls: rules.falls, portals: rules.portalsUsed }); }
+    restarted(_rules) { return this; }
     switched(rules) {
         rules.emit({ t: "speedrunStart" });
         return new ClimbSpeedrunMode(rules.falls);
@@ -626,7 +627,7 @@ class ClimbSpeedrunMode extends ClimbRunMode {
     tick(rules) {
         if (this.finished)
             return;
-        this.elapsed += ClimbBalance.TICK / rules.time.scale;
+        this.elapsed += ClimbBalance.TICK;
         const body = rules.body;
         if (body.grounded || body.hanging)
             this.highest = Math.max(this.highest, body.y);
@@ -657,6 +658,7 @@ class ClimbSpeedrunMode extends ClimbRunMode {
         rules.emit({ t: "speedrunExit" });
         return new ClimbPracticeMode();
     }
+    restarted(rules) { return new ClimbPracticeMode().switched(rules); }
 }
 class ClimbPortalKind {
     enter(_spec, _rules) { }
@@ -1035,7 +1037,7 @@ class ClimbRules {
         this.mode.finish(this);
     }
     beginSpeedrun() { this.mode = new ClimbPracticeMode().switched(this); }
-    restartSpeedrun() {
+    restartFromStart() {
         if (!this.mode.restartable)
             return false;
         this.body.respawn(this.level.spawn);
@@ -1043,7 +1045,7 @@ class ClimbRules {
         this.steer(0, 0);
         this.jumpLatch = false;
         this.bank = 0;
-        this.mode = new ClimbPracticeMode().switched(this);
+        this.mode = this.mode.restarted(this);
         this.emit({ t: "hubArrive" });
         return true;
     }

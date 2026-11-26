@@ -389,6 +389,42 @@ class ClimbWindView {
   }
 }
 
+class ClimbSeamLayers {
+  static readonly STEP = 0.015;
+  static readonly SAME_TOP = 0.03;
+  static readonly GRID = 8;
+
+  private readonly layers = new Map<PlatformPiece, number>();
+
+  constructor(pieces: readonly PlatformPiece[]) {
+    const placed: PlatformPiece[] = [];
+    for (const piece of pieces.slice().sort((a, b) => a.span - b.span)) {
+      if (piece.moving || piece.hazard || piece.rise !== 0) continue;
+      let layer = 0;
+      for (const other of placed) if (ClimbSeamLayers.shareTop(piece, other)) layer = Math.max(layer, (this.layers.get(other) ?? 0) + 1);
+      this.layers.set(piece, layer);
+      placed.push(piece);
+    }
+  }
+
+  drop(piece: PlatformPiece): number { return (this.layers.get(piece) ?? 0) * ClimbSeamLayers.STEP; }
+
+  private static shareTop(a: PlatformPiece, b: PlatformPiece): boolean {
+    if (Math.abs(a.top - b.top) > ClimbSeamLayers.SAME_TOP) return false;
+    if (Math.hypot(a.x - b.x, a.z - b.z) > a.span + b.span) return false;
+    return ClimbSeamLayers.touches(a, b) || ClimbSeamLayers.touches(b, a);
+  }
+
+  private static touches(a: PlatformPiece, b: PlatformPiece): boolean {
+    const n = ClimbSeamLayers.GRID;
+    for (let i = 0; i <= n; i++) for (let j = 0; j <= n; j++) {
+      const lx = (i / n * 2 - 1) * a.halfX * 0.999, lz = (j / n * 2 - 1) * a.halfZ * 0.999, x = a.worldX(lx, lz), z = a.worldZ(lx, lz);
+      if (a.covers(x, z) && b.covers(x, z)) return true;
+    }
+    return false;
+  }
+}
+
 class TowerLevelBuilder {
   static readonly BLOCK_OF_LOOK: Readonly<Record<string, string>> = {
     deck: "grass", block: "dirt", root: "dirt", rock: "stone", stump: "dirt", log: "wood", ramp: "wood", pad: "yellow",
@@ -431,6 +467,8 @@ class TowerLevelBuilder {
   private readonly sweepers: ClimbSweeperView;
   private readonly winds: ClimbWindView;
   private riding: PlatformPiece | null = null;
+  private readonly seams: ClimbSeamLayers;
+  private seamDrop = 0;
   private readonly ridingInverse: Three<"Matrix4">;
   private readonly marks = new Map<number, Three<"Matrix4">[]>();
   private readonly specials: Record<string, (piece: PlatformPiece) => void>;
@@ -445,6 +483,7 @@ class TowerLevelBuilder {
       rest: (piece) => this.rest(piece),
       summit: (piece) => this.summit(piece),
     };
+    this.seams = new ClimbSeamLayers(level.pieces.filter((piece) => piece.look !== TowerPropShapes.HIDDEN));
     for (const piece of level.pieces) this.draw(piece);
     this.sweepers = new ClimbSweeperView(libs, level.pieces, (stage) => this.groupOf(stage));
     this.winds = new ClimbWindView(libs, level.pieces, (stage) => this.groupOf(stage));
@@ -474,6 +513,7 @@ class TowerLevelBuilder {
   private poserOf(piece: PlatformPiece): ClimbPiecePoser { return piece instanceof MovingPlatform ? this.ridePoser : this.crumblePoser; }
 
   private addModel(stage: number, name: string, matrix: Three<"Matrix4">): void {
+    if (this.seamDrop) matrix.premultiply(new this.libs.THREE.Matrix4().makeTranslation(0, -this.seamDrop, 0));
     if (!this.riding) { this.batcherOf(stage).add(name, matrix); return; }
     const poser = this.poserOf(this.riding), key = stage + "|" + name + "|" + (poser === this.ridePoser ? "ride" : "crumble"), local = matrix.clone().premultiply(this.ridingInverse);
     const list = this.riderLists.get(key);
@@ -513,7 +553,9 @@ class TowerLevelBuilder {
 
   private draw(piece: PlatformPiece): void {
     if (piece.look === TowerPropShapes.HIDDEN || TowerLevelBuilder.HAZARD_LOOKS.includes(piece.look)) return;
+    this.seamDrop = this.seams.drop(piece);
     if (piece instanceof MovingPlatform || piece instanceof CrumblePlatform) this.drawRider(piece); else this.drawShape(piece);
+    this.seamDrop = 0;
   }
 
   private drawShape(piece: PlatformPiece): void {
@@ -570,8 +612,9 @@ class TowerLevelBuilder {
 
   private summit(piece: PlatformPiece): void {
     const THREE = this.libs.THREE, group = this.groupOf(piece.stage), K = ClimbSpaceKit;
-    const deck = new THREE.Mesh(new THREE.CylinderGeometry(piece.radius, piece.radius * 0.7, piece.depth, 40), new THREE.MeshLambertMaterial({ color: K.STEEL }));
-    deck.position.set(piece.x, piece.top - piece.depth / 2, piece.z);
+    const deckDepth = piece.depth - ClimbSeamLayers.STEP * 2;
+    const deck = new THREE.Mesh(new THREE.CylinderGeometry(piece.radius, piece.radius * 0.7, deckDepth, 40), new THREE.MeshLambertMaterial({ color: K.STEEL }));
+    deck.position.set(piece.x, piece.bottom + deckDepth / 2, piece.z);
     deck.receiveShadow = true;
     const plate = new THREE.Mesh(new THREE.CylinderGeometry(piece.radius - 0.15, piece.radius - 0.15, 0.06, 40), new THREE.MeshLambertMaterial({ color: K.PLATE }));
     plate.position.set(piece.x, piece.top - 0.03, piece.z);

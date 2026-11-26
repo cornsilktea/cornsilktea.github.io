@@ -70,9 +70,9 @@ class TowerClimbGame {
             input.onPause = () => this.pause();
         }
         this.keyboard.onPauseKey = () => this.togglePause();
-        this.keyboard.onRestartKey = () => this.restartSpeedrun();
+        this.keyboard.onRestartKey = () => this.restartFromStart();
         const restart = ClimbDom.el("btnSpeedReset");
-        restart.addEventListener("click", () => { restart.blur(); this.restartSpeedrun(); });
+        restart.addEventListener("click", () => { restart.blur(); this.restartFromStart(); });
         if (touchDevice)
             document.body.classList.add("touch");
         ClimbDom.el("btnStart").addEventListener("click", () => this.startRun(false));
@@ -158,14 +158,14 @@ class TowerClimbGame {
         ClimbDom.el("pauseBox").hidden = true;
         this.setInputs(true);
     }
-    restartSpeedrun() {
-        if (this.state !== "play" || !this.rules.restartSpeedrun())
+    restartFromStart() {
+        if (this.state !== "play" || !this.rules.restartFromStart())
             return;
         this.view.rig.reset(0);
         this.portalHint = "";
         this.dispatch(this.rules.events);
         this.rules.events.length = 0;
-        this.hud.banner("스피드런 처음부터! 시계 0:00.0", true, 2);
+        this.hud.banner(TowerClimbGame.RESTART_BANNERS[this.rules.mode.name], true, 2);
     }
     fell() {
         this.sfx.play("fall");
@@ -301,3 +301,4 @@ class TowerClimbGame {
 TowerClimbGame.COUNTDOWN = 3;
 TowerClimbGame.HINT_EVERY = 4;
 TowerClimbGame.MAX_FRAME = 0.1;
+TowerClimbGame.RESTART_BANNERS = { practice: "처음 지점으로 돌아왔어요", speedrun: "스피드런 처음부터! 시계 0:00.0" };

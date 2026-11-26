@@ -617,16 +617,18 @@ abstract class ClimbRunMode {
   get timed(): boolean { return false; }
   get seconds(): number { return 0; }
   get peak(): number { return 0; }
-  get restartable(): boolean { return false; }
+  get restartable(): boolean { return true; }
   tick(_rules: ClimbRules): void {}
   stoodAt(_height: number, _rules: ClimbRules): void {}
   abstract finish(rules: ClimbRules): void;
   abstract switched(rules: ClimbRules): ClimbRunMode;
+  abstract restarted(rules: ClimbRules): ClimbRunMode;
 }
 
 class ClimbPracticeMode extends ClimbRunMode {
   readonly name = "practice";
   finish(rules: ClimbRules): void { rules.emit({ t: "summit", falls: rules.falls, portals: rules.portalsUsed }); }
+  restarted(_rules: ClimbRules): ClimbRunMode { return this; }
   switched(rules: ClimbRules): ClimbRunMode {
     rules.emit({ t: "speedrunStart" });
     return new ClimbSpeedrunMode(rules.falls);
@@ -650,7 +652,7 @@ class ClimbSpeedrunMode extends ClimbRunMode {
 
   tick(rules: ClimbRules): void {
     if (this.finished) return;
-    this.elapsed += ClimbBalance.TICK / rules.time.scale;
+    this.elapsed += ClimbBalance.TICK;
     const body = rules.body;
     if (body.grounded || body.hanging) this.highest = Math.max(this.highest, body.y);
   }
@@ -681,6 +683,8 @@ class ClimbSpeedrunMode extends ClimbRunMode {
     rules.emit({ t: "speedrunExit" });
     return new ClimbPracticeMode();
   }
+
+  restarted(rules: ClimbRules): ClimbRunMode { return new ClimbPracticeMode().switched(rules); }
 }
 
 abstract class ClimbPortalKind {
@@ -1036,14 +1040,14 @@ class ClimbRules {
 
   beginSpeedrun(): void { this.mode = new ClimbPracticeMode().switched(this); }
 
-  restartSpeedrun(): boolean {
+  restartFromStart(): boolean {
     if (!this.mode.restartable) return false;
     this.body.respawn(this.level.spawn);
     this.crumbles.forEach((piece) => piece.reset());
     this.steer(0, 0);
     this.jumpLatch = false;
     this.bank = 0;
-    this.mode = new ClimbPracticeMode().switched(this);
+    this.mode = this.mode.restarted(this);
     this.emit({ t: "hubArrive" });
     return true;
   }

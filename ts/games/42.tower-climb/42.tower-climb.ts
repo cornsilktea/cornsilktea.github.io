@@ -5,6 +5,7 @@ class TowerClimbGame {
   static readonly COUNTDOWN = 3;
   static readonly HINT_EVERY = 4;
   static readonly MAX_FRAME = 0.1;
+  static readonly RESTART_BANNERS: Readonly<Record<ClimbRunModeName, string>> = { practice: "처음 지점으로 돌아왔어요", speedrun: "스피드런 처음부터! 시계 0:00.0" };
 
   private state: TowerClimbState = "loading";
   private level!: TowerLevel;
@@ -88,9 +89,9 @@ class TowerClimbGame {
       input.onPause = () => this.pause();
     }
     this.keyboard.onPauseKey = () => this.togglePause();
-    this.keyboard.onRestartKey = () => this.restartSpeedrun();
+    this.keyboard.onRestartKey = () => this.restartFromStart();
     const restart = ClimbDom.el("btnSpeedReset");
-    restart.addEventListener("click", () => { restart.blur(); this.restartSpeedrun(); });
+    restart.addEventListener("click", () => { restart.blur(); this.restartFromStart(); });
     if (touchDevice) document.body.classList.add("touch");
     ClimbDom.el("btnStart").addEventListener("click", () => this.startRun(false));
     ClimbDom.el("btnResume").addEventListener("click", () => this.resume());
@@ -174,13 +175,13 @@ class TowerClimbGame {
     this.setInputs(true);
   }
 
-  private restartSpeedrun(): void {
-    if (this.state !== "play" || !this.rules.restartSpeedrun()) return;
+  private restartFromStart(): void {
+    if (this.state !== "play" || !this.rules.restartFromStart()) return;
     this.view.rig.reset(0);
     this.portalHint = "";
     this.dispatch(this.rules.events);
     this.rules.events.length = 0;
-    this.hud.banner("스피드런 처음부터! 시계 0:00.0", true, 2);
+    this.hud.banner(TowerClimbGame.RESTART_BANNERS[this.rules.mode.name], true, 2);
   }
 
   private fell(): void {

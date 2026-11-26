@@ -377,6 +377,43 @@ class ClimbWindView {
 ClimbWindView.STREAKS = 40;
 ClimbWindView.STREAK_LENGTH = 1.4;
 ClimbWindView.FLOW = 9;
+class ClimbSeamLayers {
+    constructor(pieces) {
+        this.layers = new Map();
+        const placed = [];
+        for (const piece of pieces.slice().sort((a, b) => a.span - b.span)) {
+            if (piece.moving || piece.hazard || piece.rise !== 0)
+                continue;
+            let layer = 0;
+            for (const other of placed)
+                if (ClimbSeamLayers.shareTop(piece, other))
+                    layer = Math.max(layer, (this.layers.get(other) ?? 0) + 1);
+            this.layers.set(piece, layer);
+            placed.push(piece);
+        }
+    }
+    drop(piece) { return (this.layers.get(piece) ?? 0) * ClimbSeamLayers.STEP; }
+    static shareTop(a, b) {
+        if (Math.abs(a.top - b.top) > ClimbSeamLayers.SAME_TOP)
+            return false;
+        if (Math.hypot(a.x - b.x, a.z - b.z) > a.span + b.span)
+            return false;
+        return ClimbSeamLayers.touches(a, b) || ClimbSeamLayers.touches(b, a);
+    }
+    static touches(a, b) {
+        const n = ClimbSeamLayers.GRID;
+        for (let i = 0; i <= n; i++)
+            for (let j = 0; j <= n; j++) {
+                const lx = (i / n * 2 - 1) * a.halfX * 0.999, lz = (j / n * 2 - 1) * a.halfZ * 0.999, x = a.worldX(lx, lz), z = a.worldZ(lx, lz);
+                if (a.covers(x, z) && b.covers(x, z))
+                    return true;
+            }
+        return false;
+    }
+}
+ClimbSeamLayers.STEP = 0.015;
+ClimbSeamLayers.SAME_TOP = 0.03;
+ClimbSeamLayers.GRID = 8;
 class TowerLevelBuilder {
     constructor(libs, library, level) {
         this.libs = libs;
@@ -390,6 +427,7 @@ class TowerLevelBuilder {
         this.ridePoser = new ClimbRidePoser();
         this.crumblePoser = new ClimbCrumblePoser();
         this.riding = null;
+        this.seamDrop = 0;
         this.marks = new Map();
         this.root = new libs.THREE.Group();
         this.ridingInverse = new libs.THREE.Matrix4();
@@ -400,6 +438,7 @@ class TowerLevelBuilder {
             rest: (piece) => this.rest(piece),
             summit: (piece) => this.summit(piece),
         };
+        this.seams = new ClimbSeamLayers(level.pieces.filter((piece) => piece.look !== TowerPropShapes.HIDDEN));
         for (const piece of level.pieces)
             this.draw(piece);
         this.sweepers = new ClimbSweeperView(libs, level.pieces, (stage) => this.groupOf(stage));
@@ -430,6 +469,8 @@ class TowerLevelBuilder {
     }
     poserOf(piece) { return piece instanceof MovingPlatform ? this.ridePoser : this.crumblePoser; }
     addModel(stage, name, matrix) {
+        if (this.seamDrop)
+            matrix.premultiply(new this.libs.THREE.Matrix4().makeTranslation(0, -this.seamDrop, 0));
         if (!this.riding) {
             this.batcherOf(stage).add(name, matrix);
             return;
@@ -478,10 +519,12 @@ class TowerLevelBuilder {
     draw(piece) {
         if (piece.look === TowerPropShapes.HIDDEN || TowerLevelBuilder.HAZARD_LOOKS.includes(piece.look))
             return;
+        this.seamDrop = this.seams.drop(piece);
         if (piece instanceof MovingPlatform || piece instanceof CrumblePlatform)
             this.drawRider(piece);
         else
             this.drawShape(piece);
+        this.seamDrop = 0;
     }
     drawShape(piece) {
         const shape = TowerPropShapes.of(piece.look), special = this.specials[piece.look];
@@ -539,8 +582,9 @@ class TowerLevelBuilder {
     }
     summit(piece) {
         const THREE = this.libs.THREE, group = this.groupOf(piece.stage), K = ClimbSpaceKit;
-        const deck = new THREE.Mesh(new THREE.CylinderGeometry(piece.radius, piece.radius * 0.7, piece.depth, 40), new THREE.MeshLambertMaterial({ color: K.STEEL }));
-        deck.position.set(piece.x, piece.top - piece.depth / 2, piece.z);
+        const deckDepth = piece.depth - ClimbSeamLayers.STEP * 2;
+        const deck = new THREE.Mesh(new THREE.CylinderGeometry(piece.radius, piece.radius * 0.7, deckDepth, 40), new THREE.MeshLambertMaterial({ color: K.STEEL }));
+        deck.position.set(piece.x, piece.bottom + deckDepth / 2, piece.z);
         deck.receiveShadow = true;
         const plate = new THREE.Mesh(new THREE.CylinderGeometry(piece.radius - 0.15, piece.radius - 0.15, 0.06, 40), new THREE.MeshLambertMaterial({ color: K.PLATE }));
         plate.position.set(piece.x, piece.top - 0.03, piece.z);

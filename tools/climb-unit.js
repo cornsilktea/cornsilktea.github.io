@@ -505,14 +505,17 @@ function box(id, x, z, y, sx, sz, more = {}) { return { id, kind: "static", stag
     enterSpeedrun(again, alog);
     again.body.place(0, 30, 40);
     tickRun(again, 1, alog);
-    const fallsAt = again.falls, ok = again.restartSpeedrun(), restartLog = again.events.slice();
+    const fallsAt = again.falls, ok = again.restartFromStart(), restartLog = again.events.slice();
     check("스피드런 처음부터: 시작 지점·시계 0·구간 비움", ok && again.mode.name === "speedrun" && again.mode.seconds === 0 && again.mode.splits.every((x) => x === 0) && Math.hypot(again.body.x, again.body.z) < 1e-6 && again.body.mode === "free" && restartLog.some((e) => e.t === "speedrunStart"), [again.mode.seconds, restartLog.map((e) => e.t)]);
     const after = [];
     tickRun(again, 0.5, after);
     check("스피드런 처음부터: 바로 시간이 다시 흐르고 떨어진 횟수도 새로 셈", near(again.mode.seconds, 0.5, 1e-6) && again.falls === fallsAt, again.mode.seconds);
-    const practice = speedLevel();
+    const practice = speedLevel(), plogs = [];
     settle(practice);
-    check("일반 모드에서는 처음부터가 동작하지 않음", !practice.restartSpeedrun() && practice.mode.name === "practice");
+    practice.body.place(0, 30, 40);
+    tickRun(practice, 0.5, plogs);
+    const pok = practice.restartFromStart(), prestart = practice.events.slice();
+    check("일반 모드 처음부터: 허브 시작 지점으로, 일반 모드 그대로, 스피드런 이벤트 없음", pok && practice.mode.name === "practice" && Math.hypot(practice.body.x - practice.level.spawn.x, practice.body.z - practice.level.spawn.z) < 1e-6 && practice.body.y < 1 && !prestart.some((e) => e.t === "speedrunStart"), [practice.body.x, practice.body.y, practice.body.z, prestart.map((e) => e.t)]);
   }
 
   const finish = [];
@@ -562,8 +565,8 @@ function box(id, x, z, y, sx, sz, more = {}) { return { id, kind: "static", stag
   const slowFrom = slow.mode.seconds, worldFrom = slow.worldTime;
   slow.holdSlow(true);
   for (let i = 0; i < 180; i++) slow.advance(1 / 60);
-  check("스피드런 기록은 실제 시간: 슬로를 3초 써도 시계는 약 3초", near(slow.mode.seconds - slowFrom, 3, 0.02), slow.mode.seconds - slowFrom);
-  check("슬로 중에는 판 시간이 덜 감(3초 동안 1.5초 미만)", slow.worldTime - worldFrom < 1.5, slow.worldTime - worldFrom);
+  check("스피드런 시계는 판 시간: 슬로를 쓰면 같은 배율로 느려짐", near(slow.mode.seconds - slowFrom, slow.worldTime - worldFrom, 1e-9), [slow.mode.seconds - slowFrom, slow.worldTime - worldFrom]);
+  check("슬로 중에는 시계가 덜 감(실제 3초 동안 1.5초 미만)", slow.mode.seconds - slowFrom < 1.5, slow.mode.seconds - slowFrom);
 }
 
 console.log("climb-unit: 통과 " + passed + ", 실패 " + failures.length);
