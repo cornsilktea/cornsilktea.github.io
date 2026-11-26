@@ -2902,9 +2902,9 @@ SinglePassMaterials.enable(THREE);
   class RangerType extends CharacterType {
     static MODEL = { file: "Ranger", left: "bow_withString", leftTurn: Math.PI, launchPose: { clip: "Ranged_Bow_Release", sec: 0.02, node: "handslotl" } };
     static ULT = {
-      mkCount: 10, mkGap: 115, mkDmg: 40, mkRefund: 1, mkSpeed: 805, mkRange: ArenaSize.KEY * 8, mkPr: 8
+      mkCount: 10, mkGap: 115, mkDmg: 40, mkRefund: 1, mkSpeed: GameTime.gameSpeed(600), mkRange: ArenaSize.KEY * 8, mkPr: 8
     };
-    static STATS = { name: "궁수", role: "shooter", icon: "🏹", hp: 100, speed: GameTime.gameSpeed(130), haste: { add: 10 / MatchRules.GAME_SPEED, ms: GameTime.gameMs(6), max: 50 / MatchRules.GAME_SPEED }, cd: GameTime.gameMs(0.8), dmg: 20, range: 500, pSpeed: 520, pr: 12, shots: 2, gap: 70, ultName: "난사", ultAim: true };
+    static STATS = { name: "궁수", role: "shooter", icon: "🏹", hp: 100, speed: GameTime.gameSpeed(130), haste: { add: 10 / MatchRules.GAME_SPEED, ms: GameTime.gameMs(6), max: 50 / MatchRules.GAME_SPEED }, cd: GameTime.gameMs(0.8), dmg: 20, range: 500, pSpeed: GameTime.gameSpeed(500), pr: 12, shots: 2, gap: 70, ultName: "난사", ultAim: true };
     get idleClip() { return "Ranged_Bow_Idle"; }
     basicHitMark(d) { return d.isSkill ? false : d.swingAt; }
     static VOLLEY_COLOR = 0xFF8A3D;
@@ -3016,7 +3016,7 @@ SinglePassMaterials.enable(THREE);
     static ULT = {
       asSmokeMs: 400, asDur: GameTime.gameMs(21)
     };
-    static STATS = { name: "은신자", role: "assassin", icon: "🗡️", hp: 150, speed: GameTime.gameSpeed(175), ultSpeed: GameTime.gameSpeed(280), cd: GameTime.gameMs(1.1), dmg: 32, range: 110, arc: Math.PI * 0.6, hits: 2, hitGap: 160, ambushDmg: 45, throwDmg: 25, throwRange: 350, pSpeed: 1080, pr: 8, ultName: "은신" };
+    static STATS = { name: "은신자", role: "assassin", icon: "🗡️", hp: 150, speed: GameTime.gameSpeed(175), ultSpeed: GameTime.gameSpeed(280), cd: GameTime.gameMs(1.1), dmg: 32, range: 110, arc: Math.PI * 0.6, hits: 2, hitGap: 160, ambushDmg: 45, throwDmg: 25, throwRange: 350, pSpeed: GameTime.gameSpeed(750), pr: 8, ultName: "은신" };
     skillSpeed(E, t) { return E.stealthUntil > t ? this.data.ultSpeed : null; }
     ambush(E, t) { var services = this.services;
       if (E.stealthUntil <= t) return null;
@@ -3098,7 +3098,7 @@ SinglePassMaterials.enable(THREE);
   class SniperType extends CharacterType {
     static MODEL = { file: "Rogue_Hooded", portraitPlant: true, plantTilt: -Math.PI / 2, right: "crossbow_2handed", rightTurn: Math.PI / 2, muzzle: [0, 0.12, 1.12] };
     static ULT = {
-      pnDmg: 90, pnSpeed: 735, pnRange: 900, pnPr: 16, pnRefund: 4, pnScale: 3
+      pnDmg: 90, pnSpeed: GameTime.gameSpeed(700), pnRange: 900, pnPr: 16, pnRefund: 4, pnScale: 3
     };
     static STATS = { name: "저격수", role: "shooter", icon: "🎯", hp: 100, speed: GameTime.gameSpeed(130), cd: GameTime.gameMs(1), dmg: 37, range: 600, pSpeed: 800, pr: 12, farDist: 400, farBonus: 0.5, ultName: "거대 화살", ultAim: true };
     get idleClip() { return "Ranged_2H_Aiming"; }
@@ -3351,7 +3351,8 @@ SinglePassMaterials.enable(THREE);
       dmStrikeStunMs: GameTime.gameMs(0.7), dmStunGraceMs: 40, cuStacks: 3, cuBoomDmg: 40, cuBoomMs: 500, cuExpireMs: GameTime.gameMs(4)
     };
     static STATS = { name: "주술사", role: "shooter", icon: "👊", hp: 115, speed: GameTime.gameSpeed(160), cd: GameTime.gameMs(1.3), dmg: 5, range: 400, width: 100, ultName: "영역전개" };
-    static WAVE = { life: 724, travel: 564 };
+    static WAVE_SPEED = 500;
+    static WAVE = { life: GameTime.gameMs(ShamanType.STATS.range / ShamanType.WAVE_SPEED) + 160, travel: GameTime.gameMs(ShamanType.STATS.range / ShamanType.WAVE_SPEED) };
     get hasDarkWave() { return true; }
     overrideBasic(E, ang, reach, t) { var services = this.services;
       var struck = services.domainFx.domainStrikeTarget(E, t);
@@ -11042,6 +11043,10 @@ SinglePassMaterials.enable(THREE);
     static RANGE_RING = null;
     static POLE = null;
     static rangeRing() { return BannerBearerRig.RANGE_RING || (BannerBearerRig.RANGE_RING = new THREE.RingGeometry(0.985, 1, 72)); }
+    static OTHERS_RING = null;
+    static OTHERS_RING_INNER = 0.99;
+    static OTHERS_RING_OPACITY = 0.2;
+    static othersRing() { return BannerBearerRig.OTHERS_RING || (BannerBearerRig.OTHERS_RING = new THREE.RingGeometry(BannerBearerRig.OTHERS_RING_INNER, 1, 96)); }
     static poleGeo() {
       var length = BannerBearerRig.POLE_TOP - BannerBearerRig.POLE_BOTTOM;
       return BannerBearerRig.POLE || (BannerBearerRig.POLE = new THREE.CylinderGeometry(BannerBearerRig.POLE_RADIUS, BannerBearerRig.POLE_RADIUS, length, 8).translate(0, BannerBearerRig.POLE_BOTTOM + length / 2, 0));
@@ -11072,13 +11077,18 @@ SinglePassMaterials.enable(THREE);
       root.add(this.aura);
     }
     buildMarchRange(root) { var services = this.services, v = this.v;
-      this.marchRange = null;
-      if (!v.meRing) return;
+      this.marchRange = null; this.stanceRange = null;
+      if (!v.meRing) { this.buildStanceRange(root); return; }
       var range = new THREE.Group();
       var fill = services.arenaView.flatMesh(services.geo.disc, services.models.glowMat("bannerMarchFill", BannerBearerRig.GOLD_PALE, 0.05)); fill.position.y = 1.1; range.add(fill);
       var edge = services.arenaView.flatMesh(BannerBearerRig.rangeRing(), services.models.glowMat("bannerMarchEdge", BannerBearerRig.GOLD_PALE, 0.28)); edge.position.y = 1.3; range.add(edge);
       range.scale.set(BannerBearerType.ULT.bnMarchR, 1, BannerBearerType.ULT.bnMarchR);
       root.add(range); this.marchRange = range;
+    }
+    buildStanceRange(root) { var services = this.services;
+      var edge = services.arenaView.flatMesh(BannerBearerRig.othersRing(), services.models.glowMat("bannerStanceEdge", BannerBearerRig.GOLD_PALE, BannerBearerRig.OTHERS_RING_OPACITY));
+      edge.position.y = 1.2; edge.scale.set(BannerBearerType.ULT.bnR, 1, BannerBearerType.ULT.bnR); edge.visible = false;
+      root.add(edge); this.stanceRange = edge;
     }
     followFacing(nowMs) { var v = this.v;
       if (!this.stanceShown) this.flagYaw = v.yaw;
@@ -11103,6 +11113,7 @@ SinglePassMaterials.enable(THREE);
       if (this.flag) { this.flag.visible = on; if (on) this.placeFlag(nowMs); }
       this.aura.visible = on;
       if (this.marchRange) this.marchRange.visible = E.alive;
+      if (this.stanceRange) this.stanceRange.visible = on;
       if (on) this.spreadWaves(nowMs);
     }
   }
