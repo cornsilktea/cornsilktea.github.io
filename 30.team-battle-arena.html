@@ -2621,7 +2621,7 @@ SinglePassMaterials.enable(THREE);
         var shaft = new THREE.Mesh(services.geo.shaft, services.models.basicMat("shaft", 0xEADFC4, 1)); if (volley) shaft.scale.set(1.2, 1.4, 1.4); g.add(shaft);
         g.add(new THREE.Mesh(services.geo.head, services.models.basicMat("head-" + (volley ? "v" : d.team), col, 1)));
       }
-      var trail = new THREE.Mesh(services.geo.trail, services.models.glowMat("trail-" + (volley ? "v" : d.team), col, 0.45)); trail.position.x = -15; trail.scale.set(volley ? 70 : 50, volley ? 1.8 : 1.3, volley ? 1.8 : 1.3); g.add(trail);
+      var trail = new THREE.Mesh(services.geo.trail, services.models.glowMat("trail-" + (volley ? "v" : d.team), col, 0.45)); trail.position.x = -15; trail.scale.set(volley ? 70 : 50, volley ? 1.8 : 1.3, volley ? 1.8 : 1.3); g.add(ShotTail.track(g, trail, true));
     }
     isLancerWinding(E, t) { return false; }
     isHammerLeaping(E, t) { return false; }
@@ -2807,6 +2807,25 @@ SinglePassMaterials.enable(THREE);
       return E.ultUntil > E.atkAt ? ["Melee_1H_Attack_Chop", 1.6] : ["Melee_1H_Attack_Slice_Horizontal", 1.5];
     }
   }
+  class ShotTail {
+    static track(g, mesh, centered) { var full = mesh.scale.x;
+      (g.userData.tails || (g.userData.tails = [])).push({ mesh: mesh, full: full, centered: !!centered, head: centered ? mesh.position.x + full / 2 : mesh.position.x });
+      return mesh;
+    }
+    static grow(g, traveled) { var tails = g.userData.tails;
+      if (!tails) return;
+      for (var i = 0; i < tails.length; i++) {
+        var tail = tails[i], len = Math.max(1, Math.min(tail.full, traveled));
+        tail.mesh.scale.x = len;
+        if (tail.centered) tail.mesh.position.x = tail.head - len / 2;
+      }
+    }
+  }
+  class ThrowMotion {
+    static CLIP = "Throw";
+    static FROM_SEC = 0.56;
+    static RELEASE_SEC = 0.68;
+  }
   class ProjectileAura {
     constructor(services, look) { this.services = services; this.look = look; }
     build(g) { var services = this.services, A = this.look, root = new THREE.Group(), haloKey = A.key + "-halo";
@@ -2881,7 +2900,7 @@ SinglePassMaterials.enable(THREE);
     }
   }
   class RangerType extends CharacterType {
-    static MODEL = { file: "Ranger", left: "bow_withString", leftTurn: Math.PI };
+    static MODEL = { file: "Ranger", left: "bow_withString", leftTurn: Math.PI, launchPose: { clip: "Ranged_Bow_Release", sec: 0.02, node: "handslotl" } };
     static ULT = {
       mkCount: 10, mkGap: 115, mkDmg: 40, mkRefund: 1, mkSpeed: 805, mkRange: ArenaSize.KEY * 8, mkPr: 8
     };
@@ -2903,12 +2922,12 @@ SinglePassMaterials.enable(THREE);
         var shaft = new THREE.Mesh(services.geo.shaft, services.models.basicMat("shaft", 0xEADFC4, 1)); shaft.scale.set(1.2, 1.4, 1.4); g.add(shaft);
         g.add(new THREE.Mesh(services.geo.head, services.models.basicMat("head-v", RangerType.VOLLEY_COLOR, 1)));
       }
-      g.add(SniperShotShaders.tailMesh(RangerType.VOLLEY_COLOR, V.tail, V.tailWidth));
+      g.add(ShotTail.track(g, SniperShotShaders.tailMesh(RangerType.VOLLEY_COLOR, V.tail, V.tailWidth)));
       if (d.isSkill) g.userData.volleyAura = this.volleyAura().build(g);
     }
     volleyAura() { return this.auraKit || (this.auraKit = new ProjectileAura(this.services, RangerType.VOLLEY_AURA)); }
     animateProjectile(g, p, e, nowMs) { var aura = g.userData.volleyAura; if (aura) this.volleyAura().animate(aura, Math.max(1, Math.min(RangerType.VOLLEY_AURA.tailLen, p.sp * e / 1000)), nowMs); }
-    onShotLaunched(p) { this.services.sniperShots.flash(p.d.x, p.d.y, Math.atan2(p.dy, p.dx), p.d.isSkill ? RangerType.VOLLEY_MUZZLE : RangerType.BASIC_MUZZLE, RangerType.VOLLEY_COLOR, p.d.createdAt); }
+    onShotLaunched(p) { var at = this.services.effectView.launchSpot(p); this.services.sniperShots.flash(at.x, at.y, Math.atan2(p.dy, p.dx), p.d.isSkill ? RangerType.VOLLEY_MUZZLE : RangerType.BASIC_MUZZLE, RangerType.VOLLEY_COLOR, p.d.createdAt); }
     onShotHitShown(d, T) { var services = this.services; services.sniperShots.flash(T.x, T.y, Math.atan2(d.vy, d.vx), d.isSkill ? RangerType.VOLLEY_HIT : RangerType.BASIC_HIT, RangerType.VOLLEY_COLOR, services.clock.now()); }
     onHitLate(owner, h) { if (h.u === "volley") owner.gauge = Math.min(MatchRules.GAUGE_MAX, owner.gauge + RangerType.ULT.mkRefund); }
     ultLeadSeconds(dist) { return dist / RangerType.ULT.mkSpeed; }
@@ -3009,7 +3028,7 @@ SinglePassMaterials.enable(THREE);
       if (services.models.kit.weapons.dagger) {
         var knife = services.models.kit.weapons.dagger.clone(); knife.rotation.z = -Math.PI / 2; knife.scale.setScalar(ModelTuning.MODEL_SCALE); knife.position.x = -22; g.add(knife);
       } else g.add(new THREE.Mesh(services.geo.shaft, services.models.basicMat("blade", 0xDCE3EC, 1)));
-      var streak = new THREE.Mesh(services.geo.trail, services.models.glowMat("trail-rogue", 0xDCE3EC, 0.35)); streak.position.x = -10; streak.scale.set(40, 1.3, 1.3); g.add(streak);
+      var streak = new THREE.Mesh(services.geo.trail, services.models.glowMat("trail-rogue", 0xDCE3EC, 0.35)); streak.position.x = -10; streak.scale.set(40, 1.3, 1.3); g.add(ShotTail.track(g, streak, true));
     }
     launchHandOf(model) { return model.getObjectByName("muzzle") || model.getObjectByName("handslotr"); }
     cast(E, ang, reach, t) { var services = this.services;
@@ -3095,7 +3114,7 @@ SinglePassMaterials.enable(THREE);
       } else {
         var boltShaft = new THREE.Mesh(services.geo.shaft, services.models.basicMat("shaft", 0xEADFC4, 1)); boltShaft.scale.setScalar(big); g.add(boltShaft);
       }
-      g.add(SniperShotShaders.tailMesh(boltCol, d.isSkill ? 300 : 240, d.isSkill ? 40 : 22));
+      g.add(ShotTail.track(g, SniperShotShaders.tailMesh(boltCol, d.isSkill ? 300 : 240, d.isSkill ? 40 : 22)));
     }
     onShotLaunched(p) { this.services.sniperShots.launched(p); }
     onShotHitShown(d, T) { var services = this.services; services.sniperShots.hit(d, T.x, T.y, services.projectiles.damageBonusSum(d, T) > 0); }
@@ -3119,7 +3138,7 @@ SinglePassMaterials.enable(THREE);
     }
   }
   class ThrowerType extends CharacterType {
-    static MODEL = { file: "Skeleton_Rogue", right: "Potion_1", rightScale: 2.2 };
+    static MODEL = { file: "Skeleton_Rogue", right: "Potion_1", rightScale: 2.2, launchPose: { clip: ThrowMotion.CLIP, sec: ThrowMotion.RELEASE_SEC, node: "handslotr" } };
     static ULT = {
       plFlight: 700, plFlightMin: 100, plR: 70, plDur: GameTime.gameMs(2.5), plTick: GameTime.gameMs(1), plMax: 4, plFade: 500, plLob: 90, plGauge: 1,
       fgR: 150, fgDur: GameTime.gameMs(6), fgDmg: 15, fgHeal: 5, fgSlowMul: 0.6, fgSlowMs: 400, fgCast: ArenaSize.KEY * 4 + 100, fgRefund: 1
@@ -3151,7 +3170,7 @@ SinglePassMaterials.enable(THREE);
       return "사거리 " + c.minRange + "~" + c.range + "의 지정한 곳에 독병을 던져 " + services.skilltext.secs(ThrowerType.ULT.plDur) + "간 유지되는 반경 " + ThrowerType.ULT.plR + "의 독 웅덩이 생성. 적은 1초당 " + c.dmg + "의 피해";
     }
     attackClip(v, E, t) {
-      return ["Throw", E.ultUntil > E.atkAt ? 1.6 : 2.2];
+      return [ThrowMotion.CLIP, E.ultUntil > E.atkAt ? 1.6 : 2.2, null, ThrowMotion.FROM_SEC];
     }
   }
   class LancerShieldOrbit {
@@ -3607,7 +3626,7 @@ SinglePassMaterials.enable(THREE);
   }
   class StormbowType extends CharacterType {
     static MELEE = { spark: "#FFE45C" };
-    static MODEL = { file: "Ranger", left: "bow_B_withString", leftTurn: -Math.PI / 2,
+    static MODEL = { file: "Ranger", left: "bow_B_withString", leftTurn: -Math.PI / 2, launchPose: { clip: "Ranged_Bow_Release", sec: 0.02, node: "handslotl" },
                 recolor: [[0, 5, 2, "#4A82F0", "#1E44B0"], [1, 0, 1, "#FFE45C", "#E8A317"], [0, 3, 1, "#26304E", "#10152A"], [0, 7, 1, "#2A3A7A", "#141C40"],
                           [0, 1, 1, "#FFF3B0", "#E6BE4E"], [2, 7, 1, "#FFD23F", "#C98A10"], [2, 3, 1, "#1C2448", "#0B0F22"], [1, 7, 1, "#27336A", "#111733"], [1, 1, 1, "#27336A", "#111733"]],
                 leftRecolor: [[1, 6, 1, "#FFE45C", "#E0A01A"], [2, 4, 1, "#2A3A7A", "#141C40"], [3, 0, 1, "#8FE8FF", "#2A7BFF"], [2, 5, 3, "#26304E", "#10152A"]] };
@@ -3633,8 +3652,8 @@ SinglePassMaterials.enable(THREE);
       } else g.add(new THREE.Mesh(services.geo.shaft, services.models.basicMat("shaft", 0xEADFC4, 1)));
       var zapHalo = new THREE.Mesh(services.geo.ball, services.models.glowMat("zapGlow", 0x3F8CFF, 0.55)); zapHalo.position.x = 12; zapHalo.scale.setScalar(9); g.add(zapHalo);
       var zapCore = new THREE.Mesh(services.geo.ball, services.models.basicMat("zapCore", 0xFFF27A, 1)); zapCore.position.x = 12; zapCore.scale.setScalar(3.5); g.add(zapCore);
-      var zapTrail = new THREE.Mesh(services.geo.trail, services.models.glowMat("trail-zap", 0x6FC8FF, 0.55)); zapTrail.position.x = -15; zapTrail.scale.set(60, 1.8, 1.8); g.add(zapTrail);
-      var zapSpark = new THREE.Mesh(services.geo.trail, services.models.glowMat("trail-zap-core", 0xFFF27A, 0.7)); zapSpark.position.x = -8; zapSpark.scale.set(34, 0.7, 0.7); g.add(zapSpark);
+      var zapTrail = new THREE.Mesh(services.geo.trail, services.models.glowMat("trail-zap", 0x6FC8FF, 0.55)); zapTrail.position.x = -15; zapTrail.scale.set(60, 1.8, 1.8); g.add(ShotTail.track(g, zapTrail, true));
+      var zapSpark = new THREE.Mesh(services.geo.trail, services.models.glowMat("trail-zap-core", 0xFFF27A, 0.7)); zapSpark.position.x = -8; zapSpark.scale.set(34, 0.7, 0.7); g.add(ShotTail.track(g, zapSpark, true));
       g.userData.pulse = zapHalo;
       g.userData.storm = { trail: zapTrail, spark: zapSpark, bolt: this.overchargeBolt().build(g) };
     }
@@ -3668,7 +3687,7 @@ SinglePassMaterials.enable(THREE);
     }
   }
   class EngineerType extends CharacterType {
-    static MODEL = { file: "Engineer", right: "engineer_Wrench" };
+    static MODEL = { file: "Engineer", right: "engineer_Wrench", launchPose: { clip: ThrowMotion.CLIP, sec: ThrowMotion.RELEASE_SEC, node: "handslotr" } };
     static ULT = {
       trDur: GameTime.gameMs(15), trR: 500, trCd: GameTime.gameMs(1.2), trScanMs: 120, trWarmMs: 300, trDmg: 20, trFlyMs: GameTime.gameMs(0.4), trFlyFarMs: GameTime.gameMs(0.8), trFlyNear: 300,
       trBlastR: 50, trArcH: 140, trMarkMs: GameTime.gameMs(4),
@@ -3705,7 +3724,7 @@ SinglePassMaterials.enable(THREE);
         var holder = new THREE.Group(); holder.rotation.x = Math.PI / 2; holder.add(wrench); whirl.add(holder);
       } else whirl.add(new THREE.Mesh(services.geo.shaft, services.models.basicMat("blade", 0xDCE3EC, 1)));
       g.add(whirl); g.userData.whirl = whirl;
-      var streak = new THREE.Mesh(services.geo.trail, services.models.glowMat("trail-engineer", 0xFFC46A, 0.35)); streak.position.x = -10; streak.scale.set(40, 1.3, 1.3); g.add(streak);
+      var streak = new THREE.Mesh(services.geo.trail, services.models.glowMat("trail-engineer", 0xFFC46A, 0.35)); streak.position.x = -10; streak.scale.set(40, 1.3, 1.3); g.add(ShotTail.track(g, streak, true));
     }
     get hasSkillClip() { return true; }
     playSkillClip(v, E, t) { var services = this.services; services.fighterMotion.playOnce(v, "Melee_1H_Attack_Chop", 2.2, t); }
@@ -3730,7 +3749,7 @@ SinglePassMaterials.enable(THREE);
       return "사거리 " + c.range + "의 렌치를 던져 " + c.dmg + "의 피해";
     }
     attackClip(v, E, t) {
-      return ["Throw", 2.2];
+      return [ThrowMotion.CLIP, 2.2, null, ThrowMotion.FROM_SEC];
     }
   }
   class DruidType extends MagicShooterType {
@@ -11382,19 +11401,25 @@ SinglePassMaterials.enable(THREE);
       var d = p.d, g = services.effectView.projPool.takeOrBuild(d);
       services.charTypes.of(d.ownerCharacterType).dressProjectile(g, d);
       var shooter = services.fighterView.fighters[d.owner];
-      if (shooter && shooter.launchHand && shooter.root.visible) {
-        var aimed = services.models.kit.muzzle[d.ownerCharacterType];
-        if (aimed) services.effectView.tmpV.copy(aimed).applyAxisAngle(services.effectView.yUp, -Math.atan2(p.dy, p.dx));
-        else {
-          shooter.launchHand.getWorldPosition(services.effectView.tmpV);
-          services.effectView.tmpV.x -= shooter.root.position.x; services.effectView.tmpV.z -= shooter.root.position.z;
-          services.effectView.tmpV.applyAxisAngle(services.effectView.yUp, -Math.atan2(p.dy, p.dx) - shooter.body.rotation.y);
-        }
-        g.userData.from = new THREE.Vector3(shooter.root.position.x + services.effectView.tmpV.x - d.x, services.effectView.tmpV.y - ModelTuning.PROJ_Y, shooter.root.position.z + services.effectView.tmpV.z - d.y);
-      }
+      if (this.launchOffset(p, shooter)) g.userData.from = new THREE.Vector3(shooter.root.position.x + this.tmpV.x - d.x, this.tmpV.y - ModelTuning.PROJ_Y, shooter.root.position.z + this.tmpV.z - d.y);
       g.rotation.y = -Math.atan2(p.dy, p.dx);
       services.stage.scene.add(g);
       return g;
+    }
+    launchOffset(p, shooter) { var services = this.services, d = p.d;
+      if (!shooter || !shooter.launchHand || !shooter.root.visible) return false;
+      var aimed = services.models.kit.muzzle[d.ownerCharacterType];
+      if (aimed) this.tmpV.copy(aimed).applyAxisAngle(this.yUp, -Math.atan2(p.dy, p.dx));
+      else {
+        shooter.launchHand.getWorldPosition(this.tmpV);
+        this.tmpV.x -= shooter.root.position.x; this.tmpV.z -= shooter.root.position.z;
+        this.tmpV.applyAxisAngle(this.yUp, -Math.atan2(p.dy, p.dx) - shooter.body.rotation.y);
+      }
+      return true;
+    }
+    launchSpot(p) { var shooter = this.services.fighterView.fighters[p.d.owner];
+      if (!this.launchOffset(p, shooter)) return { x: p.d.x, y: p.d.y };
+      return { x: shooter.root.position.x + this.tmpV.x, y: shooter.root.position.z + this.tmpV.z };
     }
     dropProjVis(id) { var services = this.services; var g = services.effectView.projectiles[id]; if (!g) return; services.stage.scene.remove(g); services.effectView.projPool.give(g); delete services.effectView.projectiles[id]; }
     makeStabVis(d) { return this.services.arenaFx.stabs.start().root; }
@@ -11520,12 +11545,18 @@ SinglePassMaterials.enable(THREE);
       services.arenaFx.toxicPools.give(pl.vis);
       pl.vis = null;
     }
+    bottleLaunch(e, ox, oy) { var hand = this.services.models.kit.muzzle.thrower;
+      if (!hand || (e.x === ox && e.y === oy)) return { x: ox, y: oy, h: 60 };
+      var turn = -Math.atan2(e.y - oy, e.x - ox), c = Math.cos(turn), sn = Math.sin(turn);
+      return { x: ox + hand.x * c + hand.z * sn, y: oy - hand.x * sn + hand.z * c, h: hand.y };
+    }
     renderPool(pl, t, nowMs) { var services = this.services;
       var e = pl.e, start = services.fieldFx.poolStart(e), end = start + e.dur;
       if (t < start) {
-        if (!pl.bottle) pl.bottle = services.poolView.makeBottleVis();
         var k = MathKit.clamp((t - e.createdAt) / e.delay, 0, 1), ox = e.ox == null ? e.x : e.ox, oy = e.oy == null ? e.y : e.oy;
-        pl.bottle.position.set(ox + (e.x - ox) * k, 60 * (1 - k) + 4 * ThrowerType.ULT.plLob * k * (1 - k) + 4, oy + (e.y - oy) * k);
+        if (!pl.bottle) { pl.bottle = services.poolView.makeBottleVis(); pl.launch = this.bottleLaunch(e, ox, oy); }
+        var from = pl.launch;
+        pl.bottle.position.set(from.x + (e.x - from.x) * k, from.h * (1 - k) + 4 * ThrowerType.ULT.plLob * k * (1 - k) + 4, from.y + (e.y - from.y) * k);
         pl.bottle.rotation.set(k * 9, 0, k * 6);
         return;
       }
@@ -13253,8 +13284,8 @@ SinglePassMaterials.enable(THREE);
     get partSpecs() { var S = SniperShotShaders; return { flash: { shape: "flat", fragment: S.FLASH_FRAGMENT }, lane: { shape: "line", fragment: S.LANE_FRAGMENT } }; }
     warmSample() { var vis = this.warmVis(); vis.group.add(SniperShotShaders.tailMesh(Palette.C_FX.blue, 100, 8)); return vis.group; }
     flash(x, y, angle, spec, hex, at) { return this.add(new SniperFlash(x, y, angle, spec.size, hex, spec.sec, at)); }
-    launched(p) { var services = this.services, d = p.d, angle = Math.atan2(p.dy, p.dx), skill = d.isSkill, spec = skill ? SniperShotView.MUZZLE_SKILL : SniperShotView.MUZZLE;
-      this.flash(d.x, d.y, angle, spec, skill ? SniperShotShaders.TONES.blade : Palette.C_FX[d.team], d.createdAt);
+    launched(p) { var services = this.services, d = p.d, angle = Math.atan2(p.dy, p.dx), skill = d.isSkill, spec = skill ? SniperShotView.MUZZLE_SKILL : SniperShotView.MUZZLE, at = services.effectView.launchSpot(p);
+      this.flash(at.x, at.y, angle, spec, skill ? SniperShotShaders.TONES.blade : Palette.C_FX[d.team], d.createdAt);
       if (skill) this.add(new SniperLane(p, services.clock.scale));
     }
     hit(d, x, y, far) { var services = this.services, now = services.clock.now(), angle = Math.atan2(d.vy, d.vx), spec = far || d.isSkill ? SniperShotView.HIT_FAR : SniperShotView.HIT;
@@ -13983,6 +14014,7 @@ SinglePassMaterials.enable(THREE);
         else g.position.set(pos.x, ModelTuning.PROJ_Y, pos.y);
         if (p.path) g.rotation.y = services.homingBolts.yawAt(p, Math.max(0, e));
         services.charTypes.of(p.d.ownerCharacterType).animateProjectile(g, p, Math.max(0, e), nowMs);
+        ShotTail.grow(g, p.sp * Math.max(0, e) / 1000);
        if (g.userData.pulse) g.userData.pulse.scale.setScalar(9 + 2 * Math.sin(nowMs / 50));
         if (g.userData.spin) g.userData.spin.rotation.x = nowMs / 35;
         if (g.userData.whirl) g.userData.whirl.rotation.y = nowMs / 40;

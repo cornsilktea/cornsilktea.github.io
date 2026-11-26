@@ -5297,7 +5297,7 @@ class ResultCollector {
   new ShielderTests(api, { world: world, run: run, runAsync: runAsync, FRAME: FRAME }).register();
   new ArcaTests(api, { world: world, run: run, runAsync: runAsync, FRAME: FRAME, OPEN_Y: OPEN_Y, blockedAt: blockedAt, singleRowWall: singleRowWall }).register();
   new HunterTests(api, { world: world, run: run, runAsync: runAsync, FRAME: FRAME, OPEN_Y: OPEN_Y, blockedAt: blockedAt, singleRowWall: singleRowWall }).register();
-  new ArrowLookTests(api, { run: run }).register();
+  new ArrowLookTests(api, { run: run, runAsync: runAsync }).register();
   run(AUTO, "AI 6명 60초 난전 — 강 맵 + 헌터 고정 (시드 2047)", function (done) {
     var r = autoMelee("river", 60, 2047, "hunter"), kinds = Object.keys(r.issues);
     var roster = r.list.map(function (e) { return api.CHARS[e.char].name; }).join("·");
@@ -9844,6 +9844,8 @@ class HunterTests {
 class ArrowLookTests {
   static GROUP = "화살 그림";
   static FRAMES = 24;
+  static LAUNCHERS = ["ranger", "stormbow", "engineer", "thrower", "sniper", "hunter"];
+  static TAILED = ["ranger", "stormbow", "sniper", "engineer"];
   constructor(api, kit) { this.api = api; this.kit = kit; }
   shot(c, extra) { return Object.assign({ x: 0, y: 0, team: "blue", owner: "", ownerCharacterType: c, r: 8, createdAt: 0 }, extra || {}); }
   build(c, extra) { var api = this.api, type = api.CHAR_TYPES.of(c), d = this.shot(c, extra), g = new api.THREE.Group(); type.projectileMesh(g, d); type.dressProjectile(g, d); return { g: g, type: type, d: d }; }
@@ -9880,6 +9882,29 @@ class ArrowLookTests {
       self.play(charged, 10, 0); var short = b.bolt.streak.scale.x; self.play(charged, 400, 0);
       if (!(b.bolt.streak.scale.x > short)) bad.push("번개가 활에서 뻗어 나가지 않음");
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "평상시 그대로, 과충전만 번개(모양 " + seen.length + "개 돌려 쓰기, 화살끼리 공유)");
+    });
+    this.kit.runAsync(G, "발사 지점: 원거리 딜러 투사체가 몸 가운데가 아니라 공격 모션에서 놓는 순간의 손·무기 끝(몸 앞, 손 높이)에서 나가는가", async function (done) {
+      var kit = api.CHAR_TYPES.of("ranger").services.models.kit, bad = [], rows = [];
+      for (var wait = 0; wait < 40 && !kit.ready; wait++) await new Promise(function (r) { setTimeout(r, 100); });
+      if (!kit.ready) { done("info", "모델을 4초 안에 못 읽어 건너뜀"); return; }
+      ArrowLookTests.LAUNCHERS.forEach(function (c) {
+        var m = kit.muzzle[c];
+        if (!m) { bad.push(api.CHARS[c].name + " 발사점 없음"); return; }
+        rows.push(api.CHARS[c].name + " 앞 " + Math.round(m.x) + "·높이 " + Math.round(m.y));
+        if (m.x < 10) bad.push(api.CHARS[c].name + " 몸 뒤·가운데(" + Math.round(m.x) + ")");
+        if (m.y < 25 || m.y > 70) bad.push(api.CHARS[c].name + " 높이 " + Math.round(m.y));
+      });
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : rows.join(", "));
+    });
+    run(G, "던지기 모션: 공학자·투척병은 와인드업을 건너뛰고 놓기 직전부터 재생하는가(던지는 손과 투사체가 같이 나감)", function (done) {
+      var bad = [];
+      ["engineer", "thrower"].forEach(function (c) { var clip = api.CHAR_TYPES.of(c).attackClip({}, { ultUntil: 0, atkAt: 1 }, 1); if (clip[0] !== "Throw" || !(clip[3] > 0.4 && clip[3] < 0.68)) bad.push(api.CHARS[c].name + " " + JSON.stringify(clip)); });
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "두 캐릭터 모두 놓기 직전부터 재생");
+    });
+    run(G, "꼬리: 궁수·뇌전사수·저격수·공학자 투사체 꼬리는 날아간 거리만큼 자라도록 등록되는가(처음부터 길면 등 뒤로 삐져나옴)", function (done) {
+      var bad = [];
+      ArrowLookTests.TAILED.forEach(function (c) { var v = self.build(c), tails = v.g.userData.tails; if (!tails || !tails.length) bad.push(api.CHARS[c].name + " 꼬리 등록 없음"); });
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : ArrowLookTests.TAILED.length + "명 모두 등록");
     });
     run(G, "헌터: 공용 오라로 바꾼 뒤에도 스킬 중 볼트만 오라가 보이고 후광이 맥박치는가", function (done) {
       var plain = self.build("hunter"), skill = self.build("hunter", { countsAsSkill: 1 }), bad = [];
