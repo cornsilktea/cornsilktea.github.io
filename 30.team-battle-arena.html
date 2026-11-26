@@ -2946,7 +2946,7 @@ SinglePassMaterials.enable(THREE);
     static FRENZY_GLOW = 0x6A0E0E;
     static MODEL = { file: "Necromancer", launchTip: "mainhand", portraitPlant: true, plantTurn: Math.PI / 2, right: "Skeleton_Scythe" };
     static ULT = {
-      smCount: 3, smAhead: ArenaSize.KEY * 1, smSide: 38, smHp: 80, smSpeed: GameTime.gameSpeed(180), smGauge: 0.5, smDmg: 10, smCd: 800, smRange: 80,
+      smCount: 3, smAhead: ArenaSize.KEY * 1, smSide: 38, smHp: 90, smSpeed: GameTime.gameSpeed(180), smGauge: 0.5, smDmg: 12, smCd: 800, smRange: 80,
       smSwingFromSec: 0.3, smSwingImpactSec: 0.62, smSwingLeadMs: 120, smFollow: ArenaSize.KEY * 1.5, smRiseMs: 1100, smCorpseMs: 1400,
       smLeash: 600, smFrenzyMs: GameTime.gameMs(3), smFrenzyRate: 0.5, smMarkMs: GameTime.gameMs(4), smLeapMax: 300, smLeapMs: 380, smLeapH: 45
     };
@@ -7821,6 +7821,7 @@ SinglePassMaterials.enable(THREE);
   class DamageResolver {
     constructor(services) { this.services = services; }
     static ASSIST_MS = 5000;
+    static MINION_BLOCK_SHARE = 1 / 3;
     static isSkillDamage(h) { return !!h.sc || !!h.u; }
     payKillGaugeOwed(E, t) { var services = this.services;
       if (!E.killGaugeOwed || E.isGaugeLocked(t)) return;
@@ -7834,7 +7835,7 @@ SinglePassMaterials.enable(THREE);
       var dm = Math.min(amount, M.hp);
       M.hp -= dm;
       var summoner = services.targets.ent(M.owner);
-      if (summoner) summoner.blocked = (summoner.blocked || 0) + dm;
+      if (summoner) summoner.blocked = (summoner.blocked || 0) + dm * DamageResolver.MINION_BLOCK_SHARE;
       if (M.hp <= 0) { M.hp = 0; M.alive = false; M.diedAt = services.clock.now(); }
       services.damage.pushHit(owner, dm, basic, ultKey, false, gaugeGain, true);
       services.match.game.forceNet = true;

@@ -728,6 +728,17 @@ class ResultCollector {
     if (nc.alive) bad.push("치명타에도 살아남음");
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "90 피해 → 체력 " + (api.CHARS.necro.hp - 90) + "·은신 없음, 다음 치명타에 쓰러짐");
   });
+  run(PASSIVE, "네크로 해골: 해골이 받은 피해의 3분의 1만 네크로의 막은 피해에 쌓이는가", function (done) {
+    var y = OPEN_Y.forest;
+    var W = world("forest", [{ id: "nc", team: "blue", char: "necro", x: 250, y: y }, { id: "foe", team: "red", char: "knight", x: 900, y: y }]), nc = W.ent("nc");
+    W.step(api.ULT.smRiseMs + 100);
+    var m = (nc.minions || []).filter(function (s) { return s.alive; })[0];
+    if (!m) { done("fail", "시험 준비 실패: 해골 없음"); return; }
+    var before = nc.blocked || 0, hp = m.hp;
+    api.damage(m, 30, "foe", true, null, null);
+    var lost = hp - m.hp, got = (nc.blocked || 0) - before;
+    done(lost === 30 && Math.abs(got - 10) < 1e-6 ? "pass" : "fail", "해골 체력 " + lost + " 줄고 막은 피해 +" + got + " (기대 10)");
+  });
   run(PASSIVE, "네크로 해골: 기본 공격이 붙어 선 두 적 중 노린 한 명에게만 들어가고 호 표시가 없는가", function (done) {
     var y = OPEN_Y.forest, bad = [];
     var W = world("forest", [
