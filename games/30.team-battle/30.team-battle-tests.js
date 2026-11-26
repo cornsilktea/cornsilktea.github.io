@@ -5371,7 +5371,7 @@ class ShieldSweepTests {
     "hitman:basic": "돌진이 방패를 지나 뒤에서 벰", "hitman:both": "돌진이 방패를 지나 뒤에서 벰",
     "phantom:both": "잔영섬으로 방패 뒤로 넘어감"
   };
-  static ALLY_ONLY = { "thrower:basic": "독병 웅덩이는 땅에 깔려 뒤 아군만 맞음", "thrower:skill": "독안개는 땅에 깔려 뒤 아군만 맞음", "thrower:both": "독병·독안개는 땅에 깔려 뒤 아군만 맞음" };
+  static ALLY_ONLY = { "cleric:skill": "요한계시록은 방패병 본인만 막고 아군은 맞음", "cleric:both": "요한계시록은 방패병 본인만 막고 아군은 맞음", "thrower:basic": "독병 웅덩이는 땅에 깔려 뒤 아군만 맞음", "thrower:skill": "독안개는 땅에 깔려 뒤 아군만 맞음", "thrower:both": "독병·독안개는 땅에 깔려 뒤 아군만 맞음" };
   constructor(api, kit) { this.api = api; this.kit = kit; }
 
   attackers() { var api = this.api; return api.CHAR_LIST.filter(function (c) { return c !== "shielder" && !(api.CHARS[c] || {}).retired; }); }

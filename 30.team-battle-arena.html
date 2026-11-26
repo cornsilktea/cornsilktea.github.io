@@ -7237,7 +7237,7 @@ SinglePassMaterials.enable(THREE);
       if (T === services.match.me) services.sound.sfx("heal");
     }
     revBlocked(T, e, t) { var services = this.services, src = e.x != null ? e : services.targets.ent(e.owner);
-      return !!src && services.shieldWalls.stopsDirect(T, src.x, src.y, e.team, e.dmg, t);
+      return !!src && services.shieldWalls.shrug(T, src.x, src.y, e.dmg, t);
     }
     revTickIndex(e, t) { return Math.floor((t - e.createdAt) / e.tick); }
     stepRevs(t) { var services = this.services;
