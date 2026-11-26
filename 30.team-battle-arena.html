@@ -4353,6 +4353,7 @@ SinglePassMaterials.enable(THREE);
     }
     leap(e, first, t) { var services = this.services, A = this.localOwner(e.owner);
       if (!A || !A.alive) return;
+      if (e.kind === "hit" && services.shieldWalls.stops(first, A.x, A.y, e.team, t)) return;
       if (!A.isGaugeLocked(t)) A.gauge = Math.min(MatchRules.GAUGE_MAX, A.gauge + services.catalog.gaugeOnHitOf(A.char));
       services.match.game.forceNet = true;
       var next = this.secondTarget(A, first, t);
@@ -7693,7 +7694,7 @@ SinglePassMaterials.enable(THREE);
       var t = services.clock.now(), radius = e.r || EngineerType.ULT.trBlastR;
       services.targets.localTargets().forEach(function (T) {
         if (!T.alive || T.team === e.team || (!T.minion && T.isProtected(t)) || MathKit.hyp(T.x - e.tx, T.y - e.ty) > radius + T.hitR * 0.5) return;
-        if (services.shieldWalls.shrug(T, e.tx, e.ty, e.dmg, t)) return;
+        if (services.shieldWalls.shrug(T, e.mx != null ? e.mx : e.x, e.my != null ? e.my : e.y, e.dmg, t)) return;
         services.damage.damage(T, e.dmg, e.owner, true, "turret", null, T.minion ? 0 : EngineerType.ULT.trGauge);
       });
     }
