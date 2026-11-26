@@ -3897,7 +3897,7 @@ SinglePassMaterials.enable(THREE);
   class GiantType extends ArcMeleeType {
     get meleeTrail() { return 52; }
     static FORM_MODELS = { giantGolem: { file: "Skeleton_Golem", right: "Skeleton_Mace_Large", scale: 0.85 } };
-    static MODEL = { file: "Barbarian_Large", right: "Skeleton_Mace_Large", scale: 0.85, portraitFit: 0.94, portraitShiftX: 0.12 };
+    static MODEL = { file: "Barbarian_Large", right: "Skeleton_Mace_Large", scale: 0.85, portraitFit: 0.82, portraitShiftX: 0.115 };
     static ULT = {
       gjCast: 300, gjMin: 60, gjTransformMs: GameTime.gameMs(1.2), gjDur: GameTime.gameMs(6), gjDef: 0.65, gjR: 150, gjTick: GameTime.gameMs(1),
       gjTickDmg: 20, gjMaceRange: 200, gjMaceDmg: 23, gjHeal: 100
@@ -5045,7 +5045,7 @@ SinglePassMaterials.enable(THREE);
   }
   class ShielderType extends CharacterType {
     static MELEE = { color: 0xCFE2F2, spark: "#CFE6FF" };
-    static MODEL = { file: "Knight", right: "shield_square_color", rightScale: 1.6, rightPos: [0, 0, 0.28], left: "shield_square_color", leftScale: 1.6, leftPos: [0, 0, 0.28],
+    static MODEL = { file: "Knight", portraitLiftHeld: ["mainhand", "offhand"], right: "shield_square_color",rightScale: 1.6, rightPos: [0, 0, 0.28], left: "shield_square_color", leftScale: 1.6, leftPos: [0, 0, 0.28],
                recolor: [[0, 3, 1, "#6F8294", "#34404D"], [1, 0, 1, "#6F8294", "#34404D"], [2, 2, 1, "#6F8294", "#34404D"], [1, 1, 1, "#D7A75E", "#7E5527"], [1, 2, 2, "#C3CCD6", "#6D7A88"]] };
     static ULT = {
       sgDur: GameTime.gameMs(5), sgWidth: 240, sgAhead: 70, sgDepth: 36, sgHeight: 42, sgPushLen: 150, sgPush: 150, sgPushDmg: 30, sgSlideMs: GameTime.gameMs(0.15), sgJumpR: 400,
@@ -5338,7 +5338,7 @@ SinglePassMaterials.enable(THREE);
   class HunterType extends CharacterType {
     basicMoves(E, t) { return true; }
     static MELEE = { spark: "#E0405A" };
-    static MODEL = { file: "Rogue", right: "crossbow_1handed", rightTurn: Math.PI / 2, muzzle: [0, 0.1, 0.92], launchPose: { clip: "Ranged_1H_Shoot", sec: 0.12, node: "muzzle" },
+    static MODEL = { file: "Rogue", portraitTiltIntoFrame: true, right: "crossbow_1handed", rightTurn: Math.PI / 2, muzzle: [0, 0.1, 0.92],launchPose: { clip: "Ranged_1H_Shoot", sec: 0.12, node: "muzzle" },
                recolor: [[1, 0, 1, "#2A3463", "#0F1433"], [1, 1, 1, "#2A3463", "#0F1433"], [2, 1, 1, "#26305A", "#0E1330"], [0, 5, 1, "#B3263D", "#5C0B1B"], [0, 6, 1, "#353B50", "#151824"],
                          [0, 7, 1, "#C9D2DE", "#7C8798"], [2, 3, 1, "#252A3C", "#0D0F18"], [1, 7, 1, "#3A4466", "#181D33"], [2, 7, 1, "#3A4466", "#181D33"], [1, 5, 1, "#B3263D", "#5C0B1B"], [1, 6, 1, "#C9D2DE", "#7C8798"]],
                rightRecolor: [[0, 0, 8, "#3A3F52", "#161924"], [1, 0, 8, "#C9D2DE", "#6F7A8C"]] };
@@ -9873,6 +9873,42 @@ SinglePassMaterials.enable(THREE);
     }
     dispose() { this.target.dispose(); }
   }
+  class PortraitFraming {
+    static BOTTOM_NDC = -0.97;
+    static TILT_STEP = 0.04;
+    static LIFT_STEP = 0.02;
+    static MAX_STEPS = 60;
+    constructor(camera) { this.camera = camera; this.point = new THREE.Vector3(); }
+    keepInside(m, spec) {
+      if (spec.portraitTiltIntoFrame) this.tiltIntoFrame(m, m.getObjectByName("mainhand"));
+      var framing = this;
+      (spec.portraitLiftHeld || []).forEach(function (name) { framing.liftIntoFrame(m, m.getObjectByName(name)); });
+    }
+    lowestNdc(root) {
+      var lowest = Infinity, point = this.point, camera = this.camera;
+      camera.updateMatrixWorld(true);
+      root.traverse(function (o) {
+        if (!o.isMesh) return;
+        var at = o.geometry.attributes.position;
+        for (var i = 0; i < at.count; i++) lowest = Math.min(lowest, point.fromBufferAttribute(at, i).applyMatrix4(o.matrixWorld).project(camera).y);
+      });
+      return lowest;
+    }
+    tiltIntoFrame(m, held) {
+      var side = new THREE.Vector3(1, 0, 0).applyQuaternion(m.quaternion), parentTurn = held.parent.getWorldQuaternion(new THREE.Quaternion());
+      side.applyQuaternion(parentTurn.invert());
+      var step = new THREE.Quaternion().setFromAxisAngle(side, -PortraitFraming.TILT_STEP);
+      for (var i = 0; i < PortraitFraming.MAX_STEPS && this.lowestNdc(held) < PortraitFraming.BOTTOM_NDC; i++) {
+        held.quaternion.premultiply(step); m.updateMatrixWorld(true);
+      }
+    }
+    liftIntoFrame(m, held) {
+      for (var i = 0; i < PortraitFraming.MAX_STEPS && this.lowestNdc(held) < PortraitFraming.BOTTOM_NDC; i++) {
+        var at = held.getWorldPosition(new THREE.Vector3()); at.y += PortraitFraming.LIFT_STEP;
+        held.position.copy(held.parent.worldToLocal(at)); m.updateMatrixWorld(true);
+      }
+    }
+  }
   class ModelKit {
     static MINION_MODEL = { file: "Skeleton_Minion", right: "Skeleton_Blade", scale: 0.9 };
     static PROP_FILES = { bushBig: "props/Bush_1_D_Color1.gltf",
@@ -10078,8 +10114,10 @@ SinglePassMaterials.enable(THREE);
       });
       var frameH = tallest * 1.12, dist = frameH / 2 / Math.tan(15 * Math.PI / 180);
       pc.position.set(0, frameH * 0.46, dist); pc.lookAt(0, frameH * 0.46, 0);
+      var framing = new PortraitFraming(pc);
       posed.forEach(function (p) {
         ps.add(p.m);
+        framing.keepInside(p.m, services.charTypes.modelOf(p.c));
         services.catalog.iconSrc[p.c] = bodyShot.take(ps);
         services.models.aimFaceCamera(faceShot.camera, p.m);
         services.catalog.faceSrc[p.c] = faceShot.take(ps);
@@ -10666,6 +10704,9 @@ SinglePassMaterials.enable(THREE);
   class WraithChainRig {
     static COLOR = 0x8E97A6;
     static HOLD_MS = 200;
+    static PORTRAIT_FLOOR_Y = 0.46;
+    static PORTRAIT_FORWARD = 0.2;
+    static PORTRAIT_TRIM_LINKS = 4;
     constructor(services, v, root) {
       this.services = services; this.v = v; this.root = root;
       var model = v.activeForm.model;
@@ -10698,12 +10739,12 @@ SinglePassMaterials.enable(THREE);
     }
     static dressPortrait(services, m) {
       var mat = new THREE.MeshLambertMaterial({ color: WraithChainRig.COLOR }), at = new THREE.Vector3(), grip = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
-      [["handslotr", DraggedChain.RIGHT_LINKS, -0.3, true], ["handslotl", DraggedChain.LEFT_LINKS, 0.3, false]].forEach(function (row) {
+      [["handslotr", DraggedChain.RIGHT_LINKS - WraithChainRig.PORTRAIT_TRIM_LINKS, -0.08, true],["handslotl", DraggedChain.LEFT_LINKS, 0.3, false]].forEach(function (row) {
         m.getObjectByName(row[0]).getWorldPosition(at);
-        var points = [], x = at.x, y = at.y, z = at.z, pitch = DraggedChain.PITCH_MODEL, floor = DraggedChain.GROUND_Y / ModelTuning.MODEL_SCALE;
+        var points = [], x = at.x, y = at.y, z = at.z, pitch = DraggedChain.PITCH_MODEL, floor = WraithChainRig.PORTRAIT_FLOOR_Y;
         for (var i = 0; i < row[1]; i++) {
           points.push(m.worldToLocal(new THREE.Vector3(x, y, z)));
-          if (y - pitch >= floor) y -= pitch; else { y = floor; x += row[2] * pitch; z += pitch * 0.95; }
+          if (y - pitch >= floor) y -= pitch; else { y = floor; x += row[2] * pitch; z += pitch * WraithChainRig.PORTRAIT_FORWARD; }
         }
         var links = new ChainLinkMesh(services.geo.chainLink, mat, row[1], 1);
         links.drawPoints(points, 0, 0);
