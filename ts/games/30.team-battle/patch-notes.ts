@@ -24,7 +24,7 @@ interface PatchNoteIo {
 
 class PatchNoteCodec {
   static readonly TITLE_MAX = 80;
-  static readonly BODY_MAX = 4000;
+  static readonly BODY_MAX = 8000;
 
   static path(game: string): string {
     return "portal/patchNotes/" + game;

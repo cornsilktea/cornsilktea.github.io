@@ -29,7 +29,7 @@ class PatchNoteCodec {
     }
 }
 PatchNoteCodec.TITLE_MAX = 80;
-PatchNoteCodec.BODY_MAX = 4000;
+PatchNoteCodec.BODY_MAX = 8000;
 class PatchNoteSeen {
     constructor(game) {
         this.game = game;
