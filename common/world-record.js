@@ -520,7 +520,8 @@
   /* ---------- 개인 최고 기록을 계정에 저장(2026-10-26 선생님 결정) ----------
      게임마다 이 기기의 최고 기록을 localStorage(<게임>_best… 키)에 두는데, 저장 모양이 게임마다 달라(숫자·객체·곡별 표)
      원문 문자열 그대로 users/<uid>/personal/<게임>/<키> = { raw, at } 에 올려 두고, 다른 기기에서 로그인하면 내려받는다.
-       WorldRecord.syncBest(game, { storageKey, merge, onApply })
+       WorldRecord.syncBest(game, { storageKey, merge, onApply, companions })
+         companions → 기기 주인이 바뀔 때 최고 기록과 함께 옮길 localStorage 키(아래 DeviceRecordOwner).
          merge(이기기원문, 계정원문) → 둘을 합친 원문(더 좋은 쪽, 곡별 표면 칸마다 더 좋은 쪽). null 이면 아무것도 안 함.
          onApply() → 합친 원문이 이 기기에 새로 써졌을 때 게임이 localStorage 를 다시 읽고 화면을 다시 그린다.
        돌려주는 handle.push() → 게임이 끝나 이 기기 기록이 바뀌었을 때 부른다(그 게임의 WR.prompt 도 자동으로 부름).
@@ -528,7 +529,49 @@
      로그인이 안 됐으면(배포용·옛 링크) 아무것도 하지 않는다. 로그인이 게임 스크립트보다 늦게 끝나면 그때 다시 맞춘다.
      merge 도우미: WorldRecord.betterOf(scoreOf, lower) — 원문 → 점수(못 읽으면 null)로 비교해 더 좋은 원문을 고른다.
                    WorldRecord.mergeTable(lower) — {칸: 숫자} 표를 칸마다 더 좋은 값으로 합친다(0·빈칸은 기록 없음). */
+  /* 기기 기록의 주인(2026-11-27 선생님 요청): localStorage 는 계정 구분이 없어서, 한 기기를 여러 학생이 쓰면
+     앞 학생의 최고 기록·잠금 해제가 다음 학생 계정에 합쳐졌다. 저장 키마다 주인 계정을 적어 두고, 다른 계정이 로그인하면
+     앞 주인의 원문은 보관 칸으로 옮기고 이번 계정이 이 기기에 두었던 원문을 되돌린다. 주인이 없는 기록은 처음 로그인한 계정 것.
+     게임들은 이미 앞 주인의 기록을 읽은 뒤라서, 값이 바뀌었으면 페이지를 한 번 새로 연다.
+     companions: 최고 기록과 함께 옮길 키(24번 내 유령, 27번 단계 진행). 보관을 못 하면(저장 공간 부족) "failed" — 계정에 올리지 않는다. */
+  class DeviceRecordOwner {
+    static OWNERS_KEY = "portal_best_owner_v1";
+    static STASH_PREFIX = "portal_best_stash_v1:";
+
+    claim(uid, keys) {
+      try {
+        var owners = JSON.parse(localStorage.getItem(DeviceRecordOwner.OWNERS_KEY) || "{}");
+        var previous = owners[keys[0]];
+        if (previous === uid) return "same";
+        var changed = !!previous && this.handOver(keys, previous, uid);
+        owners[keys[0]] = uid;
+        localStorage.setItem(DeviceRecordOwner.OWNERS_KEY, JSON.stringify(owners));
+        return changed ? "changed" : "same";
+      } catch (e) {
+        return "failed";
+      }
+    }
+
+    /* 보관 칸 쓰기를 모두 끝낸 다음에야 원래 칸을 바꾼다 — 중간에 실패해도 기록이 사라지지 않는다 */
+    handOver(keys, from, to) {
+      var rows = keys.map((key) => ({ key: key, mine: localStorage.getItem(key), back: localStorage.getItem(this.stashKey(to, key)) }));
+      rows.forEach((row) => { if (row.mine !== null) localStorage.setItem(this.stashKey(from, row.key), row.mine); });
+      rows.forEach((row) => {
+        if (row.back !== null) localStorage.setItem(row.key, row.back);
+        else localStorage.removeItem(row.key);
+        localStorage.removeItem(this.stashKey(to, row.key));
+      });
+      return rows.some((row) => row.mine !== row.back);
+    }
+
+    stashKey(uid, key) {
+      return DeviceRecordOwner.STASH_PREFIX + uid + ":" + key;
+    }
+  }
+
   var PersonalBests = {
+    owner: new DeviceRecordOwner(),
+    reloading: false,
     syncs: {},
     cache: {},
     cacheUid: "",
@@ -569,6 +612,10 @@
     run: function (game, sync) {
       var user = window.PORTAL_USER;
       if (!user) return;
+      /* 주인 확인은 네트워크를 기다리지 않고 바로 — 같은 순간 등록된 키(코스별)를 모두 옮긴 뒤 한 번만 새로 연다 */
+      var claim = PersonalBests.owner.claim(user.uid, [sync.storageKey].concat(sync.companions));
+      if (claim === "changed" && !PersonalBests.reloading) { PersonalBests.reloading = true; location.reload(); }
+      if (claim === "failed" || PersonalBests.reloading) return;
       /* 맞추는 중에 또 불리면(게임이 끝나 기록이 바뀜) 끝난 뒤 한 번 더 맞춘다 */
       if (sync.running) { sync.again = true; return; }
       sync.running = true;
@@ -601,7 +648,7 @@
   document.addEventListener("portal-user-changed", PersonalBests.rerunAll);
 
   WorldRecord.syncBest = function (game, o) {
-    var sync = { storageKey: o.storageKey, merge: o.merge, onApply: o.onApply || function () {}, running: false };
+    var sync = { storageKey: o.storageKey, companions: o.companions || [], merge: o.merge,onApply: o.onApply || function () {}, running: false };
     (PersonalBests.syncs[game] = PersonalBests.syncs[game] || []).push(sync);
     PersonalBests.run(game, sync);
     return { push: function () { PersonalBests.run(game, sync); } };
