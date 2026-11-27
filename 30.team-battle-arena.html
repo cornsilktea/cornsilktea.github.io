@@ -3216,7 +3216,7 @@ SinglePassMaterials.enable(THREE);
     static MODEL = { file: "Barbarian", portraitPlant: true, right: "spear_A", rightScale: 1.35, hide: ["Barbarian_BearHat"], wear: { from: "knight", part: "Knight_Helmet" },
                recolor: [[0, 1, 1, "#8A5A38", "#4A2C1A"], [0, 7, 1, "#5B7FB0", "#2E4468"]] };
     static ULT = {
-      lnWind: GameTime.gameMs(0.5), lnLen: 350, lnW: 108, lnDmg: 75, lnStunMs: GameTime.gameMs(1.7)
+      lnWind: GameTime.gameMs(0.8), lnLen: 350, lnW: 108, lnDmg: 75, lnStunMs: GameTime.gameMs(1.7)
     };
     static STATS = { name: "창술사", role: "fighter", icon: "🔱", hp: 390, speed: GameTime.gameSpeed(150), cd: GameTime.gameMs(1.5), dmg: 32, range: 200, width: 50, respawnShield: true, ultName: "꿰뚫기", ultAim: true };
     addMarkers(v, root, body) { v.guardOrbit = new LancerShieldOrbit(this.services, root); }
@@ -3245,7 +3245,7 @@ SinglePassMaterials.enable(THREE);
       return "앞으로 길이 " + c.range + "·폭 " + c.width + "의 창 찌르기. 맞은 적은 " + c.dmg + "의 피해";
     }
     attackClip(v, E, t) { var services = this.services;
-      return ["Melee_2H_Attack_Stab", services.models.kit.clips.Melee_2H_Attack_Stab.duration * 1000 / (E.ultUntil > E.atkAt ? 520 : 800)];
+      return ["Melee_2H_Attack_Stab", services.models.kit.clips.Melee_2H_Attack_Stab.duration * 1000 / (E.ultUntil > E.atkAt ? LancerType.ULT.lnWind + 20 : 800)];
     }
   }
   class BlacksmithType extends CharacterType {
@@ -3472,7 +3472,7 @@ SinglePassMaterials.enable(THREE);
     static MODEL = { file: "Knight", portraitPlant: true, right: "halberd", rightScale: 1.2, rightTilt: Math.PI / 2, left: "Skeleton_Shield_Large_A", leftScale: 0.8, leftRot: [-0.266, 0, -1.588], leftPos: [0, 0.063, 0.232],
                 recolor: [[0, 3, 1, "#1F4A2E", "#0E2417"], [1, 0, 1, "#1F4A2E", "#0E2417"], [2, 2, 1, "#1F4A2E", "#0E2417"], [1, 1, 1, "#E4EAEF", "#9AA4AC"], [1, 2, 2, "#C7D1D9", "#6E7880"]] };
     static ULT = {
-      gdR: 200, gdKb: 150, gdKbMs: 500, gdDmg: 40, gdSlowMul: 0.8, gdSlowMs: GameTime.gameMs(1.5)
+      gdR: 200, gdKb: 150, gdKbMs: 500, gdDmg: 30, gdSlowMul: 0.8, gdSlowMs: GameTime.gameMs(1.5)
     };
     static STATS = { name: "수문장", role: "fighter", icon: "🏰", hp: 460, speed: GameTime.gameSpeed(150), cd: GameTime.gameMs(1.5), dmg: 25, range: 140, arc: Math.PI * 130 / 180,
                 fx: { slowMs: GameTime.gameMs(1.5), slowMul: 0.7 }, ultName: "창벽" };
@@ -3719,7 +3719,7 @@ SinglePassMaterials.enable(THREE);
   class DruidType extends MagicShooterType {
     static MODEL = { file: "Druid", launchTip: "mainhand", portraitPlant: true, right: "druid_staff" };
     static ULT = {
-      drR: 175, drDur: GameTime.gameMs(10), drTick: GameTime.gameMs(1), drHeal: 25, drCast: 450, drMin: 60, drSelfGauge: 1, drSnareMs: GameTime.gameMs(0.5), drRiseMs: 350, drCastMs: 500
+      drR: 175, drDur: GameTime.gameMs(10), drTick: GameTime.gameMs(1), drHeal: 22, drCast: 450, drMin: 60, drSelfGauge: 1, drSnareMs: GameTime.gameMs(0.5), drRiseMs: 350, drCastMs: 500
     };
     static STATS = { name: "드루이드", role: "caster", icon: "🌿", hp: 110, speed: GameTime.gameSpeed(165), cd: GameTime.gameMs(1.4), dmg: 10, range: 350, pSpeed: 1000, pr: 12, lanes: 2,
                ultName: "덩굴 부쉬", ultAim: true, heals: true };
@@ -5263,7 +5263,7 @@ SinglePassMaterials.enable(THREE);
     static ULT = {
       hnDur: GameTime.gameMs(6), hnCd: GameTime.gameMs(0.8), hnDmgRate: 0.3, hnSpeed: GameTime.gameSpeed(30)
     };
-    static STATS = { name: "헌터", role: "shooter", icon: "🌙", hp: 100, speed: GameTime.gameSpeed(130), cd: GameTime.gameMs(1.2), dmg: 30, range: 450, pSpeed: 900, pr: 10,
+    static STATS = { name: "헌터", role: "shooter", icon: "🌙", hp: 100, speed: GameTime.gameSpeed(130), cd: GameTime.gameMs(1.2), dmg: 25, range: 450, pSpeed: 900, pr: 10,
                roll: { dist: 100, ms: GameTime.gameMs(0.3) }, hunt: { ms: GameTime.gameMs(4), dmgRate: 0.2, speed: GameTime.gameSpeed(40) }, ultName: "그림자 사냥" };
     static ROLL_CLIP = "Dodge_Forward";
     static SHOOT_CLIP = "Ranged_1H_Shoot";
@@ -8617,7 +8617,7 @@ SinglePassMaterials.enable(THREE);
       var k = MathKit.clamp((dist - BlacksmithType.ULT.bsMin) / (BlacksmithType.ULT.bsCast - BlacksmithType.ULT.bsMin), 0, 1);
       return Math.round(BlacksmithType.ULT.bsLeapMinMs + (BlacksmithType.ULT.bsLeapMaxMs - BlacksmithType.ULT.bsLeapMinMs) * k);
     }
-    haltDash(E) { var D = E.dash; if (!D || D.landed) return; D.sx = D.tx = E.x; D.sy = D.ty = E.y; }
+    haltDash(E) { var D = E.dash; if (!D || D.landed) return; this.services.physics.resolve(E); D.sx = D.tx = E.x; D.sy = D.ty = E.y; }
     haltLeap(E) { var L = E.leap; if (!L) return; L.sx = L.tx = E.x; L.sy = L.ty = E.y; }
     leapProgress(t, leapAt, landAt) { return landAt > leapAt ? MathKit.clamp((t - leapAt) / (landAt - leapAt), 0, 1) : 1; }
     stepHammerLeap(E) { var services = this.services;
