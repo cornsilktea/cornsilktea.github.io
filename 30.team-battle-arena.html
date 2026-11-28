@@ -607,7 +607,7 @@ SinglePassMaterials.enable(THREE);
       '......""""......',
       '................',
       '""".........."""',
-      '""".x......x."""',
+      '""".........."""',
       '................',
       '....""tttt""....',
       '....""tttt""....'
@@ -622,8 +622,8 @@ SinglePassMaterials.enable(THREE);
       "................",
       '""....#..#....""',
       '""............""',
+      "................",
       "......####......",
-      ".....#....#.....",
       '....""....""....',
       "................",
       "~==~~~~==~~~~==~",
@@ -683,7 +683,7 @@ SinglePassMaterials.enable(THREE);
   }
   class MapCatalog {
     static KINDS = { snow: SnowPlazaMap, river: RiverMap, dungeon: DungeonMap, windhill: WindhillMap, practice: PracticeMap };
-    static IDS = ["snow", "river", "dungeon", "windhill"];
+    static IDS = ["river", "snow", "dungeon", "windhill"];
     static of(id) { return Object.prototype.hasOwnProperty.call(MapCatalog.KINDS, id) ? MapCatalog.KINDS[id].DATA : undefined; }
     static table() {
       var table = {};
@@ -1426,7 +1426,7 @@ SinglePassMaterials.enable(THREE);
     flashHint(t) { var services = this.services; services.lobby.hintText = t; services.lobby.hintUntil = Date.now() + 2500; services.lobby.renderLobby(); setTimeout(function () { services.lobby.renderLobby(); }, 2600); }
     mapChoices(mode) {
       var maps = MapCatalog.IDS.map(function (id) { return { id: id, name: MapCatalog.of(id).name }; });
-      return mode === "practice" ? maps.concat([{ id: "practice", name: MapCatalog.of("practice").name }]) : [{ id: "random", name: "랜덤" }].concat(maps);
+      return mode === "practice" ? [{ id: "practice", name: MapCatalog.of("practice").name }].concat(maps) : [{ id: "random", name: "랜덤" }].concat(maps);
     }
     nameIn(list, id, fallback) { for (var i = 0; i < list.length; i++) if (list[i].id === id) return list[i].name; return fallback; }
     modeName(id) { var services = this.services; return services.lobby.nameIn(GameModes.LIST, id, "모드 선택 중"); }
@@ -10297,8 +10297,8 @@ SinglePassMaterials.enable(THREE);
     static SNOW = 0xF4F9FF;
     static DRIFT = [0xEEF4FC, 0xE0EAF7, 0xF8FBFF];
     static SHRUB = 0x3F8F6E;
-    static HOUSE_H = 88;
-    static SNOWMAN_H = 70;
+    static BIG_SNOWMAN_H = 124;
+    static BIG_SNOWMAN_SPAN = { w: 4.1, d: 2.4 };
     static TREE_H = 150;
     static ORNAMENTS = [0xE0524A, 0xF2C14E, 0x4F8FE0, 0xFFFFFF];
     static GIFTS = ["giftRed", "giftGreen", "giftBlue", "giftYellow", "giftWhite"];
@@ -10315,8 +10315,7 @@ SinglePassMaterials.enable(THREE);
     }
     build(th) {
       var services = this.services, group = services.stage.arenaGroup;
-      this.addHouses(group);
-      this.addSnowmen(group);
+      this.addBigSnowmen(group);
       this.addCenterTree(group);
       this.addDrifts(group);
       this.addShrubs(th);
@@ -10327,17 +10326,10 @@ SinglePassMaterials.enable(THREE);
     }
     prop(name) { return this.services.models.kit.props[name]; }
     facingCenter(z) { return z < ArenaSize.MH / 2 ? 0 : Math.PI; }
-    addHouses(group) {
-      var services = this.services;
+    addBigSnowmen(group) {
+      var services = this.services, span = SnowPlazaProps.BIG_SNOWMAN_SPAN;
       services.arenaMap.tileRects("#").forEach((rect) => {
-        group.add(services.props.fitProp(this.prop("snowHouse"), rect.w * 1.34, SnowPlazaProps.HOUSE_H, rect.h * 1.34, rect.x, rect.y, this.facingCenter(rect.y)));
-      });
-    }
-    addSnowmen(group) {
-      var services = this.services;
-      services.arenaView.tilesOf("x").forEach((tile) => {
-        var x = services.arenaMap.tileX(tile[0]), z = services.arenaMap.tileY(tile[1]);
-        group.add(services.props.fitProp(this.prop("snowman"), ArenaSize.TILE * 2, SnowPlazaProps.SNOWMAN_H, ArenaSize.TILE * 1.15, x, z, this.facingCenter(z)));
+        group.add(services.props.fitProp(this.prop("snowman"), ArenaSize.TILE * span.w, SnowPlazaProps.BIG_SNOWMAN_H, ArenaSize.TILE * span.d, rect.x, rect.y, this.facingCenter(rect.y)));
       });
     }
     pineParts(parts, x, z, width, depth, height, lift) {

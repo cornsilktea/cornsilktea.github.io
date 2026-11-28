@@ -1,28 +1,44 @@
 class FixedTestArena {
-  static ID = "forest";
-  static HOST = "snow";
-  static BLUE_HALF = [
-    "................",
-    "................",
-    "................",
-    "...##......##...",
-    '""............""',
-    '"""....##...."""',
-    '""".........."""',
-    "....#......#....",
-    '....#..""..#....',
-    '.##....""....##.',
-    "................",
-    '..""...##...""..',
-    '..""........""..'
-  ];
+  static LAYOUTS = {
+    forest: { host: "snow", blueHalf: [
+      "................",
+      "................",
+      "................",
+      "...##......##...",
+      '""............""',
+      '"""....##...."""',
+      '""".........."""',
+      "....#......#....",
+      '....#..""..#....',
+      '.##....""....##.',
+      "................",
+      '..""...##...""..',
+      '..""........""..'
+    ] },
+    ford: { host: "river", blueHalf: [
+      "................",
+      "................",
+      "................",
+      "..##........##..",
+      "................",
+      '""....#..#....""',
+      '""............""',
+      "......####......",
+      ".....#....#.....",
+      '....""....""....',
+      "................",
+      "~==~~~~==~~~~==~",
+      "~==~~~~==~~~~==~"
+    ] }
+  };
   static install(api) {
-    var load = api.loadMapData, host = api.MAPS[FixedTestArena.HOST];
+    var load = api.loadMapData;
     api.loadMapData = function (id) {
-      if (id !== FixedTestArena.ID) return load(id);
-      var real = host.blueHalf;
-      host.blueHalf = FixedTestArena.BLUE_HALF;
-      try { return load(FixedTestArena.HOST); } finally { host.blueHalf = real; }
+      var fixed = FixedTestArena.LAYOUTS[id];
+      if (!fixed) return load(id);
+      var host = api.MAPS[fixed.host], real = host.blueHalf;
+      host.blueHalf = fixed.blueHalf;
+      try { return load(fixed.host); } finally { host.blueHalf = real; }
     };
   }
 }
@@ -4163,7 +4179,7 @@ class ResultCollector {
   runAsync(ROSTERG, "맵 고르기 목록(mapChoices)·무작위 맵(resolveArena)·모드 이름이 맞는가", async function (done) {
     var bad = [], ids = function (l) { return l.map(function (m) { return m.id; }).join(); }, real = Math.random;
     if (ids(api.mapChoices("pvp")) !== ["random"].concat(api.MAP_IDS).join()) bad.push("일반모드 목록 " + ids(api.mapChoices("pvp")));
-    if (ids(api.mapChoices("practice")) !== api.MAP_IDS.concat(["practice"]).join()) bad.push("연습모드 목록");
+    if (ids(api.mapChoices("practice")) !== ["practice"].concat(api.MAP_IDS).join()) bad.push("연습모드 목록");
     if (api.resolveArena("river") !== "river" || api.resolveArena("practice") !== "practice") bad.push("정해진 맵은 그대로");
     try {
       Math.random = function () { return 0.99; }; if (api.resolveArena("random") !== api.MAP_IDS[api.MAP_IDS.length - 1]) bad.push("무작위 끝");
@@ -6164,7 +6180,7 @@ class HookPathTests {
     var self = this, api = this.api, run = this.kit.run, G = HookPathTests.GROUP;
     HookPathTests.CASES.forEach(function (c) {
       run(G, c[0] + ": " + c[5] + ", 끝 (" + c[6] + "," + c[7] + "), 이동 " + c[8], function (done) {
-        api.loadMapData("river");
+        api.loadMapData("ford");
         var p = api.HOOK_PATH.plan(c[1], c[2], c[3], c[4], c[9]), ok = p.kind === c[5] && Math.abs(p.ex - c[6]) <= 1 && Math.abs(p.ey - c[7]) <= 1 && Math.abs(p.dist - c[8]) <= 1;
         done(ok ? "pass" : "fail", p.kind + ", 끝 (" + p.ex.toFixed(1) + "," + p.ey.toFixed(1) + "), 이동 " + p.dist.toFixed(1));
       });
@@ -6236,7 +6252,7 @@ class WraithTests {
     var self = this, api = this.api, run = this.kit.run, G = WraithTests.GROUP, FRAME = this.kit.FRAME, ULT = api.ULT;
     [["A2", 450, 800, 450, 560, 450, 616], ["A3", 250, 840, 250, 560, 250, 774], ["A4", 300, 774, 300, 576, 300, 774], ["A8", 476, 790, 380, 560, 424, 665.4]].forEach(function (c) {
       run(G, "실제 끌기 " + c[0] + ": 끝 위치가 경로 표와 같고, 프레임마다 벽·물 밖이며, 끝난 뒤 위치가 밀리지 않는가", function (done) {
-        var bad = [], W = self.duel("river", c[3], c[4], c[0 + 1], c[2]), A = W.ent("wr"), T = W.ent("foe");
+        var bad = [], W = self.duel("ford", c[3], c[4], c[0 + 1], c[2]), A = W.ent("wr"), T = W.ent("foe");
         function each() { if (!self.canStand(T.x, T.y)) bad.push("(" + T.x.toFixed(1) + "," + T.y.toFixed(1) + ") 에 설 수 없음"); }
         self.throwChain(W, A, T.x, T.y);
         if (!self.untilCaught(W, FRAME, each)) bad.push("맞지 않음");
@@ -6251,7 +6267,7 @@ class WraithTests {
     run(G, "프레임 간격 8·16·33·100·250ms 에서 끌기 끝 위치가 같은가(터널링 없음)", function (done) {
       var bad = [], ends = [];
       [8, 16, 33, 100, 250].forEach(function (frame) {
-        var W = self.duel("river", 380, 560, 476, 790), A = W.ent("wr"), T = W.ent("foe");
+        var W = self.duel("ford", 380, 560, 476, 790), A = W.ent("wr"), T = W.ent("foe");
         self.throwChain(W, A, T.x, T.y);
         self.untilCaught(W, frame);
         self.untilArrived(W, T, frame, function () { if (!self.canStand(T.x, T.y)) bad.push(frame + "ms 프레임에서 물 안"); });
@@ -6272,7 +6288,7 @@ class WraithTests {
     });
     run(G, "끌리는 동안 매 프레임 기절·속도 0·공격 불가이고, 도착 뒤 정확히 0.5초 뒤 기절이 풀리는가(짧은 거리·최대 거리)", function (done) {
       var bad = [], shown = [];
-      [["짧은 거리", "river", 200, 560, 200, 300], ["최대 거리", "practice", 450, 340, 450, 1010]].forEach(function (c) {
+      [["짧은 거리", "ford", 200, 560, 200, 300], ["최대 거리", "practice", 450, 340, 450, 1010]].forEach(function (c) {
         var W = self.duel(c[1], c[2], c[3], c[4], c[5]), A = W.ent("wr"), T = W.ent("foe"), hitAt = 0, atk = T.atkAt;
         self.throwChain(W, A, T.x, T.y);
         self.untilCaught(W, 4);
@@ -6291,7 +6307,7 @@ class WraithTests {
         if (api.stunned(T, freeAt + 1)) bad.push(c[0] + " 풀린 뒤에도 기절");
         shown.push(c[0] + " " + planned.toFixed(0) + " 이동, 기절 실제 " + ((freeAt - hitAt) / api.timeScale() / 1000).toFixed(2) + "초");
       });
-      [["강가 none", "river", 300, 576, 300, 774]].forEach(function (c) {
+      [["강가 none", "ford", 300, 576, 300, 774]].forEach(function (c) {
         var W = self.duel(c[1], c[2], c[3], c[4], c[5]), A = W.ent("wr"), T = W.ent("foe");
         self.throwChain(W, A, T.x, T.y);
         self.untilCaught(W, 4);
@@ -6329,7 +6345,7 @@ class WraithTests {
   registerHits() {
     var self = this, api = this.api, run = this.kit.run, G = WraithTests.GROUP, FRAME = this.kit.FRAME, ULT = api.ULT;
     run(G, "물 건너 거리 280 의 적이 맞아 피해 35·기절을 받는가", function (done) {
-      var bad = [], W = self.duel("river", 250, 560, 250, 840), A = W.ent("wr"), T = W.ent("foe");
+      var bad = [], W = self.duel("ford", 250, 560, 250, 840), A = W.ent("wr"), T = W.ent("foe");
       self.throwChain(W, A, T.x, T.y);
       if (!self.untilCaught(W, FRAME)) bad.push("맞지 않음");
       if (self.lost(T) !== ULT.hkDmg) bad.push("피해 " + self.lost(T));
@@ -6337,7 +6353,7 @@ class WraithTests {
       self.verdict(done, bad, "피해 " + self.lost(T) + "·기절");
     });
     run(G, "벽 뒤의 적은 맞지 않고 게이지를 돌려받지 않으며, 비행 시간이 끝나면 묶임이 풀리는가", function (done) {
-      var bad = [], W = self.duel("river", 200, 350, 200, 100), A = W.ent("wr"), T = W.ent("foe");
+      var bad = [], W = self.duel("ford", 200, 350, 200, 100), A = W.ent("wr"), T = W.ent("foe");
       self.throwChain(W, A, T.x, T.y);
       var rootEnd = A.hookRootUntil;
       if (api.speedOf(A) !== 0) bad.push("준비 중 움직일 수 있음");
@@ -6375,7 +6391,7 @@ class WraithTests {
       self.verdict(done, bad, "경계 " + reach + " 안쪽 맞음·바깥 빗나감");
     });
     run(G, "풀숲 안·은신 중인 적은 끌리는 동안 드러나고, 끝나면 원래 규칙으로 돌아가는가", function (done) {
-      var bad = [], W = self.duel("river", 100, 600, 100, 350), A = W.ent("wr"), T = W.ent("foe");
+      var bad = [], W = self.duel("ford", 100, 600, 100, 350), A = W.ent("wr"), T = W.ent("foe");
       self.throwChain(W, A, T.x, T.y);
       if (!api.inBush(T.x, T.y)) bad.push("풀숲 자리 아님");
       if (api.revealedTo(T, A, W.t())) bad.push("맞기 전에 드러남");
@@ -6486,7 +6502,7 @@ class WraithTests {
       self.verdict(done, bad, "돌진 끊김·끌림");
     });
     run(G, "끌리는 중 수문장 밀치기: 끌기가 끝나고 넉백되며 벽·물을 넘지 않는가", function (done) {
-      var bad = [], s = pulled("river", 450, 560, 450, 800), T = s.T, W = s.W;
+      var bad = [], s = pulled("ford", 450, 560, 450, 800), T = s.T, W = s.W;
       W.room.ref.child("meleeHits").push({ team: "blue", owner: "wr", x: T.x + 30, y: T.y, angle: Math.PI, radius: 100, arc: 6.28, dmg: 1, kb: 200, createdAt: W.t() });
       if (!T.shove) bad.push("넉백이 안 걸림");
       W.frame(FRAME);
@@ -6656,14 +6672,14 @@ class WraithTests {
       self.verdict(done, bad, "간격 " + gap.toFixed(2) + "초, 타격 1번");
     });
     run(G, "기본 공격: 벽 뒤는 맞지 않고 강 건너는 맞으며, 아군·보호 중인 적은 영향이 없고, 그림 길이가 벽에서 줄어든 길이와 같은가", function (done) {
-      var bad = [], W = self.duel("river", 200, 350, 200, 100), A = W.ent("wr"), up = -Math.PI / 2;
+      var bad = [], W = self.duel("ford", 200, 350, 200, 100), A = W.ent("wr"), up = -Math.PI / 2;
       api.fireBasic(A, up); strike(W);
       if (self.lost(W.ent("foe"))) bad.push("벽 뒤 적이 맞음");
       var hit = W.log.filter(function (p) { return p.path === "meleeHits" && !p.v.zone && p.v.owner === "wr"; })[0].v;
       if (!(hit.len < C.range)) bad.push("길이가 줄지 않음 " + hit.len);
       var slam = api.FIELD.slams[0];
       if (!slam || slam.d.len !== hit.len) bad.push("그림 길이 " + (slam && slam.d.len) + " / 판정 " + hit.len);
-      var W2 = self.duel("river", 250, 576, 250, 790), A2 = W2.ent("wr");
+      var W2 = self.duel("ford", 250, 576, 250, 790), A2 = W2.ent("wr");
       api.fireBasic(A2, Math.PI / 2); strike(W2);
       if (self.lost(W2.ent("foe")) !== C.dmg) bad.push("강 건너 피해 " + self.lost(W2.ent("foe")));
       var W3 = self.scene("practice", [{ id: "wr", team: "blue", char: "wraith", x: 150, y: y, slot: 1 }, { id: "al", team: "blue", x: 250, y: y, slot: 2 }, { id: "sf", x: 350, y: y, slot: 1 }]), A3 = W3.ent("wr"), S = W3.ent("sf");
@@ -6747,7 +6763,7 @@ class WraithTests {
       self.verdict(done, bad, "준비 뒤 타격");
     });
     run(G, "내려치기 이펙트: 사슬이 땅에 닿으면 균열·먼지·파편·불티가 생기고, 물 위에는 균열이 없으며, 끝나면 남지 않는가", function (done) {
-      var bad = [], W = self.duel("river", 250, 560, 250, 900), A = W.ent("wr"), view = api.HOOK_VIEW, B = api.ChainSlamBurst;
+      var bad = [], W = self.duel("ford", 250, 560, 250, 900), A = W.ent("wr"), view = api.HOOK_VIEW, B = api.ChainSlamBurst;
       api.fireBasic(A, Math.PI / 2); strike(W);
       var s = api.FIELD.slams[0];
       view.render(W.t(), Date.now());
@@ -6878,7 +6894,7 @@ class WraithTests {
       self.verdict(done, bad, "거리 안에서 사용");
     });
     run(G, "AI: 끌리는 거리가 " + ULT.hkBotMinPull + " 미만인 적(강 건너)에게는 스킬을 쓰지 않는가", function (done) {
-      var bad = [], W = self.duel("river", 300, 576, 300, 800, "dummy"), A = W.ent("wr"), T = W.ent("foe"), type = api.CHAR_TYPES.of("wraith");
+      var bad = [], W = self.duel("ford", 300, 576, 300, 800, "dummy"), A = W.ent("wr"), T = W.ent("foe"), type = api.CHAR_TYPES.of("wraith");
       if (type.botUltAllowed(A, T)) bad.push("강 건너 적을 허용");
       A.gauge = api.GAUGE_MAX;
       for (var ms = 0; ms < 1000; ms += 33) { A.x = 300; A.y = 576; W.frame(33, true); }
@@ -6932,7 +6948,7 @@ class WraithTests {
     run(G, "대상이 방장 기기의 AI 여도, 내 캐릭터여도 같은 결과가 나오는가", function (done) {
       var bad = [], before = api.setMyId("foe");
       try {
-        var W = self.duel("river", 380, 560, 476, 790), A = W.ent("wr"), T = W.ent("foe");
+        var W = self.duel("ford", 380, 560, 476, 790), A = W.ent("wr"), T = W.ent("foe");
         delete T.bot; delete api.MATCH.bots.foe; api.MATCH.me = T;
         W.room.host = "foe";
         self.throwChain(W, A, T.x, T.y);
