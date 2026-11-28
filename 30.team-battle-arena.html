@@ -1067,7 +1067,7 @@ SinglePassMaterials.enable(THREE);
       function claim(code, n) {
         var t = services.clock.now();
         var me = services.session.newPlayer("blue", t);
-        var obj = { mode: "pvp", map: "forest", arena: "forest", status: "lobby", hostPlayerId: services.session.myId, createdAt: t, winner: null, players: {} };
+        var obj = { mode: "pvp", map: "random", arena: "forest", status: "lobby", hostPlayerId: services.session.myId, createdAt: t, winner: null, players: {} };
         obj.players[services.session.myId] = me;
         services.backend.db.ref(RoomSession.ROOT + "/" + code).transaction(function (cur) {
           if (cur !== null) return;
@@ -1124,7 +1124,7 @@ SinglePassMaterials.enable(THREE);
       Dom.setText(Dom.$("dfRoomCode"), "방 코드 " + code);
       services.session.leaving = false;
       var ref = services.backend.db.ref(RoomSession.ROOT + "/" + code);
-      services.session.room = { code: code, ref: ref, mode: null, map: "forest", vsAt: 0, status: "lobby", host: null, startAt: 0, winner: null, overtimeAt: null, endedAt: 0, final: null, roster: null, draft: null, bans: null, statsNote: null, pauseAt: null, resumeAt: null, pausedMs: 0 };
+      services.session.room = { code: code, ref: ref, mode: null, map: "random", vsAt: 0, status: "lobby", host: null, startAt: 0, winner: null, overtimeAt: null, endedAt: 0, final: null, roster: null, draft: null, bans: null, statsNote: null, pauseAt: null, resumeAt: null, pausedMs: 0 };
       services.fxView.clear3d();
       services.session.players = {}; services.match.leave();
       ref.child("players/" + services.session.myId).onDisconnect().remove();
@@ -1145,7 +1145,7 @@ SinglePassMaterials.enable(THREE);
       });
       services.session.sub(services.backend.db.ref(".info/connected"), "value", function (s) { if (s.val() === true && services.session.room && services.session.room.ref === ref && !services.session.leaving) services.session.armDisconnect(ref); });
       services.session.sub(ref.child("mode"), "value", function (s) { services.session.room.mode = s.val(); services.lobby.playersChanged(); });
-      services.session.sub(ref.child("map"), "value", function (s) { services.session.room.map = s.val() || "forest"; services.arenaView.syncArena(); services.lobby.playersChanged(); });
+      services.session.sub(ref.child("map"), "value", function (s) { services.session.room.map = s.val() || "random"; services.arenaView.syncArena(); services.lobby.playersChanged(); });
       services.session.sub(ref.child("arena"), "value", function (s) { services.session.room.arena = s.val() || "forest"; services.arenaView.syncArena(); });
       services.session.sub(ref.child("hostPlayerId"), "value", function (s) { services.session.room.host = s.val(); services.session.room.hostLoaded = true; services.clock.hostChanged(services.session.room.host); services.session.checkHost(); services.lobby.playersChanged(); });
       services.session.sub(ref.child("startAt"), "value", function (s) { services.session.room.startAt = s.val() || 0; });
@@ -1425,8 +1425,8 @@ SinglePassMaterials.enable(THREE);
     }
     flashHint(t) { var services = this.services; services.lobby.hintText = t; services.lobby.hintUntil = Date.now() + 2500; services.lobby.renderLobby(); setTimeout(function () { services.lobby.renderLobby(); }, 2600); }
     mapChoices(mode) {
-      return MapCatalog.IDS.map(function (id) { return { id: id, name: MapCatalog.of(id).name }; })
-        .concat([mode === "practice" ? { id: "practice", name: MapCatalog.of("practice").name } : { id: "random", name: "랜덤" }]);
+      var maps = MapCatalog.IDS.map(function (id) { return { id: id, name: MapCatalog.of(id).name }; });
+      return mode === "practice" ? maps.concat([{ id: "practice", name: MapCatalog.of("practice").name }]) : [{ id: "random", name: "랜덤" }].concat(maps);
     }
     nameIn(list, id, fallback) { for (var i = 0; i < list.length; i++) if (list[i].id === id) return list[i].name; return fallback; }
     modeName(id) { var services = this.services; return services.lobby.nameIn(GameModes.LIST, id, "모드 선택 중"); }
@@ -1441,7 +1441,7 @@ SinglePassMaterials.enable(THREE);
       var mode = services.session.room.mode;
       var practice = mode === "practice", maps = services.lobby.mapChoices(mode);
       Dom.setHtml(Dom.$("modeBtns"), services.lobby.choiceButtons(GameModes.LIST, mode, "modeOpt"));
-      Dom.setHtml(Dom.$("mapBtns"), services.lobby.choiceButtons(maps, services.session.room.map || "forest", "mapOpt"));
+      Dom.setHtml(Dom.$("mapBtns"), services.lobby.choiceButtons(maps, services.session.room.map || "random", "mapOpt"));
 
       var hostCanFill = services.session.isHost() && services.session.room.status === "lobby" && !practice;
       function list(team) {
@@ -1584,7 +1584,7 @@ SinglePassMaterials.enable(THREE);
     }
     setMode(mode) { var services = this.services;
       if (!services.session.isHost() || services.session.room.status !== "lobby" || services.session.room.mode === mode) return;
-      if (mode !== "practice") { services.session.room.ref.update(services.session.room.map === "practice" ? { mode: mode, map: "forest" } : { mode: mode }); return; }
+      if (mode !== "practice") { services.session.room.ref.update(services.session.room.map === "practice" ? { mode: mode, map: "random" } : { mode: mode }); return; }
       if (services.session.humans(services.session.players).length > 1) { services.lobby.flashHint("연습모드는 방에 혼자 있을 때만 고를 수 있어요."); return; }
       var u = { mode: "practice", map: "practice" };
       Object.keys(services.session.players || {}).forEach(function (id) { if (services.session.players[id] && services.session.players[id].isAI) u["players/" + id] = null; });

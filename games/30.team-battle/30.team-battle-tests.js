@@ -3690,14 +3690,14 @@ class ResultCollector {
       if (!await waitFor(function () { return !!api.room(); })) { done("fail", "방이 안 만들어짐: " + startMessage()); return; }
       var room = api.room(), node = fake.get(ROOMS + "/" + room.code) || {}, mine = (node.players || {})[me()] || {};
       if (!/^\d{5}$/.test(room.code)) bad.push("코드 모양 " + room.code);
-      if (node.mode !== "pvp" || node.map !== "forest" || node.arena !== "forest" || node.status !== "lobby") bad.push("기본 설정 " + JSON.stringify([node.mode, node.map, node.arena, node.status]));
+      if (node.mode !== "pvp" || node.map !== "random" || node.arena !== "forest" || node.status !== "lobby") bad.push("기본 설정 " + JSON.stringify([node.mode, node.map, node.arena, node.status]));
       if (node.hostPlayerId !== me() || typeof node.createdAt !== "number" || node.timeScale !== undefined) bad.push("방장·시각 기록(시간 배율은 더 이상 방에 저장하지 않음)");
       if (mine.team !== "blue" || mine.isAI !== false || mine.nickname !== "나" || mine.characterType !== api.FALLBACK_CHAR || typeof mine.joinedAt !== "number") bad.push("내 기록 " + JSON.stringify(mine));
       ["players/", "ping/", "pong/"].forEach(function (k) { if (fake.disconnects.indexOf(ROOMS + "/" + room.code + "/" + k + me()) < 0) bad.push(k + " 끊김 정리가 등록 안 됨"); });
       if (api.screen() !== "lobby" || el("lobbyCode").textContent !== room.code) bad.push("화면 " + api.screen() + " / 코드 표시 " + el("lobbyCode").textContent);
       if (el("btnCreate").disabled) bad.push("방을 만든 뒤에도 버튼이 잠겨 있음");
       if (room.host !== me() || room.status !== "lobby" || room.mode !== "pvp" || !api.players()[me()]) bad.push("방 상태가 구독으로 채워지지 않음: " + JSON.stringify([room.host, room.status, room.mode]));
-      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "5자리 코드, 일반모드·숲속 공터, 방장 나, 끊김 정리 3종 등록");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "5자리 코드, 일반모드·랜덤 맵, 방장 나, 끊김 정리 3종 등록");
     });
   });
   runAsync(CONNG, "방 만들기: 이미 있는 코드와 겹치면 다른 코드로 다시 시도하고 기존 방은 건드리지 않는가", async function (done) {
@@ -4081,13 +4081,13 @@ class ResultCollector {
       var ps = playersIn(fake, code);
       if (mode() !== "practice" || map() !== "practice" || ps.ai1 || ps[me()].team !== "blue") bad.push("연습모드 전환 결과 " + JSON.stringify([mode(), map(), !!ps.ai1, ps[me()].team]));
       api.setMode("pvp"); await sleep(5);
-      if (mode() !== "pvp" || map() !== "forest") bad.push("연습모드를 나오면 맵이 숲속으로 돌아와야 함 " + map());
+      if (mode() !== "pvp" || map() !== "random") bad.push("연습모드를 나오면 맵이 랜덤으로 돌아와야 함 " + map());
       fake.put(base + "players/h2", person("방장2", "red", 9, 3)); fake.put(base + "hostPlayerId", "h2"); await sleep(5);
       api.setMode("cup"); api.setMapChoice("dungeon"); await sleep(5);
-      if (mode() !== "pvp" || map() !== "forest") bad.push("방장이 아닌데 바뀜");
+      if (mode() !== "pvp" || map() !== "random") bad.push("방장이 아닌데 바뀜");
       fake.put(base + "hostPlayerId", me()); fake.put(base + "status", "playing"); await sleep(5);
       api.setMode("cup"); api.setMapChoice("dungeon"); await sleep(5);
-      if (mode() !== "pvp" || map() !== "forest") bad.push("게임 중에 바뀜");
+      if (mode() !== "pvp" || map() !== "random") bad.push("게임 중에 바뀜");
     });
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "모드·맵 변경, 연습모드 조건·정리, 방장·로비 제한");
   });
@@ -4133,7 +4133,7 @@ class ResultCollector {
   });
   runAsync(ROSTERG, "맵 고르기 목록(mapChoices)·무작위 맵(resolveArena)·모드 이름이 맞는가", async function (done) {
     var bad = [], ids = function (l) { return l.map(function (m) { return m.id; }).join(); }, real = Math.random;
-    if (ids(api.mapChoices("pvp")) !== api.MAP_IDS.concat(["random"]).join()) bad.push("일반모드 목록 " + ids(api.mapChoices("pvp")));
+    if (ids(api.mapChoices("pvp")) !== ["random"].concat(api.MAP_IDS).join()) bad.push("일반모드 목록 " + ids(api.mapChoices("pvp")));
     if (ids(api.mapChoices("practice")) !== api.MAP_IDS.concat(["practice"]).join()) bad.push("연습모드 목록");
     if (api.resolveArena("river") !== "river" || api.resolveArena("practice") !== "practice") bad.push("정해진 맵은 그대로");
     try {
