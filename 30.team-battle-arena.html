@@ -234,7 +234,7 @@
       <div id="endStats" hidden></div>
       <div id="endStreak" class="mk-notice"></div>
       <div class="scoreRow"><div class="sb">블루팀<b id="endBlue">0</b></div><div class="sr">레드팀<b id="endRed">0</b></div></div>
-      <div class="boardWrap"><table class="board"><thead><tr><th>팀</th><th class="nm">닉네임</th><th class="nm">직업</th><th>처치</th><th>쓰러짐</th><th>어시스트</th><th>입힌 피해</th><th>회복</th><th>막은 피해</th><th>기절</th><th>둔화 점수</th><th>환산점수<button id="btnScoreHelp" class="scoreHelp" type="button" aria-label="환산점수 계산식">?</button></th></tr></thead><tbody id="boardBody"></tbody></table></div>
+      <div class="boardWrap"><table class="board"><thead><tr><th>팀</th><th class="nm">닉네임</th><th class="nm">직업</th><th>처치</th><th>쓰러짐</th><th>어시스트</th><th>입힌 피해</th><th>회복</th><th>막은 피해</th><th>받은 피해</th><th>기절</th><th>둔화 점수</th><th>환산점수<button id="btnScoreHelp" class="scoreHelp" type="button" aria-label="환산점수 계산식">?</button></th></tr></thead><tbody id="boardBody"></tbody></table></div>
       <div id="endMvp" class="mvpBox"></div>
       <div class="endBtns"><button id="btnAgain" class="primary" type="button">다시하기</button><button id="btnLeaveEnd" type="button">방 나가기</button></div>
     </div>
@@ -2444,7 +2444,7 @@ SinglePassMaterials.enable(THREE);
         services.netstate.oneDecimal(E.gauge), services.netstate.oneDecimal(E.dmg), E.deaths || 0, E.kills || 0, Math.round(E.heal || 0), E.skillDur || ""]
         .concat(NetState.STATE_TIMES.map(function (k) { return services.netstate.relTime(E[k]); }))
         .concat([E.slowUntil ? Math.round(E.slowMulAt(services.clock.now()) * 100) : "", services.netstate.packMinions(E),
-                 services.netstate.oneDecimal(E.stunDealt), services.netstate.oneDecimal(E.slowDealt), services.netstate.twoDecimals(E.slowWeight), Math.round(E.blocked || 0), E.frostStacks || "", E.shield ? 1 : "", E.assists || "", services.netstate.oneDecimal(E.skillDmg), services.netstate.relTime(E.snareUntil)]).join(",");
+                 services.netstate.oneDecimal(E.stunDealt), services.netstate.oneDecimal(E.slowDealt), services.netstate.twoDecimals(E.slowWeight), Math.round(E.blocked || 0), E.frostStacks || "", E.shield ? 1 : "", E.assists || "", services.netstate.oneDecimal(E.skillDmg), services.netstate.relTime(E.snareUntil), Math.round(E.taken || 0)]).join(",");
     }
     stateOf(d) { var services = this.services;
       var s = d && d.slot ? services.match.stateByKey[services.netstate.stKey(d.team, d.slot)] : null;
@@ -2462,6 +2462,7 @@ SinglePassMaterials.enable(THREE);
           o.assists = +f[NetState.STATE_EXTRA_AT + 8] || 0;
           o.skillDmg = +f[NetState.STATE_EXTRA_AT + 9] || 0;
           o.snareUntil = services.netstate.absTime(f[NetState.STATE_EXTRA_AT + 10]);
+          o.taken = +f[NetState.STATE_EXTRA_AT + 11] || 0;
         }
         return o;
       }
@@ -5486,7 +5487,7 @@ SinglePassMaterials.enable(THREE);
                cdUntil: 0, cdDur: 0, atkAt: 0, ultUntil: 0, buffUntil: 0, stealthUntil: s.stealthUntil || 0, regenUntil: 0,
                skillUntil: s.skillUntil || 0, skillDur: s.skillDur || 0,
                kills: s.kills || 0, assists: s.assists || 0, heal: s.heal || 0, protectUntil: s.protectUntil || 0, hurtBy: {}, helpedBy: {},
-               stunDealt: s.stunDealt || 0, slowDealt: s.slowDealt || 0, slowWeight: s.slowWeight || 0, blocked: s.blocked || 0, skillDmg: s.skillDmg || 0,
+               stunDealt: s.stunDealt || 0, slowDealt: s.slowDealt || 0, slowWeight: s.slowWeight || 0, blocked: s.blocked || 0, taken: s.taken || 0, skillDmg: s.skillDmg || 0,
                slowUntil: s.slowUntil || 0, slowMul: s.slowMul || 1, stunUntil: s.stunUntil || 0,
                summonAt: s.summonAt || 0, minions: [], revealUntil: s.revealUntil || 0, frostStacks: s.frostStacks || 0, frostStackAt: s.frostStackAt || 0,
                rallyUsed: !!(services.charTypes.statsOf(c).rally && s.hp != null && s.hp < services.charTypes.statsOf(c).hp * services.charTypes.statsOf(c).rally.hpRate),
@@ -5564,7 +5565,7 @@ SinglePassMaterials.enable(THREE);
         r.type.steerRemote(r, services.clock.now());
         if (!pos.full) return;
         r.deaths = pos.deaths; r.diedAt = pos.diedAt; r.kills = pos.kills; r.assists = pos.assists; r.heal = pos.heal; r.protectUntil = pos.protectUntil;
-        r.stunDealt = pos.stunDealt; r.slowDealt = pos.slowDealt; r.slowWeight = pos.slowWeight; r.blocked = pos.blocked; r.skillDmg = pos.skillDmg;
+        r.stunDealt = pos.stunDealt; r.slowDealt = pos.slowDealt; r.slowWeight = pos.slowWeight; r.blocked = pos.blocked; r.taken = pos.taken; r.skillDmg = pos.skillDmg;
         r.hp = pos.hp; r.alive = pos.alive; r.gauge = pos.gauge; r.dmg = pos.dmg;
         r.atkAt = pos.atkAt; r.stabAt = pos.stabAt; r.ultUntil = pos.ultUntil; r.leapAt = pos.leapAt; r.buffUntil = pos.buffUntil;
         r.type.adoptRemote(r, pos);
@@ -14195,6 +14196,7 @@ SinglePassMaterials.enable(THREE);
           "<td>" + E.kills + "</td><td>" + E.deaths + "</td><td>" + (E.assists || 0) + "</td><td>" + Math.round(E.dmg) + "</td>" +
           "<td>" + (services.charTypes.statsOf(E.char).heals ? Math.round(E.heal) : "-") + "</td>" +
           "<td>" + (services.charTypes.statsOf(E.char).blocks ? Math.round(E.blocked || 0) : "-") + "</td>" +
+          (list ? "" : "<td>" + Math.round(E.taken || 0) + "</td>") +
           "<td>" + services.resultBoard.secText(E.stunDealt) + "</td><td>" + services.resultBoard.scoreText(E.slowWeight) + "</td>" +
           '<td class="sc">' + services.resultBoard.mvpScore(E) + "</td></tr>";
       });
@@ -14229,6 +14231,7 @@ SinglePassMaterials.enable(THREE);
       return "<table>" + items.map(function (item) {
         return "<tr><td>" + item[0] + '</td><td class="' + (item[1].charAt(0) === "−" ? "minus" : "") + '">' + item[1] + "</td></tr>";
       }).join("") + "</table><ul>" +
+        "<li>받은 피해는 점수에 넣지 않습니다.</li>" +
         "<li>둔화는 둔화율을 곱합니다. 예) 50% 둔화 2초 = 2 × 0.5 × " + ResultBoard.MVP_SLOW_PER_SEC + " = " + ResultBoard.MVP_SLOW_PER_SEC + "점</li>" +
         "<li>기절·둔화는 이미 걸린 효과와 겹치지 않고 새로 늘어난 시간만 셉니다</li>" +
         "<li>블랙홀에 끌려간 시간은" + Math.round(AstrologerType.ULT.agCcRate * 100) + "% 둔화로 셉니다</li>" +

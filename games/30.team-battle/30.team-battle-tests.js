@@ -1364,6 +1364,7 @@ class ResultCollector {
     if (ln.blocked !== 30) bad.push("보호막 없이 맞은 피해가 쌓임 " + ln.blocked);
     api.damage(sd, 100, "gd", false, null);
     if (sd.blocked !== 10 || sd.maxHp - sd.hp !== 90) bad.push("방패병 막은 피해 " + sd.blocked + " (받은 피해 " + (sd.maxHp - sd.hp) + ", 기대 10 / 90)");
+    if (sd.taken !== 90 || ln.taken !== 30) bad.push("받은 피해 방패병 " + sd.taken + " (기대 90) · 창술사 " + ln.taken + " (기대 30)");
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "창술사 30·글자 30, 방패병 패시브 " + sd.blocked);
   });
 
