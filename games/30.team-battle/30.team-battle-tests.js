@@ -1,44 +1,28 @@
-class FixedTestArena {
-  static LAYOUTS = {
-    forest: { host: "snow", blueHalf: [
-      "................",
-      "................",
-      "................",
-      "...##......##...",
-      '""............""',
-      '"""....##...."""',
-      '""".........."""',
-      "....#......#....",
-      '....#..""..#....',
-      '.##....""....##.',
-      "................",
-      '..""...##...""..',
-      '..""........""..'
-    ] },
-    ford: { host: "river", blueHalf: [
-      "................",
-      "................",
-      "................",
-      "..##........##..",
-      "................",
-      '""....#..#....""',
-      '""............""',
-      "......####......",
-      ".....#....#.....",
-      '....""....""....',
-      "................",
-      "~==~~~~==~~~~==~",
-      "~==~~~~==~~~~==~"
-    ] }
-  };
+class TestField {
+  static ID = "testfield";
+  static HOST = "river";
+  static BLUE_HALF = [
+    "................",
+    "................",
+    "................",
+    "..##........##..",
+    "................",
+    '""....#..#....""',
+    '""............""',
+    "......####......",
+    ".....#....#.....",
+    '....""....""....',
+    "................",
+    "~==~~~~==~~~~==~",
+    "~==~~~~==~~~~==~"
+  ];
   static install(api) {
     var load = api.loadMapData;
     api.loadMapData = function (id) {
-      var fixed = FixedTestArena.LAYOUTS[id];
-      if (!fixed) return load(id);
-      var host = api.MAPS[fixed.host], real = host.blueHalf;
-      host.blueHalf = fixed.blueHalf;
-      try { return load(fixed.host); } finally { host.blueHalf = real; }
+      if (id !== TestField.ID) return load(id);
+      var host = api.MAPS[TestField.HOST], real = host.blueHalf;
+      host.blueHalf = TestField.BLUE_HALF;
+      try { return load(TestField.HOST); } finally { host.blueHalf = real; }
     };
   }
 }
@@ -50,7 +34,7 @@ class ResultCollector {
   var api = this.api;
   var T0 = 1700000000000;
   var FRAME = 1000 / 60;
-  var OPEN_Y = { forest: 575, river: 575, dungeon: 525, windhill: 575 };
+  var OPEN_Y = { testfield: 575, river: 575, dungeon: 525, windhill: 575 };
 
   function hyp(x, y) { return Math.sqrt(x * x + y * y); }
   function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
@@ -189,14 +173,14 @@ class ResultCollector {
         if (why) bad.push(m + " (" + x + ", " + y + ") → (" + Math.round(p.x) + ", " + Math.round(p.y) + ") " + why);
       }
     });
-    api.loadMapData("forest");
+    api.loadMapData("testfield");
     done(bad.length ? "fail" : "pass", bad.length ? bad.length + "곳 실패. 예: " + bad.slice(0, 3).join(" / ") : maps.length + "개 맵 모든 착지 지점이 빈 곳으로 나옴");
   });
 
   function guardianIntoWall(hitchMs) {
-    var W = world("forest", []), q = singleRowWall();
+    var W = world("testfield", []), q = singleRowWall();
     var ty = q.y + q.h / 2 + api.BODY_R + 2;
-    W = world("forest", [
+    W = world("testfield", [
       { id: "gd", team: "blue", char: "guardian", x: q.x, y: ty + 80, angle: -Math.PI / 2, gauge: api.GAUGE_MAX },
       { id: "foe", team: "red", char: "knight", x: q.x, y: ty }
     ]);
@@ -222,7 +206,7 @@ class ResultCollector {
 
   run(MOVE, "자객 돌진: 벽을 향해 돌진하면 벽 앞에서 멈추는가", function (done) {
     var q = singleRowWall(), x0 = q.x - 25, y0 = q.y + q.h / 2 + 130;
-    var W = world("forest", [{ id: "hm", team: "blue", char: "hitman", x: x0, y: y0, angle: -Math.PI / 2 }]);
+    var W = world("testfield", [{ id: "hm", team: "blue", char: "hitman", x: x0, y: y0, angle: -Math.PI / 2 }]);
     if (blockedAt(x0, y0)) { done("fail", "시험 준비 실패: 출발 위치가 막혀 있음"); return; }
     api.fireBasic(W.ent("hm"), -Math.PI / 2);
     var worst = null;
@@ -233,7 +217,7 @@ class ResultCollector {
 
   run(MOVE, "자객 처형: 벽에 붙어 있는 적을 맞히고 순간이동하면 벽에 끼지 않는가", function (done) {
     var q = singleRowWall(), ty = q.y + q.h / 2 + api.BODY_R + 2, x = q.x - 25;
-    var W = world("forest", [
+    var W = world("testfield", [
       { id: "hm", team: "blue", char: "hitman", x: x, y: ty + 280, gauge: api.GAUGE_MAX },
       { id: "foe", team: "red", char: "knight", x: x, y: ty }
     ]);
@@ -247,7 +231,7 @@ class ResultCollector {
 
   run(MOVE, "결투가 돌진: 벽을 향해 돌진하면 벽 앞에서 바로 멈추고 찌르기로 넘어가는가", function (done) {
     var q = singleRowWall(), x0 = q.x - 25, y0 = q.y + q.h / 2 + 130, c = api.CHARS.duelist;
-    var W = world("forest", [{ id: "du", team: "blue", char: "duelist", x: x0, y: y0, angle: -Math.PI / 2 }]);
+    var W = world("testfield", [{ id: "du", team: "blue", char: "duelist", x: x0, y: y0, angle: -Math.PI / 2 }]);
     if (blockedAt(x0, y0)) { done("fail", "시험 준비 실패: 출발 위치가 막혀 있음"); return; }
     var E = W.ent("du"), start = W.t(), endedAt = 0, worst = null;
     api.fireBasic(E, -Math.PI / 2);
@@ -261,7 +245,7 @@ class ResultCollector {
   });
 
   run(MOVE, "결투가 찌르기: 찌를 적이 없어도 찌르기 범위가 표시되는가 (피해 없음)", function (done) {
-    var W = world("forest", [{ id: "du", team: "blue", char: "duelist", x: 200, y: OPEN_Y.forest }]);
+    var W = world("testfield", [{ id: "du", team: "blue", char: "duelist", x: 200, y: OPEN_Y.testfield }]);
     api.fireBasic(W.ent("du"), 0);
     W.step(api.CHARS.duelist.dashMs + 100);
     var hits = W.pushesFrom("du", "meleeHits");
@@ -270,8 +254,8 @@ class ResultCollector {
   });
 
   run(MOVE, "결투가 찌르기: 돌진이 끝난 뒤 반경 안의 가장 가까운 적 1명만 찌르고 체력을 회복하는가", function (done) {
-    var y = OPEN_Y.forest, c = api.CHARS.duelist;
-    var W = world("forest", [
+    var y = OPEN_Y.testfield, c = api.CHARS.duelist;
+    var W = world("testfield", [
       { id: "du", team: "blue", char: "duelist", x: 200, y: y },
       { id: "near", team: "red", char: "guardian", x: 200 + c.dashRange + 60, y: y },
       { id: "far", team: "red", char: "guardian", x: 200 + c.dashRange + 120, y: y }
@@ -292,8 +276,8 @@ class ResultCollector {
   });
 
   run(MOVE, "결투가 르미즈: 기본 공격 대기시간이 초기화되고 3초간 초당 3회·0.3초 돌진이 되는가", function (done) {
-    var y = OPEN_Y.forest, c = api.CHARS.duelist;
-    var W = world("forest", [{ id: "du", team: "blue", char: "duelist", x: 150, y: y, gauge: api.GAUGE_MAX }]);
+    var y = OPEN_Y.testfield, c = api.CHARS.duelist;
+    var W = world("testfield", [{ id: "du", team: "blue", char: "duelist", x: 150, y: y, gauge: api.GAUGE_MAX }]);
     var du = W.ent("du"), bad = [];
     api.fireBasic(du, 0);
     W.step(c.dashMs + 50);
@@ -314,7 +298,7 @@ class ResultCollector {
 
   run(MOVE, "블랙홀 중심을 벽 안에 찍어도 끌려간 적이 벽에 끼지 않는가", function (done) {
     var q = singleRowWall(), ty = q.y + q.h / 2 + api.BODY_R + 40;
-    var W = world("forest", [
+    var W = world("testfield", [
       { id: "pr", team: "blue", char: "astrologer", x: q.x, y: ty + 150, gauge: api.GAUGE_MAX },
       { id: "foe", team: "red", char: "knight", x: q.x + 30, y: ty }
     ]);
@@ -327,8 +311,8 @@ class ResultCollector {
   });
 
   run(MOVE, "블랙홀에 끌려가는 중에 창벽 넉백을 같이 받으면 벽·물에 끼지 않는가", function (done) {
-    var y = OPEN_Y.forest;
-    var W = world("forest", [
+    var y = OPEN_Y.testfield;
+    var W = world("testfield", [
       { id: "pr", team: "blue", char: "astrologer", x: 250, y: y, gauge: api.GAUGE_MAX },
       { id: "gd", team: "blue", char: "guardian", x: 500, y: y, gauge: api.GAUGE_MAX },
       { id: "foe", team: "red", char: "knight", x: 440, y: y }
@@ -342,14 +326,14 @@ class ResultCollector {
   });
 
   function lancerDisplaced(push) {
-    var y = OPEN_Y.forest;
-    var W = world("forest", [
+    var y = OPEN_Y.testfield;
+    var W = world("testfield", [
       { id: "ln", team: "blue", char: "lancer", x: 250, y: y, gauge: api.GAUGE_MAX },
       { id: "foe", team: "red", char: "knight", x: 480, y: y },
       { id: "gd", team: "red", char: "guardian", x: 190, y: y, gauge: api.GAUGE_MAX },
-      { id: "pr", team: "red", char: "astrologer", x: 250, y: y + 250, gauge: api.GAUGE_MAX }
+      { id: "pr", team: "red", char: "astrologer", x: 250, y: y - 250, gauge: api.GAUGE_MAX }
     ]);
-    if (push === "hole") { api.useUlt(W.ent("pr"), -Math.PI / 2, 120); W.step(100); }
+    if (push === "hole") { api.useUlt(W.ent("pr"), Math.PI / 2, 120); W.step(100); }
     var castX = W.ent("ln").x, castY = W.ent("ln").y;
     api.useUlt(W.ent("ln"), 0);
     W.step(50);
@@ -375,8 +359,8 @@ class ResultCollector {
   });
 
   function lancerStunnedBy(stunMs) {
-    var y = OPEN_Y.forest;
-    var W = world("forest", [
+    var y = OPEN_Y.testfield;
+    var W = world("testfield", [
       { id: "ln", team: "blue", char: "lancer", x: 250, y: y, gauge: api.GAUGE_MAX },
       { id: "foe", team: "red", char: "knight", x: 450, y: y }
     ]);
@@ -395,7 +379,7 @@ class ResultCollector {
   });
 
   run(MISC, "부활 보호(" + api.RESPAWN_PROTECT_MS / 1000 + "초) 중에는 모든 공격·기절·둔화·넉백·끌어당김에 면역인가", function (done) {
-    var y = OPEN_Y.forest, casters = [
+    var y = OPEN_Y.testfield, casters = [
       { id: "mg", team: "blue", char: "mage", x: 300, y: y - 220, gauge: api.GAUGE_MAX },
       { id: "gd", team: "blue", char: "guardian", x: 520, y: y, gauge: api.GAUGE_MAX },
       { id: "bs", team: "blue", char: "blacksmith", x: 420, y: y + 250, gauge: api.GAUGE_MAX },
@@ -404,7 +388,7 @@ class ResultCollector {
       { id: "hm", team: "blue", char: "hitman", x: 150, y: y, gauge: api.GAUGE_MAX },
       { id: "gb", team: "blue", char: "guardian", x: 360, y: y, slot: 3 }
     ];
-    var W = world("forest", casters.concat([{ id: "foe", team: "red", char: "warrior", x: 420, y: y }]));
+    var W = world("testfield", casters.concat([{ id: "foe", team: "red", char: "warrior", x: 420, y: y }]));
     var foe = W.ent("foe"), bad = [], sx = foe.x, sy = foe.y, hm = W.ent("hm"), hmX = hm.x;
     foe.protectUntil = W.t() + 3000;
     api.useUlt(W.ent("bs"), -Math.PI / 2, 250);
@@ -425,7 +409,7 @@ class ResultCollector {
   });
 
   run(STUN, "둔화가 겹치면 더 강한 둔화만 적용되는가 (20% 4초 + 40% 2초 동시)", function (done) {
-    var W = world("forest", [{ id: "kn", team: "red", char: "knight", x: 450, y: OPEN_Y.forest }]);
+    var W = world("testfield", [{ id: "kn", team: "red", char: "knight", x: 450, y: OPEN_Y.testfield }]);
     var E = W.ent("kn"), base = api.CHARS.knight.speed, seen = [];
     api.afflict(E, { slowMs: 4000, slowMul: 0.8 }); api.afflict(E, { slowMs: 2000, slowMul: 0.6 });
     [1000, 3000, 4200].forEach(function (at, i) {
@@ -437,7 +421,7 @@ class ResultCollector {
   });
 
   run(STUN, "MVP 기절·둔화 기여는 이미 걸린 효과와 겹친 만큼 빼고 쌓이는가", function (done) {
-    var W = world("forest", [{ id: "kn", team: "red", char: "knight", x: 450, y: OPEN_Y.forest }]);
+    var W = world("testfield", [{ id: "kn", team: "red", char: "knight", x: 450, y: OPEN_Y.testfield }]);
     var E = W.ent("kn"), pend = api.ccPending();
     api.afflict(E, { stunMs: 1200 }, "a"); api.afflict(E, { stunMs: 800 }, "b");
     api.afflict(E, { slowMs: 4000, slowMul: 0.8 }, "c"); api.afflict(E, { slowMs: 2000, slowMul: 0.6 }, "d");
@@ -449,8 +433,8 @@ class ResultCollector {
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "기절 1.2초만, 둔화는 늘어난 강도만(가중 0.8초 + 0.4초) 기여로 셈");
   });
   run(STUN, "블랙홀에 끌려간 시간은 기절이 아니라 " + Math.round(api.ULT.agCcRate * 100) + "% 둔화로 MVP 기여에 쌓이는가", function (done) {
-    var y = OPEN_Y.forest;
-    var W = world("forest", [
+    var y = OPEN_Y.testfield;
+    var W = world("testfield", [
       { id: "pr", team: "blue", char: "astrologer", x: 250, y: y, gauge: api.GAUGE_MAX },
       { id: "foe", team: "red", char: "knight", x: 560, y: y }
     ]);
@@ -469,7 +453,7 @@ class ResultCollector {
   });
 
   run(STUN, "기절 중에는 이동·기본 공격·궁극기를 못 쓰는가", function (done) {
-    var W = world("forest", [{ id: "kn", team: "red", char: "knight", x: 450, y: OPEN_Y.forest, gauge: api.GAUGE_MAX }]);
+    var W = world("testfield", [{ id: "kn", team: "red", char: "knight", x: 450, y: OPEN_Y.testfield, gauge: api.GAUGE_MAX }]);
     var E = W.ent("kn");
     api.afflict(E, { stunMs: 1000 });
     var speed = api.speedOf(E), cdBefore = E.cdUntil;
@@ -482,15 +466,15 @@ class ResultCollector {
   });
 
   run(STUN, "기절이 겹치면 더 긴 기절이 유지되는가 (1.2초 뒤에 0.8초)", function (done) {
-    var W = world("forest", [{ id: "kn", team: "red", char: "knight", x: 450, y: OPEN_Y.forest }]);
+    var W = world("testfield", [{ id: "kn", team: "red", char: "knight", x: 450, y: OPEN_Y.testfield }]);
     var E = W.ent("kn"), t = W.t();
     api.afflict(E, { stunMs: 1200 }); api.afflict(E, { stunMs: 800 });
     done(E.stunUntil === t + 1200 ? "pass" : "fail", "기절 끝나는 시각: +" + (E.stunUntil - t) + "ms");
   });
 
   run(STUN, "자객 돌진 중에 기절하면 마무리 공격이 취소되고 벽에 끼지 않는가", function (done) {
-    var y = OPEN_Y.forest;
-    var W = world("forest", [
+    var y = OPEN_Y.testfield;
+    var W = world("testfield", [
       { id: "hm", team: "blue", char: "hitman", x: 250, y: y },
       { id: "foe", team: "red", char: "knight", x: 600, y: y }
     ]);
@@ -503,8 +487,8 @@ class ResultCollector {
   });
 
   run(STUN, "결투가 돌진 중에 기절하면 찌르기가 취소되는가", function (done) {
-    var y = OPEN_Y.forest, c = api.CHARS.duelist;
-    var W = world("forest", [
+    var y = OPEN_Y.testfield, c = api.CHARS.duelist;
+    var W = world("testfield", [
       { id: "du", team: "blue", char: "duelist", x: 200, y: y },
       { id: "foe", team: "red", char: "knight", x: 200 + c.dashRange + 60, y: y }
     ]);
@@ -517,8 +501,8 @@ class ResultCollector {
   });
 
   run(STUN, "대장장이 내려찍기: 도약 중에 기절해도 끝까지 진행되는가 (시전 동작 없음 → 기절 무시)", function (done) {
-    var y = OPEN_Y.forest;
-    var W = world("forest", [
+    var y = OPEN_Y.testfield;
+    var W = world("testfield", [
       { id: "bs", team: "blue", char: "blacksmith", x: 250, y: y, gauge: api.GAUGE_MAX },
       { id: "foe", team: "red", char: "knight", x: 500, y: y }
     ]);
@@ -530,9 +514,9 @@ class ResultCollector {
     done(landed ? "pass" : "fail", landed ? "기절해도 착지 피해·기절이 들어감" : "기절하면 착지 공격이 취소됨");
   });
   run(MOVE, "대장장이 내려찍기: 최소 거리는 " + api.ULT.bsLeapMinMs / 1000 + "초, 최대 거리는 " + api.ULT.bsLeapMaxMs / 1000 + "초 뒤에 착지하는가", function (done) {
-    var y = OPEN_Y.forest, landedAfter = [];
+    var y = OPEN_Y.testfield, landedAfter = [];
     [api.ULT.bsMin, api.ULT.bsCast].forEach(function (reach) {
-      var W = world("forest", [{ id: "bs", team: "blue", char: "blacksmith", x: 250, y: y, gauge: api.GAUGE_MAX }]);
+      var W = world("testfield", [{ id: "bs", team: "blue", char: "blacksmith", x: 250, y: y, gauge: api.GAUGE_MAX }]);
       var bs = W.ent("bs"), t0 = W.t(), landAt = null;
       api.useUlt(bs, 0, reach);
       W.step(api.ULT.bsLeapMaxMs + 300, FRAME, function (t) { if (landAt == null && !bs.leap) landAt = t; });
@@ -543,9 +527,9 @@ class ResultCollector {
   });
 
   run(STUN, "대장장이 기본 공격: 멈춰 서서 " + api.CHARS.blacksmith.windup + "ms 뒤 타격해 " + api.CHARS.blacksmith.fx.stunMs + "ms 기절시키고, 그 전에 기절하면 취소되는가", function (done) {
-    var y = OPEN_Y.forest, c = api.CHARS.blacksmith, bad = [];
+    var y = OPEN_Y.testfield, c = api.CHARS.blacksmith, bad = [];
     function duel() {
-      return world("forest", [
+      return world("testfield", [
         { id: "bs", team: "blue", char: "blacksmith", x: 250, y: y },
         { id: "foe", team: "red", char: "guardian", x: 250 + c.range - 10, y: y + c.width / 2 - 10 }
       ]);
@@ -576,12 +560,12 @@ class ResultCollector {
   });
 
   run(STUN, "주술사 메테오: 가운데 " + api.ULT.mbDmg + "·" + api.ULT.mbStunMs / 1000 + "초 ~ 끝 " + api.ULT.mbDmgMin + "·" + api.ULT.mbStunMin / 1000 + "초로 " + api.ULT.mbSteps + "단계로 줄고, 시전 뒤 기절해도 " + api.ULT.mbDelay / 1000 + "초 뒤 떨어지는가", function (done) {
-    var y = OPEN_Y.forest, U = api.ULT, reach = U.mbR + api.BODY_R, bad = [], tiers = [];
+    var y = OPEN_Y.testfield, U = api.ULT, reach = U.mbR + api.BODY_R, bad = [], tiers = [];
     for (var i = 0; i < U.mbSteps; i++) { var h = api.meteorHitAt(reach * (i + 0.5) / U.mbSteps, U.mbR); tiers.push(h.dmg + "/" + h.stunMs / 1000); }
     var want = [];
     for (var j = 0; j < U.mbSteps; j++) want.push(Math.round(U.mbDmg - (U.mbDmg - U.mbDmgMin) * j / (U.mbSteps - 1)) + "/" + Math.round(U.mbStunMs - (U.mbStunMs - U.mbStunMin) * j / (U.mbSteps - 1)) / 1000);
     if (tiers.join() !== want.join()) bad.push("단계 " + tiers.join(" · ") + " (기대 " + want.join(" · ") + ")");
-    var W = world("forest", [
+    var W = world("testfield", [
       { id: "mg", team: "blue", char: "mage", x: 250, y: y, gauge: api.GAUGE_MAX },
       { id: "foe", team: "red", char: "guardian", x: 450, y: y }
     ]);
@@ -597,8 +581,8 @@ class ResultCollector {
   });
 
   run(STUN, "기사 방어태세: 기절해 있어도 끝날 때 주변 기절이 발동하는가 (시전 동작 없음)", function (done) {
-    var y = OPEN_Y.forest;
-    var W = world("forest", [
+    var y = OPEN_Y.testfield;
+    var W = world("testfield", [
       { id: "kn", team: "blue", char: "knight", x: 250, y: y, gauge: api.GAUGE_MAX },
       { id: "foe", team: "red", char: "warrior", x: 320, y: y }
     ]);
@@ -611,8 +595,8 @@ class ResultCollector {
   });
 
   run(STUN, "궁수 난사: 연사 중에는 기본 공격이 안 나가고, 연사가 끝나면 다시 쏘는가", function (done) {
-    var y = OPEN_Y.forest, bad = [];
-    var W = world("forest", [
+    var y = OPEN_Y.testfield, bad = [];
+    var W = world("testfield", [
       { id: "rg", team: "blue", char: "ranger", x: 250, y: y, gauge: api.GAUGE_MAX },
       { id: "foe", team: "red", char: "knight", x: 450, y: y }
     ]);
@@ -629,8 +613,8 @@ class ResultCollector {
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "연사 중 막힘, 끝난 뒤 발사");
   });
   run(STUN, "궁수 난사: 기절하는 순간 남은 화살이 멈추는가", function (done) {
-    var y = OPEN_Y.forest;
-    var W = world("forest", [
+    var y = OPEN_Y.testfield;
+    var W = world("testfield", [
       { id: "rg", team: "blue", char: "ranger", x: 250, y: y, gauge: api.GAUGE_MAX },
       { id: "foe", team: "red", char: "knight", x: 450, y: y }
     ]);
@@ -644,8 +628,8 @@ class ResultCollector {
   });
 
   run(GAUGE, "광전사 광폭화 중에는 공격해도 게이지가 오르지 않는가", function (done) {
-    var y = OPEN_Y.forest;
-    var W = world("forest", [
+    var y = OPEN_Y.testfield;
+    var W = world("testfield", [
       { id: "wr", team: "blue", char: "warrior", x: 250, y: y, gauge: api.GAUGE_MAX },
       { id: "foe", team: "red", char: "knight", x: 330, y: y }
     ]);
@@ -658,8 +642,8 @@ class ResultCollector {
   });
 
   run(GAUGE, "궁수 난사 10발을 모두 맞히면 게이지가 가득 돌아오는가 (의도된 규칙)", function (done) {
-    var y = OPEN_Y.forest;
-    var W = world("forest", [
+    var y = OPEN_Y.testfield;
+    var W = world("testfield", [
       { id: "rg", team: "blue", char: "ranger", x: 250, y: y, gauge: api.GAUGE_MAX },
       { id: "foe", team: "red", char: "knight", x: 450, y: y }
     ]);
@@ -671,8 +655,8 @@ class ResultCollector {
   });
 
   run(GAUGE, "투척병 독병: 1틱 적중마다 게이지 +1인가 (적 3명, 3틱)", function (done) {
-    var y = OPEN_Y.forest;
-    var W = world("forest", [
+    var y = OPEN_Y.testfield;
+    var W = world("testfield", [
       { id: "th", team: "blue", char: "thrower", x: 250, y: y },
       { id: "a", team: "red", char: "knight", x: 450, y: y },
       { id: "b", team: "red", char: "knight", x: 450, y: y - 35 },
@@ -685,9 +669,9 @@ class ResultCollector {
   });
 
   run(GAUGE, "게이지가 0~" + api.GAUGE_MAX + " 범위를 벗어나지 않는가 (피격 200번)", function (done) {
-    var W = world("forest", [
-      { id: "kn", team: "red", char: "knight", x: 450, y: OPEN_Y.forest },
-      { id: "wr", team: "blue", char: "warrior", x: 250, y: OPEN_Y.forest }
+    var W = world("testfield", [
+      { id: "kn", team: "red", char: "knight", x: 450, y: OPEN_Y.testfield },
+      { id: "wr", team: "blue", char: "warrior", x: 250, y: OPEN_Y.testfield }
     ]);
     var kn = W.ent("kn"), wr = W.ent("wr"), bad = 0;
     kn.hp = kn.maxHp = 1e9;
@@ -699,9 +683,9 @@ class ResultCollector {
   });
 
   run(MISC, "기절 중에 죽으면 기절이 풀리고, 부활하면 이동기·넉백 상태가 모두 초기화되는가", function (done) {
-    var W = world("forest", [
-      { id: "kn", team: "red", char: "knight", x: 450, y: OPEN_Y.forest },
-      { id: "mg", team: "blue", char: "mage", x: 250, y: OPEN_Y.forest }
+    var W = world("testfield", [
+      { id: "kn", team: "red", char: "knight", x: 450, y: OPEN_Y.testfield },
+      { id: "mg", team: "blue", char: "mage", x: 250, y: OPEN_Y.testfield }
     ]);
     var E = W.ent("kn"), bad = [];
     api.afflict(E, { stunMs: 1000, slowMs: 1000, slowMul: 0.6 });
@@ -722,8 +706,8 @@ class ResultCollector {
 
   var PASSIVE = "궁수·저격수·네크로 패시브";
   run(PASSIVE, "궁수: 기본 공격 적중마다 이동속도 +" + api.shownSpeed(api.CHARS.ranger.haste.add) + ", 최대 +" + api.shownSpeed(api.CHARS.ranger.haste.max) + "(표시 속도), " + api.CHARS.ranger.haste.ms + "ms 뒤 사라지는가", function (done) {
-    var y = OPEN_Y.forest, h = api.CHARS.ranger.haste, base = api.CHARS.ranger.speed;
-    var W = world("forest", [
+    var y = OPEN_Y.testfield, h = api.CHARS.ranger.haste, base = api.CHARS.ranger.speed;
+    var W = world("testfield", [
       { id: "rg", team: "blue", char: "ranger", x: 250, y: y },
       { id: "foe", team: "red", char: "knight", x: 450, y: y }
     ]);
@@ -743,14 +727,14 @@ class ResultCollector {
     done(ok ? "pass" : "fail", "이동속도 증가(표시) " + got.map(function (v) { return "+" + api.shownSpeed(v); }).join(" → ") + " (기대: +" + api.shownSpeed(2 * h.add) + " → +" + api.shownSpeed(h.max) + " ×4 → +0, 적중마다 지속시간 초기화)");
   });
   run(PASSIVE, "저격수: 내 화면 발밑 반투명 원 반지름이 추가 피해 거리 " + api.CHARS.sniper.farDist + " 와 같은가", function (done) {
-    var W = world("forest", [{ id: "sn", team: "blue", char: "sniper", x: 100, y: OPEN_Y.forest }]), sn = W.ent("sn");
+    var W = world("testfield", [{ id: "sn", team: "blue", char: "sniper", x: 100, y: OPEN_Y.testfield }]), sn = W.ent("sn");
     var r = api.CHAR_TYPES.of("sniper").rangeRingOf(sn, W.t());
     done(r === api.CHARS.sniper.farDist ? "pass" : "fail", "원 반지름 " + r + " (기대 " + api.CHARS.sniper.farDist + ")");
   });
   run(PASSIVE, "저격수: " + api.CHARS.sniper.farDist + "보다 먼 적에게만 피해 +" + Math.round(api.CHARS.sniper.farBonus * 100) + "%인가", function (done) {
-    var y = OPEN_Y.forest, c = api.CHARS.sniper;
+    var y = OPEN_Y.testfield, c = api.CHARS.sniper;
     function shotAt(dist) {
-      var W = world("forest", [
+      var W = world("testfield", [
         { id: "sn", team: "blue", char: "sniper", x: 100, y: y },
         { id: "foe", team: "red", char: "guardian", x: 100 + dist, y: y }
       ]);
@@ -765,8 +749,8 @@ class ResultCollector {
     done(ok ? "pass" : "fail", "거리 300 → " + near + ", 거리 600 → " + far + " (기대: " + c.dmg + " / " + Math.round(c.dmg * (1 + c.farBonus)) + ")");
   });
   run(PASSIVE, "네크로: 체력이 낮아져도 은신하거나 체력이 멈추지 않는가", function (done) {
-    var y = OPEN_Y.forest, bad = [];
-    var W = world("forest", [
+    var y = OPEN_Y.testfield, bad = [];
+    var W = world("testfield", [
       { id: "nc", team: "blue", char: "necro", x: 250, y: y },
       { id: "foe", team: "red", char: "knight", x: 700, y: y }
     ]);
@@ -779,8 +763,8 @@ class ResultCollector {
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "90 피해 → 체력 " + (api.CHARS.necro.hp - 90) + "·은신 없음, 다음 치명타에 쓰러짐");
   });
   run(PASSIVE, "네크로 해골: 해골이 받은 피해의 3분의 1만 네크로의 막은 피해에 쌓이는가", function (done) {
-    var y = OPEN_Y.forest;
-    var W = world("forest", [{ id: "nc", team: "blue", char: "necro", x: 250, y: y }, { id: "foe", team: "red", char: "knight", x: 900, y: y }]), nc = W.ent("nc");
+    var y = OPEN_Y.testfield;
+    var W = world("testfield", [{ id: "nc", team: "blue", char: "necro", x: 250, y: y }, { id: "foe", team: "red", char: "knight", x: 900, y: y }]), nc = W.ent("nc");
     W.step(api.ULT.smRiseMs + 100);
     var m = (nc.minions || []).filter(function (s) { return s.alive; })[0];
     if (!m) { done("fail", "시험 준비 실패: 해골 없음"); return; }
@@ -790,8 +774,8 @@ class ResultCollector {
     done(lost === 30 && Math.abs(got - 10) < 1e-6 ? "pass" : "fail", "해골 체력 " + lost + " 줄고 막은 피해 +" + got + " (기대 10)");
   });
   run(PASSIVE, "네크로 해골: 기본 공격이 붙어 선 두 적 중 노린 한 명에게만 들어가고 호 표시가 없는가", function (done) {
-    var y = OPEN_Y.forest, bad = [];
-    var W = world("forest", [
+    var y = OPEN_Y.testfield, bad = [];
+    var W = world("testfield", [
       { id: "nc", team: "blue", char: "necro", x: 100, y: y },
       { id: "fa", team: "red", char: "knight", x: 330, y: y },
       { id: "fb", team: "red", char: "knight", x: 330, y: y + 34 }
@@ -813,8 +797,8 @@ class ResultCollector {
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "공격 " + swings.length + "번, 모두 노린 적에게만 " + api.ULT.smDmg + "씩");
   });
   run(PASSIVE, "네크로 해골: 공격할 대상이 없으면 네크로에게 다가오는가", function (done) {
-    var y = OPEN_Y.forest;
-    var W = world("forest", [{ id: "nc", team: "blue", char: "necro", x: 250, y: y, gauge: api.GAUGE_MAX }]);
+    var y = OPEN_Y.testfield;
+    var W = world("testfield", [{ id: "nc", team: "blue", char: "necro", x: 250, y: y, gauge: api.GAUGE_MAX }]);
     var nc = W.ent("nc");
     api.useUlt(nc, 0);
     W.step(api.ULT.smRiseMs + 100);
@@ -828,7 +812,7 @@ class ResultCollector {
   });
 
   run(PASSIVE, "네크로 해골: 경기 시작부터 " + api.ULT.smCount + "마리(체력 " + api.ULT.smHp + ")가 있고, 유지 시간 없이 계속 남는가", function (done) {
-    var y = OPEN_Y.forest, W = world("forest", [{ id: "nc", team: "blue", char: "necro", x: 250, y: y }]), nc = W.ent("nc"), bad = [];
+    var y = OPEN_Y.testfield, W = world("testfield", [{ id: "nc", team: "blue", char: "necro", x: 250, y: y }]), nc = W.ent("nc"), bad = [];
     W.step(api.ULT.smRiseMs + 100);
     var list = nc.minions || [];
     if (list.length !== api.ULT.smCount) bad.push("시작 해골 " + list.length + "마리");
@@ -840,8 +824,8 @@ class ResultCollector {
   });
 
   run(PASSIVE, "네크로 스킬: 쓰러진 해골을 채워 " + api.ULT.smCount + "마리로 만들고 살아 있는 해골 체력을 채우며, " + api.secs(api.ULT.smFrenzyMs) + "간 해골 공격 간격이 빨라지는가", function (done) {
-    var y = OPEN_Y.forest, bad = [];
-    var W = world("forest", [{ id: "nc", team: "blue", char: "necro", x: 250, y: y }, { id: "wr", team: "red", char: "guardian", x: 420, y: y }]), nc = W.ent("nc"), wr = W.ent("wr");
+    var y = OPEN_Y.testfield, bad = [];
+    var W = world("testfield", [{ id: "nc", team: "blue", char: "necro", x: 250, y: y }, { id: "wr", team: "red", char: "guardian", x: 420, y: y }]), nc = W.ent("nc"), wr = W.ent("wr");
     W.step(api.ULT.smRiseMs + 100);
     var list = nc.minions;
     list[0].alive = false; list[0].hp = 0; list[0].diedAt = W.t(); list[1].hp = 10;
@@ -871,8 +855,8 @@ class ResultCollector {
   });
 
   run(PASSIVE, "네크로 해골: 한 자리에 몰려도 서로 겹치지 않게 벌어지고, 공격 대상을 둘러싸는가", function (done) {
-    var y = OPEN_Y.forest, bad = [];
-    var W = world("forest", [{ id: "nc", team: "blue", char: "necro", x: 100, y: y }, { id: "foe", team: "red", char: "guardian", x: 320, y: y }]), nc = W.ent("nc"), foe = W.ent("foe");
+    var y = OPEN_Y.testfield, bad = [];
+    var W = world("testfield", [{ id: "nc", team: "blue", char: "necro", x: 100, y: y }, { id: "foe", team: "red", char: "guardian", x: 320, y: y }]), nc = W.ent("nc"), foe = W.ent("foe");
     W.step(api.ULT.smRiseMs + 100);
     foe.maxHp = 100000; foe.hp = 100000; foe.cdUntil = Infinity;
     nc.minions.forEach(function (m) { m.x = 220; m.y = y; m.cdUntil = Infinity; });
@@ -892,8 +876,8 @@ class ResultCollector {
   });
 
   run(PASSIVE, "네크로 표식: 기본 공격에 맞은 적에게 해골이 뛰어들고, 네크로에서 " + api.ULT.smLeash + " 밖의 적은 쫓지 않는가", function (done) {
-    var y = OPEN_Y.forest, bad = [];
-    var W = world("forest", [{ id: "nc", team: "blue", char: "necro", x: 200, y: y }, { id: "near", team: "red", char: "guardian", x: 260, y: y + 130 }, { id: "mk", team: "red", char: "guardian", x: 520, y: y }]), nc = W.ent("nc"), mk = W.ent("mk"), near = W.ent("near");
+    var y = OPEN_Y.testfield, bad = [];
+    var W = world("testfield", [{ id: "nc", team: "blue", char: "necro", x: 200, y: y }, { id: "near", team: "red", char: "guardian", x: 260, y: y + 130 }, { id: "mk", team: "red", char: "guardian", x: 520, y: y }]), nc = W.ent("nc"), mk = W.ent("mk"), near = W.ent("near");
     W.step(api.ULT.smRiseMs + 100);
     near.cdUntil = Infinity; mk.cdUntil = Infinity;
     nc.minions.forEach(function (m, i) { m.x = 230; m.y = y + 90 + i * 20; m.cdUntil = Infinity; });
@@ -914,8 +898,8 @@ class ResultCollector {
   });
 
   run(PASSIVE, "네크로 해골: 해골의 공격은 적의 게이지를 채우지 않고 네크로 게이지만 공격마다 " + api.ULT.smGauge + " 채우며, 해골에게 입힌 피해는 피해량에 안 들어가며 기본 공격 게이지는 오르는가", function (done) {
-    var y = OPEN_Y.forest;
-    var W = world("forest", [
+    var y = OPEN_Y.testfield;
+    var W = world("testfield", [
       { id: "nc", team: "blue", char: "necro", x: 250, y: y, gauge: api.GAUGE_MAX },
       { id: "wr", team: "red", char: "warrior", x: 330, y: y, angle: Math.PI }
     ]);
@@ -947,8 +931,8 @@ class ResultCollector {
 
   var FROST = "얼음술사·은신";
   function frostDuel() {
-    var y = OPEN_Y.forest;
-    return world("forest", [
+    var y = OPEN_Y.testfield;
+    return world("testfield", [
       { id: "fr", team: "blue", char: "frost", x: 250, y: y, angle: 0 },
       { id: "foe", team: "red", char: "knight", x: 450, y: y }
     ]);
@@ -976,8 +960,8 @@ class ResultCollector {
     done(foe.frostStacks === 1 && !api.stunned(foe, W.t()) ? "pass" : "fail", "2스택 뒤 쉬었다 맞힘 → " + foe.frostStacks + "스택" + (api.stunned(foe, W.t()) ? ", 빙결됨" : ""));
   });
   run(FROST, "눈보라: 시전자를 따라다니고, 범위 안 적은 1초에 " + api.ULT.frBzDmg + " 피해, 아군은 먼 적에게 숨겨지는가", function (done) {
-    var y = OPEN_Y.forest;
-    var W = world("forest", [
+    var y = OPEN_Y.testfield;
+    var W = world("testfield", [
       { id: "fr", team: "blue", char: "frost", x: 300, y: y, gauge: api.GAUGE_MAX },
       { id: "al", team: "blue", char: "knight", x: 420, y: y },
       { id: "foe", team: "red", char: "guardian", x: 300, y: y + 250 },
@@ -1003,8 +987,8 @@ class ResultCollector {
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "3초간 " + lost + " 피해, 따라다님, 끝나면 은신·피해 모두 멈춤");
   });
   run(FROST, "눈보라: 1초마다 냉기 화살 1중첩, 3중첩이면 빙결, 빙결이 끝난 뒤 다음 틱부터 다시 1중첩이 쌓이는가", function (done) {
-    var y = OPEN_Y.forest;
-    var W = world("forest", [
+    var y = OPEN_Y.testfield;
+    var W = world("testfield", [
       { id: "fr", team: "blue", char: "frost", x: 300, y: y, gauge: api.GAUGE_MAX },
       { id: "foe", team: "red", char: "guardian", x: 300, y: y + 250 }
     ]);
@@ -1026,8 +1010,8 @@ class ResultCollector {
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "중첩 " + seen.join(" → "));
   });
   run(FROST, "눈보라: 시전자가 지속 중 죽으면 눈보라가 바로 사라지고 피해·아군 은신도 멈추는가", function (done) {
-    var y = OPEN_Y.forest;
-    var W = world("forest", [
+    var y = OPEN_Y.testfield;
+    var W = world("testfield", [
       { id: "fr", team: "blue", char: "frost", x: 300, y: y, gauge: api.GAUGE_MAX },
       { id: "al", team: "blue", char: "knight", x: 420, y: y },
       { id: "foe", team: "red", char: "knight", x: 300, y: y + 200 },
@@ -1045,8 +1029,8 @@ class ResultCollector {
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "죽는 순간 눈보라·피해·아군 은신 모두 사라짐");
   });
   run(FROST, "눈보라 안에서 공격하면 0.5초간 드러났다가 다시 숨고, 장판 도트 피해로는 다시 드러나지 않는가", function (done) {
-    var y = OPEN_Y.forest;
-    var W = world("forest", [
+    var y = OPEN_Y.testfield;
+    var W = world("testfield", [
       { id: "fr", team: "blue", char: "frost", x: 300, y: y, gauge: api.GAUGE_MAX },
       { id: "foe", team: "red", char: "ranger", x: 300, y: y + 300 }
     ]);
@@ -1065,13 +1049,13 @@ class ResultCollector {
     done(ok ? "pass" : "fail", "공격 전 " + (seen[0] ? "보임" : "숨음") + " → 공격 순간 " + (seen[1] ? "보임" : "숨음") + " → 0.6초 뒤 " + (seen[2] ? "보임" : "숨음") + (revealedByTick ? ", 도트 피해로 다시 드러남" : ", 도트 피해 중 계속 숨음"));
   });
   run(FROST, "부쉬 안 저격수가 쏘면 0.5초간 거리와 상관없이 보였다가 다시 숨는가", function (done) {
-    world("forest", []);
+    world("testfield", []);
     var tiles = [].concat.apply([], api.bushTiles()), spot = null;
     tiles.forEach(function (b) { if (!spot && !blockedAt(b.x, b.y)) spot = b; });
     if (!spot) { done("fail", "시험 준비 실패: 부쉬를 찾지 못함"); return; }
-    var W = world("forest", [
+    var W = world("testfield", [
       { id: "sn", team: "blue", char: "sniper", x: spot.x, y: spot.y },
-      { id: "foe", team: "red", char: "knight", x: 450, y: OPEN_Y.forest + 400 }
+      { id: "foe", team: "red", char: "knight", x: 450, y: OPEN_Y.testfield + 400 }
     ]);
     var sn = W.ent("sn"), foe = W.ent("foe"), seen = [];
     seen.push(api.visibleTo(sn, foe, W.t()));
@@ -1084,10 +1068,10 @@ class ResultCollector {
 
   var DANCER = "검무희";
   function dancerDuel(foes) {
-    return world("forest", [{ id: "dn", team: "blue", char: "dancer", x: 250, y: OPEN_Y.forest, angle: 0 }].concat(foes));
+    return world("testfield", [{ id: "dn", team: "blue", char: "dancer", x: 250, y: OPEN_Y.testfield, angle: 0 }].concat(foes));
   }
   run(DANCER, "단검 투척: 적에게 맞으면 직격 " + api.CHARS.dancer.dmg + " + 회전 " + api.ULT.bdDmg + " 피해가 한 번씩만 들어가고 게이지는 한 번만 오르는가", function (done) {
-    var W = dancerDuel([{ id: "foe", team: "red", char: "guardian", x: 450, y: OPEN_Y.forest }]);
+    var W = dancerDuel([{ id: "foe", team: "red", char: "guardian", x: 450, y: OPEN_Y.testfield }]);
     var dn = W.ent("dn"), foe = W.ent("foe");
     api.fireBasic(dn, 0);
     W.step(800);
@@ -1095,7 +1079,7 @@ class ResultCollector {
     done(lost === want && dn.gauge === gain ? "pass" : "fail", "피해 " + lost + " (기대 " + want + "), 게이지 +" + dn.gauge + " (기대 +" + gain + ")");
   });
   run(DANCER, "단검 투척: 아무도 못 맞히면 사거리 끝에서 회전해 반경 " + api.ULT.bdR + " 안의 적만 맞히는가", function (done) {
-    var y = OPEN_Y.forest, endX = 250 + 20 + api.CHARS.dancer.range;
+    var y = OPEN_Y.testfield, endX = 250 + 20 + api.CHARS.dancer.range;
     var W = dancerDuel([
       { id: "near", team: "red", char: "guardian", x: endX, y: y + 50 },
       { id: "far", team: "red", char: "ranger", x: endX, y: y + 120 }
@@ -1107,7 +1091,7 @@ class ResultCollector {
     done(nearLost === api.ULT.bdDmg && !farLost ? "pass" : "fail", "끝점 50 옆 적 " + nearLost + " 피해, 120 옆 적 " + farLost + " 피해");
   });
   run(DANCER, "단검 투척: 회전 피해는 적중 " + api.ULT.bdDelay / 1000 + "초 뒤에 들어가는가", function (done) {
-    var W = dancerDuel([{ id: "foe", team: "red", char: "guardian", x: 450, y: OPEN_Y.forest }]);
+    var W = dancerDuel([{ id: "foe", team: "red", char: "guardian", x: 450, y: OPEN_Y.testfield }]);
     var dn = W.ent("dn"), foe = W.ent("foe"), hitAt = null, lostAtHit = 0, lostBefore = 0;
     api.fireBasic(dn, 0);
     W.step(800, FRAME, function (t) {
@@ -1119,7 +1103,7 @@ class ResultCollector {
     done(lostAtHit === dmg && lostBefore === dmg && lost === dmg + api.ULT.bdDmg ? "pass" : "fail", "적중 순간 " + lostAtHit + ", " + api.ULT.bdDelay / 1000 + "초 전 " + lostBefore + ", 끝 " + lost + " 피해");
   });
   function dancerStormBroken(breaker) {
-    var y = OPEN_Y.forest;
+    var y = OPEN_Y.testfield;
     var W = dancerDuel([
       { id: "foe", team: "red", char: "knight", x: 350, y: y },
       { id: "gd", team: "red", char: "guardian", x: 400, y: y, gauge: api.GAUGE_MAX }
@@ -1143,8 +1127,8 @@ class ResultCollector {
     });
   });
   run(DANCER, "칼날 폭풍: 회전 중에는 기본 공격이 안 나가고, 끝나면 다시 쓸 수 있는가", function (done) {
-    var y = OPEN_Y.forest, bad = [];
-    var W = world("forest", [
+    var y = OPEN_Y.testfield, bad = [];
+    var W = world("testfield", [
       { id: "dc", team: "blue", char: "dancer", x: 250, y: y, gauge: api.GAUGE_MAX },
       { id: "foe", team: "red", char: "knight", x: 700, y: y }
     ]);
@@ -1159,7 +1143,7 @@ class ResultCollector {
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "회전 중 막힘, 끝난 뒤 사용");
   });
   run(DANCER, "칼날 폭풍: " + api.secs(api.ULT.bwDur) + "간 이동속도 " + api.shownSpeed(api.CHARS.dancer.ultSpeed) + ", 반경 " + api.ULT.bwR + " 안 적에게 " + api.secs(api.ULT.bwTick) + "마다 " + api.ULT.bwDmg + " 피해, 따라다니고 끝나면 멈추는가", function (done) {
-    var y = OPEN_Y.forest;
+    var y = OPEN_Y.testfield;
     var W = dancerDuel([
       { id: "foe", team: "red", char: "guardian", x: 350, y: y },
       { id: "out", team: "red", char: "guardian", x: 250, y: y + 260 }
@@ -1181,7 +1165,7 @@ class ResultCollector {
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : ticks + "틱 " + lost + " 피해, 이동해도 따라다님, 끝나면 속도·피해 원래대로");
   });
   run(DANCER, "검무희 패시브: 적을 처치하면 게이지 " + api.ULT.bwKillGauge + " 회복 (기본 공격 적중 게이지와 따로 쌓임)", function (done) {
-    var W = dancerDuel([{ id: "foe", team: "red", char: "ranger", x: 450, y: OPEN_Y.forest }]);
+    var W = dancerDuel([{ id: "foe", team: "red", char: "ranger", x: 450, y: OPEN_Y.testfield }]);
     var dn = W.ent("dn"), foe = W.ent("foe");
     foe.hp = 10;
     api.fireBasic(dn, 0);
@@ -1190,7 +1174,7 @@ class ResultCollector {
     done(!foe.alive && dn.gauge === want ? "pass" : "fail", (foe.alive ? "처치 실패, " : "처치 후 ") + "게이지 " + dn.gauge + " (기대 " + want + ")");
   });
   run(DANCER, "검무희 패시브: 칼날 폭풍 중 처치는 폭풍이 끝난 뒤 처치당 게이지 " + api.ULT.bwKillGauge + " 회복", function (done) {
-    var y = OPEN_Y.forest;
+    var y = OPEN_Y.testfield;
     var W = dancerDuel([
       { id: "a", team: "red", char: "ranger", x: 320, y: y },
       { id: "b", team: "red", char: "ranger", x: 250, y: y + 70 }
@@ -1270,8 +1254,8 @@ class ResultCollector {
   }
   var PASSIVE2 = "주술사·투척병·기사·창술사·광전사 패시브";
   run(PASSIVE2, "주술사: 적중한 적이 " + api.secs(api.CHARS.mage.burn.ms) + "간 불타며 1초당 최대 체력의 " + api.CHARS.mage.burn.maxHpRate * 100 + "%의 피해를 입고, 그동안 회복이 절반인가", function (done) {
-    var y = OPEN_Y.forest, burn = api.CHARS.mage.burn;
-    var W = world("forest", [
+    var y = OPEN_Y.testfield, burn = api.CHARS.mage.burn;
+    var W = world("testfield", [
       { id: "mg", team: "blue", char: "mage", x: 250, y: y },
       { id: "foe", team: "red", char: "warrior", x: 450, y: y }
     ]);
@@ -1289,8 +1273,8 @@ class ResultCollector {
   });
 
   run(PASSIVE2, "투척병: 적중한 적이 " + api.secs(api.CHARS.thrower.poison.ms) + "간 중독되어 1초당 최대 체력의 " + api.CHARS.thrower.poison.maxHpRate * 100 + "%의 피해를 입고, 그동안 회복이 절반이며 화상과 겹쳐도 절반 1회만 적용되는가", function (done) {
-    var y = OPEN_Y.forest, poison = api.CHARS.thrower.poison;
-    var W = world("forest", [
+    var y = OPEN_Y.testfield, poison = api.CHARS.thrower.poison;
+    var W = world("testfield", [
       { id: "th", team: "blue", char: "thrower", x: 250, y: y },
       { id: "mg", team: "blue", char: "mage", x: 250, y: y - 200 },
       { id: "foe", team: "red", char: "warrior", x: 450, y: y }
@@ -1311,8 +1295,8 @@ class ResultCollector {
   });
 
   run(PASSIVE2, "기사: 모든 피해가 1회마다 " + api.CHARS.knight.armor + " 줄고(방어태세는 배율 먼저), 줄어든 만큼 막은 피해에 쌓이는가", function (done) {
-    var y = OPEN_Y.forest, armor = api.CHARS.knight.armor;
-    var W = world("forest", [
+    var y = OPEN_Y.testfield, armor = api.CHARS.knight.armor;
+    var W = world("testfield", [
       { id: "rg", team: "blue", char: "ranger", x: 250, y: y - 200 },
       { id: "th", team: "blue", char: "thrower", x: 250, y: y },
       { id: "kn", team: "red", char: "knight", x: 450, y: y - 200 },
@@ -1337,8 +1321,8 @@ class ResultCollector {
   });
 
   run(PASSIVE2, "창술사: 게임 시작·부활할 때 보호막이 생겨 다음 피해 1회만 막고, 함께 온 기절은 그대로 받는가", function (done) {
-    var y = OPEN_Y.forest;
-    var W = world("forest", [
+    var y = OPEN_Y.testfield;
+    var W = world("testfield", [
       { id: "gd", team: "blue", char: "guardian", x: 250, y: y },
       { id: "ln", team: "red", char: "lancer", x: 450, y: y }
     ]);
@@ -1362,8 +1346,8 @@ class ResultCollector {
   });
 
   run(PASSIVE2, "광전사: 체력 " + api.CHARS.warrior.rally.hpRate * 100 + "% 미만이 되면 " + api.secs(api.CHARS.warrior.rally.ms) + "간 1초당 " + api.CHARS.warrior.rally.perSec + " 회복하고, 죽기 전까지 다시 발동하지 않는가", function (done) {
-    var y = OPEN_Y.forest, R = api.CHARS.warrior.rally;
-    var W = world("forest", [
+    var y = OPEN_Y.testfield, R = api.CHARS.warrior.rally;
+    var W = world("testfield", [
       { id: "kn", team: "blue", char: "knight", x: 250, y: y },
       { id: "wr", team: "red", char: "warrior", x: 450, y: y }
     ]);
@@ -1401,8 +1385,8 @@ class ResultCollector {
   function inBush(W, ids) { return ids.filter(function (id) { return api.hiddenFrom(W.ent(id), W.t()); }); }
   function shootTimes(W, sb, n, ang) { for (var i = 0; i < n; i++) { api.fireBasic(sb, ang || 0); W.step(SB.cd + 100); } }
   run(STORM, "뇌전사수 기본 공격: 관통하지 않고 첫 적에서 멈추며, 게이지는 기본 적중만큼 오르는가", function (done) {
-    var y = OPEN_Y.forest;
-    var W = world("forest", [
+    var y = OPEN_Y.testfield;
+    var W = world("testfield", [
       { id: "sb", team: "blue", char: "stormbow", x: 150, y: y },
       { id: "f1", team: "red", char: "ranger", x: 350, y: y },
       { id: "f2", team: "red", char: "sniper", x: 450, y: y }
@@ -1413,8 +1397,8 @@ class ResultCollector {
     done(ok ? "pass" : "fail", "첫 적 " + a + " (기대 " + SB.dmg + "), 뒤의 적 " + b + " (기대 0), 게이지 " + gauge + " (기대 " + want + ")");
   });
   run(STORM, "뇌전사수 패시브: " + CH.every + "번째 적중마다 맞은 적과 그 주변 반경 " + CH.r + "의 가까운 적 " + CH.count + "명에게만 " + CH.dmg + "의 번개 피해가 들어가는가", function (done) {
-    var y = OPEN_Y.forest;
-    var W = world("forest", [
+    var y = OPEN_Y.testfield;
+    var W = world("testfield", [
       { id: "sb", team: "blue", char: "stormbow", x: 150, y: y },
       { id: "tg", team: "red", char: "knight", x: 450, y: y },
       { id: "n1", team: "red", char: "ranger", x: 450, y: y + 110 },
@@ -1444,8 +1428,8 @@ class ResultCollector {
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : CH.every + "번째 적중에 맞은 적과 가까운 두 적 " + CH.dmg + "씩, 세 번째·반경 밖은 제외, 딜 " + dealt);
   });
   run(STORM, "뇌전사수 패시브: 번개는 해골 병사에게도 튕기지만 해골로는 게이지가 오르지 않고, 적 캐릭터로는 오르는가", function (done) {
-    var y = OPEN_Y.forest;
-    var W = world("forest", [
+    var y = OPEN_Y.testfield;
+    var W = world("testfield", [
       { id: "sb", team: "blue", char: "stormbow", x: 150, y: y },
       { id: "tg", team: "red", char: "knight", x: 450, y: y },
       { id: "n1", team: "red", char: "ranger", x: 450, y: y - 180 },
@@ -1469,8 +1453,8 @@ class ResultCollector {
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "해골·적 캐릭터 모두 " + CH.dmg + " 피해, 게이지 " + gauge + "(해골 몫 0)");
   });
   run(STORM, "뇌전사수 패시브: 은신 중인 적·부활 보호 중인 적·아군에게는 튕기지 않는가", function (done) {
-    var y = OPEN_Y.forest;
-    var W = world("forest", [
+    var y = OPEN_Y.testfield;
+    var W = world("testfield", [
       { id: "sb", team: "blue", char: "stormbow", x: 150, y: y },
       { id: "ally", team: "blue", char: "knight", x: 460, y: y + 60 },
       { id: "tg", team: "red", char: "knight", x: 450, y: y },
@@ -1494,8 +1478,8 @@ class ResultCollector {
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "가까운 은신·보호·아군은 건너뛰고 더 먼 보이는 적에게만 " + CH.dmg);
   });
   run(STORM, "뇌전사수 스킬 과충전: " + api.ULT.ocDur / 1000 + "초간 매 적중마다 번개, 공격 간격 " + api.ULT.ocRate + "배 빠르게, 적중 수는 그대로 두는가", function (done) {
-    var y = OPEN_Y.forest, U = api.ULT;
-    var W = world("forest", [
+    var y = OPEN_Y.testfield, U = api.ULT;
+    var W = world("testfield", [
       { id: "sb", team: "blue", char: "stormbow", x: 150, y: y, gauge: api.GAUGE_MAX },
       { id: "tg", team: "red", char: "knight", x: 450, y: y },
       { id: "n1", team: "red", char: "ranger", x: 450, y: y - 160 }
@@ -1534,8 +1518,8 @@ class ResultCollector {
   });
 
   run(STORM, "뇌전사수 스킬 번개 막: 쓰는 순간 반경 " + api.ULT.ocR + " 안의 적만 " + api.ULT.ocDmg + "의 피해와 " + api.ULT.ocStunMs / 1000 + "초 기절", function (done) {
-    var y = OPEN_Y.forest, U = api.ULT;
-    var W = world("forest", [
+    var y = OPEN_Y.testfield, U = api.ULT;
+    var W = world("testfield", [
       { id: "sb", team: "blue", char: "stormbow", x: 300, y: y, gauge: api.GAUGE_MAX },
       { id: "near", team: "red", char: "ranger", x: 300 + U.ocR - 20, y: y },
       { id: "far", team: "red", char: "mage", x: 300, y: y + U.ocR + api.BODY_R + 60 },
@@ -1553,8 +1537,8 @@ class ResultCollector {
   });
   var ASSIST = "어시스트", AMS = api.ASSIST_MS;
   run(ASSIST, "피해 어시스트: 쓰러지기 " + AMS / 1000 + "초 안에 피해를 준 사람만 어시스트, 처치한 사람은 처치만 오르는가", function (done) {
-    var y = OPEN_Y.forest;
-    var W = world("forest", [
+    var y = OPEN_Y.testfield;
+    var W = world("testfield", [
       { id: "old", team: "blue", char: "guardian", x: 200, y: y },
       { id: "helper", team: "blue", char: "knight", x: 300, y: y },
       { id: "killer", team: "blue", char: "sniper", x: 400, y: y },
@@ -1578,8 +1562,8 @@ class ResultCollector {
   });
 
   function clericHealsThenKill(waitMs) {
-    var y = OPEN_Y.forest;
-    var W = world("forest", [
+    var y = OPEN_Y.testfield;
+    var W = world("testfield", [
       { id: "pr", team: "blue", char: "cleric", x: 250, y: y },
       { id: "ally", team: "blue", char: "sniper", x: 450, y: y },
       { id: "foe", team: "red", char: "ranger", x: 450, y: y + 400 }
@@ -1601,8 +1585,8 @@ class ResultCollector {
     done(r.assists === 1 && r.kills === 1 ? "pass" : "fail", "클레릭 어시스트 " + r.assists + " (기대 1), 아군 처치 " + r.kills);
   });
   run(ASSIST, "회복 어시스트: 회복 뒤 " + AMS / 1000 + "초가 지나 처치하면 어시스트가 없는가", function (done) {
-    var y = OPEN_Y.forest;
-    var W = world("forest", [
+    var y = OPEN_Y.testfield;
+    var W = world("testfield", [
       { id: "pr", team: "blue", char: "cleric", x: 250, y: y },
       { id: "ally", team: "blue", char: "sniper", x: 450, y: y },
       { id: "foe", team: "red", char: "ranger", x: 450, y: y + 400 }
@@ -1619,8 +1603,8 @@ class ResultCollector {
     done(n === 0 ? "pass" : "fail", "클레릭 어시스트 " + n + " (기대 0)");
   });
   run(ASSIST, "이로운 효과 어시스트: 얼음술사 눈보라로 은신한 아군이 처치하면 얼음술사가 어시스트를 받는가", function (done) {
-    var y = OPEN_Y.forest;
-    var W = world("forest", [
+    var y = OPEN_Y.testfield;
+    var W = world("testfield", [
       { id: "fr", team: "blue", char: "frost", x: 300, y: y, gauge: api.GAUGE_MAX },
       { id: "ally", team: "blue", char: "sniper", x: 400, y: y },
       { id: "foe", team: "red", char: "ranger", x: 450, y: y + 500 }
@@ -1635,8 +1619,8 @@ class ResultCollector {
   });
 
   run(ASSIST, "해로운 효과 어시스트: 기절이나 둔화만 건 사람도 " + AMS / 1000 + "초 안에 적이 쓰러지면 어시스트를 받는가", function (done) {
-    var y = OPEN_Y.forest;
-    var W = world("forest", [
+    var y = OPEN_Y.testfield;
+    var W = world("testfield", [
       { id: "stunner", team: "blue", char: "knight", x: 200, y: y },
       { id: "slower", team: "blue", char: "guardian", x: 300, y: y },
       { id: "late", team: "blue", char: "cleric", x: 400, y: y },
@@ -1657,8 +1641,8 @@ class ResultCollector {
 
   var CLERIC = "클레릭";
   function clericTeam(extra) {
-    var y = OPEN_Y.forest;
-    return world("forest", [
+    var y = OPEN_Y.testfield;
+    return world("testfield", [
       { id: "cl", team: "blue", char: "cleric", x: 300, y: y },
       { id: "kn", team: "blue", char: "knight", x: 450, y: y },
       { id: "rg", team: "blue", char: "ranger", x: 300, y: y + 120 },
@@ -1681,7 +1665,7 @@ class ResultCollector {
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "기도 중 막힘, 끝난 뒤 사용");
   });
   run(CLERIC, "기본 공격: 반경 " + api.CHARS.cleric.range + " 안에서 체력 비율이 가장 낮은 아군 1명만 " + api.CHARS.cleric.graceHeal + " 회복하고, 자신·먼 아군·부활 보호 중 아군은 고르지 않는가", function (done) {
-    var W = clericTeam([{ id: "far", team: "blue", char: "ranger", x: 300, y: OPEN_Y.forest - 480 }]);
+    var W = clericTeam([{ id: "far", team: "blue", char: "ranger", x: 300, y: OPEN_Y.testfield - 480 }]);
     var cl = W.ent("cl"), kn = W.ent("kn"), rg = W.ent("rg"), far = W.ent("far"), bad = [];
     cl.hp = 10; kn.hp = 200; rg.hp = 40; far.hp = 5;
     clericSwing(W);
@@ -1702,7 +1686,7 @@ class ResultCollector {
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "체력 비율이 가장 낮은 아군만 " + api.CHARS.cleric.graceHeal + " 회복, 자신·먼 아군·보호 중 아군 제외");
   });
   run(CLERIC, "기본 공격: 반경 안 아군이 모두 가득 차거나 없으면 자신을 회복하고, 게이지는 채우지 않으며 회복량에는 넣는가", function (done) {
-    var W = clericTeam([{ id: "far", team: "blue", char: "ranger", x: 300, y: OPEN_Y.forest - 480 }]);
+    var W = clericTeam([{ id: "far", team: "blue", char: "ranger", x: 300, y: OPEN_Y.testfield - 480 }]);
     var cl = W.ent("cl"), kn = W.ent("kn"), rg = W.ent("rg"), far = W.ent("far"), heal = api.CHARS.cleric.graceHeal, bad = [];
     far.hp = 5; cl.hp = 10; cl.heal = 0; cl.gauge = 0;
     var angleBefore = cl.angle;
@@ -1719,7 +1703,7 @@ class ResultCollector {
     cl.hp = 10; kn.hp = kn.maxHp - 1;
     clericSwing(W);
     if (kn.hp !== kn.maxHp || cl.hp !== 10) bad.push("체력이 조금이라도 깎인 아군보다 자신을 먼저 회복(기사 " + kn.hp + "·자신 " + cl.hp + ")");
-    kn.x = rg.x = 300; kn.y = rg.y = OPEN_Y.forest + 450;
+    kn.x = rg.x = 300; kn.y = rg.y = OPEN_Y.testfield + 450;
     clericSwing(W);
     if (cl.hp !== 10 + heal) bad.push("반경 안에 아군이 없을 때 자신을 회복하지 않음(자신 " + cl.hp + ")");
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "아군이 모두 가득 찼거나 없을 때 자신을 " + heal + " 회복, 게이지 그대로");
@@ -1814,8 +1798,8 @@ class ResultCollector {
 
   var SHAMAN = "주술사";
   function shamanTeam(extra) {
-    var y = OPEN_Y.forest;
-    var W = world("forest", [
+    var y = OPEN_Y.testfield;
+    var W = world("testfield", [
       { id: "sh", team: "blue", char: "shaman", x: 300, y: y, gauge: api.GAUGE_MAX },
       { id: "al", team: "blue", char: "knight", x: 420, y: y + 20 },
       { id: "near", team: "red", char: "guardian", x: 420, y: y },
@@ -1826,7 +1810,7 @@ class ResultCollector {
     return W;
   }
   run(SHAMAN, "기본 공격: 폭 " + api.CHARS.shaman.width + " 안의 적은 위치와 상관없이 " + api.CHARS.shaman.dmg + "의 피해, 사거리 " + api.CHARS.shaman.range + ", 아군 회복 없음", function (done) {
-    var y = OPEN_Y.forest, W = shamanTeam([{ id: "edge", team: "red", char: "guardian", x: 460, y: y + api.CHARS.shaman.width / 2 - 5 }, { id: "wide", team: "red", char: "guardian", x: 460, y: y + api.CHARS.shaman.width / 2 + api.BODY_R + 30 }, { id: "beyond", team: "red", char: "guardian", x: 300 + api.CHARS.shaman.range + api.BODY_R + 30, y: y }]);
+    var y = OPEN_Y.testfield, W = shamanTeam([{ id: "edge", team: "red", char: "guardian", x: 460, y: y + api.CHARS.shaman.width / 2 - 5 }, { id: "wide", team: "red", char: "guardian", x: 460, y: y + api.CHARS.shaman.width / 2 + api.BODY_R + 30 }, { id: "beyond", team: "red", char: "guardian", x: 300 + api.CHARS.shaman.range + api.BODY_R + 30, y: y }]);
     var sh = W.ent("sh"), al = W.ent("al"), near = W.ent("near"), edge = W.ent("edge"), wide = W.ent("wide"), beyond = W.ent("beyond"), bad = [];
     al.hp = 100;
     sh.cdUntil = 0; api.fireBasic(sh, 0);
@@ -1890,7 +1874,7 @@ class ResultCollector {
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "가까운 적 " + Math.round(at.nearStun) + "ms·먼 적 " + Math.round(at.farStun) + "ms에 기절, 기절이 풀린 " + Math.round(at.nearBolt) + "ms에 " + api.ULT.dmBoltDmg + " 피해 한 번");
   });
   run(SHAMAN, "영역전개: 주술사를 따라다니고, 다 커진 뒤 들어온 적은 기절하지 않지만 번개(최대 체력의 " + api.ULT.dmStrikeMaxHpRate * 100 + "%) 대상이 되는가", function (done) {
-    var y = OPEN_Y.forest, W = shamanTeam(), sh = W.ent("sh"), near = W.ent("near"), far = W.ent("far"), bad = [];
+    var y = OPEN_Y.testfield, W = shamanTeam(), sh = W.ent("sh"), near = W.ent("near"), far = W.ent("far"), bad = [];
     near.x = 300; near.y = y - 480; far.x = 300; far.y = y - 700;
     api.useUlt(sh, 0);
     W.step(api.ULT.dmGrowMs + 200);
@@ -1909,7 +1893,7 @@ class ResultCollector {
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "주술사가 움직이면 영역도 따라감, 늦게 들어온 적은 커질 때 기절 없이 번개(최대 체력의 " + api.ULT.dmStrikeMaxHpRate * 100 + "%) 피해와 " + api.ULT.dmStrikeStunMs + "ms 기절");
   });
   run(SHAMAN, "영역전개: 영역 안의 네크로 해골도 번개 대상(가장 가까운 적)이 되는가", function (done) {
-    var y = OPEN_Y.forest, W = shamanTeam([{ id: "nc", team: "red", char: "necro", x: 300, y: y + 340, gauge: api.GAUGE_MAX }]), sh = W.ent("sh"), nc = W.ent("nc"), near = W.ent("near");
+    var y = OPEN_Y.testfield, W = shamanTeam([{ id: "nc", team: "red", char: "necro", x: 300, y: y + 340, gauge: api.GAUGE_MAX }]), sh = W.ent("sh"), nc = W.ent("nc"), near = W.ent("near");
     near.x = 300; near.y = y + 300; W.ent("far").y = y + 900;
     api.useUlt(nc, -Math.PI / 2);
     W.step(api.ULT.smRiseMs + 100);
@@ -1926,7 +1910,7 @@ class ResultCollector {
     done(ok ? "pass" : "fail", "해골 체력 " + m0 + " → " + minion.hp + ", 더 먼 적 " + (n0 - near.hp) + " 피해");
   });
   run(SHAMAN, "영역전개: 은신한 적은 번개 대상에서 빠지고, 보이는 적 중 가장 가까운 적이 맞는가", function (done) {
-    var y = OPEN_Y.forest, W = shamanTeam([{ id: "rg", team: "red", char: "rogue", x: 360, y: y, gauge: api.GAUGE_MAX }]), sh = W.ent("sh"), rg = W.ent("rg"), near = W.ent("near");
+    var y = OPEN_Y.testfield, W = shamanTeam([{ id: "rg", team: "red", char: "rogue", x: 360, y: y, gauge: api.GAUGE_MAX }]), sh = W.ent("sh"), rg = W.ent("rg"), near = W.ent("near");
     api.useUlt(sh, 0);
     W.step(api.ULT.dmGrowMs + api.ULT.dmStunMs + 200);
     api.useUlt(rg, 0);
@@ -1978,7 +1962,7 @@ class ResultCollector {
     if (value === null || value === undefined) delete cur[last]; else cur[last] = JSON.parse(JSON.stringify(value));
   }
   function recordingRoom(over) {
-    var room = { code: "TEST", mode: "cup", map: "forest", status: "lobby", host: "pb1", startAt: null, winner: null, endedAt: null,
+    var room = { code: "TEST", mode: "cup", map: "snow", status: "lobby", host: "pb1", startAt: null, winner: null, endedAt: null,
                  roster: null, draft: null, arena: null, bans: null, statsNote: null, updates: [], sets: [], listeners: {} };
     Object.keys(over || {}).forEach(function (k) { room[k] = over[k]; });
     function node(path) {
@@ -2954,7 +2938,7 @@ class ResultCollector {
     api.joy.id = null; api.aim.id = null;
   }
   function withMe(list, fn) {
-    var W = world("forest", list), me = W.ent(api.myId);
+    var W = world("testfield", list), me = W.ent(api.myId);
     delete me.bot; delete api.MATCH.bots[api.myId]; api.MATCH.me = me;
     releaseInput();
     try { return fn(W, me); }
@@ -2976,15 +2960,15 @@ class ResultCollector {
   function shotsBy(W, id) { return W.log.filter(function (p) { return p.path === "shots" && p.v.o === id; }); }
 
   run(INPUTG, "방향키·WASD 이동: 빨강은 키 방향 그대로, 파랑은 화면이 뒤집혀 반대로, 대각선도 같은 속도인가", function (done) {
-    var bad = [], speed = api.CHARS.ranger.speed, want = speed * 0.2, y = OPEN_Y.forest;
+    var bad = [], speed = api.CHARS.ranger.speed, want = speed * 0.2, y = OPEN_Y.testfield;
     [["right", "red", 1, 0], ["left", "red", -1, 0], ["down", "red", 0, 1], ["up", "red", 0, -1], ["right", "blue", -1, 0], ["up", "blue", 0, 1]].forEach(function (c) {
-      withMe([meEntry("ranger", c[1], 600, y)], function (W, me) {
+      withMe([meEntry("ranger", c[1], 450, y)], function (W, me) {
         api.KEY_ON[c[0]] = true;
         var m = moveOf(W, me, 200);
         if (Math.abs(m.dx - c[2] * want) > 3 || Math.abs(m.dy - c[3] * want) > 3 || !me.mv) bad.push(c[1] + " " + c[0] + " → 이동 (" + Math.round(m.dx) + ", " + Math.round(m.dy) + "), 기대 (" + c[2] * want + ", " + c[3] * want + "), mv " + me.mv);
       });
     });
-    withMe([meEntry("ranger", "red", 600, y)], function (W, me) {
+    withMe([meEntry("ranger", "red", 450, y)], function (W, me) {
       api.KEY_ON.right = true; api.KEY_ON.down = true;
       var m = moveOf(W, me, 200);
       if (Math.abs(m.dist - want) > 3) bad.push("대각선 이동 거리 " + Math.round(m.dist) + " (기대 " + want + ")");
@@ -2993,7 +2977,7 @@ class ResultCollector {
   });
 
   run(INPUTG, "키를 떼면 멈추고, 반대 키를 함께 누르면 제자리인가", function (done) {
-    withMe([meEntry("ranger", "red", 600, OPEN_Y.forest)], function (W, me) {
+    withMe([meEntry("ranger", "red", 600, OPEN_Y.testfield)], function (W, me) {
       var bad = [];
       api.KEY_ON.left = true; api.KEY_ON.right = true;
       var both = moveOf(W, me, 300);
@@ -3008,9 +2992,9 @@ class ResultCollector {
   });
 
   run(INPUTG, "조이스틱 이동: 가운데 8px 미만은 무시, 조금만 밀어도 그 방향 최고 속도, 파랑은 뒤집히는가", function (done) {
-    var bad = [], speed = api.CHARS.ranger.speed, y = OPEN_Y.forest, R = api.joyRadius();
+    var bad = [], speed = api.CHARS.ranger.speed, y = OPEN_Y.testfield, R = api.joyRadius();
     [["빨강 가운데", "red", 5, 0, 0], ["빨강 살짝", "red", 10, 0, 1], ["빨강 반", "red", R / 2, 0, 1], ["빨강 최대", "red", R * 2, 0, 1], ["파랑 최대", "blue", R * 2, 0, -1], ["빨강 아래", "red", 0, R, 1]].forEach(function (c) {
-      withMe([meEntry("ranger", c[1], 600, y)], function (W, me) {
+      withMe([meEntry("ranger", c[1], 450, y)], function (W, me) {
         var joy = api.joy;
         joy.id = 1; joy.ox = 100; joy.oy = 100; joy.x = 100 + c[2]; joy.y = 100 + c[3];
         var m = moveOf(W, me, 500), along = c[3] ? m.dy : m.dx, want = c[4] * speed * 0.5;
@@ -3021,8 +3005,8 @@ class ResultCollector {
   });
 
   run(INPUTG, "벽을 향해 계속 걸어도 벽을 뚫지 않고, 기절 중에는 키를 눌러도 못 움직이는가", function (done) {
-    world("forest", []);
-    var q = singleRowWall(), bad = [], y = OPEN_Y.forest;
+    world("testfield", []);
+    var q = singleRowWall(), bad = [], y = OPEN_Y.testfield;
     withMe([meEntry("ranger", "red", q.x - 25, q.y + q.h / 2 + 130)], function (W, me) {
       api.KEY_ON.up = true;
       var worst = null;
@@ -3064,7 +3048,7 @@ class ResultCollector {
   });
 
   run(INPUTG, "공격 키(K): 가장 가까운 적을 자동 조준해 쿨타임마다 한 번씩만 쏘는가", function (done) {
-    withMe([meEntry("ranger", "red", 200, OPEN_Y.forest), { id: "foe", team: "blue", char: "knight", x: 500, y: OPEN_Y.forest }, { id: "far", team: "blue", char: "knight", x: 900, y: OPEN_Y.forest }], function (W, me) {
+    withMe([meEntry("ranger", "red", 200, OPEN_Y.testfield), { id: "foe", team: "blue", char: "knight", x: 500, y: OPEN_Y.testfield }, { id: "far", team: "blue", char: "knight", x: 900, y: OPEN_Y.testfield }], function (W, me) {
       var bad = [], cd = api.CHARS.ranger.cd;
       api.KEY_ON.atk = true;
       W.frame(FRAME);
@@ -3090,7 +3074,7 @@ class ResultCollector {
   });
 
   run(INPUTG, "화면 조이스틱(포인터): 조이스틱 근처에서만 시작하고, 다른 손가락·멀리 누르기·기절 중에는 무시하며 떼면 끝나는가", function (done) {
-    var cv = document.getElementById("cv"), y = OPEN_Y.forest;
+    var cv = document.getElementById("cv"), y = OPEN_Y.testfield;
     withMe([meEntry("ranger", "red", 600, y), { id: "foe", team: "blue", char: "knight", x: 900, y: y }], function (W, me) {
       var bad = [], jb = api.joyBase(), R = api.joyRadius();
       pointer(cv, "pointerdown", 7, jb.x + R * 3, jb.y);
@@ -3114,7 +3098,7 @@ class ResultCollector {
   });
 
   run(INPUTG, "공격 버튼: 짧게 누르면 가장 가까운 적을 자동 조준하고, 끌어서 뗀 방향으로 쏘며 파랑은 방향이 뒤집히는가", function (done) {
-    var btn = document.getElementById("btnAtk"), y = OPEN_Y.forest, bad = [];
+    var btn = document.getElementById("btnAtk"), y = OPEN_Y.testfield, bad = [];
     withMe([meEntry("ranger", "red", 600, y), { id: "foe", team: "blue", char: "knight", x: 600, y: y - 300 }], function (W, me) {
       pointer(btn, "pointerdown", 3, 100, 100);
       if (api.aim.id !== 3 || api.aim.btn !== "atk") bad.push("공격 버튼이 눌리지 않음");
@@ -3147,7 +3131,7 @@ class ResultCollector {
   });
 
   run(INPUTG, "스킬 버튼: 조준이 필요 없는 스킬은 누르는 즉시, 조준 스킬은 손을 뗄 때 쓰고 게이지가 비는가 (게이지 부족·기절이면 안 씀)", function (done) {
-    var btn = document.getElementById("btnUlt"), y = OPEN_Y.forest, bad = [], C = api.CHARS;
+    var btn = document.getElementById("btnUlt"), y = OPEN_Y.testfield, bad = [], C = api.CHARS;
     var instant = api.CHAR_LIST.filter(function (c) { return !C[c].ultAim && !C[c].noAim; })[0], aimed = api.CHAR_LIST.filter(function (c) { return C[c].ultAim; })[0];
     function foe() { return { id: "foe", team: "blue", char: "knight", x: 900, y: y }; }
     withMe([meEntry(instant, "red", 600, y, { gauge: api.GAUGE_MAX }), foe()], function (W, me) {
@@ -3178,7 +3162,7 @@ class ResultCollector {
   });
 
   run(VISG, "시야: 은신은 100 안에서만 보이고, 은신이 끝나거나 드러난 동안(revealUntil)에는 멀어도 보이는가", function (done) {
-    var y = OPEN_Y.forest, W = world("forest", [{ id: "h", team: "blue", char: "rogue", x: 300, y: y }, { id: "v", team: "red", char: "knight", x: 300, y: y }]);
+    var y = OPEN_Y.testfield, W = world("testfield", [{ id: "h", team: "blue", char: "rogue", x: 300, y: y }, { id: "v", team: "red", char: "knight", x: 300, y: y }]);
     var h = W.ent("h"), v = W.ent("v"), t = W.t(), bad = [], near = api.STEALTH_REVEAL_DIST;
     h.stealthUntil = t + api.ULT.asDur;
     v.x = 300 + near - 1; if (!api.visibleTo(h, v, t)) bad.push("가까이(" + (near - 1) + ") 있는데 안 보임");
@@ -3191,12 +3175,12 @@ class ResultCollector {
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "은신 거리 " + near + " 경계, 드러남 시간, 은신 종료 모두 맞음");
   });
   run(VISG, "덤불: 덤불 안의 캐릭터는 같은 덤불 안의 상대에게만 보이고 다른 덤불·바깥에서는 안 보이는가", function (done) {
-    var y = OPEN_Y.forest, bushes;
-    world("forest", []);
+    var y = OPEN_Y.testfield, bushes;
+    world("testfield", []);
     bushes = api.bushTiles();
     if (bushes.length < 2) { done("fail", "시험 준비 실패: 덤불이 2개 미만"); return; }
     var a = bushes[0][0], b = bushes[1][0], bad = [];
-    var W = world("forest", [{ id: "h", team: "blue", char: "knight", x: a.x, y: a.y }, { id: "same", team: "red", char: "knight", x: bushes[0][bushes[0].length - 1].x, y: bushes[0][bushes[0].length - 1].y }, { id: "other", team: "red", char: "knight", x: b.x, y: b.y }, { id: "out", team: "red", char: "knight", x: 200, y: y }]);
+    var W = world("testfield", [{ id: "h", team: "blue", char: "knight", x: a.x, y: a.y }, { id: "same", team: "red", char: "knight", x: bushes[0][bushes[0].length - 1].x, y: bushes[0][bushes[0].length - 1].y }, { id: "other", team: "red", char: "knight", x: b.x, y: b.y }, { id: "out", team: "red", char: "knight", x: 200, y: y }]);
     var h = W.ent("h"), t = W.t();
     if (!api.inBush(h.x, h.y) || !api.hiddenFrom(h, t)) bad.push("덤불 안인데 숨겨지지 않음");
     if (!api.visibleTo(h, W.ent("same"), t)) bad.push("같은 덤불 안 상대에게 안 보임");
@@ -3208,7 +3192,7 @@ class ResultCollector {
   });
 
   run(VISG, "표적 목록(localTargets): 살아 있는 내 캐릭터·호스트의 AI 와 준비된 해골만 들어가고, 호스트가 아니면 AI 는 빠지는가", function (done) {
-    var y = OPEN_Y.forest;
+    var y = OPEN_Y.testfield;
     withMe([meEntry("ranger", "red", 300, y), { id: "ally", team: "red", char: "knight", x: 400, y: y }, { id: "nc", team: "blue", char: "necro", x: 600, y: y, gauge: api.GAUGE_MAX }, { id: "dead", team: "blue", char: "knight", x: 700, y: y }], function (W, me) {
       var bad = [], ids = function () { return api.localTargets().map(function (T) { return T.id; }).sort().join(","); };
       W.ent("dead").alive = false;
@@ -3230,7 +3214,7 @@ class ResultCollector {
     });
   });
   run(VISG, "소리 범위(hear)는 700 미만만 들리고, 지난 투사체·근접 기록(pruneLocal)은 시간이 지나면 지워지는가", function (done) {
-    var y = OPEN_Y.forest;
+    var y = OPEN_Y.testfield;
     withMe([meEntry("ranger", "red", 300, y)], function (W, me) {
       var bad = [], t = W.t();
       if (!api.hear({ x: me.x + 699, y: me.y }) || api.hear({ x: me.x + 700, y: me.y }) || !api.hear({ x: me.x, y: me.y + 100 })) bad.push("소리 범위 경계");
@@ -3247,8 +3231,8 @@ class ResultCollector {
     });
   });
   run(VISG, "광선·시선: 벽 앞에서 멈추고 맵 가장자리에서 끊기며, 벽을 사이에 둔 두 점은 시선이 막히고 선분-원 충돌이 맞는가", function (done) {
-    var bad = [], y = OPEN_Y.forest, q;
-    world("forest", []);
+    var bad = [], y = OPEN_Y.testfield, q;
+    world("testfield", []);
     q = singleRowWall();
     var wallBottom = q.y + q.h / 2, startY = wallBottom + api.BODY_R + 52, gap = startY - wallBottom;
     var hit = api.rayCast(q.x, startY, 0, -1, 1000, 0);
@@ -3273,9 +3257,9 @@ class ResultCollector {
     feed.innerHTML = ""; banner.className = ""; banner.innerHTML = "";
   }
   run(KILLG, "킬 피드: 처치마다 한 줄이 생기고 같은 기록은 한 번만, 너무 오래된 기록은 안 보이며 최대 줄 수를 넘기지 않는가", function (done) {
-    var y = OPEN_Y.forest, list = [];
+    var y = OPEN_Y.testfield, list = [];
     ["alpha", "bravo", "charlie", "delta", "echo", "foxtrot"].forEach(function (id, i) { list.push({ id: id, team: i % 2 ? "red" : "blue", char: "knight", x: 300 + i * 50, y: y }); });
-    var W = world("forest", list), t = W.t(), bad = [], feed = document.getElementById("killFeed");
+    var W = world("testfield", list), t = W.t(), bad = [], feed = document.getElementById("killFeed");
     clearKillFeed();
     try {
       api.onKillFeed(killRow(W, "k1", "alpha", "bravo", t));
@@ -3290,7 +3274,7 @@ class ResultCollector {
     } finally { clearKillFeed(); }
   });
   run(KILLG, "연속 처치 표시: 3초 안의 두 번째 처치에 '더블 킬', 단계가 오르면 이름이 바뀌고 5번째부터는 '펜타 킬'인가", function (done) {
-    var y = OPEN_Y.forest, W = world("forest", [{ id: "a", team: "blue", char: "knight", x: 300, y: y }, { id: "b", team: "red", char: "knight", x: 400, y: y }]), t = W.t(), bad = [], feed = document.getElementById("killFeed");
+    var y = OPEN_Y.testfield, W = world("testfield", [{ id: "a", team: "blue", char: "knight", x: 300, y: y }, { id: "b", team: "red", char: "knight", x: 400, y: y }]), t = W.t(), bad = [], feed = document.getElementById("killFeed");
     clearKillFeed();
     try {
       for (var i = 0; i < 6; i++) api.onKillFeed(killRow(W, "m" + i, "a", "b", t + i * 500));
@@ -3304,7 +3288,7 @@ class ResultCollector {
     } finally { clearKillFeed(); }
   });
   run(KILLG, "내 처치 배너: 내가 잡으면 '처치!' 배너가 뜨고 줄이 내 것으로 표시되며, 남이 잡은 건 배너가 안 뜨는가", function (done) {
-    var y = OPEN_Y.forest;
+    var y = OPEN_Y.testfield;
     withMe([meEntry("ranger", "red", 300, y), { id: "foe", team: "blue", char: "knight", x: 500, y: y }], function (W, me) {
       var bad = [], banner = document.getElementById("killBanner"), feed = document.getElementById("killFeed"), t = W.t();
       clearKillFeed();
@@ -3323,7 +3307,7 @@ class ResultCollector {
   var AIMG = "자동 조준·AI 역할·드래프트 전사", AIM_N = 400;
   function aimSamples(char, foeChar, moving) {
     var out = [];
-    withMe([meEntry(char, "red", 200, OPEN_Y.forest), { id: "foe", team: "blue", char: foeChar, x: 500, y: OPEN_Y.forest }], function (W, me) {
+    withMe([meEntry(char, "red", 200, OPEN_Y.testfield), { id: "foe", team: "blue", char: foeChar, x: 500, y: OPEN_Y.testfield }], function (W, me) {
       var foe = W.ent("foe");
       if (moving) { foe.mv = true; foe.moveAng = -Math.PI / 2; foe.moveAt = api.CLOCK.now(); }
       withSeed(3, function () { for (var i = 0; i < AIM_N; i++) out.push(api.AUTO_AIM.angle(me)); });
@@ -3375,7 +3359,7 @@ class ResultCollector {
   function forwardAxis(blueX, blueY, redX, redY) { var d = hyp(redX - blueX, redY - blueY); return { x: (redX - blueX) / d, y: (redY - blueY) / d }; }
 
   run(AIMG, "AI 후방: 앞 라인 아군이 살아 있으면 마법사·궁수가 그 아군보다 앞으로 나가지 않는가", function (done) {
-    var y = OPEN_Y.forest, bad = [], rows = [];
+    var y = OPEN_Y.testfield, bad = [], rows = [];
     ["mage", "ranger", "stormbow", "sniper"].forEach(function (back) {
       withSeed(21, function () {
         withMe([meEntry("knight", "red", 700, y + 520), { id: "k", team: "blue", char: "knight", x: 700, y: y - 40 }, { id: "bk", team: "blue", char: back, x: 700, y: y - 140 }], function (W, me) {
@@ -3396,7 +3380,7 @@ class ResultCollector {
   });
 
   run(AIMG, "AI 후방: 앞 라인 아군이 모두 쓰러지면 제 거리까지 나와서 싸우는가", function (done) {
-    var y = OPEN_Y.forest;
+    var y = OPEN_Y.testfield;
     withSeed(21, function () {
       withMe([meEntry("knight", "red", 700, y + 440), { id: "k", team: "blue", char: "knight", x: 700, y: y - 40 }, { id: "bk", team: "blue", char: "mage", x: 700, y: y - 140 }], function (W, me) {
         var k = W.ent("k"), b = W.ent("bk"), nearest = Infinity;
@@ -3408,7 +3392,7 @@ class ResultCollector {
   });
 
   run(AIMG, "AI 틈새: 호위가 붙은 적은 기다리고, 쓰러지기 직전이거나 호위 없는 후방 적이 보이면 달려드는가", function (done) {
-    var y = OPEN_Y.forest, bad = [], info = [];
+    var y = OPEN_Y.testfield, bad = [], info = [];
     function trial(label, redChar, tweak) {
       var closest = Infinity;
       withSeed(5, function () {
@@ -3430,7 +3414,7 @@ class ResultCollector {
   });
 
   run(AIMG, "AI 틈새: 오래 기다리면 기회가 없어도 공격에 나서는가", function (done) {
-    var y = OPEN_Y.forest, closest = Infinity;
+    var y = OPEN_Y.testfield, closest = Infinity;
     withSeed(5, function () {
       withMe([meEntry("knight", "red", 700, y + 450), { id: "k", team: "blue", char: "knight", x: 640, y: y }, { id: "rg", team: "blue", char: "rogue", x: 700, y: y }], function (W, me) {
         var rg = W.ent("rg");
@@ -4362,8 +4346,8 @@ class ResultCollector {
   function updateWith(cap, key) { return cap.updates.filter(function (x) { return key in x.u; }); }
 
   run(NETG, "상태 문자열: packState → stateOf 로 위치·체력·게이지·시간값·해골·보호막까지 같은 값으로 풀리는가", function (done) {
-    var y = OPEN_Y.forest; api.MATCH.stateByKey = {};
-    var W = world("forest", [{ id: "a", team: "blue", char: "necro", x: 333.4, y: y + 10.6, angle: 1.1 }, { id: "b", team: "red", char: "knight", x: 700, y: y }]);
+    var y = OPEN_Y.testfield; api.MATCH.stateByKey = {};
+    var W = world("testfield", [{ id: "a", team: "blue", char: "necro", x: 333.4, y: y + 10.6, angle: 1.1 }, { id: "b", team: "red", char: "knight", x: 700, y: y }]);
     var a = W.ent("a"), start = W.room.startAt, bad = [];
     Object.assign(a, { mv: true, hp: 77.2, alive: true, gauge: 6.37, dmg: 123.46, deaths: 2, kills: 3, heal: 17.4, skillDur: 3000, stunDealt: 2.34, slowDealt: 1.25, slowWeight: 0.456, skillDmg: 77.77, blocked: 44.6, frostStacks: 2, shield: true, assists: 4 });
     api.STATE_TIMES.forEach(function (k, i) { a[k] = start + 1000.4 + i * 100; });
@@ -4386,8 +4370,8 @@ class ResultCollector {
     done(bad.length ? "fail" : "pass", bad.length ? bad.slice(0, 5).join(" / ") : "위치·체력·게이지·시간 " + api.STATE_TIMES.length + "개·해골 2마리·보호막·통계값 모두 일치");
   });
   run(STATSG, "스킬 비율: 평범한 기본 공격만 빼고 스킬·강화 기본 공격·패시브·추가 피해를 모두 스킬 피해로 세는가", function (done) {
-    var y = OPEN_Y.forest, bad = [];
-    var W = world("forest", [{ id: "a", team: "blue", char: "stormbow", x: 150, y: y }, { id: "b", team: "red", char: "ranger", x: 350, y: y }]);
+    var y = OPEN_Y.testfield, bad = [];
+    var W = world("testfield", [{ id: "a", team: "blue", char: "stormbow", x: 150, y: y }, { id: "b", team: "red", char: "ranger", x: 350, y: y }]);
     var A = W.ent("a"), T = W.ent("b");
     T.hp = T.maxHp = 100000;
     var seen = function (name, wantDmg, wantSkill, act) {
@@ -4414,8 +4398,8 @@ class ResultCollector {
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "평범한 기본 공격만 스킬 0, 강화 기본 공격·과충전 화살·스킬·패시브·bd 는 스킬로 셈");
   });
   run(NETG, "상태 문자열: 막 만든 캐릭터는 체력 가득·시간값 0·해골 없음으로, 상태가 없거나 짧으면 출발 자리·위치만으로 풀리는가", function (done) {
-    var y = OPEN_Y.forest; api.MATCH.stateByKey = {};
-    var W = world("forest", [{ id: "a", team: "blue", char: "knight", x: 300, y: y }, { id: "b", team: "red", char: "necro", x: 500, y: y }]), bad = [];
+    var y = OPEN_Y.testfield; api.MATCH.stateByKey = {};
+    var W = world("testfield", [{ id: "a", team: "blue", char: "knight", x: 300, y: y }, { id: "b", team: "red", char: "necro", x: 500, y: y }]), bad = [];
     var a = W.ent("a");
     api.MATCH.stateByKey[api.stKey("blue", api.players().a.slot)] = api.packState(a);
     var o = api.stateOf(api.players().a);
@@ -4430,7 +4414,7 @@ class ResultCollector {
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "새 캐릭터·상태 없음·짧은 상태·참가자 아님 4가지 처리");
   });
   run(NETG, "각도(angDeg)·시간(relTime/absTime)·해골 문자열(packMinions/unpackMinions) 변환이 맞는가", function (done) {
-    var W = world("forest", []), start = W.room.startAt, bad = [], D = 180 / Math.PI;
+    var W = world("testfield", []), start = W.room.startAt, bad = [], D = 180 / Math.PI;
     [[0, 0], [Math.PI / 2, 90], [-Math.PI / 2, 270], [Math.PI, 180], [2 * Math.PI, 0], [1.4 / D, 0], [1.6 / D, 3], [-1.6 / D, 357], [10 / D, 9]].forEach(function (c) { if (api.angDeg(c[0]) !== c[1]) bad.push("angDeg(" + Math.round(c[0] * D * 10) / 10 + "°) = " + api.angDeg(c[0]) + " (기대 " + c[1] + ")"); });
     if (api.relTime(0) !== "" || api.relTime(undefined) !== "" || api.relTime(start + 1234.6) !== 1235 || api.relTime(start - 50) !== -50) bad.push("relTime");
     if (api.absTime("") !== 0 || api.absTime(null) !== 0 || api.absTime(undefined) !== 0 || api.absTime(1235) !== start + 1235 || api.absTime("-50") !== start - 50 || api.absTime("zzz") !== start) bad.push("absTime");
@@ -4443,8 +4427,8 @@ class ResultCollector {
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "각도 9가지·시간·해골 문자열 확인");
   });
   run(NETG, "네트워크 쓰기(netWrite): 내 캐릭터·호스트의 AI 상태를 바뀐 것만 보내고, 짧은 간격엔 건너뛰며 강제로 보내도 같은 값은 다시 안 보내는가", function (done) {
-    var y = OPEN_Y.forest; api.MATCH.stateByKey = {};
-    var W = world("forest", [{ id: "a", team: "blue", char: "knight", x: 300, y: y }, { id: "b", team: "red", char: "knight", x: 700, y: y }]), cap = recordRef(W), bad = [];
+    var y = OPEN_Y.testfield; api.MATCH.stateByKey = {};
+    var W = world("testfield", [{ id: "a", team: "blue", char: "knight", x: 300, y: y }, { id: "b", team: "red", char: "knight", x: 700, y: y }]), cap = recordRef(W), bad = [];
     api.MATCH.game.lastNet = 0;
     api.netWrite(false);
     var first = cap.updates.length ? cap.updates[0].u : {}, keys1 = Object.keys(first).sort().join();
@@ -4469,7 +4453,7 @@ class ResultCollector {
   });
 
   run(JUDGEG, "팀 합계(teamTotals): 팀별 피해·인원·생존·킬(상대 팀 죽음 수)을 세는가", function (done) {
-    var y = OPEN_Y.forest, W = world("forest", [{ id: "a", team: "blue", char: "knight", x: 300, y: y }, { id: "b", team: "blue", char: "knight", x: 350, y: y }, { id: "c", team: "red", char: "knight", x: 700, y: y }, { id: "d", team: "red", char: "knight", x: 750, y: y }]);
+    var y = OPEN_Y.testfield, W = world("testfield", [{ id: "a", team: "blue", char: "knight", x: 300, y: y }, { id: "b", team: "blue", char: "knight", x: 350, y: y }, { id: "c", team: "red", char: "knight", x: 700, y: y }, { id: "d", team: "red", char: "knight", x: 750, y: y }]);
     var a = W.ent("a"), b = W.ent("b"), c = W.ent("c"), d = W.ent("d");
     a.dmg = 100; b.dmg = 50.5; c.dmg = 30; d.dmg = 0; a.deaths = 2; b.deaths = 1; c.deaths = 4; d.deaths = 0; b.alive = false; d.alive = false;
     var s = api.teamTotals(), bad = [];
@@ -4479,7 +4463,7 @@ class ResultCollector {
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "피해 150.5/30, 생존 1/1, 킬 4/3");
   });
   run(JUDGEG, "나간 선수의 쓰러짐: 나가도 상대 팀 킬이 줄지 않고, 돌아오면 두 번 세지 않으며, 동점이면 연장이 그대로인가", function (done) {
-    var y = OPEN_Y.forest, W = world("forest", [{ id: "a", team: "blue", char: "knight", x: 300, y: y }, { id: "c", team: "red", char: "knight", x: 700, y: y }, { id: "d", team: "red", char: "knight", x: 750, y: y }]), bad = [];
+    var y = OPEN_Y.testfield, W = world("testfield", [{ id: "a", team: "blue", char: "knight", x: 300, y: y }, { id: "c", team: "red", char: "knight", x: 700, y: y }, { id: "d", team: "red", char: "knight", x: 750, y: y }]), bad = [];
     var P = api.players(), c = W.ent("c");
     c.deaths = 4; W.ent("d").deaths = 1; W.ent("a").deaths = 5;
     var seatOf = function (id) { return { team: P[id].team, c: "knight", ai: false, s: P[id].slot, n: id }; };
@@ -4508,7 +4492,7 @@ class ResultCollector {
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "나간 뒤에도 5:5 유지, 돌아와도 5:5, 연습 봇 명단 제외, 끝난 뒤 나간 선수는 나감 아님");
   });
   run(JUDGEG, "한 팀이 모두 나갔는지(teamAllQuit): 시작할 때 양 팀에 사람이 있었고 지금 한 팀에만 남았을 때만 알려 주는가", function (done) {
-    var y = OPEN_Y.forest, W = world("forest", [{ id: "a", team: "blue", char: "knight", x: 300, y: y }, { id: "b", team: "red", char: "knight", x: 700, y: y }]), bad = [];
+    var y = OPEN_Y.testfield, W = world("testfield", [{ id: "a", team: "blue", char: "knight", x: 300, y: y }, { id: "b", team: "red", char: "knight", x: 700, y: y }]), bad = [];
     var P = api.players(); P.a.isAI = false; P.b.isAI = false;
     W.room.roster = { a: { team: "blue", c: "knight", ai: false }, b: { team: "red", c: "knight", ai: false } };
     if (api.teamAllQuit() !== null) bad.push("둘 다 남았는데 " + api.teamAllQuit());
@@ -4524,9 +4508,9 @@ class ResultCollector {
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "5가지 경우가 모두 맞음");
   });
   run(JUDGEG, "호스트 판정(hostJudge): 카운트다운이 끝나면 playing 으로 한 번만 바꾸고, 시간이 다 되면 킬 수로 승패(무승부 포함)를 한 번만 적으며 연습모드는 끝내지 않는가", function (done) {
-    var y = OPEN_Y.forest, bad = [];
+    var y = OPEN_Y.testfield, bad = [];
     function setup(mode) {
-      var W = world("forest", [{ id: "a", team: "blue", char: "knight", x: 300, y: y }, { id: "b", team: "red", char: "knight", x: 700, y: y }]);
+      var W = world("testfield", [{ id: "a", team: "blue", char: "knight", x: 300, y: y }, { id: "b", team: "red", char: "knight", x: 700, y: y }]);
       W.room.mode = mode || "pvp"; return { W: W, cap: recordRef(W), start: W.room.startAt };
     }
     var s = setup();
@@ -4560,9 +4544,9 @@ class ResultCollector {
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "playing 전환 1번·시간 종료 판정 1번·무승부·레드 승·연습 제외·통계 안내");
   });
   run(JUDGEG, "대회모드 연장전: 시간이 끝났을 때 킬이 같으면 끝내지 않고 연장전을 한 번 열고, 연장 중 먼저 처치한 팀이 이기며, 일반모드는 그대로 무승부인가", function (done) {
-    var y = OPEN_Y.forest, bad = [];
+    var y = OPEN_Y.testfield, bad = [];
     function setup(mode) {
-      var W = world("forest", [{ id: "a", team: "blue", char: "knight", x: 300, y: y }, { id: "b", team: "red", char: "knight", x: 700, y: y }]);
+      var W = world("testfield", [{ id: "a", team: "blue", char: "knight", x: 300, y: y }, { id: "b", team: "red", char: "knight", x: 700, y: y }]);
       W.room.mode = mode; W.room.status = "playing"; W.room.overtimeAt = null; return { W: W, cap: recordRef(W), start: W.room.startAt };
     }
     var cup = setup("cup"); cup.W.ent("a").deaths = 1; cup.W.ent("b").deaths = 1;
@@ -4588,7 +4572,7 @@ class ResultCollector {
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "동점 → 연장 1번·킬 없으면 계속·연장 중 처치 팀 승·킬 차이면 바로 끝·일반모드 무승부");
   });
   run(JUDGEG, "경기 종료 뒤 킬 고정: 끝난 뒤에는 피해가 들어가지 않고, 쓰러짐이 늘어도 킬 점수는 확정 점수(room.final) 그대로인가", function (done) {
-    var y = OPEN_Y.forest, W = world("forest", [{ id: "a", team: "blue", char: "knight", x: 300, y: y }, { id: "b", team: "red", char: "knight", x: 700, y: y }]), bad = [];
+    var y = OPEN_Y.testfield, W = world("testfield", [{ id: "a", team: "blue", char: "knight", x: 300, y: y }, { id: "b", team: "red", char: "knight", x: 700, y: y }]), bad = [];
     var a = W.ent("a"), b = W.ent("b");
     W.room.mode = "cup"; W.room.status = "ended"; W.room.final = { blue: 8, red: 7 };
     a.deaths = 7; b.deaths = 8;
@@ -4604,7 +4588,7 @@ class ResultCollector {
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "종료 후 피해 무시·점수 8:7 고정·경기 중에는 실제 값");
   });
   run(JUDGEG, "퍼즈: 퍼즈 중에는 게임 시계가 멈추고 재개하면 멈춘 만큼 늦춰 이어지며, 퍼즈 중에는 호스트가 경기를 끝내지 않는가", function (done) {
-    var y = OPEN_Y.forest, W = world("forest", [{ id: "a", team: "blue", char: "knight", x: 300, y: y }, { id: "b", team: "red", char: "knight", x: 700, y: y }]), bad = [];
+    var y = OPEN_Y.testfield, W = world("testfield", [{ id: "a", team: "blue", char: "knight", x: 300, y: y }, { id: "b", team: "red", char: "knight", x: 700, y: y }]), bad = [];
     var C = api.CLOCK, room = { pauseAt: null, resumeAt: null, pausedMs: 0 };
     if (C.withoutPause(5000, room) !== 5000) bad.push("퍼즈 없을 때 시간이 바뀜");
     room = { pauseAt: 1000, resumeAt: null, pausedMs: 0 };
@@ -4625,7 +4609,7 @@ class ResultCollector {
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "퍼즈 중 정지·재개 뒤 늦춰 이어짐·퍼즈 중 판정 없음");
   });
   run(JUDGEG, "퍼즈 버튼: 교사 계정일 때만, 연습모드가 아닌 경기 중에만 나타나고, 퍼즈하면 재개 글자로 바뀌며 빠진 선수가 있으면 재개가 꺼지는가", function (done) {
-    var y = OPEN_Y.forest, W = world("forest", [{ id: "a", team: "blue", char: "knight", x: 300, y: y }, { id: "b", team: "red", char: "knight", x: 700, y: y }]), bad = [];
+    var y = OPEN_Y.testfield, W = world("testfield", [{ id: "a", team: "blue", char: "knight", x: 300, y: y }, { id: "b", team: "red", char: "knight", x: 700, y: y }]), bad = [];
     var button = document.getElementById("btnPause"), savedUser = window.PORTAL_USER, P = api.PAUSE;
     function shown() { P.paint(); return !button.hidden; }
     try {
@@ -4710,7 +4694,7 @@ class ResultCollector {
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "버튼 위치·창 열림·밴 2+픽 6 순서·시간 표시 없음·되돌리기·같은 팀 교환·처음부터");
   });
   runAsync(JUDGEG, "퍼즈 누르기: 교사 로그인 토큰으로 방 값을 PATCH 로 쓰며 바로 멈추고, 저장이 거부되면 되돌리고, 재개는 3초 뒤 시각과 멈춘 시간을 쓰는가", function (done) {
-    var y = OPEN_Y.forest, W = world("forest", [{ id: "a", team: "blue", char: "knight", x: 300, y: y }, { id: "b", team: "red", char: "knight", x: 700, y: y }]), bad = [];
+    var y = OPEN_Y.testfield, W = world("testfield", [{ id: "a", team: "blue", char: "knight", x: 300, y: y }, { id: "b", team: "red", char: "knight", x: 700, y: y }]), bad = [];
     var P = api.PAUSE, calls = [], accept = true, savedFetch = window.fetch, savedUser = window.PORTAL_USER;
     function later(fn) { setTimeout(fn, 60); }
     function restore() { window.fetch = savedFetch; window.PORTAL_USER = savedUser; delete P.adminUids; P.busy = false; P.failedUntil = 0; W.room.pauseAt = null; W.room.resumeAt = null; W.room.pausedMs = 0; P.paint(); }
@@ -4743,7 +4727,7 @@ class ResultCollector {
     });
   });
   run(JUDGEG, "호스트 판정: 한 팀이 모두 나가면 시간이 남아도 상대 팀 승리로 끝내고 통계에서 제외하는가", function (done) {
-    var y = OPEN_Y.forest, W = world("forest", [{ id: "a", team: "blue", char: "knight", x: 300, y: y }, { id: "b", team: "red", char: "knight", x: 700, y: y }]), bad = [];
+    var y = OPEN_Y.testfield, W = world("testfield", [{ id: "a", team: "blue", char: "knight", x: 300, y: y }, { id: "b", team: "red", char: "knight", x: 700, y: y }]), bad = [];
     var cap = recordRef(W), P = api.players();
     P.a.isAI = false; P.b.isAI = false; W.room.mode = "cup"; W.room.status = "playing";
     W.room.roster = { a: { team: "blue", c: "knight", ai: false }, b: { team: "red", c: "knight", ai: false } };
@@ -4754,8 +4738,8 @@ class ResultCollector {
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "레드가 모두 나가 블루 승리·통계 제외 안내");
   });
   run(JUDGEG, "끝난 방 정리(hostCleanup)·결과 뒤 처리(onEnded)·다시하기(restart)가 조건대로 동작하는가", function (done) {
-    var y = OPEN_Y.forest, bad = [];
-    var W = world("forest", [{ id: api.myId, team: "blue", char: "knight", x: 300, y: y }, { id: "b", team: "red", char: "knight", x: 700, y: y }]), cap = recordRef(W), start = W.room.startAt;
+    var y = OPEN_Y.testfield, bad = [];
+    var W = world("testfield", [{ id: api.myId, team: "blue", char: "knight", x: 300, y: y }, { id: "b", team: "red", char: "knight", x: 700, y: y }]), cap = recordRef(W), start = W.room.startAt;
     delete api.MATCH.bots[api.myId];
     W.room.status = "ended"; W.room.endedAt = start;
     api.setClock(start + 300000); api.hostCleanup(); if (cap.removes.length) bad.push("5분이 안 됐는데 방을 지움");
@@ -4777,7 +4761,7 @@ class ResultCollector {
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "5분 정리·결과 도착 기록·1.5초/통계 저장 중 잠금·다시하기");
   });
   run(JUDGEG, "관전자 결과 유지: 결과 창을 붙잡고 있으면 버튼이 '대기실로'가 되고, 놓으면 원래대로 돌아오며 대기실 화면으로 가는가", function (done) {
-    var W = world("forest", [{ id: "a", team: "blue", char: "knight", x: 300, y: 600 }]), bad = [], btn = document.getElementById("btnAgain");
+    var W = world("testfield", [{ id: "a", team: "blue", char: "knight", x: 300, y: 600 }]), bad = [], btn = document.getElementById("btnAgain");
     W.room.status = "lobby"; var cap = recordRef(W);
     api.holdSpecResult();
     if (!api.specResultHeld() || btn.textContent !== "대기실로") bad.push("붙잡기 " + btn.textContent);
@@ -4791,8 +4775,8 @@ class ResultCollector {
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "붙잡기·놓기·대기실 화면·일반 다시하기");
   });
   run(JUDGEG, "경기 준비: makeEnt 는 체력 가득·보호막(해당 캐릭터)·없는 캐릭터는 기본 캐릭터로, initGame 은 내 캐릭터(관전은 없음)와 경기 정보를 새로 만드는가", function (done) {
-    var y = OPEN_Y.forest, bad = []; api.MATCH.stateByKey = {};
-    var W = world("forest", [{ id: api.myId, team: "red", char: "ranger", x: 300, y: y }, { id: "s", team: "blue", char: "knight", x: 300, y: y }]);
+    var y = OPEN_Y.testfield, bad = []; api.MATCH.stateByKey = {};
+    var W = world("testfield", [{ id: api.myId, team: "red", char: "ranger", x: 300, y: y }, { id: "s", team: "blue", char: "knight", x: 300, y: y }]);
     var shielded = api.CHAR_LIST.filter(function (c) { return api.CHARS[c].respawnShield; })[0], plain = api.CHAR_LIST.filter(function (c) { return !api.CHARS[c].respawnShield; })[0];
     var P = api.players(), E1 = api.makeEnt("x1", { team: "blue", characterType: plain, nickname: "엑스", slot: 1 }), E2 = api.makeEnt("x2", { team: "blue", characterType: shielded, nickname: "방패", slot: 2 }), E3 = api.makeEnt("x3", { team: "red", characterType: "없는캐릭터", nickname: "?", slot: 3 });
     if (E1.hp !== api.CHARS[plain].hp || E1.maxHp !== E1.hp || !E1.alive || E1.shield || E1.gauge !== 0 || E1.nickname !== "엑스" || E1.isAI) bad.push("기본값 " + JSON.stringify([E1.hp, E1.maxHp, E1.alive, E1.shield]));
@@ -4808,7 +4792,7 @@ class ResultCollector {
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "기본값·보호막·없는 캐릭터·initGame·관전 판정");
   });
   run(JUDGEG, "다른 기기 캐릭터 동기화(syncRemote): 상태 문자열을 받으면 체력·게이지·피해·기절 등이 따라오고, 위치는 부드럽게 다가가다 250 넘게 떨어지면 바로 이동하는가", function (done) {
-    var y = OPEN_Y.forest, W = world("forest", [{ id: "a", team: "blue", char: "knight", x: 300, y: y }, { id: "b", team: "red", char: "necro", x: 700, y: y }]), bad = [];
+    var y = OPEN_Y.testfield, W = world("testfield", [{ id: "a", team: "blue", char: "knight", x: 300, y: y }, { id: "b", team: "red", char: "necro", x: 700, y: y }]), bad = [];
     var a = W.ent("a"), start = W.room.startAt, P = api.players();
     function publish() { ["a", "b"].forEach(function (id) { api.MATCH.stateByKey[api.stKey(P[id].team, P[id].slot)] = api.packState(W.ent(id)); }); }
     Object.assign(a, { hp: 211, gauge: 4.5, dmg: 60, kills: 2, deaths: 1, assists: 1, stunUntil: start + 9000, protectUntil: start + 8000, slowMul: 1 });
@@ -5364,7 +5348,7 @@ class ResultCollector {
       (kinds.length ? " / 규칙 위반: " + kinds.map(function (k) { return k + " " + r.issues[k].n + "번 (처음: " + r.issues[k].first + ")"; }).join("; ") : " / 규칙 위반 없음(벽 안·결계 밖 탈출 포함)"));
   });
   run(AUTO, "AI 6명 60초 난전 — 시험장 맵 + 방패병 고정 (시드 2045)", function (done) {
-    var r = autoMelee("forest", 60, 2045, "shielder"), kinds = Object.keys(r.issues);
+    var r = autoMelee("testfield", 60, 2045, "shielder"), kinds = Object.keys(r.issues);
     var roster = r.list.map(function (e) { return api.CHARS[e.char].name; }).join("·");
     done(kinds.length ? "fail" : "pass", "출전: " + roster + " / 킬 " + r.kills + ", 궁극기 " + r.ults + "번" +
       (kinds.length ? " / 규칙 위반: " + kinds.map(function (k) { return k + " " + r.issues[k].n + "번 (처음: " + r.issues[k].first + ")"; }).join("; ") : " / 규칙 위반 없음"));
@@ -5380,7 +5364,7 @@ class ResultCollector {
     done(kinds.length ? "fail" : "pass", kinds.length ? kinds.join(" / ") : "문제 없음");
   });
   run(AUTO, "AI 6명 60초 난전 — 시험장 맵 + 선봉장 고정 (시드 2042)", function (done) {
-    var r = autoMelee("forest", 60, 2042, "bearer"), kinds = Object.keys(r.issues);
+    var r = autoMelee("testfield", 60, 2042, "bearer"), kinds = Object.keys(r.issues);
     done(kinds.length ? "fail" : "pass", kinds.length ? kinds.join(" / ") : "문제 없음");
   });
   run(AUTO, "AI 6명 60초 난전 — 강 맵 + 사슬 망령 고정 (시드 2041)", function (done) {
@@ -6180,7 +6164,7 @@ class HookPathTests {
     var self = this, api = this.api, run = this.kit.run, G = HookPathTests.GROUP;
     HookPathTests.CASES.forEach(function (c) {
       run(G, c[0] + ": " + c[5] + ", 끝 (" + c[6] + "," + c[7] + "), 이동 " + c[8], function (done) {
-        api.loadMapData("ford");
+        api.loadMapData("testfield");
         var p = api.HOOK_PATH.plan(c[1], c[2], c[3], c[4], c[9]), ok = p.kind === c[5] && Math.abs(p.ex - c[6]) <= 1 && Math.abs(p.ey - c[7]) <= 1 && Math.abs(p.dist - c[8]) <= 1;
         done(ok ? "pass" : "fail", p.kind + ", 끝 (" + p.ex.toFixed(1) + "," + p.ey.toFixed(1) + "), 이동 " + p.dist.toFixed(1));
       });
@@ -6252,7 +6236,7 @@ class WraithTests {
     var self = this, api = this.api, run = this.kit.run, G = WraithTests.GROUP, FRAME = this.kit.FRAME, ULT = api.ULT;
     [["A2", 450, 800, 450, 560, 450, 616], ["A3", 250, 840, 250, 560, 250, 774], ["A4", 300, 774, 300, 576, 300, 774], ["A8", 476, 790, 380, 560, 424, 665.4]].forEach(function (c) {
       run(G, "실제 끌기 " + c[0] + ": 끝 위치가 경로 표와 같고, 프레임마다 벽·물 밖이며, 끝난 뒤 위치가 밀리지 않는가", function (done) {
-        var bad = [], W = self.duel("ford", c[3], c[4], c[0 + 1], c[2]), A = W.ent("wr"), T = W.ent("foe");
+        var bad = [], W = self.duel("testfield", c[3], c[4], c[0 + 1], c[2]), A = W.ent("wr"), T = W.ent("foe");
         function each() { if (!self.canStand(T.x, T.y)) bad.push("(" + T.x.toFixed(1) + "," + T.y.toFixed(1) + ") 에 설 수 없음"); }
         self.throwChain(W, A, T.x, T.y);
         if (!self.untilCaught(W, FRAME, each)) bad.push("맞지 않음");
@@ -6267,7 +6251,7 @@ class WraithTests {
     run(G, "프레임 간격 8·16·33·100·250ms 에서 끌기 끝 위치가 같은가(터널링 없음)", function (done) {
       var bad = [], ends = [];
       [8, 16, 33, 100, 250].forEach(function (frame) {
-        var W = self.duel("ford", 380, 560, 476, 790), A = W.ent("wr"), T = W.ent("foe");
+        var W = self.duel("testfield", 380, 560, 476, 790), A = W.ent("wr"), T = W.ent("foe");
         self.throwChain(W, A, T.x, T.y);
         self.untilCaught(W, frame);
         self.untilArrived(W, T, frame, function () { if (!self.canStand(T.x, T.y)) bad.push(frame + "ms 프레임에서 물 안"); });
@@ -6288,7 +6272,7 @@ class WraithTests {
     });
     run(G, "끌리는 동안 매 프레임 기절·속도 0·공격 불가이고, 도착 뒤 정확히 0.5초 뒤 기절이 풀리는가(짧은 거리·최대 거리)", function (done) {
       var bad = [], shown = [];
-      [["짧은 거리", "ford", 200, 560, 200, 300], ["최대 거리", "practice", 450, 340, 450, 1010]].forEach(function (c) {
+      [["짧은 거리", "testfield", 200, 560, 200, 300], ["최대 거리", "practice", 450, 340, 450, 1010]].forEach(function (c) {
         var W = self.duel(c[1], c[2], c[3], c[4], c[5]), A = W.ent("wr"), T = W.ent("foe"), hitAt = 0, atk = T.atkAt;
         self.throwChain(W, A, T.x, T.y);
         self.untilCaught(W, 4);
@@ -6307,7 +6291,7 @@ class WraithTests {
         if (api.stunned(T, freeAt + 1)) bad.push(c[0] + " 풀린 뒤에도 기절");
         shown.push(c[0] + " " + planned.toFixed(0) + " 이동, 기절 실제 " + ((freeAt - hitAt) / api.timeScale() / 1000).toFixed(2) + "초");
       });
-      [["강가 none", "ford", 300, 576, 300, 774]].forEach(function (c) {
+      [["강가 none", "testfield", 300, 576, 300, 774]].forEach(function (c) {
         var W = self.duel(c[1], c[2], c[3], c[4], c[5]), A = W.ent("wr"), T = W.ent("foe");
         self.throwChain(W, A, T.x, T.y);
         self.untilCaught(W, 4);
@@ -6345,7 +6329,7 @@ class WraithTests {
   registerHits() {
     var self = this, api = this.api, run = this.kit.run, G = WraithTests.GROUP, FRAME = this.kit.FRAME, ULT = api.ULT;
     run(G, "물 건너 거리 280 의 적이 맞아 피해 35·기절을 받는가", function (done) {
-      var bad = [], W = self.duel("ford", 250, 560, 250, 840), A = W.ent("wr"), T = W.ent("foe");
+      var bad = [], W = self.duel("testfield", 250, 560, 250, 840), A = W.ent("wr"), T = W.ent("foe");
       self.throwChain(W, A, T.x, T.y);
       if (!self.untilCaught(W, FRAME)) bad.push("맞지 않음");
       if (self.lost(T) !== ULT.hkDmg) bad.push("피해 " + self.lost(T));
@@ -6353,7 +6337,7 @@ class WraithTests {
       self.verdict(done, bad, "피해 " + self.lost(T) + "·기절");
     });
     run(G, "벽 뒤의 적은 맞지 않고 게이지를 돌려받지 않으며, 비행 시간이 끝나면 묶임이 풀리는가", function (done) {
-      var bad = [], W = self.duel("ford", 200, 350, 200, 100), A = W.ent("wr"), T = W.ent("foe");
+      var bad = [], W = self.duel("testfield", 200, 350, 200, 100), A = W.ent("wr"), T = W.ent("foe");
       self.throwChain(W, A, T.x, T.y);
       var rootEnd = A.hookRootUntil;
       if (api.speedOf(A) !== 0) bad.push("준비 중 움직일 수 있음");
@@ -6391,7 +6375,7 @@ class WraithTests {
       self.verdict(done, bad, "경계 " + reach + " 안쪽 맞음·바깥 빗나감");
     });
     run(G, "풀숲 안·은신 중인 적은 끌리는 동안 드러나고, 끝나면 원래 규칙으로 돌아가는가", function (done) {
-      var bad = [], W = self.duel("ford", 100, 600, 100, 350), A = W.ent("wr"), T = W.ent("foe");
+      var bad = [], W = self.duel("testfield", 100, 600, 100, 350), A = W.ent("wr"), T = W.ent("foe");
       self.throwChain(W, A, T.x, T.y);
       if (!api.inBush(T.x, T.y)) bad.push("풀숲 자리 아님");
       if (api.revealedTo(T, A, W.t())) bad.push("맞기 전에 드러남");
@@ -6502,7 +6486,7 @@ class WraithTests {
       self.verdict(done, bad, "돌진 끊김·끌림");
     });
     run(G, "끌리는 중 수문장 밀치기: 끌기가 끝나고 넉백되며 벽·물을 넘지 않는가", function (done) {
-      var bad = [], s = pulled("ford", 450, 560, 450, 800), T = s.T, W = s.W;
+      var bad = [], s = pulled("testfield", 450, 560, 450, 800), T = s.T, W = s.W;
       W.room.ref.child("meleeHits").push({ team: "blue", owner: "wr", x: T.x + 30, y: T.y, angle: Math.PI, radius: 100, arc: 6.28, dmg: 1, kb: 200, createdAt: W.t() });
       if (!T.shove) bad.push("넉백이 안 걸림");
       W.frame(FRAME);
@@ -6672,14 +6656,14 @@ class WraithTests {
       self.verdict(done, bad, "간격 " + gap.toFixed(2) + "초, 타격 1번");
     });
     run(G, "기본 공격: 벽 뒤는 맞지 않고 강 건너는 맞으며, 아군·보호 중인 적은 영향이 없고, 그림 길이가 벽에서 줄어든 길이와 같은가", function (done) {
-      var bad = [], W = self.duel("ford", 200, 350, 200, 100), A = W.ent("wr"), up = -Math.PI / 2;
+      var bad = [], W = self.duel("testfield", 200, 350, 200, 100), A = W.ent("wr"), up = -Math.PI / 2;
       api.fireBasic(A, up); strike(W);
       if (self.lost(W.ent("foe"))) bad.push("벽 뒤 적이 맞음");
       var hit = W.log.filter(function (p) { return p.path === "meleeHits" && !p.v.zone && p.v.owner === "wr"; })[0].v;
       if (!(hit.len < C.range)) bad.push("길이가 줄지 않음 " + hit.len);
       var slam = api.FIELD.slams[0];
       if (!slam || slam.d.len !== hit.len) bad.push("그림 길이 " + (slam && slam.d.len) + " / 판정 " + hit.len);
-      var W2 = self.duel("ford", 250, 576, 250, 790), A2 = W2.ent("wr");
+      var W2 = self.duel("testfield", 250, 576, 250, 790), A2 = W2.ent("wr");
       api.fireBasic(A2, Math.PI / 2); strike(W2);
       if (self.lost(W2.ent("foe")) !== C.dmg) bad.push("강 건너 피해 " + self.lost(W2.ent("foe")));
       var W3 = self.scene("practice", [{ id: "wr", team: "blue", char: "wraith", x: 150, y: y, slot: 1 }, { id: "al", team: "blue", x: 250, y: y, slot: 2 }, { id: "sf", x: 350, y: y, slot: 1 }]), A3 = W3.ent("wr"), S = W3.ent("sf");
@@ -6763,7 +6747,7 @@ class WraithTests {
       self.verdict(done, bad, "준비 뒤 타격");
     });
     run(G, "내려치기 이펙트: 사슬이 땅에 닿으면 균열·먼지·파편·불티가 생기고, 물 위에는 균열이 없으며, 끝나면 남지 않는가", function (done) {
-      var bad = [], W = self.duel("ford", 250, 560, 250, 900), A = W.ent("wr"), view = api.HOOK_VIEW, B = api.ChainSlamBurst;
+      var bad = [], W = self.duel("testfield", 250, 560, 250, 900), A = W.ent("wr"), view = api.HOOK_VIEW, B = api.ChainSlamBurst;
       api.fireBasic(A, Math.PI / 2); strike(W);
       var s = api.FIELD.slams[0];
       view.render(W.t(), Date.now());
@@ -6795,7 +6779,7 @@ class WraithTests {
       self.verdict(done, bad, "균열·먼지·파편·불티 후 정리");
     });
     run(G, "대장장이 타격 이펙트: 기본 공격 타격 때만 재사용 폭발 그림이 생기고, 옛 입자 그림은 안 만들며, 끝나면 남지 않는가", function (done) {
-      var bad = [], W = self.scene("forest", [{ id: "bs", team: "blue", char: "blacksmith", x: 450, y: 675, slot: 1 }, { id: "foe", char: "dummy", x: 450, y: 1000, slot: 1 }]), A = W.ent("bs"), B = api.HammerBasicBlast;
+      var bad = [], W = self.scene("testfield", [{ id: "bs", team: "blue", char: "blacksmith", x: 450, y: 675, slot: 1 }, { id: "foe", char: "dummy", x: 450, y: 1000, slot: 1 }]), A = W.ent("bs"), B = api.HammerBasicBlast;
       var isHammerHit = function (blast) { return blast instanceof B; };
       api.fireBasic(A, Math.PI / 2);
       if (api.FIELD.impactBlasts.some(isHammerHit)) bad.push("대기 표시 때 터짐");
@@ -6894,7 +6878,7 @@ class WraithTests {
       self.verdict(done, bad, "거리 안에서 사용");
     });
     run(G, "AI: 끌리는 거리가 " + ULT.hkBotMinPull + " 미만인 적(강 건너)에게는 스킬을 쓰지 않는가", function (done) {
-      var bad = [], W = self.duel("ford", 300, 576, 300, 800, "dummy"), A = W.ent("wr"), T = W.ent("foe"), type = api.CHAR_TYPES.of("wraith");
+      var bad = [], W = self.duel("testfield", 300, 576, 300, 800, "dummy"), A = W.ent("wr"), T = W.ent("foe"), type = api.CHAR_TYPES.of("wraith");
       if (type.botUltAllowed(A, T)) bad.push("강 건너 적을 허용");
       A.gauge = api.GAUGE_MAX;
       for (var ms = 0; ms < 1000; ms += 33) { A.x = 300; A.y = 576; W.frame(33, true); }
@@ -6948,7 +6932,7 @@ class WraithTests {
     run(G, "대상이 방장 기기의 AI 여도, 내 캐릭터여도 같은 결과가 나오는가", function (done) {
       var bad = [], before = api.setMyId("foe");
       try {
-        var W = self.duel("ford", 380, 560, 476, 790), A = W.ent("wr"), T = W.ent("foe");
+        var W = self.duel("testfield", 380, 560, 476, 790), A = W.ent("wr"), T = W.ent("foe");
         delete T.bot; delete api.MATCH.bots.foe; api.MATCH.me = T;
         W.room.host = "foe";
         self.throwChain(W, A, T.x, T.y);
@@ -7416,15 +7400,15 @@ class MarinaTests {
       if (S.firstTarget(M, t).unit !== W.ent("mid")) bad.push("보호 중을 건너뛰지 않음");
       W.ent("mid").stealthUntil = t + 1000;
       if (S.firstTarget(M, t)) bad.push("은신한 적·사거리 밖을 고름");
-      var spot = self.spotWhere("forest", function (lens, x, y, ang) {
+      var spot = self.spotWhere("testfield", function (lens, x, y, ang) {
         if (ang !== api.TsunamiLanes.exactAngle(Math.PI / 2)) return false;
         return self.tileIsBlock(x, y + api.TILE) && !self.tileIsBlock(x, y + api.TILE * 2) && !api.losClear(x, y, x, y + api.TILE * 2);
       });
       if (!spot) bad.push("벽 자리를 못 찾음");
       else {
-        var W2 = self.scene("forest", [{ id: "mr", team: "blue", char: "marina", x: spot.x, y: spot.y, slot: 1 }, { id: "behind", x: spot.x, y: spot.y + api.TILE * 2 }]);
+        var W2 = self.scene("testfield", [{ id: "mr", team: "blue", char: "marina", x: spot.x, y: spot.y, slot: 1 }, { id: "behind", x: spot.x, y: spot.y + api.TILE * 2 }]);
         if (S.firstTarget(W2.ent("mr"), W2.t())) bad.push("벽 뒤 적을 고름");
-        var W2b = self.scene("forest", [{ id: "mr", team: "blue", char: "marina", x: spot.x, y: spot.y, slot: 1 }, { id: "ally", team: "blue", char: "knight", x: spot.x, y: spot.y + api.TILE * 2 }]);
+        var W2b = self.scene("testfield", [{ id: "mr", team: "blue", char: "marina", x: spot.x, y: spot.y, slot: 1 }, { id: "ally", team: "blue", char: "knight", x: spot.x, y: spot.y + api.TILE * 2 }]);
         self.hurt(W2b.ent("ally"), 0.5);
         if (!S.firstTarget(W2b.ent("mr"), W2b.t())) bad.push("벽 뒤 아군 회복은 막지 않아야 함");
       }
@@ -7595,12 +7579,12 @@ class MarinaTests {
     });
     run(G, "칸 계산: 출발점이 벽 안인 칸은 0, 얇은 벽 너머 칸은 마리나 앞 길이를 못 넘고, 맵 밖은 벽이며, 물·다리는 막지 않는가", function (done) {
       var bad = [];
-      var inWall = self.spotWhere("forest", function (lens, x, y, ang) {
+      var inWall = self.spotWhere("testfield", function (lens, x, y, ang) {
         var ca = Math.cos(ang), sa = Math.sin(ang), off = E.laneOffset(0);
         return self.tileIsBlock(x - sa * off, y + ca * off) && lens[0] !== 0;
       });
       if (inWall) bad.push("벽 안 출발 칸이 0 이 아님 " + inWall.lens);
-      var thin = self.spotWhere("forest", function (lens, x, y, ang) {
+      var thin = self.spotWhere("testfield", function (lens, x, y, ang) {
         var ca = Math.cos(ang), sa = Math.sin(ang), off = E.laneOffset(ULT.mrLanes - 1);
         return !self.tileIsBlock(x - sa * off, y + ca * off) && !api.losClear(x, y, x - sa * off, y + ca * off);
       });
@@ -7609,7 +7593,7 @@ class MarinaTests {
         var thinCa = Math.cos(thin.angle), thinSa = Math.sin(thin.angle), casterReach = L.walk(thin.x, thin.y, thinCa, thinSa);
         if (thin.lens[ULT.mrLanes - 1] > casterReach) bad.push("얇은 벽 너머 칸이 마리나 앞 길이보다 김 " + thin.lens + " / " + casterReach);
       }
-      api.loadMapData("forest");
+      api.loadMapData("testfield");
       if (!L.blockAt(-1, 3) || !L.blockAt(3, -1) || !L.blockAt(9999, 3)) bad.push("맵 밖이 벽이 아님");
       var water = self.spotWhere("river", function (lens, x, y, ang) {
         var ca = Math.cos(ang), sa = Math.sin(ang), off = E.laneOffset(2), rows = api.mapRows(), crossed = false;
@@ -7742,7 +7726,7 @@ class MarinaTests {
       self.verdict(done, bad, "피하기·면역·끊기·기절 중 진행 확인");
     });
     run(G, "해일 판정: 벽에 막힌 칸 너머 적은 안 맞고 뚫린 칸의 적은 맞는가", function (done) {
-      var bad = [], spot = self.spotWhere("forest", function (lens) { return lens[0] === ULT.mrLen && lens[ULT.mrLanes - 1] > 100 && lens[ULT.mrLanes - 1] < 300; }) || self.spotWhere("river", function (lens) { return lens[0] === ULT.mrLen && lens[ULT.mrLanes - 1] > 100 && lens[ULT.mrLanes - 1] < 300; });
+      var bad = [], spot = self.spotWhere("testfield", function (lens) { return lens[0] === ULT.mrLen && lens[ULT.mrLanes - 1] > 100 && lens[ULT.mrLanes - 1] < 300; }) || self.spotWhere("river", function (lens) { return lens[0] === ULT.mrLen && lens[ULT.mrLanes - 1] > 100 && lens[ULT.mrLanes - 1] < 300; });
       if (!spot) { self.verdict(done, ["자리를 못 찾음"], ""); return; }
       var ca = Math.cos(spot.angle), sa = Math.sin(spot.angle);
       function laneSpot(i, along) { var off = api.TsunamiLanes.laneOffset(i); return { x: spot.x - sa * off + ca * along, y: spot.y + ca * off + sa * along }; }
@@ -7778,7 +7762,7 @@ class MarinaTests {
       self.verdict(done, bad, "회복 " + ULT.mrWaveHeal + " 한 번, 자신 제외");
     });
     run(G, "해일: 칸 판정이 아군에게도 똑같이 적용되어 막힌 칸 너머 아군은 회복하지 않는가", function (done) {
-      var bad = [], spot = self.spotWhere("forest", function (lens) { return lens[0] === ULT.mrLen && lens[ULT.mrLanes - 1] > 100 && lens[ULT.mrLanes - 1] < 300; }) || self.spotWhere("river", function (lens) { return lens[0] === ULT.mrLen && lens[ULT.mrLanes - 1] > 100 && lens[ULT.mrLanes - 1] < 300; });
+      var bad = [], spot = self.spotWhere("testfield", function (lens) { return lens[0] === ULT.mrLen && lens[ULT.mrLanes - 1] > 100 && lens[ULT.mrLanes - 1] < 300; }) || self.spotWhere("river", function (lens) { return lens[0] === ULT.mrLen && lens[ULT.mrLanes - 1] > 100 && lens[ULT.mrLanes - 1] < 300; });
       if (!spot) { self.verdict(done, ["자리를 못 찾음"], ""); return; }
       var ca = Math.cos(spot.angle), sa = Math.sin(spot.angle), off = api.TsunamiLanes.laneOffset(ULT.mrLanes - 1), along = spot.lens[ULT.mrLanes - 1] + 120;
       var W = self.scene(spot.map, [{ id: "mr", team: "blue", char: "marina", x: spot.x, y: spot.y, slot: 1 }, { id: "a", team: "blue", char: "guardian", x: spot.x - sa * off + ca * along, y: spot.y + ca * off + sa * along, slot: 2 }]), M = W.ent("mr"), a = self.hurt(W.ent("a"), 0.5), hp = a.hp;
@@ -8029,11 +8013,11 @@ class EngineerDruidTests {
 
   freshWorld(list) {
     this.api.MATCH.stateByKey = {};
-    return this.kit.world("forest", list);
+    return this.kit.world("testfield", list);
   }
 
   engineerWorld(foes) {
-    var y = this.kit.OPEN_Y.forest;
+    var y = this.kit.OPEN_Y.testfield;
     return this.freshWorld([{ id: "eg", team: "blue", char: "engineer", x: 150, y: y, gauge: this.api.GAUGE_MAX }].concat(foes.map(function (f, i) {
       return { id: f.id, team: "red", char: "guardian", x: f.x, y: y + (f.dy || 0), slot: i + 1 };
     })));
@@ -8066,7 +8050,7 @@ class EngineerDruidTests {
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "자신의 자리 설치·게이지 0·최대 " + ULT.trMax + "개(가장 오래된 것 제거)");
     });
     run(G, "공학자: 게이지가 가득 찬 채로 시작하고, 조준하면 거리 " + ULT.trCast + " 안 지정한 곳(더 멀면 " + ULT.trCast + ")에 포탑을 놓는가", function (done) {
-      var y = self.kit.OPEN_Y.forest, bad = [], W = self.freshWorld([{ id: "eg", team: "blue", char: "engineer", x: 150, y: y }]), eg = W.ent("eg");
+      var y = self.kit.OPEN_Y.testfield, bad = [], W = self.freshWorld([{ id: "eg", team: "blue", char: "engineer", x: 150, y: y }]), eg = W.ent("eg");
       if (eg.gauge !== api.GAUGE_MAX) bad.push("시작 게이지 " + eg.gauge);
       api.useUlt(eg, 0, 200); W.frame(FRAME);
       var first = self.turretsAlive()[0];
@@ -8121,8 +8105,8 @@ class EngineerDruidTests {
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "표식 적 먼저, 끝나면 가까운 적");
     });
     run(G, "포탑 곡사 포격: 벽 너머 적도 쏘고 맞히는가", function (done) {
-      var bad = [], W = self.freshWorld([{ id: "eg", team: "blue", char: "engineer", x: 275, y: 525 }, { id: "hid", team: "red", char: "guardian", x: 275, y: 325 }]), eg = W.ent("eg");
-      if (api.losClear(275, 525, 275, 325)) bad.push("시험 준비 실패: 벽이 없음");
+      var bad = [], W = self.freshWorld([{ id: "eg", team: "blue", char: "engineer", x: 425, y: 525 }, { id: "hid", team: "red", char: "guardian", x: 425, y: 325 }]), eg = W.ent("eg");
+      if (api.losClear(425, 525, 425, 325)) bad.push("시험 준비 실패: 벽이 없음");
       api.useUlt(eg, 0); W.frame(FRAME);
       W.step(ULT.trWarmMs + ULT.trFlyMs + 80);
       if (!self.shotsOf(W).length) bad.push("벽 너머 적을 쏘지 않음");
@@ -8156,7 +8140,7 @@ class EngineerDruidTests {
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "비행 " + (first && first.v.fly) + "ms, 피하면 빗나감");
     });
     run(G, "포탑 포탄: 포탑 중심이 아니라 대상 쪽 총구에서 출발하고, 대상이 총구보다 가까우면 대상 위치를 넘지 않는가", function (done) {
-      var bad = [], forward = api.TURRET_MUZZLE_FORWARD, y = self.kit.OPEN_Y.forest;
+      var bad = [], forward = api.TURRET_MUZZLE_FORWARD, y = self.kit.OPEN_Y.testfield;
       var W = self.engineerWorld([{ id: "n1", x: 150 + 300 }]);
       api.useUlt(W.ent("eg"), 0); W.frame(FRAME);
       W.step(ULT.trWarmMs + 30);
@@ -8183,12 +8167,12 @@ class EngineerDruidTests {
   }
 
   druidWorld(extra) {
-    var y = this.kit.OPEN_Y.forest;
+    var y = this.kit.OPEN_Y.testfield;
     return this.freshWorld([{ id: "dr", team: "blue", char: "druid", x: 200, y: y }].concat(extra));
   }
 
   registerDruid() {
-    var self = this, api = this.api, run = this.kit.run, FRAME = this.kit.FRAME, ULT = api.ULT, G = EngineerDruidTests.DRUID_GROUP, C = api.CHARS.druid, y = this.kit.OPEN_Y.forest;
+    var self = this, api = this.api, run = this.kit.run, FRAME = this.kit.FRAME, ULT = api.ULT, G = EngineerDruidTests.DRUID_GROUP, C = api.CHARS.druid, y = this.kit.OPEN_Y.testfield;
     run(G, "드루이드 기본 공격: 덩굴 가시가 " + C.dmg + "의 피해와 " + api.secs(ULT.drSnareMs) + " 속박(이동 0)을 주고, 풀리면 이동속도가 돌아오며 둔화는 없는가", function (done) {
       var bad = [], W = self.druidWorld([{ id: "foe", team: "red", char: "guardian", x: 200 + 280, y: y }]), dr = W.ent("dr"), foe = W.ent("foe");
       var before = api.speedOf(foe);
@@ -8231,13 +8215,14 @@ class EngineerDruidTests {
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "이동 기술 4가지 막힘, 기사 방어태세는 됨, 풀리면 다시 됨, 도약은 끝까지 가고 착지 뒤 속박");
     });
     run(G, "드루이드 스킬: 벽·물·풀숲 칸에는 부쉬가 생기지 않고 그 칸은 부쉬로 치지 않는가", function (done) {
-      var bad = [], W = self.freshWorld([{ id: "dr", team: "blue", char: "druid", x: 425, y: 425, gauge: api.GAUGE_MAX }]), dr = W.ent("dr");
+      var bad = [], W = self.freshWorld([{ id: "dr", team: "blue", char: "druid", x: 425, y: 525, gauge: api.GAUGE_MAX }]), dr = W.ent("dr");
       api.useUlt(dr, 0); W.frame(FRAME);
       var g = api.FIELD.groves[0];
       if (!g) { done("fail", "시험 준비 실패: 부쉬 없음"); return; }
-      if (api.inBush(425, 325)) bad.push("벽 칸이 부쉬로 침");
-      if (!api.inBush(425, 375)) bad.push("열린 칸이 부쉬가 아님");
-      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "벽 칸 제외, 열린 칸 포함");
+      if (api.inBush(425, 425)) bad.push("벽 칸이 부쉬로 침");
+      if (api.inBush(325, 625)) bad.push("물 칸이 부쉬로 침");
+      if (!api.inBush(425, 475)) bad.push("열린 칸이 부쉬가 아님");
+      done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "벽·물 칸 제외, 열린 칸 포함");
     });
     run(G, "드루이드 기본 공격: 덩굴이 " + C.lanes + "줄 나란히 나가 맞는 폭이 넓어지고, 한 적에게 두 줄이 맞아도 피해는 한 번뿐인가", function (done) {
       var bad = [], reach = api.BODY_R + C.pr;
@@ -8289,7 +8274,7 @@ class EngineerDruidTests {
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "밖에서는 숨고 안에서는 보임");
     });
     run(G, "드루이드 스킬: 부쉬가 정사각형(" + ULT.drR * 2 + "×" + ULT.drR * 2 + ")이라 모서리 안쪽은 포함하고 바깥은 포함하지 않는가", function (done) {
-      var bad = [], W = self.druidWorld([]), dr = W.ent("dr");
+      var bad = [], W = self.freshWorld([{ id: "dr", team: "blue", char: "druid", x: 275, y: 375 }]), dr = W.ent("dr");
       dr.gauge = api.GAUGE_MAX; api.useUlt(dr, 0); W.frame(FRAME);
       var g = api.FIELD.groves[0].e, h = ULT.drR;
       if (!api.inBush(g.x + h - 2, g.y + h - 2)) bad.push("모서리 안쪽이 부쉬가 아님");
@@ -8326,9 +8311,9 @@ class GiantTests {
   lost(W, id) { var E = W.ent(id); return E.maxHp - E.hp; }
 
   giantWorld(foes, startX) {
-    var y = this.kit.OPEN_Y.forest;
+    var y = this.kit.OPEN_Y.testfield;
     this.api.MATCH.stateByKey = {};
-    return this.kit.world("forest", [{ id: "gi", team: "blue", char: "giant", x: startX || 200, y: y, gauge: this.api.GAUGE_MAX }].concat(foes.map(function (f) {
+    return this.kit.world("testfield", [{ id: "gi", team: "blue", char: "giant", x: startX || 200, y: y, gauge: this.api.GAUGE_MAX }].concat(foes.map(function (f) {
       return { id: f.id, team: "red", char: "guardian", x: f.x, y: y + (f.dy || 0) };
     })));
   }
@@ -8367,9 +8352,9 @@ class GiantTests {
     run(G, "거신 피격 범위: 몸집(반경 " + C.bodyR + ")에 맞춰 보통 캐릭터(" + api.BODY_R + ")는 빗나가는 거리에서도 맞는가", function (done) {
       var bad = [], gap = api.CHARS.guardian.range + (C.bodyR + api.BODY_R) / 2;
       function lostAt(char) {
-        var y = self.kit.OPEN_Y.forest;
+        var y = self.kit.OPEN_Y.testfield;
         api.MATCH.stateByKey = {};
-        var W = self.kit.world("forest", [{ id: "tg", team: "blue", char: char, x: 500, y: y }, { id: "atk", team: "red", char: "guardian", x: 500 + gap, y: y }]);
+        var W = self.kit.world("testfield", [{ id: "tg", team: "blue", char: char, x: 500, y: y }, { id: "atk", team: "red", char: "guardian", x: 500 + gap, y: y }]);
         api.fireBasic(W.ent("atk"), Math.PI); W.frame(FRAME);
         return self.lost(W, "tg");
       }
@@ -8443,9 +8428,9 @@ class GiantTests {
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "철퇴 그림 반경 " + (blast && blast.r) + ", 맞은 적 자리");
     });
     run(G, "대장장이 내려찍기 그림: 착지점에 번개와 폭발 하나가 공격 범위만큼 나오고 판정은 그대로인가", function (done) {
-      var bad = [], y = self.kit.OPEN_Y.forest, W, bs, foe;
+      var bad = [], y = self.kit.OPEN_Y.testfield, W, bs, foe;
       api.MATCH.stateByKey = {};
-      W = self.kit.world("forest", [{ id: "bs", team: "blue", char: "blacksmith", x: 200, y: y, gauge: api.GAUGE_MAX }, { id: "foe", team: "red", char: "guardian", x: 400 + ULT.bsR - 40, y: y }]);
+      W = self.kit.world("testfield", [{ id: "bs", team: "blue", char: "blacksmith", x: 200, y: y, gauge: api.GAUGE_MAX }, { id: "foe", team: "red", char: "guardian", x: 400 + ULT.bsR - 40, y: y }]);
       bs = W.ent("bs"); foe = W.ent("foe");
       api.FIELD.impactBlasts.length = 0; api.MATCH.melee = {};
       api.useUlt(bs, 0, 200);
@@ -8464,9 +8449,9 @@ class GiantTests {
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "반경 " + (blast && blast.r) + ", 피해 " + ULT.bsDmg);
     });
     run(G, "자객 그림: 돌진은 길이만큼, 회전베기는 반경만큼 칼날 선으로 나오고 예전 띠·원은 안 그리며 판정은 그대로인가", function (done) {
-      var bad = [], y = self.kit.OPEN_Y.forest, W, hm, foe, H = api.CHARS.hitman;
+      var bad = [], y = self.kit.OPEN_Y.testfield, W, hm, foe, H = api.CHARS.hitman;
       api.MATCH.stateByKey = {};
-      W = self.kit.world("forest", [{ id: "hm", team: "blue", char: "hitman", x: 200, y: y }, { id: "foe", team: "red", char: "guardian", x: 300, y: y }]);
+      W = self.kit.world("testfield", [{ id: "hm", team: "blue", char: "hitman", x: 200, y: y }, { id: "foe", team: "red", char: "guardian", x: 300, y: y }]);
       hm = W.ent("hm"); foe = W.ent("foe");
       api.FIELD.hitmanSlashes.length = 0; api.MATCH.melee = {};
       api.fireBasic(hm, 0); W.frame(FRAME);
@@ -8481,9 +8466,9 @@ class GiantTests {
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "돌진·회전베기 그림과 피해 " + (H.dashDmg + H.dmg));
     });
     run(G, "수문장 창벽 그림: 판정 반경으로 창을 휘두르는 그림이 나오고, 기본 공격은 예전 부채꼴을 유지하며 피해가 그대로인가", function (done) {
-      var bad = [], y = self.kit.OPEN_Y.forest, W, gd, foe;
+      var bad = [], y = self.kit.OPEN_Y.testfield, W, gd, foe;
       api.MATCH.stateByKey = {};
-      W = self.kit.world("forest", [{ id: "gd", team: "blue", char: "guardian", x: 300, y: y, gauge: api.GAUGE_MAX }, { id: "foe", team: "red", char: "guardian", x: 400, y: y }]);
+      W = self.kit.world("testfield", [{ id: "gd", team: "blue", char: "guardian", x: 300, y: y, gauge: api.GAUGE_MAX }, { id: "foe", team: "red", char: "guardian", x: 400, y: y }]);
       gd = W.ent("gd"); foe = W.ent("foe");
       api.FIELD.impactBlasts.length = 0; api.MATCH.melee = {};
       api.useUlt(gd, 0); W.frame(FRAME);
@@ -8498,9 +8483,9 @@ class GiantTests {
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "창벽 반경 " + (wall && wall.r) + ", 피해 " + ULT.gdDmg);
     });
     run(G, "저격수 그림: 기본 공격은 총구 빛과 적중 표시, 스킬은 궤적과 적중 폭발이 나오고 피해가 그대로인가", function (done) {
-      var bad = [], y = self.kit.OPEN_Y.forest, W, sn, foe, C = api.CHARS.sniper;
+      var bad = [], y = self.kit.OPEN_Y.testfield, W, sn, foe, C = api.CHARS.sniper;
       api.MATCH.stateByKey = {};
-      W = self.kit.world("forest", [{ id: "sn", team: "blue", char: "sniper", x: 200, y: y, gauge: api.GAUGE_MAX }, { id: "foe", team: "red", char: "guardian", x: 420, y: y }]);
+      W = self.kit.world("testfield", [{ id: "sn", team: "blue", char: "sniper", x: 200, y: y, gauge: api.GAUGE_MAX }, { id: "foe", team: "red", char: "guardian", x: 420, y: y }]);
       sn = W.ent("sn"); foe = W.ent("foe");
       api.FIELD.sniperMarks.length = 0; api.FIELD.impactBlasts.length = 0;
       api.fireBasic(sn, 0); W.frame(FRAME);
@@ -8552,9 +8537,9 @@ class GiantTests {
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "버튼·위쪽 HUD 모두 가벼운 층만 사용");
     });
     run(G, "화염술사 메테오 그림: " + ULT.mbDelay + "ms 뒤 떨어지는 순간 범위 폭발로 바뀌는가", function (done) {
-      var bad = [], y = self.kit.OPEN_Y.forest, W, mage;
+      var bad = [], y = self.kit.OPEN_Y.testfield, W, mage;
       api.MATCH.stateByKey = {};
-      W = self.kit.world("forest", [{ id: "mg", team: "blue", char: "mage", x: 200, y: y, gauge: api.GAUGE_MAX }, { id: "foe", team: "red", char: "guardian", x: 500, y: y }]);
+      W = self.kit.world("testfield", [{ id: "mg", team: "blue", char: "mage", x: 200, y: y, gauge: api.GAUGE_MAX }, { id: "foe", team: "red", char: "guardian", x: 500, y: y }]);
       mage = W.ent("mg");
       api.FIELD.impactBlasts.length = 0;
       api.useUlt(mage, 0, 300); W.frame(FRAME);
@@ -8605,10 +8590,10 @@ class SkillResetTests {
   constructor(api, kit) { this.api = api; this.kit = kit; }
 
   register() {
-    var api = this.api, kit = this.kit, run = kit.run, ULT = api.ULT, G = SkillResetTests.GROUP, y = kit.OPEN_Y.forest;
+    var api = this.api, kit = this.kit, run = kit.run, ULT = api.ULT, G = SkillResetTests.GROUP, y = kit.OPEN_Y.testfield;
     run(G, "광전사 스킬: 쓰는 순간 기본 공격 대기시간이 초기화되는가", function (done) {
       api.MATCH.stateByKey = {};
-      var W = kit.world("forest", [{ id: "wr", team: "blue", char: "warrior", x: 200, y: y, gauge: api.GAUGE_MAX }]), wr = W.ent("wr"), bad = [];
+      var W = kit.world("testfield", [{ id: "wr", team: "blue", char: "warrior", x: 200, y: y, gauge: api.GAUGE_MAX }]), wr = W.ent("wr"), bad = [];
       api.fireBasic(wr, 0); W.frame(kit.FRAME);
       if (wr.cdUntil <= W.t()) bad.push("시험 준비 실패: 기본 공격 대기 중이 아님");
       api.useUlt(wr, 0);
@@ -8618,7 +8603,7 @@ class SkillResetTests {
     run(G, "투척병 독병(기본 공격)과 독안개(스킬)는 겹치면 둘 다 들어가고, 독병끼리는 한 번만 들어가는가(2026-11-06 선생님 요청)", function (done) {
       function measure(basics, fog) {
         api.MATCH.stateByKey = {};
-        var W = kit.world("forest", [{ id: "th", team: "blue", char: "thrower", x: 200, y: y, gauge: api.GAUGE_MAX }, { id: "foe", team: "red", char: "guardian", x: 500, y: y }]), th = W.ent("th"), foe = W.ent("foe");
+        var W = kit.world("testfield", [{ id: "th", team: "blue", char: "thrower", x: 200, y: y, gauge: api.GAUGE_MAX }, { id: "foe", team: "red", char: "guardian", x: 500, y: y }]), th = W.ent("th"), foe = W.ent("foe");
         for (var i = 0; i < basics; i++) api.fireBasic(th, 0, 300);
         if (fog) api.useUlt(th, 0, 300);
         for (var i = 0; i < (ULT.fgDur + 2000) / 100; i++) { W.step(100); foe.poisonUntil = 0; foe.poisonNext = 0; }
@@ -8638,12 +8623,12 @@ class AstrologerTests {
   lost(W, id) { var E = W.ent(id); return E.maxHp - E.hp; }
 
   astroWorld(foes, allies) {
-    var y = this.kit.OPEN_Y.forest;
+    var y = this.kit.OPEN_Y.testfield;
     this.api.MATCH.stateByKey = {};
     var list = [{ id: "as", team: "blue", char: "astrologer", x: 200, y: y, gauge: this.api.GAUGE_MAX }]
       .concat((allies || []).map(function (a) { return { id: a.id, team: "blue", char: "knight", x: a.x, y: y + (a.dy || 0) }; }))
       .concat(foes.map(function (f) { return { id: f.id, team: "red", char: "guardian", x: f.x, y: y + (f.dy || 0) }; }));
-    return this.kit.world("forest", list);
+    return this.kit.world("testfield", list);
   }
 
   register() {
@@ -8823,7 +8808,7 @@ class TestPanel {
 }
 
 export function runTeamBattleTests(api) {
-  FixedTestArena.install(api);
+  TestField.install(api);
   function once() {
     if (!api.isIdle()) { alert("방에 들어가 있지 않은 첫 화면에서만 검사할 수 있어요."); return; }
     var mapBefore = api.currentMap(), started = performance.now(), results, offsetBefore = api.CLOCK.serverOffset;
@@ -8837,15 +8822,16 @@ export function runTeamBattleTests(api) {
 }
 
 class MinionSkillTests {
+  static OPEN_PRACTICE_Y = 675;
   static GROUP = "해골 병사와 스킬";
   constructor(api, kit) { this.api = api; this.kit = kit; }
 
   holeWorld(withHole) {
-    var api = this.api, y = this.kit.OPEN_Y.forest;
+    var api = this.api, y = MinionSkillTests.OPEN_PRACTICE_Y;
     api.MATCH.stateByKey = {};
-    var W = this.kit.world("forest", [
+    var W = this.kit.world("practice", [
       { id: "as", team: "blue", char: "astrologer", x: 200, y: y, gauge: api.GAUGE_MAX },
-      { id: "nc", team: "red", char: "necro", x: 750, y: y + 600, gauge: api.GAUGE_MAX }
+      { id: "nc", team: "red", char: "necro", x: 750, y: y + 300, gauge: api.GAUGE_MAX }
     ]);
     var nc = W.ent("nc"), as = W.ent("as");
     api.useUlt(nc, Math.PI / 2);
@@ -8856,14 +8842,14 @@ class MinionSkillTests {
   }
 
   register() {
-    var self = this, api = this.api, run = this.kit.run, ULT = api.ULT, G = MinionSkillTests.GROUP, y = this.kit.OPEN_Y.forest;
+    var self = this, api = this.api, run = this.kit.run, ULT = api.ULT, G = MinionSkillTests.GROUP, y = this.kit.OPEN_Y.testfield;
     run(G, "점성술사 블랙홀: 해골 병사도 중심으로 끌려오고, 끝나는 순간 폭발 피해 " + ULT.agBoomDmg + "을 받는가", function (done) {
       var bad = [], control = self.holeWorld(false);
       control.step(700);
-      var dc = Math.min.apply(null, control.ent("nc").minions.map(function (m) { return Math.hypot(m.x - 500, m.y - y); }));
+      var dc = Math.min.apply(null, control.ent("nc").minions.map(function (m) { return Math.hypot(m.x - 500, m.y - MinionSkillTests.OPEN_PRACTICE_Y); }));
       var pulled = self.holeWorld(true);
       pulled.step(700);
-      var dp = Math.min.apply(null, pulled.ent("nc").minions.map(function (m) { return Math.hypot(m.x - 500, m.y - y); }));
+      var dp = Math.min.apply(null, pulled.ent("nc").minions.map(function (m) { return Math.hypot(m.x - 500, m.y - MinionSkillTests.OPEN_PRACTICE_Y); }));
       if (!(dp < dc - 20)) bad.push("끌려오지 않음: 블랙홀 있음 " + Math.round(dp) + " / 없음 " + Math.round(dc));
       pulled.step(ULT.agDur + 400);
       var hp = pulled.ent("nc").minions.map(function (m) { return m.hp; });
@@ -8872,7 +8858,7 @@ class MinionSkillTests {
     });
     run(G, "클레릭 요한계시록: 적 해골 병사는 피해를 받지 않고, 아군 해골 병사도 회복되지 않는가", function (done) {
       api.MATCH.stateByKey = {};
-      var W = self.kit.world("forest", [
+      var W = self.kit.world("testfield", [
         { id: "cl", team: "blue", char: "cleric", x: 200, y: y, gauge: api.GAUGE_MAX },
         { id: "ea", team: "red", char: "necro", x: 750, y: y + 600, gauge: api.GAUGE_MAX },
         { id: "al", team: "blue", char: "necro", x: 150, y: y + 600, gauge: api.GAUGE_MAX }
@@ -8905,8 +8891,8 @@ class AimGuideReachTests {
   constructor(api, kit) { this.api = api; this.kit = kit; }
   hurtOrMoved(E, x, y) { return E.hp < E.maxHp || Math.hypot(E.x - x, E.y - y) > 2; }
   trial(c, d) {
-    var api = this.api, y = this.kit.OPEN_Y.forest, foe = c.place(d, y), team = c.ally ? "blue" : "red";
-    var W = this.kit.world("forest", [{ id: "me", team: "blue", char: c.char, x: 200, y: y, gauge: api.GAUGE_MAX }, { id: "t", team: team, char: "guardian", x: foe.x, y: foe.y }]), T = W.ent("t");
+    var api = this.api, y = c.y || this.kit.OPEN_Y.testfield, foe = c.place(d, y), team = c.ally ? "blue" : "red";
+    var W = this.kit.world(c.map || "testfield", [{ id: "me", team: "blue", char: c.char, x: 200, y: y, gauge: api.GAUGE_MAX }, { id: "t", team: team, char: "guardian", x: foe.x, y: foe.y }]), T = W.ent("t");
     if (c.ally) T.hp = T.maxHp - 200;
     var hp0 = T.hp;
     api.useUlt(W.ent("me"), 0, c.reach); W.step(c.ms);
@@ -8937,11 +8923,11 @@ class AimGuideReachTests {
       });
     });
     run(G, "드루이드 부쉬: 빨간 정사각형 안 모서리의 아군은 회복하고 바로 바깥은 회복하지 않는가", function (done) {
-      var bad = [], h = api.ULT.drR, y = self.kit.OPEN_Y.forest;
-      var probe = api.useUlt && self.kit.world("forest", [{ id: "me", team: "blue", char: "druid", x: 200, y: y, gauge: api.GAUGE_MAX }]);
+      var bad = [], h = api.ULT.drR, y = MinionSkillTests.OPEN_PRACTICE_Y;
+      var probe = api.useUlt && self.kit.world("practice", [{ id: "me", team: "blue", char: "druid", x: 200, y: y, gauge: api.GAUGE_MAX }]);
       api.useUlt(probe.ent("me"), 0, 200); probe.frame(self.kit.FRAME);
       var g = api.FIELD.groves[0].e, cx = g.x, cy = g.y;
-      var at = function (dx, dy) { return { name: "", char: "druid", reach: 200, ms: 1500, ally: true, place: function () { return { x: cx + dx, y: cy + dy }; } }; };
+      var at = function (dx, dy) { return { name: "", char: "druid", reach: 200, ms: 1500, ally: true, map: "practice", y: y, place: function () { return { x: cx + dx, y: cy + dy }; } }; };
       if (!self.trial(at(h - E, h - E), 0)) bad.push("안 모서리 아군이 회복 안 됨");
       if (self.trial(at(h + E, 0), 0)) bad.push("오른쪽 바깥 아군이 회복됨");
       if (self.trial(at(0, -h - E), 0)) bad.push("위쪽 바깥 아군이 회복됨");
@@ -8955,10 +8941,10 @@ class RangerGaugeTests {
   constructor(api, kit) { this.api = api; this.kit = kit; }
 
   register() {
-    var api = this.api, run = this.kit.run, y = this.kit.OPEN_Y.forest, C = api.CHARS.ranger, want = api.ROLES.shooter.gaugeOnHit;
+    var api = this.api, run = this.kit.run, y = this.kit.OPEN_Y.testfield, C = api.CHARS.ranger, want = api.ROLES.shooter.gaugeOnHit;
     run(RangerGaugeTests.GROUP, "궁수 기본 공격: 화살이 1발만 맞아도 게이지 +" + want + ", 2발이 다 맞아도 +" + want + "(한 번에 한 번만)이고 카드에도 적히는가", function (done) {
       api.MATCH.stateByKey = {};
-      var W = this.kit.world("forest", [
+      var W = this.kit.world("testfield", [
         { id: "rg", team: "blue", char: "ranger", x: 150, y: y },
         { id: "foe", team: "red", char: "knight", x: 350, y: y }
       ]);
@@ -8966,7 +8952,7 @@ class RangerGaugeTests {
       api.fireBasic(rg, 0);
       W.step(C.cd + 300);
       if (rg.gauge !== want) bad.push("2발 적중 게이지 " + rg.gauge + " (기대 " + want + ")");
-      var W2 = this.kit.world("forest", [
+      var W2 = this.kit.world("testfield", [
         { id: "rg", team: "blue", char: "ranger", x: 150, y: y },
         { id: "foe", team: "red", char: "knight", x: 350, y: y }
       ]);
@@ -9234,10 +9220,10 @@ class AccountStatsTests {
 class ArcaTests {
   static GROUP = "아르카";
   static BASE_R = 150;
-  constructor(api, kit) { this.api = api; this.kit = kit; this.y = kit.OPEN_Y.forest; this.cx = 500; }
+  constructor(api, kit) { this.api = api; this.kit = kit; this.y = kit.OPEN_Y.testfield; this.cx = 500; }
   foe(id, x, dy, char) { return { id: id, team: "red", char: char || "guardian", x: x, y: this.y + (dy || 0), gauge: this.api.GAUGE_MAX }; }
   ally(id, x, dy, char) { return { id: id, team: "blue", char: char || "guardian", x: x, y: this.y + (dy || 0), gauge: this.api.GAUGE_MAX }; }
-  scene(list) { return this.kit.world("forest", [{ id: "ak", team: "blue", char: "arca", x: 200, y: this.y, gauge: this.api.GAUGE_MAX }].concat(list)); }
+  scene(list) { return this.kit.world("testfield", [{ id: "ak", team: "blue", char: "arca", x: 200, y: this.y, gauge: this.api.GAUGE_MAX }].concat(list)); }
   deploy(W, reach) { var api = this.api; api.useUlt(W.ent("ak"), 0, reach == null ? this.cx - 200 : reach); W.step(api.ULT.akDelay + this.kit.FRAME * 2); }
   inner() { return this.api.ULT.akR - this.api.BODY_R; }
   lost(E) { return E.maxHp - E.hp; }
@@ -9381,7 +9367,7 @@ class ArcaTests {
       if (!q) bad.push("시험 준비 실패: 한 줄 벽 없음");
       else {
         var below = q.y + q.h / 2 + api.BODY_R + 2, cy = below + 40, top = q.y - q.h / 2 - api.BODY_R - 2;
-        var V = self.kit.world("forest", [{ id: "ak", team: "blue", char: "arca", x: q.x, y: below + 100, gauge: api.GAUGE_MAX }, { id: "a", team: "red", char: "guardian", x: q.x, y: cy }]), vk = V.ent("ak"), va = V.ent("a");
+        var V = self.kit.world("testfield", [{ id: "ak", team: "blue", char: "arca", x: q.x, y: below + 100, gauge: api.GAUGE_MAX }, { id: "a", team: "red", char: "guardian", x: q.x, y: cy }]), vk = V.ent("ak"), va = V.ent("a");
         if (self.kit.blockedAt(q.x, below + 100) || self.kit.blockedAt(q.x, top)) bad.push("시험 준비 실패: 자리 막힘");
         api.useUlt(vk, -Math.PI / 2, 60); V.step(U.akDelay + self.kit.FRAME * 2);
         vk.x = q.x; vk.y = top; V.frame(self.kit.FRAME);
@@ -9424,7 +9410,7 @@ class ArcaTests {
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "모두 결계 끝(" + U.akR + " − 몸 반지름)에서 멈춤: " + shown.join(", "));
     });
     run(G, "팬텀 회귀: 결계에 갇힌 팬텀은 끝에서 회귀가 끝나고 원래 자리로 가지 않는가", function (done) {
-      var W = self.kit.world("forest", [{ id: "ak", team: "blue", char: "arca", x: 200, y: self.y, gauge: api.GAUGE_MAX }, { id: "m", team: "red", char: "phantom", x: 950, y: self.y, gauge: api.GAUGE_MAX }]), m = W.ent("m"), bad = [];
+      var W = self.kit.world("testfield", [{ id: "ak", team: "blue", char: "arca", x: 200, y: self.y, gauge: api.GAUGE_MAX }, { id: "m", team: "red", char: "phantom", x: 950, y: self.y, gauge: api.GAUGE_MAX }]), m = W.ent("m"), bad = [];
       api.useUlt(m, Math.PI);
       W.step(U.phWind + 400);
       if (!m.phantom || m.phantom.stage !== "free") { done("fail", "시험 준비 실패: 팬텀 단계 " + (m.phantom && m.phantom.stage)); return; }
@@ -9503,7 +9489,7 @@ class ArcaTests {
       if (!api.CHAR_TYPES.of("arca").hasSkillClip) bad.push("시전 동작 없음");
       var reach = [];
       ["mage", "frost", "druid", "necro", "marina", "astrologer"].forEach(function (c) {
-        var M = api.CHAR_TYPES.of(c).constructor.MODEL, e = self.kit.world("forest", [{ id: "p", team: "blue", char: c, x: 200, y: self.y }]).ent("p"), pv = api.FIGHTER_VIEW.makeVis(e, new api.THREE.Group());
+        var M = api.CHAR_TYPES.of(c).constructor.MODEL, e = self.kit.world("testfield", [{ id: "p", team: "blue", char: c, x: 200, y: self.y }]).ent("p"), pv = api.FIGHTER_VIEW.makeVis(e, new api.THREE.Group());
         if (!pv.launchHand || pv.launchHand.parent !== pv.root.getObjectByName(M.launchTip)) { bad.push(c + " 발사 지점이 무기(" + M.launchTip + ") 끝에 없음"); return; }
         pv.root.updateMatrixWorld(true);
         var tipAt = pv.launchHand.getWorldPosition(new api.THREE.Vector3()), gripAt = pv.launchHand.parent.getWorldPosition(new api.THREE.Vector3());
@@ -9511,10 +9497,10 @@ class ArcaTests {
         if (!(tipAt.distanceTo(gripAt) > 10)) bad.push(c + " 끝점이 손에서 떨어져 있지 않음(" + Math.round(tipAt.distanceTo(gripAt)) + ")");
       });
       ["mage", "astrologer"].forEach(function (c) { if (!api.CHAR_TYPES.of(c).hasSkillClip) bad.push(c + " 시전 동작 없음"); });
-      var hv = api.FIGHTER_VIEW.makeVis(self.kit.world("forest", [{ id: "p", team: "blue", char: "hunter", x: 200, y: self.y }]).ent("p"), new api.THREE.Group());
+      var hv = api.FIGHTER_VIEW.makeVis(self.kit.world("testfield", [{ id: "p", team: "blue", char: "hunter", x: 200, y: self.y }]).ent("p"), new api.THREE.Group());
       if (!hv.launchHand || hv.launchHand.name !== "muzzle" || hv.launchHand.parent !== hv.root.getObjectByName("mainhand")) bad.push("헌터 볼트 발사 지점이 석궁 끝(muzzle)에 없음");
       else { hv.root.updateMatrixWorld(true); reach.push("헌터 석궁 " + Math.round(hv.launchHand.getWorldPosition(new api.THREE.Vector3()).distanceTo(hv.launchHand.parent.getWorldPosition(new api.THREE.Vector3())))); }
-      var fromBody = api.CHAR_LIST.filter(function (c) { if (!api.CHARS[c] || /bot/.test(c)) return false; var e = self.kit.world("forest", [{ id: "p", team: "blue", char: c, x: 200, y: self.y }]).ent("p"), pv = api.FIGHTER_VIEW.makeVis(e, new api.THREE.Group()); return pv.kit && !pv.launchHand; });
+      var fromBody = api.CHAR_LIST.filter(function (c) { if (!api.CHARS[c] || /bot/.test(c)) return false; var e = self.kit.world("testfield", [{ id: "p", team: "blue", char: c, x: 200, y: self.y }]).ent("p"), pv = api.FIGHTER_VIEW.makeVis(e, new api.THREE.Group()); return pv.kit && !pv.launchHand; });
       done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "아르카·화염술사·얼음술사·드루이드·네크로·마리나·점성술사는 무기 끝, 헌터는 석궁 끝 고정점(손에서 끝까지 " + reach.join(", ") + "), 시전 동작 있음. 손·총구 고정점 없이 몸에서 나가는 캐릭터: " + (fromBody.join(", ") || "없음"));
     });
     run(G, "카드: 패시브·스킬 설명과 능력치 표가 수치에서 만들어지는가", function (done) {
@@ -9531,11 +9517,11 @@ class ArcaTests {
 class HunterTests {
   static GROUP = "헌터";
   static NEAR = 2;
-  constructor(api, kit) { this.api = api; this.kit = kit; this.y = kit.OPEN_Y.forest; }
+  constructor(api, kit) { this.api = api; this.kit = kit; this.y = kit.OPEN_Y.testfield; }
   get C() { return this.api.CHARS.hunter; }
   get U() { return this.api.ULT; }
   foe(id, x, dy, char) { return { id: id, team: "red", char: char || "ranger", x: x, y: this.y + (dy || 0) }; }
-  scene(list, x, y, gauge) { return this.kit.world("forest", [{ id: "hn", team: "blue", char: "hunter", x: x == null ? 400 : x, y: y == null ? this.y : y, angle: 0, gauge: gauge || 0 }].concat(list || [])); }
+  scene(list, x, y, gauge) { return this.kit.world("testfield", [{ id: "hn", team: "blue", char: "hunter", x: x == null ? 400 : x, y: y == null ? this.y : y, angle: 0, gauge: gauge || 0 }].concat(list || [])); }
   shots(W) { return W.log.filter(function (p) { return p.path === "shots" && p.v.o === "hn"; }).map(function (p) { return p.v; }); }
   rolls(W) { return W.log.filter(function (p) { return p.path === "effects" && p.v.type === "hunterRoll" && !p.v.cut; }).map(function (p) { return p.v; }); }
   rollMs() { return this.C.roll.ms; }
@@ -9653,7 +9639,7 @@ class HunterTests {
   registerStops() {
     var self = this, api = this.api, run = this.kit.run, G = HunterTests.GROUP, C = this.C;
     run(G, "벽 앞에서 구르면 벽에서 멈추고 그 자리에서 쏘는가", function (done) {
-      self.kit.world("forest", []);
+      self.kit.world("testfield", []);
       var q = self.kit.singleRowWall(), y0 = q.y + q.h / 2 + api.BODY_R + 30, bad = [], worst = null;
       var W = self.scene([], q.x, y0), hn = W.ent("hn");
       self.fire(W, Math.PI / 2, true, -Math.PI / 2);
@@ -9852,7 +9838,7 @@ class HunterTests {
       var near = bot.rollAngle(hn, f, 200), far = bot.rollAngle(hn, f, 380);
       if (self.angleGap(near, Math.PI) > 0.01) bad.push("가까운 적에서 구르는 방향 " + near.toFixed(2));
       if (Math.abs(self.angleGap(far, 0) - Math.PI / 2) > 0.01) bad.push("먼 적에서 구르는 방향 " + far.toFixed(2));
-      self.kit.world("forest", []);
+      self.kit.world("testfield", []);
       var q = self.kit.singleRowWall(), Wq = self.scene([{ id: "f", team: "red", char: "knight", x: q.x, y: q.y + q.h / 2 + api.BODY_R + 30 + 150 }], q.x, q.y + q.h / 2 + api.BODY_R + 30, 0);
       var blocked = bot.rollAngle(Wq.ent("hn"), Wq.ent("f"), 150);
       if (Math.abs(self.angleGap(blocked, Math.PI / 2) - Math.PI / 2) > 0.01) bad.push("벽 쪽이 막혔는데 구르는 방향 " + blocked.toFixed(2));
