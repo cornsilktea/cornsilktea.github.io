@@ -12,7 +12,7 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="정보 수업용 링크 모음">
 <meta property="og:title" content="3v3 팀 배틀 아레나">
-<meta property="og:description" content="방 코드로 모여 블루 vs 레드로 싸우는 3D 3v3 실시간 팀 대전(숲속 공터·강 건너기·던전 회랑 맵 선택) / 역할군별 캐릭터(전사: 광전사·기사·창술사 / 마법사: 주술사·네크로 / 원거리 딜러: 궁수·저격수·투척병 / 암살자: 은신자·자객) 중 선택, 역할군별 스킬 게이지·풀숲 숨기 / 쓰러지면 3초 뒤 부활, 1분 30초 뒤 킬 스코어가 높은 팀 승리">
+<meta property="og:description" content="방 코드로 모여 블루 vs 레드로 싸우는 3D 3v3 실시간 팀 대전(눈 마을 광장·강 건너기·던전 회랑 맵 선택) / 역할군별 캐릭터(전사: 광전사·기사·창술사 / 마법사: 주술사·네크로 / 원거리 딜러: 궁수·저격수·투척병 / 암살자: 은신자·자객) 중 선택, 역할군별 스킬 게이지·풀숲 숨기 / 쓰러지면 3초 뒤 부활, 1분 30초 뒤 킬 스코어가 높은 팀 승리">
 <meta property="og:url" content="https://cornsilktea.github.io/30.team-battle-arena.html">
 <meta property="og:image" content="https://cornsilktea.github.io/icon-512.png">
 <meta name="twitter:card" content="summary">
@@ -488,9 +488,9 @@ SinglePassMaterials.enable(THREE);
     static SWAPPED_TEAM = { blue: "red", red: "blue" };
   }
   class TileKinds {
-    static BLOCK_TILES = "#xo";
+    static BLOCK_TILES = "#xot";
     static WATER_TILES = "~";
-    static ROCK_TILES = "#x";
+    static ROCK_TILES = "#xt";
   }
   class Palette {
     static C_TEAM = { blue: 0x2F6FD6, red: 0xD6453D };
@@ -596,21 +596,21 @@ SinglePassMaterials.enable(THREE);
       return services.catalog.iconSrc[c];
     }
   }
-  class ForestMap {
-    static DATA = { name: "숲속 공터", blueHalf: [
-      "................",
-      "................",
-      "................",
-      "...##......##...",
-      '""............""',
-      '"""....##...."""',
+  class SnowPlazaMap {
+    static DATA = { name: "눈 마을 광장", blueHalf: [
+      '................',
+      '................',
+      '................',
+      '................',
+      '...##......##...',
+      '...##......##...',
+      '......""""......',
+      '................',
       '""".........."""',
-      "....#......#....",
-      '....#..""..#....',
-      '.##....""....##.',
-      "................",
-      '..""...##...""..',
-      '..""........""..'
+      '""".x......x."""',
+      '................',
+      '....""tttt""....',
+      '....""tttt""....'
     ] };
   }
   class RiverMap {
@@ -682,8 +682,8 @@ SinglePassMaterials.enable(THREE);
     ] };
   }
   class MapCatalog {
-    static KINDS = { forest: ForestMap, river: RiverMap, dungeon: DungeonMap, windhill: WindhillMap, practice: PracticeMap };
-    static IDS = ["forest", "river", "dungeon", "windhill"];
+    static KINDS = { snow: SnowPlazaMap, river: RiverMap, dungeon: DungeonMap, windhill: WindhillMap, practice: PracticeMap };
+    static IDS = ["snow", "river", "dungeon", "windhill"];
     static of(id) { return Object.prototype.hasOwnProperty.call(MapCatalog.KINDS, id) ? MapCatalog.KINDS[id].DATA : undefined; }
     static table() {
       var table = {};
@@ -760,7 +760,7 @@ SinglePassMaterials.enable(THREE);
       });
     }
     load(id) { var services = this.services;
-      services.arenaMap.id = MapCatalog.of(id) ? id : "forest";
+      services.arenaMap.id = MapCatalog.of(id) ? id : "snow";
       services.arenaMap.rows = services.arenaMap.fullMap(MapCatalog.of(services.arenaMap.id).blueHalf);
       services.arenaMap.cols = services.arenaMap.rows[0].length; services.arenaMap.rowCount = services.arenaMap.rows.length;
       services.arenaMap.obstacles = services.arenaMap.tileRects(TileKinds.BLOCK_TILES);
@@ -1067,7 +1067,7 @@ SinglePassMaterials.enable(THREE);
       function claim(code, n) {
         var t = services.clock.now();
         var me = services.session.newPlayer("blue", t);
-        var obj = { mode: "pvp", map: "random", arena: "forest", status: "lobby", hostPlayerId: services.session.myId, createdAt: t, winner: null, players: {} };
+        var obj = { mode: "pvp", map: "random", arena: "snow", status: "lobby", hostPlayerId: services.session.myId, createdAt: t, winner: null, players: {} };
         obj.players[services.session.myId] = me;
         services.backend.db.ref(RoomSession.ROOT + "/" + code).transaction(function (cur) {
           if (cur !== null) return;
@@ -1146,7 +1146,7 @@ SinglePassMaterials.enable(THREE);
       services.session.sub(services.backend.db.ref(".info/connected"), "value", function (s) { if (s.val() === true && services.session.room && services.session.room.ref === ref && !services.session.leaving) services.session.armDisconnect(ref); });
       services.session.sub(ref.child("mode"), "value", function (s) { services.session.room.mode = s.val(); services.lobby.playersChanged(); });
       services.session.sub(ref.child("map"), "value", function (s) { services.session.room.map = s.val() || "random"; services.arenaView.syncArena(); services.lobby.playersChanged(); });
-      services.session.sub(ref.child("arena"), "value", function (s) { services.session.room.arena = s.val() || "forest"; services.arenaView.syncArena(); });
+      services.session.sub(ref.child("arena"), "value", function (s) { services.session.room.arena = s.val() || "snow"; services.arenaView.syncArena(); });
       services.session.sub(ref.child("hostPlayerId"), "value", function (s) { services.session.room.host = s.val(); services.session.room.hostLoaded = true; services.clock.hostChanged(services.session.room.host); services.session.checkHost(); services.lobby.playersChanged(); });
       services.session.sub(ref.child("startAt"), "value", function (s) { services.session.room.startAt = s.val() || 0; });
       services.session.sub(ref.child("pauseAt"), "value", function (s) { services.session.room.pauseAt = s.val() || null; });
@@ -9636,7 +9636,7 @@ SinglePassMaterials.enable(THREE);
       services.arenaView.builtArena = services.arenaMap.id + (services.models.kit.propsReady ? ":kit" : "");
     }
     useArena(id) { var services = this.services;
-      if (!MapCatalog.of(id)) id = "forest";
+      if (!MapCatalog.of(id)) id = "snow";
       if (services.arenaView.builtArena === id + (services.models.kit.propsReady ? ":kit" : "")) return;
       services.arenaMap.load(id);
       services.arenaView.buildArena();
@@ -9691,6 +9691,7 @@ SinglePassMaterials.enable(THREE);
           }
         }
       }
+      if (th.plaza) services.arenaPaint.paintPlaza(g2, th.plaza);
       if (th.rockShade) services.arenaPaint.paintRockShade(g2, th.rockShade);
       var practice = !!MapCatalog.of(services.arenaMap.id).practice;
       g2.strokeStyle = th.line; g2.lineWidth = 1;
@@ -9711,6 +9712,15 @@ SinglePassMaterials.enable(THREE);
       tx.colorSpace = THREE.SRGBColorSpace;
       tx.anisotropy = services.cameraRig.renderer ? Math.min(4, services.cameraRig.renderer.capabilities.getMaxAnisotropy()) : 1;
       return tx;
+    }
+    paintPlaza(g2, colors) {
+      var cx = ArenaSize.MW / 2, cy = ArenaSize.MH / 2, ring = 26;
+      for (var i = 6; i >= 1; i--) {
+        g2.fillStyle = colors[i % 2];
+        g2.beginPath(); g2.ellipse(cx, cy, 60 + i * ring, 40 + i * ring, 0, 0, Math.PI * 2); g2.fill();
+      }
+      g2.strokeStyle = "rgba(255,255,255,.85)"; g2.lineWidth = 9;
+      g2.beginPath(); g2.ellipse(cx, cy, 60 + 6 * ring, 40 + 6 * ring, 0, 0, Math.PI * 2); g2.stroke();
     }
     paintRockShade(g2, rgb) { var services = this.services;
       for (var r = 0; r < services.arenaMap.rowCount; r++) for (var c = 0; c < services.arenaMap.cols; c++) {
@@ -9821,7 +9831,11 @@ SinglePassMaterials.enable(THREE);
       dgBox: "dungeon/box_large.gltf", dgBarrel: "dungeon/barrel_large.gltf", dgTorch: "dungeon/torch_lit.gltf",
       dgBannerBlue: "dungeon/banner_patternA_blue.gltf", dgBannerRed: "dungeon/banner_patternA_red.gltf",
       mill: "medieval/objects/mill.glb", farmPlot: "medieval/objects/farm_plot.glb", hill: "medieval/objects/detail_hill.glb",
-      forestTile: "medieval/tiles/square_forest.glb", turret: "props/turret_base.gltf", shellBomb: "props/smokebomb.gltf" };
+      forestTile: "medieval/tiles/square_forest.glb", turret: "props/turret_base.gltf", shellBomb: "props/smokebomb.gltf",
+      snowHouse: "holiday/gingerbread_house_decorated.gltf", snowLamp: "holiday/lantern.gltf", snowman: "snow/snowman_A.gltf", snowPile: "snow/snowball_pile.gltf",
+      snowRockA: "snow/Rock_1_E_Color1.gltf", snowRockB: "snow/Rock_1_G_Color1.gltf",
+      giftRed: "holiday/present_B_red.gltf", giftGreen: "holiday/present_D_green.gltf", giftBlue: "holiday/present_D_blue.gltf",
+      giftYellow: "snow/present_A_yellow.gltf", giftWhite: "snow/present_A_white.gltf" };
     static KIT_DIR = "assets/kaykit/";
     static modelChars(services) { return services.charTypes.list.concat(["giantGolem", "dummy", "dummyAlly"]); }
     static SKIN_COLS = 8;
@@ -10145,6 +10159,7 @@ SinglePassMaterials.enable(THREE);
     }
     buildOutdoorProps(th) { var services = this.services;
       if (th.windy) { services.propThemes.buildWindhillProps(th); return; }
+      if (th.snowy) { services.snowPlaza.build(th); return; }
       var P3 = services.models.kit.props, g = services.stage.arenaGroup, blocks = [[], []];
       function rockTile(c, r, hMin, hRange) {
         blocks[services.props.seeded() < 0.5 ? 0 : 1].push({ w: ArenaSize.TILE * 1.08, h: hMin + services.props.seeded() * hRange, d: ArenaSize.TILE * 1.08, x: services.arenaMap.tileX(c), z: services.arenaMap.tileY(r), yaw: services.props.quarterTurn() });
@@ -10274,6 +10289,135 @@ SinglePassMaterials.enable(THREE);
         var top = services.props.fitProp(P3.dgBannerBlue, 40, 84, 8, services.arenaMap.tileX(c) - (c === 8 ? ArenaSize.TILE / 2 : 0), ArenaSize.MAP_Y0 - ArenaSize.TILE / 2 + 18, 0); top.position.y += 78; g.add(top);
         var bottom = services.props.fitProp(P3.dgBannerRed, 40, 84, 8, services.arenaMap.tileX(services.arenaMap.cols - 1 - c) + (c === 8 ? ArenaSize.TILE / 2 : 0), ArenaSize.BOUND.b + ArenaSize.TILE / 2 - 18, Math.PI); bottom.position.y += 78; g.add(bottom);
       });
+    }
+  }
+  class SnowPlazaProps {
+    static PINE_GREEN = 0x2F6B4F;
+    static PINE_DEEP = 0x265A47;
+    static SNOW = 0xF4F9FF;
+    static DRIFT = [0xEEF4FC, 0xE0EAF7, 0xF8FBFF];
+    static SHRUB = 0x3F8F6E;
+    static HOUSE_H = 88;
+    static SNOWMAN_H = 70;
+    static TREE_H = 150;
+    static ORNAMENTS = [0xE0524A, 0xF2C14E, 0x4F8FE0, 0xFFFFFF];
+    static GIFTS = ["giftRed", "giftGreen", "giftBlue", "giftYellow", "giftWhite"];
+    constructor(services) { this.services = services; this.shapes = null; }
+    templates() {
+      if (!this.shapes) {
+        var cone = new THREE.ConeGeometry(0.5, 1, 10), ball = new THREE.SphereGeometry(0.5, 10, 8);
+        var disc = new THREE.CylinderGeometry(0.5, 0.56, 1, 24), star = new THREE.OctahedronGeometry(0.5);
+        var matte = new THREE.MeshLambertMaterial({ color: 0xffffff });
+        this.shapes = { cone: new THREE.Mesh(cone, matte), ball: new THREE.Mesh(ball, new THREE.MeshBasicMaterial({ color: 0xffffff })),
+                        disc: new THREE.Mesh(disc, matte), star: new THREE.Mesh(star, new THREE.MeshBasicMaterial({ color: 0xFFE27A })), drift: matte };
+      }
+      return this.shapes;
+    }
+    build(th) {
+      var services = this.services, group = services.stage.arenaGroup;
+      this.addHouses(group);
+      this.addSnowmen(group);
+      this.addCenterTree(group);
+      this.addDrifts(group);
+      this.addShrubs(th);
+      if (!services.props.sceneryWanted()) return;
+      var scenery = services.arenaView.scenery.group = new THREE.Group();
+      group.add(scenery);
+      this.addScenery(scenery);
+    }
+    prop(name) { return this.services.models.kit.props[name]; }
+    facingCenter(z) { return z < ArenaSize.MH / 2 ? 0 : Math.PI; }
+    addHouses(group) {
+      var services = this.services;
+      services.arenaMap.tileRects("#").forEach((rect) => {
+        group.add(services.props.fitProp(this.prop("snowHouse"), rect.w * 1.34, SnowPlazaProps.HOUSE_H, rect.h * 1.34, rect.x, rect.y, this.facingCenter(rect.y)));
+      });
+    }
+    addSnowmen(group) {
+      var services = this.services;
+      services.arenaView.tilesOf("x").forEach((tile) => {
+        var x = services.arenaMap.tileX(tile[0]), z = services.arenaMap.tileY(tile[1]);
+        group.add(services.props.fitProp(this.prop("snowman"), ArenaSize.TILE * 2, SnowPlazaProps.SNOWMAN_H, ArenaSize.TILE * 1.15, x, z, this.facingCenter(z)));
+      });
+    }
+    pineParts(parts, x, z, width, depth, height, lift) {
+      for (var tier = 0; tier < 3; tier++) {
+        var k = 1 - tier * 0.24;
+        parts.push({ w: width * k, h: height * 0.42, d: depth * k, x: x, y: lift + height * (0.1 + 0.24 * tier), z: z, color: tier === 1 ? SnowPlazaProps.PINE_DEEP : SnowPlazaProps.PINE_GREEN });
+      }
+      var cap = 0.52 * (0.2 / 0.42) * 1.1;
+      parts.push({ w: width * cap, h: height * 0.2, d: depth * cap, x: x, y: lift + height * 0.805, z: z, color: SnowPlazaProps.SNOW });
+    }
+    addCenterTree(group) {
+      var services = this.services, rect = services.arenaMap.tileRects("t");
+      if (!rect.length) return;
+      var left = Math.min(...rect.map((r) => r.x - r.w / 2)), right = Math.max(...rect.map((r) => r.x + r.w / 2));
+      var top = Math.min(...rect.map((r) => r.y - r.h / 2)), bottom = Math.max(...rect.map((r) => r.y + r.h / 2));
+      var x = (left + right) / 2, z = (top + bottom) / 2, width = right - left, depth = bottom - top;
+      var shapes = this.templates(), props = services.props, parts = [], balls = [], height = SnowPlazaProps.TREE_H;
+      group.add(props.instancedProp(shapes.disc, [{ w: width, h: 12, d: depth, x: x, z: z, color: SnowPlazaProps.SNOW }]));
+      this.pineParts(parts, x, z, width * 0.86, depth * 0.96, height, 8);
+      group.add(props.instancedProp(shapes.cone, parts));
+      [[0.17, 0.4, 11], [0.41, 0.29, 8], [0.65, 0.19, 5]].forEach((ring, row) => {
+        for (var i = 0; i < ring[2]; i++) {
+          var angle = i / ring[2] * Math.PI * 2 + row * 0.4;
+          balls.push({ w: 11, h: 11, d: 11, x: x + Math.cos(angle) * width * ring[1] * 0.9, y: 8 + height * ring[0], z: z + Math.sin(angle) * depth * ring[1],
+                       color: SnowPlazaProps.ORNAMENTS[(i + row) % SnowPlazaProps.ORNAMENTS.length] });
+        }
+      });
+      group.add(props.instancedProp(shapes.ball, balls));
+      group.add(props.instancedProp(shapes.star, [{ w: 22, h: 28, d: 22, x: x, y: height + 4, z: z }]));
+      var half = ArenaSize.TILE / 2, index = 0;
+      [[left + half, top + half], [right - half, top + half], [left + half, bottom - half], [right - half, bottom - half]].forEach((corner) => {
+        [[-6, -4, 30], [12, 10, 21]].forEach((gift) => {
+          var name = SnowPlazaProps.GIFTS[index++ % SnowPlazaProps.GIFTS.length];
+          group.add(this.uniform(name, gift[2], corner[0] + gift[0], corner[1] + gift[1], props.quarterTurn()));
+        });
+      });
+    }
+    uniform(name, height, x, z, yaw) { return this.services.propThemes.uniformProp(this.prop(name), height, x, z, yaw); }
+    addDrifts(group) {
+      var services = this.services, props = services.props, piles = [[], []];
+      services.arenaView.borderTiles().forEach((tile) => {
+        piles[props.seeded() < 0.5 ? 0 : 1].push({ w: ArenaSize.TILE * 1.16, h: 24 + props.seeded() * 18, d: ArenaSize.TILE * 1.16,
+          x: services.arenaMap.tileX(tile[0]), z: services.arenaMap.tileY(tile[1]), yaw: props.quarterTurn(),
+          color: SnowPlazaProps.DRIFT[Math.floor(props.seeded() * SnowPlazaProps.DRIFT.length)] });
+      });
+      ["snowRockA", "snowRockB"].forEach((name, i) => {
+        if (piles[i].length) group.add(props.instancedProp(this.prop(name), piles[i], this.templates().drift));
+      });
+    }
+    addShrubs(th) {
+      var services = this.services, props = services.props, bush = this.prop("bushBig");
+      services.arenaPaint.hideVolumes(th, (volume) => {
+        var mat = new THREE.MeshLambertMaterial({ color: 0xffffff, transparent: true });
+        var list = [];
+        volume.tiles.forEach((tile) => {
+          var size = ArenaSize.TILE * (1.3 + props.seeded() * 0.15), yaw = props.seeded() * 6.28;
+          var x = services.arenaMap.tileX(tile[0]) + (props.seeded() - 0.5) * 8, z = services.arenaMap.tileY(tile[1]) + (props.seeded() - 0.5) * 8;
+          list.push({ w: size, h: 48 + props.seeded() * 10, d: size, x: x, z: z, yaw: yaw, color: SnowPlazaProps.SHRUB });
+          list.push({ w: size * 0.46, h: 14, d: size * 0.46, x: x, y: 44, z: z, yaw: yaw, color: SnowPlazaProps.SNOW });
+        });
+        return { mesh: props.instancedProp(bush, list, mat), mat: mat, full: 1 };
+      });
+    }
+    addScenery(group) {
+      var services = this.services, props = services.props, pines = [];
+      for (var z = -160; z <= ArenaSize.MH + 160; z += 150) {
+        [-120 - props.seeded() * 90, ArenaSize.MW + 120 + props.seeded() * 90].forEach((x) => {
+          var height = 190 + props.seeded() * 90;
+          this.pineParts(pines, x, z + props.seeded() * 50, height * 0.62, height * 0.62, height, 0);
+        });
+      }
+      group.add(props.instancedProp(this.templates().cone, pines));
+      [[-330, 260], [-340, 900], [ArenaSize.MW + 330, 450], [ArenaSize.MW + 340, 1100]].forEach((spot) => {
+        group.add(this.uniform("snowHouse", 190, spot[0], spot[1], spot[0] < 0 ? Math.PI / 2 : -Math.PI / 2));
+      });
+      [140, ArenaSize.MH / 2, ArenaSize.MH - 140].forEach((z) => {
+        [-52, ArenaSize.MW + 52].forEach((x) => { group.add(this.uniform("snowLamp", 96, x, z, x < 0 ? Math.PI / 2 : -Math.PI / 2)); });
+      });
+      [[-70, 420], [ArenaSize.MW + 70, 930]].forEach((spot) => { group.add(this.uniform("snowman", 74, spot[0], spot[1], spot[0] < 0 ? Math.PI / 2 : -Math.PI / 2)); });
+      [[-66, 760], [ArenaSize.MW + 66, 590]].forEach((spot) => { group.add(this.uniform("snowPile", 34, spot[0], spot[1], props.quarterTurn())); });
     }
   }
   class FighterView {
@@ -14625,7 +14769,11 @@ SinglePassMaterials.enable(THREE);
                      floor: ["#81B853", "#8CC25B"], wallFloor: "#6F7A5A", hideFloor: "#5E9640",
                      fleck: ["rgba(255,255,230,.10)", "rgba(30,60,20,.10)"], line: "rgba(40,70,30,.10)" };
     static THEMES = {
-    forest: MapThemes.GRASS_LOOK,
+    snow: Object.assign({}, MapThemes.GRASS_LOOK, { sky: 0x9FB6D4, outer: 0xC9D8EA, ambient: 1.35, sun: 0xFFF1DC, sunI: 1.75,
+                                           floor: ["#CBD9EA", "#D3E0EF"], wallFloor: "#AFC0D6", hideFloor: "#9DB8CC", rockShade: "86,110,148",
+                                           fleck: ["rgba(255,255,255,.35)", "rgba(80,110,160,.10)"], line: "rgba(60,90,140,.10)",
+                                           flowers: ["rgba(255,255,255,.9)", "rgba(244,250,255,.9)"], plaza: ["#BFAE93", "#B3A185"],
+                                           noCenterMark: true, snowy: true }),
     river: Object.assign({}, MapThemes.GRASS_LOOK, { water: "#3E9FC4", waterHi: "rgba(210,245,255,.45)", bank: "#D8C58E", bridgeFloor: "#9C6B45", noCenterMark: true }),
     dungeon: { sky: 0x16131B, outer: 0x1C1922, ambient: 1.15, sun: 0xFFE2B8, sunI: 1.7, dungeon: true,
                floor: ["#6B6762", "#625E59"], wallFloor: "#34313A", hideFloor: "#2B2533",
@@ -15949,6 +16097,7 @@ SinglePassMaterials.enable(THREE);
       services.modelStyle = new ModelStyle(services);
       services.props = new PropBuilder(services);
       services.propThemes = new PropThemes(services);
+      services.snowPlaza = new SnowPlazaProps(services);
       services.fighterView = new FighterView(services);
       services.fighterMotion = new FighterMotion(services);
       services.fighterAuras = new FighterAuras(services);
@@ -16011,7 +16160,7 @@ SinglePassMaterials.enable(THREE);
   class ServiceBoot {
     constructor(services) { this.services = services; }
     connect() { var services = this.services;
-    services.arenaMap.load("forest");
+    services.arenaMap.load("snow");
     services.nick.bindProfileEvents();
     services.backend.connect();
     if (services.backend.db) services.backend.db.ref(".info/serverTimeOffset").on("value", function (s) { services.clock.serverOffset = s.val() || 0; });

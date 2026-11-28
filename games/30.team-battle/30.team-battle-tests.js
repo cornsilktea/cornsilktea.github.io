@@ -1,3 +1,32 @@
+class FixedTestArena {
+  static ID = "forest";
+  static HOST = "snow";
+  static BLUE_HALF = [
+    "................",
+    "................",
+    "................",
+    "...##......##...",
+    '""............""',
+    '"""....##...."""',
+    '""".........."""',
+    "....#......#....",
+    '....#..""..#....',
+    '.##....""....##.',
+    "................",
+    '..""...##...""..',
+    '..""........""..'
+  ];
+  static install(api) {
+    var load = api.loadMapData, host = api.MAPS[FixedTestArena.HOST];
+    api.loadMapData = function (id) {
+      if (id !== FixedTestArena.ID) return load(id);
+      var real = host.blueHalf;
+      host.blueHalf = FixedTestArena.BLUE_HALF;
+      try { return load(FixedTestArena.HOST); } finally { host.blueHalf = real; }
+    };
+  }
+}
+
 class ResultCollector {
   constructor(api) { this.api = api; }
 
@@ -1993,7 +2022,7 @@ class ResultCollector {
 
   run(DRAFTG, "매칭 화면: 맵이 랜덤인 방에서도 선수 승률·많이 고른 캐릭터를 그리는가", function (done) {
     var V = api.VERSUS, bad = [], name = "";
-    if (V.mapName({ map: "forest" }) !== api.MAPS.forest.name) bad.push("정해진 맵 이름 " + V.mapName({ map: "forest" }));
+    if (V.mapName({ map: "snow" }) !== api.MAPS.snow.name) bad.push("정해진 맵 이름 " + V.mapName({ map: "snow" }));
     try { name = V.mapName({ map: "random" }); } catch (e) { bad.push("랜덤 맵에서 오류: " + e.message); }
     if (!name) bad.push("랜덤 맵 이름이 비어 있음");
     var person = { nick: "가", ai: false, me: true, card: { g: 10, w: 5, top: [{ c: "knight", n: 4, w: 2 }] } };
@@ -3658,7 +3687,7 @@ class ResultCollector {
   function person(nickname, team, joinedAt, charIndex, isAI) { return { nickname: nickname, isAI: !!isAI, team: team, characterType: HUMAN_CHARS[charIndex], joinedAt: joinedAt }; }
   function roomTree(code, players, over) {
     var first = Object.keys(players).filter(function (id) { return !players[id].isAI; })[0];
-    var node = { mode: "pvp", map: "forest", arena: "forest", status: "lobby", hostPlayerId: first || null, createdAt: Date.now(), players: players };
+    var node = { mode: "pvp", map: "snow", arena: "snow", status: "lobby", hostPlayerId: first || null, createdAt: Date.now(), players: players };
     Object.keys(over || {}).forEach(function (k) { node[k] = over[k]; });
     var tree = { teambattle: { rooms: {} } };
     tree.teambattle.rooms[code] = node;
@@ -3690,7 +3719,7 @@ class ResultCollector {
       if (!await waitFor(function () { return !!api.room(); })) { done("fail", "방이 안 만들어짐: " + startMessage()); return; }
       var room = api.room(), node = fake.get(ROOMS + "/" + room.code) || {}, mine = (node.players || {})[me()] || {};
       if (!/^\d{5}$/.test(room.code)) bad.push("코드 모양 " + room.code);
-      if (node.mode !== "pvp" || node.map !== "random" || node.arena !== "forest" || node.status !== "lobby") bad.push("기본 설정 " + JSON.stringify([node.mode, node.map, node.arena, node.status]));
+      if (node.mode !== "pvp" || node.map !== "random" || node.arena !== "snow" || node.status !== "lobby") bad.push("기본 설정 " + JSON.stringify([node.mode, node.map, node.arena, node.status]));
       if (node.hostPlayerId !== me() || typeof node.createdAt !== "number" || node.timeScale !== undefined) bad.push("방장·시각 기록(시간 배율은 더 이상 방에 저장하지 않음)");
       if (mine.team !== "blue" || mine.isAI !== false || mine.nickname !== "나" || mine.characterType !== api.FALLBACK_CHAR || typeof mine.joinedAt !== "number") bad.push("내 기록 " + JSON.stringify(mine));
       ["players/", "ping/", "pong/"].forEach(function (k) { if (fake.disconnects.indexOf(ROOMS + "/" + room.code + "/" + k + me()) < 0) bad.push(k + " 끊김 정리가 등록 안 됨"); });
@@ -4262,7 +4291,7 @@ class ResultCollector {
         if (row !== rows[rows.length - 1 - r].split("").reverse().join("")) bad.push((r + 1) + "행이 점대칭이 아님");
       });
       var o = api.obstacles();
-      var blocking = 0; rows.forEach(function (row) { for (var c = 0; c < row.length; c++) if ("#xo".indexOf(row.charAt(c)) >= 0) blocking++; });
+      var blocking = 0; rows.forEach(function (row) { for (var c = 0; c < row.length; c++) if ("#xot".indexOf(row.charAt(c)) >= 0) blocking++; });
       var areaOf = function (list) { return list.reduce(function (s, q) { return s + q.w * q.h; }, 0); };
       if (areaOf(o.walls) !== blocking * api.TILE * api.TILE) bad.push("벽 면적이 글자 수와 다름 " + areaOf(o.walls) + " vs " + blocking * api.TILE * api.TILE);
       var water = 0; rows.forEach(function (row) { for (var c = 0; c < row.length; c++) if (row.charAt(c) === "~") water++; });
@@ -4286,13 +4315,13 @@ class ResultCollector {
       done(bad.length ? "fail" : "pass", bad.length ? bad.slice(0, 4).join(" / ") : "벽 " + o.walls.length + "·물 " + o.water.length + "·덤불 " + bush + "칸, 출발 자리 6곳 비어 있음");
     });
   });
-  run(MAPG, "맵 데이터: 없는 맵 이름은 숲속 공터로 읽고, 반쪽 지도 합치기(fullMap)는 가운데 줄을 한 번만 쓰는가", function (done) {
+  run(MAPG, "맵 데이터: 없는 맵 이름은 눈 마을 광장로 읽고, 반쪽 지도 합치기(fullMap)는 가운데 줄을 한 번만 쓰는가", function (done) {
     api.loadMapData("없는맵");
     var bad = [];
-    if (api.currentMap() !== "forest") bad.push("없는 맵 → " + api.currentMap());
+    if (api.currentMap() !== "snow") bad.push("없는 맵 → " + api.currentMap());
     var full = api.fullMap(["aa", "bc", "de"]);
     if (full.join("|") !== "aa|bc|de|cb|aa") bad.push("합친 결과 " + full.join("|"));
-    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "숲속 공터로 대체, 합치기 aa|bc|de|cb|aa");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(" / ") : "눈 마을 광장로 대체, 합치기 aa|bc|de|cb|aa");
   });
 
   var NETG = "상태 주고받기", JUDGEG = "경기 진행·판정", CATG = "캐릭터 정보·설명", TIMEG = "시간 배율", SCRG = "화면 전환", STATSVG = "통계 창", SOUNDG = "소리", NICKG = "닉네임";
@@ -5070,7 +5099,7 @@ class ResultCollector {
   });
   runAsync(LAUNCHG, "연습장 봇 자리(practiceSpots): 봇 3자리가 맵 안·벽 밖이고 서로 떨어져 있으며 연습장은 정해진 자리를 쓰는가", async function (done) {
     var bad = [];
-    ["forest", "river", "dungeon", "windhill"].forEach(function (id) {
+    ["snow", "river", "dungeon", "windhill"].forEach(function (id) {
       api.loadMapData(id);
       var spots = api.practiceSpots(id, "blue");
       if (spots.length !== api.PRACTICE_BOTS.length) bad.push(id + " 자리 수 " + spots.length);
@@ -5253,7 +5282,7 @@ class ResultCollector {
       modal.hidden = false; modal.dispatchEvent(new MouseEvent("click", { bubbles: true })); if (!modal.hidden) bad.push("바깥을 누르면 닫혀야 함");
       document.getElementById("btnMapView").click();
       var grid = document.getElementById("mapViewGrid");
-      if (document.getElementById("mapViewModal").hidden || grid.querySelectorAll("figure").length !== api.MAP_IDS.length || grid.innerHTML.indexOf("img/teambattle/maps/forest.webp") < 0) bad.push("맵 보기 창");
+      if (document.getElementById("mapViewModal").hidden || grid.querySelectorAll("figure").length !== api.MAP_IDS.length || grid.innerHTML.indexOf("img/teambattle/maps/snow.webp") < 0) bad.push("맵 보기 창");
       document.getElementById("btnMapViewClose").click();
     });
     ["statsModal", "mapViewModal"].forEach(function (id) { document.getElementById(id).hidden = true; });
@@ -5318,7 +5347,7 @@ class ResultCollector {
     done(kinds.length ? "fail" : "pass", "출전: " + roster + " / 킬 " + r.kills + ", 궁극기 " + r.ults + "번" +
       (kinds.length ? " / 규칙 위반: " + kinds.map(function (k) { return k + " " + r.issues[k].n + "번 (처음: " + r.issues[k].first + ")"; }).join("; ") : " / 규칙 위반 없음(벽 안·결계 밖 탈출 포함)"));
   });
-  run(AUTO, "AI 6명 60초 난전 — 숲 맵 + 방패병 고정 (시드 2045)", function (done) {
+  run(AUTO, "AI 6명 60초 난전 — 시험장 맵 + 방패병 고정 (시드 2045)", function (done) {
     var r = autoMelee("forest", 60, 2045, "shielder"), kinds = Object.keys(r.issues);
     var roster = r.list.map(function (e) { return api.CHARS[e.char].name; }).join("·");
     done(kinds.length ? "fail" : "pass", "출전: " + roster + " / 킬 " + r.kills + ", 궁극기 " + r.ults + "번" +
@@ -5334,7 +5363,7 @@ class ResultCollector {
     var r = autoMelee("dungeon", 60, 2043, "marina"), kinds = Object.keys(r.issues);
     done(kinds.length ? "fail" : "pass", kinds.length ? kinds.join(" / ") : "문제 없음");
   });
-  run(AUTO, "AI 6명 60초 난전 — 숲 맵 + 선봉장 고정 (시드 2042)", function (done) {
+  run(AUTO, "AI 6명 60초 난전 — 시험장 맵 + 선봉장 고정 (시드 2042)", function (done) {
     var r = autoMelee("forest", 60, 2042, "bearer"), kinds = Object.keys(r.issues);
     done(kinds.length ? "fail" : "pass", kinds.length ? kinds.join(" / ") : "문제 없음");
   });
@@ -6140,7 +6169,7 @@ class HookPathTests {
         done(ok ? "pass" : "fail", p.kind + ", 끝 (" + p.ex.toFixed(1) + "," + p.ey.toFixed(1) + "), 이동 " + p.dist.toFixed(1));
       });
     });
-    ["forest", "river", "dungeon", "windhill", "practice"].forEach(function (map, i) {
+    ["snow", "river", "dungeon", "windhill", "practice"].forEach(function (map, i) {
       run(G, "무작위 경로 불변식 — " + map + " " + HookPathTests.PAIRS_PER_MAP + "쌍: 설 수 있음·벽 통과 없음·직선 위·길이·재현·막힘·이름·숫자·강 건너기", function (done) {
         api.loadMapData(map);
         var rnd = self.random(7300 + i * 31), bad = [], made = 0, kinds = { full: 0, partial: 0, none: 0 };
@@ -7543,7 +7572,7 @@ class MarinaTests {
       var bad = [];
       api.loadMapData("practice");
       if (!allFull(L.plan(MarinaTests.X, MarinaTests.Y, Math.PI / 2))) bad.push("연습장 " + L.plan(MarinaTests.X, MarinaTests.Y, Math.PI / 2));
-      var maps = ["forest", "river", "dungeon", "windhill"], found = null;
+      var maps = ["snow", "river", "dungeon", "windhill"], found = null;
       for (var i = 0; i < maps.length && !found; i++) found = self.spotWhere(maps[i], function (lens) { return lens.slice(0, ULT.mrLanes - 2).every(function (n) { return n === ULT.mrLen; }) && lens.slice(ULT.mrLanes - 2).every(function (n) { return n > 0 && n < ULT.mrLen; }); });
       if (!found) bad.push("오른쪽 2칸만 막히는 자리를 못 찾음");
       self.verdict(done, bad, found ? "일부 칸만 막힘 예 " + found.map + " " + found.lens.join(",") : "");
@@ -8778,6 +8807,7 @@ class TestPanel {
 }
 
 export function runTeamBattleTests(api) {
+  FixedTestArena.install(api);
   function once() {
     if (!api.isIdle()) { alert("방에 들어가 있지 않은 첫 화면에서만 검사할 수 있어요."); return; }
     var mapBefore = api.currentMap(), started = performance.now(), results, offsetBefore = api.CLOCK.serverOffset;
