@@ -5205,7 +5205,7 @@ SinglePassMaterials.enable(THREE);
       akCast: 450, akMin: 60, akR: 180, akDelay: GameTime.gameMs(0.4), akDur: GameTime.gameMs(5), akDmg: 30, akEdgeDmg: 20, akStunMs: GameTime.gameMs(1),
       akPullMs: GameTime.gameMs(0.3), akEdgeGapMs: GameTime.gameMs(1), akSlowMul: 0.6
     };
-    static STATS = { name: "아르카", role: "caster", icon: "🏮", hp: 120, speed: GameTime.gameSpeed(170), cd: GameTime.gameMs(1.4), dmg: 15, range: 350, pSpeed: GameTime.gameSpeed(1000), pr: 9,
+    static STATS = { name: "아르카", role: "caster", icon: "🏮", hp: 120, speed: GameTime.gameSpeed(170), cd: GameTime.gameMs(1.4), dmg: 15, range: 350, pSpeed: 1000, pr: 9,
                impededBonus: 0.5, ultName: "결계", ultAim: true };
     constructor(services, id) { super(services, id); this.lantern = new ArcaLantern(); }
     get shotName() { return "등불 구슬"; }
@@ -6520,6 +6520,7 @@ SinglePassMaterials.enable(THREE);
       R.lim = Math.max(inner, Math.min(R.lim, d));
       if (d <= R.lim + BarrierSystem.EDGE_SLACK) return;
       this.pinTo(T, R, R.lim);
+      services.physics.resolve(T);
       T.mv = false;
       this.haltMoves(T, t);
       this.touchEdge(T, R, t);
