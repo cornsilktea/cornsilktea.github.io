@@ -322,7 +322,7 @@
 <script charset="utf-8" src="common/character-maker.js?v=20261116a"></script>
 <script>new CharacterMakerDialog(undefined, false);</script>
 <script charset="utf-8" src="common/account-match-kit.js?v=20261103e"></script>
-<script charset="utf-8" src="common/account-stats.js?v=20261109a"></script>
+<script charset="utf-8" src="common/account-stats.js?v=20261128a"></script>
 <script charset="utf-8" src="games/30.team-battle/30.team-battle-versus.js?v=20261104a"></script>
 <script charset="utf-8" src="games/30.team-battle/30.team-battle-fx.js?v=20261125hunter"></script>
 <script charset="utf-8" src="games/30.team-battle/patch-notes.js?v=20261127a"></script>
@@ -14183,7 +14183,9 @@ SinglePassMaterials.enable(THREE);
     static MVP_STUN_PER_SEC = 40;
     static MVP_SLOW_PER_SEC = 20;
     static MVP_ASSIST = 80;
-    static MVP_HEAL = 0.7;
+    static MVP_DAMAGE = 0.5;
+    static MVP_HEAL = 0.5;
+    static MVP_BLOCK = 0.5;
     constructor(services) { this.services = services; this.roster = new ResultRoster(services); }
     boardRows(list, myId) { var services = this.services;
       var rows = "", redStarted = false, mine = list ? myId : services.session.myId;
@@ -14205,7 +14207,7 @@ SinglePassMaterials.enable(THREE);
     secText(v) { var services = this.services; return v > 0 ? services.netstate.oneDecimal(v) + "초" : "-"; }
     scoreText(v) { return v > 0 ? (Math.round(v * 10) / 10).toFixed(1) : "-"; }
     mvpScore(E) { var services = this.services;
-      return E.kills * 100 + (E.assists || 0) * ResultBoard.MVP_ASSIST + Math.round(E.dmg) + Math.round(Math.round(E.heal || 0) * ResultBoard.MVP_HEAL) + Math.round(E.blocked || 0)
+      return E.kills * 100 + (E.assists || 0) * ResultBoard.MVP_ASSIST + Math.round(Math.round(E.dmg) * ResultBoard.MVP_DAMAGE) + Math.round(Math.round(E.heal || 0) * ResultBoard.MVP_HEAL) + Math.round(Math.round(E.blocked || 0) * ResultBoard.MVP_BLOCK)
         + Math.round(services.netstate.oneDecimal(E.stunDealt) * ResultBoard.MVP_STUN_PER_SEC) + Math.round(services.netstate.twoDecimals(E.slowWeight) * ResultBoard.MVP_SLOW_PER_SEC) - E.deaths * 100;
     }
     mvpHtml(list) { var services = this.services;
@@ -14225,7 +14227,7 @@ SinglePassMaterials.enable(THREE);
     }
     scoreHelpHtml() {
       var items = [
-        ["처치 1번", "+100"], ["어시스트 1번", "+" + ResultBoard.MVP_ASSIST], ["입힌 피해 1", "+1"], ["회복 1", "+" + ResultBoard.MVP_HEAL], ["막은 피해 1", "+1"],
+        ["처치 1번", "+100"], ["어시스트 1번", "+" + ResultBoard.MVP_ASSIST], ["입힌 피해 1", "+" + ResultBoard.MVP_DAMAGE], ["회복 1", "+" + ResultBoard.MVP_HEAL], ["막은 피해 1", "+" + ResultBoard.MVP_BLOCK],
         ["기절 1초", "+" + ResultBoard.MVP_STUN_PER_SEC], ["둔화 1초 × 둔화율", "+" + ResultBoard.MVP_SLOW_PER_SEC], ["쓰러짐 1번", "−100"]
       ];
       return "<table>" + items.map(function (item) {

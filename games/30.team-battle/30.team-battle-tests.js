@@ -7275,7 +7275,7 @@ class BannerBearerTests {
       cap.updates.length = 0;
       cap.pushes.filter(function (p) { return p.path === "hits/" + me; }).forEach(function (p, i) { api.onHit({ key: "end" + i, val: function () { return p.v; }, ref: { parent: { key: me }, remove: function () {} } }); });
       if (B.dmg !== 20 || B.blocked !== 20) bad.push("선봉장 기록 " + B.dmg + "·" + B.blocked);
-      if (Math.abs(api.mvpScore(B) - scoreBefore - 40) > 1e-6) bad.push("MVP 점수 차이 " + (api.mvpScore(B) - scoreBefore));
+      if (Math.abs(api.mvpScore(B) - scoreBefore - 20) > 1e-6) bad.push("MVP 점수 차이 " + (api.mvpScore(B) - scoreBefore));
       if (!cap.updates.length) bad.push("상태를 보내지 않음");
       if (cap.sets.some(function (x) { return x.path === "done/" + me; })) bad.push("켜진 판인데 도착 기록을 바로 씀");
       var W2 = self.scene([{ id: me, team: "blue", char: "bearer", x: 300, slot: 1 }, { id: "foe", x: 500, slot: 1 }]), cap2 = kit.recordRef(W2), B2 = W2.ent(me);

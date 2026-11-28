@@ -512,18 +512,22 @@ interface TeamBattleCharLabel {
 /* 결과 창 환산점수 식(30번 ResultBoard.mvpScore 와 같은 식 — &test 가 둘이 같은 값을 내는지 본다).
    최근 매치 목록·교사 화면은 저장된 줄로 다시 계산한다(점수는 저장하지 않음, 5-2b).
    2026-10-29 v3 패치에서 어시스트 50→80·회복 1→0.7·기절 60→40·둔화 40→20 으로 바꿨다(선생님 결정).
-   지난 경기 계정 통계는 그때 제어판 도구로 새 식에 맞춰 다시 셌다(도구는 쓰고 나서 지움, git 기록에 있음) */
+   지난 경기 계정 통계는 그때 제어판 도구로 새 식에 맞춰 다시 셌다(도구는 쓰고 나서 지움, git 기록에 있음).
+   2026-11-28 입힌 피해·회복·막은 피해를 모두 1당 0.5점으로 바꿨고(선생님 결정) v7 경기 기록만 고쳤다 */
 class TeamBattleScore {
   static readonly KILL = 100;
   static readonly ASSIST = 80;
   static readonly DEATH = 100;
-  static readonly HEAL = 0.7;
+  static readonly DAMAGE = 0.5;
+  static readonly HEAL = 0.5;
+  static readonly BLOCK = 0.5;
   static readonly STUN_PER_SEC = 40;
   static readonly SLOW_PER_SEC = 20;
 
   static of(line: AccountPlayerLine): number {
     return line.kills * TeamBattleScore.KILL + (line.assists || 0) * TeamBattleScore.ASSIST
-      + Math.round(line.dmg) + Math.round(Math.round(line.heal || 0) * TeamBattleScore.HEAL) + Math.round(line.blocked || 0)
+      + Math.round(Math.round(line.dmg) * TeamBattleScore.DAMAGE) + Math.round(Math.round(line.heal || 0) * TeamBattleScore.HEAL)
+      + Math.round(Math.round(line.blocked || 0) * TeamBattleScore.BLOCK)
       + Math.round(AccountNumbers.oneDecimal(line.stun) * TeamBattleScore.STUN_PER_SEC)
       + Math.round(AccountNumbers.twoDecimals(line.slowWeight) * TeamBattleScore.SLOW_PER_SEC)
       - line.deaths * TeamBattleScore.DEATH;
