@@ -2586,7 +2586,7 @@ SinglePassMaterials.enable(THREE);
     basicHitMark(d) { return !d.isSkill; }
     afterProjectileHit(d, T, immune) {}
     skillGuard(T, amount, t) { return amount; }
-    tallyBlocked(T, unguarded, amount) {}
+    tallyBlocked(T, unguarded, amount) { T.blocked = (T.blocked || 0) + Math.min(unguarded, T.hp) - Math.min(amount, T.hp); }
     stepPassive(T, t) {}
     afterDealtDamage(T, owner, ultKey, t) {}
     afterStrike(T, d) {}
@@ -2785,7 +2785,6 @@ SinglePassMaterials.enable(THREE);
     static STATS = { name: "기사", role: "fighter", icon: "🛡️", hp: 400, speed: GameTime.gameSpeed(150), cd: GameTime.gameMs(1.5), dmg: 28, range: 110, arc: Math.PI * 0.7, armor: 2, ultName: "방어태세", blocks: true };
     get heavyStrikeSpark() { return true; }
     skillGuard(T, amount, t) { return T.buffUntil > t ? Math.round(amount * KnightType.ULT.tkDef) : amount; }
-    tallyBlocked(T, unguarded, amount) { T.blocked = (T.blocked || 0) + Math.min(unguarded, T.hp) - Math.min(amount, T.hp); }
     addMarkers(v, root, body) { v.skillAura = this.services.arenaFx.guardAuras.attachTo(root); }
     skillAuraOn(E, t) { return E.buffUntil > t; }
     drawsOwnStrike(d) { return !!d.slam; }
@@ -3218,7 +3217,7 @@ SinglePassMaterials.enable(THREE);
     static ULT = {
       lnWind: GameTime.gameMs(0.8), lnLen: 350, lnW: 108, lnDmg: 75, lnStunMs: GameTime.gameMs(1.7)
     };
-    static STATS = { name: "창술사", role: "fighter", icon: "🔱", hp: 390, speed: GameTime.gameSpeed(150), cd: GameTime.gameMs(1.5), dmg: 32, range: 200, width: 50, respawnShield: true, ultName: "꿰뚫기", ultAim: true };
+    static STATS = { name: "창술사", role: "fighter", icon: "🔱", hp: 390, speed: GameTime.gameSpeed(150), cd: GameTime.gameMs(1.5), dmg: 32, range: 200, width: 50, respawnShield: true, ultName: "꿰뚫기", ultAim: true, blocks: true };
     addMarkers(v, root, body) { v.guardOrbit = new LancerShieldOrbit(this.services, root); }
     isLancerWinding(E, t) { return E.ultUntil > t; }
     isRooted(E, t) { return this.isLancerWinding(E, t); }
@@ -3834,7 +3833,6 @@ SinglePassMaterials.enable(THREE);
     isGolem(E, t) { return E.buffUntil > t && t >= E.buffUntil - GiantType.ULT.gjDur; }
     usesAltModel(E, t) { return this.isGolem(E, t); }
     skillGuard(T, amount, t) { return this.isGolem(T, t) ? Math.round(amount * GiantType.ULT.gjDef) : amount; }
-    tallyBlocked(T, unguarded, amount) { T.blocked = (T.blocked || 0) + Math.min(unguarded, T.hp) - Math.min(amount, T.hp); }
     isHammerLeaping(E, t) { return E.ultUntil > t && !this.isGolem(E, t); }
     isRooted(E, t) { return this.isHammerLeaping(E, t); }
     cannotAttack(E, t) { return this.isHammerLeaping(E, t); }
@@ -8210,6 +8208,16 @@ SinglePassMaterials.enable(THREE);
       var f = { k: "txt", x: hit.x, y: hit.y, s: this.label(n), c: ShieldBlockPopups.COLOR, t: now, life: 800 };
       services.match.fx.push(f);
       this.last[id] = { f: f, sum: n, at: now };
+    }
+  }
+  class ShieldBreakNotice {
+    static FRESH_MS = 500;
+    constructor(services) { this.services = services; this.seen = {}; }
+    watch(E) {
+      var now = Date.now(), before = this.seen[E.id], blocked = E.blocked || 0;
+      this.seen[E.id] = { shield: !!E.shield, blocked: blocked, at: now };
+      if (!before || !before.shield || E.shield || now - before.at > ShieldBreakNotice.FRESH_MS || !(blocked > before.blocked)) return;
+      this.services.shieldWalls.popups.pop({ G: { E: E }, x: E.x, y: E.y }, blocked - before.blocked);
     }
   }
   class ShieldWallSystem {
@@ -14011,6 +14019,7 @@ SinglePassMaterials.enable(THREE);
           else services.fxView.floatText(E.x, E.y, "+" + d, "#2FB35A");
         }
         services.match.lastHp[id] = E.hp;
+        services.shieldBreak.watch(E);
         if (E.knockedAt && E.knockedAt !== v.knockSeen) { v.knockSeen = E.knockedAt; hurt = true; }
         var poisoned = E.alive && E.poisonUntil > t;
         if (poisoned && !v.poisonShown) services.fxView.floatText(E.x, E.y - 14, "중독", "#5FD35A");
@@ -15668,6 +15677,7 @@ SinglePassMaterials.enable(THREE);
       TURRET_MUZZLE_FORWARD: TurretSystem.MUZZLE_FORWARD, turretMuzzle: services.turrets.muzzleToward.bind(services.turrets), CHARS: services.charTypes.statsTable(), CHAR_LIST: services.charTypes.list, ULT: services.charTypes.skillTable(), ROLES: RoleKinds.TABLE, ROLE_LIST: RoleKinds.LIST, MAPS: MapCatalog.table(), roleGauge: function (c) { return services.catalog.gaugeOnHitOf(c); }, spawnOf: services.arenaMap.spawnOf.bind(services.arenaMap), BODY_R: ArenaSize.BODY_R, GAUGE_MAX: MatchRules.GAUGE_MAX, BOUND: ArenaSize.BOUND, MAP_IDS: MapCatalog.IDS, RESPAWN_MS: services.timescale.respawnMs, RESPAWN_PROTECT_MS: services.timescale.respawnProtectMs, myId: services.session.myId,
       VERSUS: services.versus,
       obstacles: function () { return { walls: services.arenaMap.obstacles, water: services.arenaMap.water }; },
+      watchShieldBreak: services.shieldBreak.watch.bind(services.shieldBreak),
       mapTopShot: function (id, pxW, pxH) {
         if (!services.cameraRig.renderer || !services.models.kit.propsReady) return null;
         services.arenaView.useArena(id);
@@ -16051,6 +16061,7 @@ SinglePassMaterials.enable(THREE);
       services.bladeSpins = new BladeSpins(services);
       services.melee = new MeleeSystem(services);
       services.shieldWalls = new ShieldWallSystem(services);
+      services.shieldBreak = new ShieldBreakNotice(services);
       services.dashMoves = new DashMoves(services);
       services.gargantuaSys = new GargantuaSystem(services);
       services.starfall = new StarfallSystem(services);

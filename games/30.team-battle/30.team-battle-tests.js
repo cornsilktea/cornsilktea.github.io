@@ -1345,6 +1345,28 @@ class ResultCollector {
     done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "시작·부활 시 보호막, 피해 30 막고 기절은 적용, 다음 피해는 그대로");
   });
 
+  run(PASSIVE2, "막은 피해: 창술사 보호막과 방패병 패시브로 줄인 양이 쌓이고, 보호막이 깨지면 \"막음\" 숫자가 뜨는가", function (done) {
+    var y = OPEN_Y.testfield;
+    var W = world("testfield", [
+      { id: "gd", team: "blue", char: "guardian", x: 250, y: y },
+      { id: "ln", team: "red", char: "lancer", x: 450, y: y },
+      { id: "sd", team: "red", char: "shielder", x: 700, y: y }
+    ]);
+    var ln = W.ent("ln"), sd = W.ent("sd"), bad = [], popped = 0;
+    api.MATCH.fx.length = 0;
+    api.watchShieldBreak(ln);
+    api.damage(ln, 30, "gd", false, null);
+    api.watchShieldBreak(ln);
+    api.MATCH.fx.forEach(function (f) { var m = f.k === "txt" && /^막음 (\d+)$/.exec(f.s); if (m) popped += +m[1]; });
+    if (ln.blocked !== 30) bad.push("창술사 막은 피해 " + ln.blocked);
+    if (popped !== 30) bad.push("막음 글자 " + popped);
+    api.damage(ln, 30, "gd", false, null);
+    if (ln.blocked !== 30) bad.push("보호막 없이 맞은 피해가 쌓임 " + ln.blocked);
+    api.damage(sd, 100, "gd", false, null);
+    if (sd.blocked !== 10 || sd.maxHp - sd.hp !== 90) bad.push("방패병 막은 피해 " + sd.blocked + " (받은 피해 " + (sd.maxHp - sd.hp) + ", 기대 10 / 90)");
+    done(bad.length ? "fail" : "pass", bad.length ? bad.join(", ") : "창술사 30·글자 30, 방패병 패시브 " + sd.blocked);
+  });
+
   run(PASSIVE2, "광전사: 체력 " + api.CHARS.warrior.rally.hpRate * 100 + "% 미만이 되면 " + api.secs(api.CHARS.warrior.rally.ms) + "간 1초당 " + api.CHARS.warrior.rally.perSec + " 회복하고, 죽기 전까지 다시 발동하지 않는가", function (done) {
     var y = OPEN_Y.testfield, R = api.CHARS.warrior.rally;
     var W = world("testfield", [
